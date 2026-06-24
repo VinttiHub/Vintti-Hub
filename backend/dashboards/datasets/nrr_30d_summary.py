@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from ._periods import window_bounds
+from ._mrr_staffing import HIRES_FULL_CTE, unit_snapshot
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -47,110 +48,88 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
 
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    # R5: NRR sobre el MOTOR CANÓNICO de MRR (mismo de Management/mrr_history):
+    # MRR efectivo por (candidato, cuenta) con dedup de opp primaria + salary_updates,
+    # para que "MRR inicial" reconcilie EXACTO con el GMRR de Management.
+    #   - base (mrr_inicial) = MRR canónico de la cohorte activa al INICIO (win_ini).
+    #   - upsell = nuevos hires cerrados en la ventana sobre cuentas de la cohorte.
+    #   - churn/downgrade = unidades de la cohorte que YA NO están activas al fin,
+    #     valuadas a su MRR canónico al inicio; downgrade = baja por layoffs/downsizing.
+    sql = f"""
         WITH ventana AS (
-          SELECT
-            %(corte)s::date                                AS cutoff,
-            %(win_ini)s::date    AS win_ini,
-            %(win_fin)s::date                                AS win_fin
+          SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
-        hires_full AS (
-          SELECT
-            ho.opportunity_id,
-            ho.candidate_id,
-            ho.account_id,
-            CASE
-              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(ho.start_date::text, '')::date
-            END AS start_d,
-            CASE
-              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-              WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
-              ELSE ho.end_date::date
-            END AS end_d,
-            COALESCE(ho.salary, 0)::numeric AS salary,
-            COALESCE(ho.fee,    0)::numeric AS fee,
-            TRIM(COALESCE(ho.inactive_reason::text, '')) AS inactive_reason,
-            o.opp_sales_lead,
-            o.opp_close_date::date AS opp_close_d
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE o.opp_model = 'Staffing'
-            AND (
-              CASE
-                WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                ELSE NULLIF(ho.start_date::text, '')::date
-              END
-            ) IS NOT NULL
-        ),
-        activos_cutoff AS (
-          SELECT DISTINCT ON (h.opportunity_id, h.candidate_id)
-            h.opportunity_id,
-            h.candidate_id,
-            h.salary,
-            h.fee
-          FROM ventana v
-          JOIN hires_full h
-            ON h.start_d <= v.win_fin
-           AND (h.end_d IS NULL OR h.end_d >= v.win_fin)
-          ORDER BY h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
-        ),
+        {HIRES_FULL_CTE},
+        {unit_snapshot('unit_ini', '%(win_ini)s::date')},
         mrr_base AS (
-          SELECT
-            SUM(
-              CASE
-                WHEN %(metric)s = 'Fee' THEN a.fee
-                ELSE (a.salary + a.fee)
-              END
-            )::numeric AS mrr_inicial
-          FROM activos_cutoff a
+          SELECT SUM(
+            CASE WHEN %(metric)s = 'Fee' THEN fee ELSE (salary + fee) END
+          )::numeric AS mrr_inicial
+          FROM unit_ini
         ),
-        upsells AS (
+        cohort_accounts AS (
+          SELECT DISTINCT account_id FROM unit_ini WHERE account_id IS NOT NULL
+        ),
+        active_fin AS (
+          SELECT DISTINCT h.candidate_id, h.account_id
+          FROM hires_full h CROSS JOIN ventana v
+          WHERE h.start_d <= v.win_fin AND (h.end_d IS NULL OR h.end_d >= v.win_fin)
+        ),
+        churn_units AS (
           SELECT
-            SUM(
-              CASE
-                WHEN %(metric)s = 'Fee' THEN h.fee
-                ELSE (h.salary + h.fee)
-              END
-            )::numeric AS upsells_lara
-          FROM ventana v
-          JOIN hires_full h
-            ON h.opp_sales_lead = 'lara@vintti.com'
-           AND h.opp_close_d IS NOT NULL
-           AND h.opp_close_d >  v.win_ini
-           AND h.opp_close_d <= v.win_fin
+            ui.candidate_id, ui.account_id, ui.salary, ui.fee,
+            (
+              SELECT TRIM(COALESCE(h.inactive_reason, ''))
+              FROM hires_full h CROSS JOIN ventana v
+              WHERE h.candidate_id = ui.candidate_id
+                AND h.account_id = ui.account_id
+                AND h.end_d IS NOT NULL
+                AND h.end_d > v.win_ini AND h.end_d <= v.win_fin
+              ORDER BY h.end_d DESC LIMIT 1
+            ) AS reason
+          FROM unit_ini ui
+          WHERE NOT EXISTS (
+            SELECT 1 FROM active_fin af
+            WHERE af.candidate_id = ui.candidate_id
+              AND af.account_id = ui.account_id
+          )
         ),
         perdidas AS (
           SELECT
-            SUM(
-              CASE
-                WHEN h.inactive_reason ILIKE '%%recorte%%' THEN
-                  CASE WHEN %(metric)s = 'Fee' THEN h.fee ELSE (h.salary + h.fee) END
-                ELSE 0
-              END
-            )::numeric AS downgrades_recorte,
-            SUM(
-              CASE
-                WHEN h.inactive_reason ILIKE '%%recorte%%' THEN 0
-                ELSE
-                  CASE WHEN %(metric)s = 'Fee' THEN h.fee ELSE (h.salary + h.fee) END
-              END
-            )::numeric AS churn_no_recorte
-          FROM ventana v
-          JOIN hires_full h
-            ON h.start_d <= v.win_ini
-           AND (h.end_d IS NULL OR h.end_d >= v.win_ini)
-          WHERE h.end_d IS NOT NULL
-            AND h.end_d >  v.win_ini
-            AND h.end_d <= v.win_fin
+            SUM(CASE
+                  WHEN (reason ILIKE '%%layoff%%' OR reason ILIKE '%%downsizing%%')
+                  THEN (CASE WHEN %(metric)s = 'Fee' THEN fee ELSE (salary + fee) END)
+                  ELSE 0
+                END)::numeric AS downgrades_recorte,
+            SUM(CASE
+                  WHEN (reason ILIKE '%%layoff%%' OR reason ILIKE '%%downsizing%%')
+                  THEN 0
+                  ELSE (CASE WHEN %(metric)s = 'Fee' THEN fee ELSE (salary + fee) END)
+                END)::numeric AS churn_no_recorte
+          FROM churn_units
+        ),
+        upsell_hires AS (
+          SELECT DISTINCT ON (h.opportunity_id, h.candidate_id)
+            h.salary AS hs, h.fee AS hf
+          FROM hires_full h CROSS JOIN ventana v
+          WHERE h.opp_close_d IS NOT NULL
+            AND h.opp_close_d > v.win_ini AND h.opp_close_d <= v.win_fin
+            AND h.account_id IN (SELECT account_id FROM cohort_accounts)
+          ORDER BY h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
+        ),
+        upsells AS (
+          SELECT SUM(
+            CASE WHEN %(metric)s = 'Fee' THEN hf ELSE (hs + hf) END
+          )::numeric AS upsells_lara
+          FROM upsell_hires
         )
         SELECT
-          TO_CHAR(v.win_ini, 'YYYY-MM-DD')                                           AS win_ini,
-          TO_CHAR(v.win_fin, 'YYYY-MM-DD')                                           AS win_fin,
-          COALESCE(mb.mrr_inicial,        0)::float                                  AS mrr_inicial,
-          COALESCE(u.upsells_lara,        0)::float                                  AS upsells_lara,
-          COALESCE(p.downgrades_recorte,  0)::float                                  AS downgrades_recorte,
-          COALESCE(p.churn_no_recorte,    0)::float                                  AS churn_no_recorte,
+          TO_CHAR(v.win_ini, 'YYYY-MM-DD')                          AS win_ini,
+          TO_CHAR(v.win_fin, 'YYYY-MM-DD')                          AS win_fin,
+          COALESCE(mb.mrr_inicial,        0)::float                 AS mrr_inicial,
+          COALESCE(u.upsells_lara,        0)::float                 AS upsells_lara,
+          COALESCE(p.downgrades_recorte,  0)::float                 AS downgrades_recorte,
+          COALESCE(p.churn_no_recorte,    0)::float                 AS churn_no_recorte,
           ROUND(
             100.0 *
             (
@@ -161,7 +140,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               )
               / NULLIF(mb.mrr_inicial, 0)
             )
-          , 2)::float                                                                AS nrr_pct
+          , 2)::float                                               AS nrr_pct
         FROM ventana v
         CROSS JOIN mrr_base mb
         LEFT JOIN upsells u  ON TRUE
@@ -169,7 +148,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,"metric": metric, "corte": corte}
+        "win_ini": win_ini, "win_fin": win_fin, "metric": metric, "corte": corte}
 
 
 DATASET = {
