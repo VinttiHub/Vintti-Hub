@@ -1746,7 +1746,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_revenue_outbound_ytd",
         "tab_key": "sales",
-        "title": "Annual Revenue Sales - Outbound · AE + AM (MRR acumulado YTD)",
+        "title": "Annual Gross Revenue Sales - Outbound · AE + AM (MRR acumulado YTD · salary + fee)",
         "type": "kpi",
         "dataset_key": "revenue_outbound_ytd",
         "config": {"mapping": {"value": "total_revenue", "formatter": "currency"}},
@@ -1796,7 +1796,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_kr_revenue_new_logos",
         "tab_key": "sales",
-        "title": "KR1 · Revenue nuevos clientes (new logos · AM+AE) · 30d/Semana",
+        "title": "KR1 · Gross Revenue nuevos clientes (new logos · AM+AE · salary + fee) · 30d/Semana",
         "type": "kpi",
         "dataset_key": "kr_revenue_new_logos",
         "config": {"mapping": {"value": "total_revenue", "formatter": "currency"}},
@@ -1816,7 +1816,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_kr_revenue_outbound",
         "tab_key": "sales",
-        "title": "KR2 · Revenue Outbound (AM+AE) · 30d/Semana",
+        "title": "KR2 · Gross Revenue Outbound (AM+AE · salary + fee) · 30d/Semana",
         "type": "kpi",
         "dataset_key": "kr_revenue_outbound",
         "config": {"mapping": {"value": "total_revenue", "formatter": "currency"}},
@@ -3031,7 +3031,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "gr_kpi_revenue_ytd",
         "tab_key": "growth",
-        "title": "Revenue YTD — Staffing + Recruiting",
+        "title": "Gross Revenue YTD — Staffing + Recruiting (salary + fee)",
         "type": "kpi",
         "dataset_key": "revenue_ytd_total",
         "config": {
@@ -3435,7 +3435,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "ae_kpi_revenue_card",
         "tab_key": "sales",
-        "title": "Revenue Generated (M+B) — YTD vs goal",
+        "title": "Gross Revenue Generated (M+B) — YTD vs goal (salary + fee)",
         "type": "kpi",
         "dataset_key": "revenue_ae_card",
         "config": {

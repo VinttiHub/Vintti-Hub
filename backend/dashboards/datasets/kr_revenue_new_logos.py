@@ -118,7 +118,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "kr_revenue_new_logos",
-    "label": "KR1 · Revenue nuevos clientes (new logos, AM+AE) por ventana",
+    "label": "KR1 · Gross Revenue nuevos clientes (new logos, AM+AE, salary + fee) por ventana",
     "dimensions": [{"key": "window_label", "label": "Ventana", "type": "string"}],
     "measures": [
         {"key": "total_revenue", "label": "Revenue total", "type": "currency"},

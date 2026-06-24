@@ -132,7 +132,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "revenue_ae_detail",
-    "label": "Revenue Generated (AEs only) — Detalle por close en ventana",
+    "label": "Gross Revenue Generated (AEs only, salary + fee) — Detalle por close en ventana",
     "dimensions": [
         {"key": "candidate_name", "label": "Candidato(s)", "type": "string"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
