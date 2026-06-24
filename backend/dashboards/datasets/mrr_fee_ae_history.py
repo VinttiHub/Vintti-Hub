@@ -1,21 +1,21 @@
 """MRR Staffing YTD per mes — Vintti fee only (sin salario), AEs only.
 
-Espejo de `gmrr_ae_history` pero sumando SOLO `ho.fee` — el margen de Vintti,
-no el costo del candidato. Mismo set de hires activos M+B (Mariano + Bahia).
+Espejo de `gmrr_ae_history` pero sumando SOLO el `fee` efectivo — el margen de
+Vintti, no el costo del candidato. Mismo motor canónico compartido
+(`_ae_mrr_staffing.HISTORY_CTE`: dedup de opp primaria + `salary_updates`), así
+que los head-counts y la base de hires coinciden exactamente con `gmrr_ae_history`.
 
 Para cada mes desde 1 de enero del año actual hasta el mes actual:
   - `monthly_fee`     : SUM(fee) de hires Staffing activos al cierre del mes.
   - `cumulative_fee`  : suma corrida desde enero.
   - `total_ytd_fee`   : total acumulado al mes actual (constante en todas las filas).
-  - `active_contractors` / `active_accounts`: head-count por mes (mismos valores
-    que `gmrr_ae_history` — la base de hires es la misma).
+  - `active_contractors` / `active_accounts`: head-count por mes.
 """
 from __future__ import annotations
 
 from datetime import date, datetime
 
-
-SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
+from ._ae_mrr_staffing import AE_LEADS, HISTORY_CTE
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
@@ -23,47 +23,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     year_start = date(today.year, 1, 1)
     period_end = today
 
-    sql = """
-        WITH hires AS (
-          SELECT
-            ho.account_id,
-            ho.candidate_id,
-            CASE
-              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active
-              ELSE NULLIF(ho.start_date::text, '')::date
-            END AS start_d,
-            CASE
-              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive
-              WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
-              ELSE ho.end_date::date
-            END AS end_d,
-            COALESCE(ho.fee, 0)::numeric AS fee
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE o.opp_model = 'Staffing'
-            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
-            -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
-            AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
-        ),
-        meses AS (
-          SELECT
-            DATE_TRUNC('month', gs)::date                                AS mes,
-            (DATE_TRUNC('month', gs) + INTERVAL '1 month - 1 day')::date AS fin_mes
-          FROM generate_series(%(year_start)s::date, %(period_end)s::date, INTERVAL '1 month') gs
-        ),
-        monthly AS (
-          SELECT
-            m.mes,
-            COALESCE(SUM(h.fee), 0)::numeric AS monthly_fee,
-            COUNT(DISTINCT h.candidate_id) FILTER (WHERE h.candidate_id IS NOT NULL)::int AS active_contractors,
-            COUNT(DISTINCT h.account_id)   FILTER (WHERE h.account_id   IS NOT NULL)::int AS active_accounts
-          FROM meses m
-          LEFT JOIN hires h
-            ON h.start_d IS NOT NULL
-           AND h.start_d <= m.fin_mes
-           AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
-          GROUP BY m.mes
-        )
+    sql = f"""
+        WITH {HISTORY_CTE}
         SELECT
           TO_CHAR(mes, 'YYYY-MM')                                          AS mes,
           monthly_fee::bigint                                              AS monthly_fee,
@@ -76,7 +37,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
-        "sales_leads": SALES_LEADS,
+        "ae_leads": AE_LEADS,
         "year_start": year_start,
         "period_end": period_end,
     }

@@ -1,8 +1,10 @@
 """Breakdown per contractor of Gross MRR Staffing al corte (hoy) — AEs only.
 
-Lista cada hire Staffing activo HOY cuyo `opp_sales_lead` ∈ {Mariano, Bahia}.
+Lista cada hire Staffing activo al corte cuyo `opp_sales_lead` ∈ {Mariano, Bahia}.
 Cada fila aporta `salary + fee` (= GMRR mensual). La suma de la columna `gmrr`
-es el último mes (`monthly_gmrr` actual) de `gmrr_ae_history`.
+reconcilia con el último mes (`monthly_gmrr` actual) de `gmrr_ae_history` porque
+ambos usan el motor canónico compartido `_ae_mrr_staffing.SNAPSHOT_CTE` (dedup de
+opp primaria + salary efectivo vía `salary_updates`) — R4.
 
 Usado en el drawer del card "Gross MRR Staffing YTD" del tab AE.
 """
@@ -10,8 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-
-SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
+from ._ae_mrr_staffing import AE_LEADS, SNAPSHOT_CTE
 
 
 def _parse_date(value):
@@ -43,52 +44,22 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # YTD: limitar a deals cuya Close Win fue este año (el año del mes consultado).
     year_start = date(corte.year, 1, 1)
 
-    sql = """
-        WITH hires AS (
-          SELECT
-            ho.candidate_id,
-            ho.account_id,
-            COALESCE(c.name, '')                                          AS candidate_name,
-            COALESCE(a.client_name, '')                                   AS client_name,
-            COALESCE(o.opp_sales_lead, '')                                AS opp_sales_lead,
-            COALESCE(ho.salary, 0)::numeric                               AS salary,
-            COALESCE(ho.fee, 0)::numeric                                  AS fee,
-            CASE
-              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active
-              ELSE NULLIF(ho.start_date::text, '')::date
-            END                                                           AS start_d,
-            CASE
-              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive
-              WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
-              ELSE ho.end_date::date
-            END                                                           AS end_d
-          FROM hire_opportunity ho
-          JOIN opportunity o      ON o.opportunity_id = ho.opportunity_id
-          LEFT JOIN candidates c  ON c.candidate_id   = ho.candidate_id
-          LEFT JOIN account a     ON a.account_id     = ho.account_id
-          WHERE o.opp_model = 'Staffing'
-            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
-            AND ho.candidate_id IS NOT NULL
-            -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
-            AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
-        )
+    sql = f"""
+        WITH {SNAPSHOT_CTE}
         SELECT
-          h.candidate_name,
-          h.client_name,
-          h.opp_sales_lead,
-          h.salary::float                       AS salary,
-          h.fee::float                          AS fee,
-          (h.salary + h.fee)::float             AS gmrr,
-          TO_CHAR(h.start_d, 'YYYY-MM-DD')      AS start_date
-        FROM hires h
-        WHERE h.start_d IS NOT NULL
-          AND h.start_d <= %(corte)s::date
-          AND (h.end_d IS NULL OR h.end_d >= %(corte)s::date)
-        ORDER BY gmrr DESC NULLS LAST, h.candidate_name;
+          candidate_name,
+          client_name,
+          opp_sales_lead,
+          salary::float                  AS salary,
+          fee::float                     AS fee,
+          (salary + fee)::float          AS gmrr,
+          TO_CHAR(start_d, 'YYYY-MM-DD') AS start_date
+        FROM eff
+        ORDER BY gmrr DESC NULLS LAST, candidate_name;
     """
 
     return sql, {
-        "sales_leads": SALES_LEADS,
+        "ae_leads": AE_LEADS,
         "corte": corte,
         "year_start": year_start,
     }
