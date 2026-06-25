@@ -12,13 +12,14 @@ tiene 2 hires (ej Theta), cada uno suma independientemente — el ratio queda
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    today = datetime.utcnow().date()
+    today = today_ar()
     year_start = date(today.year, 1, 1)
 
     sql = """

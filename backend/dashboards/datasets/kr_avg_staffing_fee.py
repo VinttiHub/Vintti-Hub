@@ -8,6 +8,7 @@ avg = Σ fee / nº de candidatos colocados (hires con candidate_id).
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -32,7 +33,7 @@ def _parse_date(value: str | None) -> date | None:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+             or today_ar())
     win_ini, win_fin = window_bounds(filters)
 
     sql = f"""

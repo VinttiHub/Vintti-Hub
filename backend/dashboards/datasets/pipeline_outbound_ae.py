@@ -19,6 +19,7 @@ Métricas:
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -56,7 +57,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
 
     sql = f"""

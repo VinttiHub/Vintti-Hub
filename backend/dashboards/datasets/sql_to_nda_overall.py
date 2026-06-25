@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 from ._sales_scope import sales_leads as _sales_leads
@@ -44,7 +45,7 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     win_ini = corte - timedelta(days=29)
 

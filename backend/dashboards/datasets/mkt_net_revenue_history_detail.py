@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 def _parse_date(value):
@@ -43,7 +44,7 @@ def _bucket_bounds(start: date, gran: str) -> date:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+             or today_ar())
     gran = _gran(filters)
     # bucket = inicio del bucket clickeado; default = bucket actual.
     start = _parse_date(filters.get("bucket"))

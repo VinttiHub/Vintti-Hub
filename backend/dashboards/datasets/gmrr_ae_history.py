@@ -15,12 +15,13 @@ primaria por candidato+cuenta + salary efectivo vía `salary_updates`), igual qu
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 from ._ae_mrr_staffing import AE_LEADS, HISTORY_CTE
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    today = datetime.utcnow().date()
+    today = today_ar()
     year_start = date(today.year, 1, 1)
     period_end = today
 

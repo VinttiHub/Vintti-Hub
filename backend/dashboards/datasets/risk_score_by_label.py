@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -31,7 +32,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     as_of = (
         _parse_date(filters.get("as_of_date"))
         or _parse_date(filters.get("corte"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     dias_sin_hire = _parse_int(filters.get("dias_sin_hire"), 90)
     min_replacements = _parse_int(filters.get("min_replacements"), 2)

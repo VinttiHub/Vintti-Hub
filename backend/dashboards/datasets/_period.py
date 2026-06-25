@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._now import today_ar
+
 
 def _parse_d(value):
     if not value:
@@ -46,7 +48,7 @@ def monthly_range(filters: dict) -> tuple[date, date]:
     """Rango (lo, hi) para charts MENSUALES que pueden recortarse:
     Mes/Desde-Hasta > Corte (ventana rodante 30d) > YTD por defecto.
     Lo usan tanto las barras como sus detalles (para cruzar el mes clickeado)."""
-    today = datetime.utcnow().date()
+    today = today_ar()  # R11: hoy en ARG (UTC-3)
     desde, hasta = period_bounds(filters)
     corte = _parse_d(filters.get("corte"))
     if desde or hasta:

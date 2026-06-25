@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -31,7 +32,7 @@ def _grain(filters: dict) -> str:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    today = datetime.utcnow().date()
+    today = today_ar()
     grain = _grain(filters)
 
     # Defaults: weekly = last 12 ISO weeks, monthly = last 12 months, yearly = last 5 years

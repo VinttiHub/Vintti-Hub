@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -35,7 +36,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("fecha_corte"))
-        or datetime.now(timezone.utc).date()
+        or today_ar()
     )
 
     win_ini, win_fin = window_bounds(filters)

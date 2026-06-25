@@ -20,6 +20,7 @@ import logging
 import os
 import threading
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 from ._periods import window_bounds
 from typing import Any
@@ -125,7 +126,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     win_ini, win_fin = window_bounds(filters)
     sales_leads = _sales_leads()

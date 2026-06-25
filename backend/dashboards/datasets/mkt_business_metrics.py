@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import os
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta
 
 from .mkt_sqls_by_origin import period_bounds
 from ._marketing_scope import is_marketing_mql_source
@@ -47,16 +47,23 @@ def _minus_months(d: date, n: int) -> date:
 
 
 def _prev_bounds(ini: date, fin: date, label: str) -> tuple[date, date]:
-    """Mismo span, un período hacia atrás (para comparación justa MTD/YTD/...)."""
+    """Período anterior con EXACTAMENTE el mismo span (comparación justa MTD/YTD/...).
+
+    R11 sub-D: antes desplazaba `ini` y `fin` por separado con clamping de día
+    (`_minus_months`), lo que daba spans desiguales en bordes de meses de 30/31 días
+    (p.ej. jun 15→30 = 16d vs may 15→31 = 17d). Ahora se ancla SOLO el inicio un
+    período atrás y el fin = inicio + (fin-ini), garantizando la misma cantidad de días.
+    """
+    span = fin - ini  # timedelta exacto
     if label == "Semana":
-        from datetime import timedelta
-        return ini - timedelta(days=7), fin - timedelta(days=7)
-    if label == "Trimestre":
-        return _minus_months(ini, 3), _minus_months(fin, 3)
-    if label == "Año":
-        return date(ini.year - 1, 1, 1), _minus_months(fin, 12)
-    # Mes
-    return _minus_months(ini, 1), _minus_months(fin, 1)
+        p_ini = ini - timedelta(days=7)
+    elif label == "Trimestre":
+        p_ini = _minus_months(ini, 3)
+    elif label == "Año":
+        p_ini = _minus_months(ini, 12)
+    else:  # Mes
+        p_ini = _minus_months(ini, 1)
+    return p_ini, p_ini + span
 
 
 def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, int]:

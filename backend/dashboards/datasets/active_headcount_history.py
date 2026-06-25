@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 _ALLOWED_SEGMENTS = {"staffing", "recruiting", "total"}
@@ -34,7 +35,7 @@ def _resolve_modelo(filters: dict) -> str:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    today = datetime.utcnow().date()
+    today = today_ar()
     current_month_start = today.replace(day=1)
 
     desde = (

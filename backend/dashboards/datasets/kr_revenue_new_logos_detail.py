@@ -6,6 +6,7 @@ ventana y es AM+AE. Una fila por new-logo opp.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -28,7 +29,7 @@ def _parse_date(value):
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+             or today_ar())
     window_key = str(filters.get("window") or "30d").strip().lower()
     if window_key in ("week", "semana", "last_week", "prev_week"):
         prev_sunday = corte - timedelta(days=corte.weekday() + 1)

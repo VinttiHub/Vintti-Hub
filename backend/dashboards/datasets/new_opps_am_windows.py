@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 _DEFAULT_AM_EMAILS = ("lara@vintti.com",)
@@ -45,7 +46,7 @@ def _am_emails() -> list[str]:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Ventanas de CALENDARIO (last week / WTD / last month / MTD) → siempre
     # relativas a HOY. NO siguen el filtro CORTE (solo las cards de 30d lo siguen).
-    corte = datetime.utcnow().date()
+    corte = today_ar()
 
     # Windows (consistent with sql_leads_windows._windows):
     #   last_week  = previous full calendar week (Mon-Sun)

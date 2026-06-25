@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 def _parse_ym(value: str | None) -> date | None:
@@ -40,7 +41,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_ym(filters.get("fecha"))
         or _parse_ym(filters.get("mes"))
         or _parse_ym(filters.get("month"))
-        or datetime.utcnow().date().replace(day=1)
+        or today_ar().replace(day=1)
     )
     modelo = _resolve_modelo(filters)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 SALES_LEADS = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
@@ -55,7 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("fecha_corte"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
 
     sql = """

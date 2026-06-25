@@ -14,6 +14,7 @@ KPI total is composed of.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -62,7 +63,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("hasta"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     win_ini, win_fin = _window_bounds(filters, corte)
     window_days = (win_fin - win_ini).days + 1

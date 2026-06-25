@@ -11,6 +11,7 @@ La batería se llena con el split Staffing/Recruiting (% del total).
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -52,7 +53,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("hasta"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     window_key = _window_key(filters)
     win_ini, win_fin, window_label = _window_bounds(window_key, corte)

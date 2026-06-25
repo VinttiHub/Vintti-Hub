@@ -8,6 +8,7 @@ Devuelve count + expected_revenue por industria, con totales (constantes).
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 def _parse_date(value):
@@ -24,7 +25,7 @@ def _parse_date(value):
 
 def period_bounds(filters: dict) -> tuple[date, date, str]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+             or today_ar())
     p = str(filters.get("periodo") or filters.get("period") or "mes").strip().lower()
     if p in ("semana", "week", "w"):
         return corte - timedelta(days=corte.weekday()), corte, "Semana"

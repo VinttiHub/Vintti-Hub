@@ -159,6 +159,19 @@
   // Paleta para series apiladas (origins) — colores distintos por índice.
   const STACK_PALETTE = ['#6c38ff', '#4ba9ff', '#c1ff72', '#f5b94a', '#ff1fdb', '#003bff', '#6cd391', '#f590ad', '#8a93a3', '#b0782e'];
 
+  /* R11 sub-E: ¿el valor x es el MES en curso? (YYYY-MM o YYYY-MM-DD).
+     Se usa para marcar el último punto de las series mensuales como "parcial".
+     new Date() = hora local del navegador (= ARG para el equipo). Charts cuyo x
+     no es un mes (per-opp, etc.) no matchean el regex y quedan sin marcar. */
+  function isCurrentMonthX(rawVal) {
+    if (rawVal == null) return false;
+    const m = String(rawVal).trim().match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+    if (!m) return false;
+    const now = new Date();
+    return parseInt(m[1], 10) === now.getFullYear()
+        && parseInt(m[2], 10) === (now.getMonth() + 1);
+  }
+
   /* ---------- render: line / area ---------- */
   function renderLine(svg, rows, opts) {
     if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
@@ -224,6 +237,27 @@
       dot.setAttribute('stroke', stroke);
       dot.setAttribute('stroke-width', '3');
       dot.setAttribute('data-rendered', '');
+      // R11 sub-E: si el último punto cae en el mes en curso, marcarlo PARCIAL
+      // (anillo punteado + etiqueta), para no leerlo como un mes completo.
+      const lastRaw = last.raw && last.raw[xKey];
+      if (isCurrentMonthX(lastRaw)) {
+        dot.setAttribute('stroke-dasharray', '3 2');
+        dot.setAttribute('fill', stroke);
+        dot.setAttribute('fill-opacity', '0.25');
+        if (idx === 0) {
+          const lbl = document.createElementNS(SVG_NS, 'text');
+          lbl.setAttribute('x', last.x.toFixed(2));
+          lbl.setAttribute('y', Math.max(10, last.y - 10).toFixed(2));
+          lbl.setAttribute('text-anchor', 'end');
+          lbl.setAttribute('font-size', '9');
+          lbl.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+          lbl.setAttribute('font-weight', '700');
+          lbl.setAttribute('fill', stroke);
+          lbl.setAttribute('data-rendered', '');
+          lbl.textContent = 'parcial';
+          svg.appendChild(lbl);
+        }
+      }
       svg.appendChild(dot);
 
       seriesInfo.push({

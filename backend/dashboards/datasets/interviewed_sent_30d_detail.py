@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from ._now import today_ar
 
 
 def _parse_date(value) -> date | None:
@@ -61,7 +62,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         filters.get("opportunity_id")
         or filters.get("opp_id")
     )
-    today = datetime.now(timezone.utc).date()
+    today = today_ar()
     desde = (
         _parse_date(filters.get("desde"))
         or date(today.year, today.month, 1)

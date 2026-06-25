@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 _ALLOWED_METRICS = {"Revenue", "Fee"}
@@ -31,7 +32,7 @@ def _parse_ymd(value: str | None) -> date | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
-    current_month_start = datetime.utcnow().date().replace(day=1)
+    current_month_start = today_ar().replace(day=1)
 
     from_dt = _parse_ym(filters.get("from")) or _parse_ym(filters.get("desde")) or datetime(2023, 1, 1)
     to_dt = (

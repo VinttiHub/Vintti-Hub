@@ -13,6 +13,7 @@ agree on what "Last week / WTD / Last month / MTD" mean.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -35,7 +36,7 @@ def _parse_date(value: str | None) -> date | None:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Ventanas de CALENDARIO (last week / WTD / last month / MTD) → siempre
     # relativas a HOY. NO siguen el filtro CORTE (solo las cards de 30d lo siguen).
-    corte = datetime.utcnow().date()
+    corte = today_ar()
 
     # Windows (mirror sql_leads_windows._windows):
     #   last_week  = previous full calendar week (Mon-Sun)

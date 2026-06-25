@@ -11,6 +11,7 @@ proporción relativa de cada avg para el bar de distribución.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -38,7 +39,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("hasta"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     win_fin = corte
     win_ini = corte - timedelta(days=29)

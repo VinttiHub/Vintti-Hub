@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -29,7 +30,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = (
         _parse_date(filters.get("hasta"))
         or _parse_date(filters.get("to"))
-        or datetime.utcnow().date().replace(day=1)
+        or today_ar().replace(day=1)
     )
     if hasta < desde:
         hasta = desde

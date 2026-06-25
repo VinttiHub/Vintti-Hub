@@ -16,6 +16,7 @@ Columnas:
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 def _parse_date(value):
@@ -47,7 +48,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("hasta"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     fin_mes = _end_of_month(corte)
 

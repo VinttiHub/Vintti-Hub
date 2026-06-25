@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from ._now import today_ar
 
 
 def _parse_ym(value: str | None) -> datetime | None:
@@ -16,7 +17,7 @@ def _parse_ym(value: str | None) -> datetime | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
-    today = datetime.utcnow().date().replace(day=1)
+    today = today_ar().replace(day=1)
     last_full_month = (today - timedelta(days=1)).replace(day=1)
 
     from_dt = _parse_ym(filters.get("from")) or _parse_ym(filters.get("desde"))

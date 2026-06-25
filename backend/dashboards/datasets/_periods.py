@@ -13,6 +13,8 @@ from __future__ import annotations
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 
+from ._now import today_ar
+
 
 def _pd(value):
     if value is None or value == "":
@@ -31,7 +33,7 @@ def _pd(value):
 def window_bounds(filters: dict | None, days: int = 30) -> tuple[date, date]:
     filters = filters or {}
     corte = (_pd(filters.get("corte")) or _pd(filters.get("cutoff"))
-             or _pd(filters.get("hasta")) or datetime.utcnow().date())
+             or _pd(filters.get("hasta")) or today_ar())  # R11: hoy en ARG (UTC-3)
     desde = _pd(filters.get("desde"))
     hasta = _pd(filters.get("hasta"))
     mes = _pd(filters.get("mes"))

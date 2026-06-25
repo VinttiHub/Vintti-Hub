@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -29,7 +30,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # cnt_30d sigue el filtro (MES → mes, CORTE → 30d rodante). Las ventanas de
     # CALENDARIO (semana 7d / MTD / mes anterior) se anclan a HOY e ignoran el corte.
     win_ini, win_fin = window_bounds(filters)
-    hoy = datetime.utcnow().date()
+    hoy = today_ar()
     sql = """
         WITH base AS (
           SELECT a.creation_date AS d

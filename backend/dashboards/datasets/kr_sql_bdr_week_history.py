@@ -8,6 +8,7 @@ Cada fila repite (constante) el `pct_vs_prev` (semana en curso vs la previa) y
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -29,7 +30,7 @@ def _parse_date(value):
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Semanas de CALENDARIO (Lun–Dom, últimas 6) → siempre relativas a HOY. NO
     # siguen el filtro CORTE (solo las cards de 30d lo siguen).
-    corte = datetime.utcnow().date()
+    corte = today_ar()
     this_monday = corte - timedelta(days=corte.weekday())
     first_monday = this_monday - timedelta(days=7 * (WEEKS - 1))
 

@@ -9,6 +9,7 @@ bucket (para el drill). Excluye outbound. Net revenue = fee Vintti
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 
 # (date_trunc unit, generate_series step, nº de buckets)
@@ -51,7 +52,7 @@ def _gran_key(filters: dict) -> str:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+             or today_ar())
     gk = _gran_key(filters)
     unit, step, n, off_kind = _GRAN[gk]
     if off_kind == "months_q":

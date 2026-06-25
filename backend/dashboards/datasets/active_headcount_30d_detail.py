@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from ._now import today_ar
 
 from ._periods import window_bounds
 
@@ -132,7 +133,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("hasta"))
         or _parse_date(filters.get("fecha"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     modelo = _resolve_modelo(filters)
     # ONLY `event_window` triggers event-in-window mode here. The global state

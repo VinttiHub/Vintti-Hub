@@ -11,6 +11,7 @@ Usado en el drawer del card "Gross MRR Staffing YTD" del tab AE.
 from __future__ import annotations
 
 from datetime import date, datetime
+from ._now import today_ar
 
 from ._ae_mrr_staffing import AE_LEADS, SNAPSHOT_CTE
 
@@ -39,7 +40,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         _parse_date(filters.get("corte"))
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("hasta"))
-        or datetime.utcnow().date()
+        or today_ar()
     )
     # YTD: limitar a deals cuya Close Win fue este año (el año del mes consultado).
     year_start = date(corte.year, 1, 1)
