@@ -157,6 +157,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           CROSS JOIN params p
           WHERE o.opp_model = 'Recruiting'
+            AND TRIM(o.opp_stage) = 'Close Win'   -- R10: solo revenue de opps ganadas
             AND o.opp_close_date IS NOT NULL
             AND o.opp_close_date >= p.year_start_py
             AND o.opp_close_date <= p.corte_d

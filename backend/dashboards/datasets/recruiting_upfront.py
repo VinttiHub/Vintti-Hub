@@ -43,6 +43,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o
             ON ho.opportunity_id = o.opportunity_id
           WHERE o.opp_model = 'Recruiting'
+            AND TRIM(o.opp_stage) = 'Close Win'   -- R10: solo revenue de opps ganadas
             AND o.opp_close_date IS NOT NULL
             AND ho.revenue IS NOT NULL
           GROUP BY 1

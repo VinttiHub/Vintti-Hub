@@ -82,6 +82,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id
         LEFT JOIN account a    ON a.account_id   = ho.account_id
         WHERE o.opp_model = 'Recruiting'
+          AND TRIM(o.opp_stage) = 'Close Win'   -- R10: solo revenue de opps ganadas
           AND o.opp_close_date IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '')::date >= %(win_ini)s::date
           AND NULLIF(o.opp_close_date::text, '')::date <= %(win_fin)s::date
