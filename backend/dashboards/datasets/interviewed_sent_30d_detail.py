@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from ._now import today_ar
+from ._periods import window_bounds
 
 
 def _parse_date(value) -> date | None:
@@ -62,17 +63,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         filters.get("opportunity_id")
         or filters.get("opp_id")
     )
-    today = today_ar()
-    desde = (
-        _parse_date(filters.get("desde"))
-        or date(today.year, today.month, 1)
-    )
-    if today.month == 12:
-        next_month = date(today.year + 1, 1, 1)
-    else:
-        next_month = date(today.year, today.month + 1, 1)
-    end_of_month = date.fromordinal(next_month.toordinal() - 1)
-    hasta = _parse_date(filters.get("hasta")) or end_of_month
+    # R12: usar la MISMA ventana que la card summary (window_bounds → 30d rolling
+    # por default, o Mes/Desde-Hasta si hay filtro). Antes el detalle usaba mes
+    # calendario por default → no cuadraba con la card de 30d.
+    desde, hasta = window_bounds(filters)
 
     sql = """
         WITH base AS (
