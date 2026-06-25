@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import Json
 
 from db import get_connection
-from dashboards.auth import is_editor
+from dashboards.auth import is_editor, editor_email
 from dashboards.datasets import get as get_dataset, list_all as list_datasets
 from dashboards.executor import run_dataset, sample_dataset, DatasetError
 
@@ -71,6 +71,13 @@ def _cache_set(key: tuple, value) -> None:
         _CHART_CACHE[key] = (time.time(), value)
 
 
+def _cache_clear() -> None:
+    """R13: invalidar el caché de charts tras una mutación (crear/editar/borrar
+    chart o cambiar el layout), para que el frontend no vea datos stale hasta el TTL."""
+    with _CHART_CACHE_LOCK:
+        _CHART_CACHE.clear()
+
+
 ALLOWED_CHART_TYPES = {
     "bar", "line", "area", "pie", "donut", "scatter",
     "table", "kpi", "gauge", "funnel", "heatmap", "sankey", "treemap",
@@ -90,6 +97,87 @@ def _require_editor():
     return None
 
 
+# ---------------------------------------------------------------------------
+# R13: gate de LECTURAS de datos. Las lecturas estaban totalmente abiertas
+# (revenue/MRR/churn/PII sin auth). Exigimos que el header X-User-Email (que el
+# frontend ya manda desde localStorage) sea un USUARIO ACTIVO — mismo criterio
+# que el login (users + admin_user_access.is_active). Así un EX-EMPLEADO
+# desactivado queda bloqueado aunque tenga @vintti.com.
+#
+# Allowlist por env `DASHBOARD_EXTRA_VIEWERS` (emails separados por coma) +
+# el email editor, como red de seguridad para logins legítimos fuera de `users`.
+#
+# Degradación: si no se puede cargar la lista de activos (hipo de BD), se cae a
+# chequeo de dominio @vintti.com (no tirar el dashboard). El set de activos se
+# cachea en memoria (TTL 300s) para no pegarle a la BD en cada chart.
+#
+# Sigue siendo un gate DÉBIL (X-User-Email es spoofable) — auth real necesita
+# tokens firmados + cambios de frontend (proyecto aparte). Pero corta el acceso
+# anónimo y el de cuentas desactivadas.
+# ---------------------------------------------------------------------------
+_ALLOWED_EMAIL_DOMAIN = "@vintti.com"
+_ACTIVE_EMAILS: set[str] = set()
+_ACTIVE_EMAILS_TS: float = 0.0
+_ACTIVE_EMAILS_LOCK = Lock()
+
+
+def _allowlist() -> set[str]:
+    raw = os.environ.get("DASHBOARD_EXTRA_VIEWERS", "")
+    extra = {p.strip().lower() for p in raw.split(",") if p.strip()}
+    extra.add(editor_email())
+    return extra
+
+
+def _active_emails() -> set[str]:
+    global _ACTIVE_EMAILS, _ACTIVE_EMAILS_TS
+    now = time.time()
+    with _ACTIVE_EMAILS_LOCK:
+        if _ACTIVE_EMAILS and (now - _ACTIVE_EMAILS_TS) < 300:
+            return _ACTIVE_EMAILS
+    emails: set[str] = set()
+    try:
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT LOWER(TRIM(u.email_vintti))
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE u.email_vintti IS NOT NULL
+                  AND COALESCE(aua.is_active, TRUE)
+                """
+            )
+            emails = {r[0] for r in cur.fetchall() if r and r[0]}
+            cur.close()
+        finally:
+            conn.close()
+    except Exception:
+        logging.exception("R13: no se pudo refrescar la lista de usuarios activos")
+        return _ACTIVE_EMAILS  # lo que haya (puede estar vacío → degradación abajo)
+    with _ACTIVE_EMAILS_LOCK:
+        _ACTIVE_EMAILS = emails
+        _ACTIVE_EMAILS_TS = now
+    return emails
+
+
+def _require_active_user():
+    email = _user_email()
+    if not email:
+        return jsonify({"error": "unauthorized"}), 401
+    if email in _allowlist():
+        return None
+    actives = _active_emails()
+    if not actives:
+        # No se pudo cargar la lista → degradar a chequeo de dominio (no romper).
+        if email.endswith(_ALLOWED_EMAIL_DOMAIN):
+            return None
+        return jsonify({"error": "forbidden"}), 403
+    if email in actives:
+        return None
+    return jsonify({"error": "forbidden"}), 403
+
+
 def _row_to_dict(cur, row):
     return dict(zip([c[0] for c in cur.description], row))
 
@@ -107,6 +195,9 @@ def datasets_index():
 
 @bp.route("/datasets/<key>/sample", methods=["GET"])
 def dataset_sample(key: str):
+    gate = _require_active_user()  # R13: solo usuarios activos
+    if gate is not None:
+        return gate
     try:
         limit = min(int(request.args.get("limit", 20)), 200)
         rows = sample_dataset(key, limit=limit)
@@ -151,6 +242,9 @@ def get_dashboard(slug: str):
 
 @bp.route("/<slug>/charts/<chart_key>/data", methods=["GET"])
 def get_chart_data(slug: str, chart_key: str):
+    gate = _require_active_user()  # R13: solo usuarios activos (data = revenue/PII)
+    if gate is not None:
+        return gate
     # Build a stable cache key from the query args (config-level filters are
     # static per chart_key, so request args fully determine the variant).
     args = request.args.to_dict(flat=True)
@@ -282,6 +376,7 @@ def create_chart(slug: str):
         chart_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
+        _cache_clear()  # R13: invalidar caché tras crear chart
         return jsonify({"id": chart_id, **cleaned})
     except Exception as exc:
         conn.rollback()
@@ -351,6 +446,7 @@ def update_chart(slug: str, chart_id: int):
         updated = cur.rowcount
         conn.commit()
         cur.close()
+        _cache_clear()  # R13: invalidar caché tras editar chart
         if not updated:
             return jsonify({"error": "not_found"}), 404
         return jsonify({"ok": True})
@@ -382,6 +478,7 @@ def delete_chart(slug: str, chart_id: int):
         deleted = cur.rowcount
         conn.commit()
         cur.close()
+        _cache_clear()  # R13: invalidar caché tras borrar chart
         if not deleted:
             return jsonify({"error": "not_found"}), 404
         return jsonify({"ok": True})
@@ -431,6 +528,7 @@ def update_dashboard(slug: str):
         row = cur.fetchone()
         conn.commit()
         cur.close()
+        _cache_clear()  # R13: invalidar caché tras editar el dashboard (layout)
         if not row:
             return jsonify({"error": "not_found"}), 404
         return jsonify({"ok": True, "version": row[0]})
