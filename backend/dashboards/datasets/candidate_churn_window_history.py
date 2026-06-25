@@ -42,8 +42,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             SELECT
               h.candidate_id,
               h.account_id,
-              NULLIF(h.start_date::text, '')::date AS start_d,
               CASE
+                WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
+                ELSE NULLIF(h.start_date::text, '')::date
+              END AS start_d,
+              CASE
+                WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
                 WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
                 ELSE h.end_date::date
               END AS end_d,
@@ -104,18 +108,43 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN ho h
             ON h.start_d BETWEEN v.win_ini AND v.m_fin
         ),
-        resumen AS (
+        -- R7: roll-up a grano (mes, CANDIDATO) antes de contar. Antes starts contaba
+        -- candidatos distintos y bajas filas-hire → churn podía pasar de 100 si un
+        -- candidato tenía 2 hires en la ventana del mes.
+        per_cand_mes AS (
           SELECT
             d.mes,
-            COUNT(DISTINCT d.candidate_id)                                       AS starts,
-            COUNT(*) FILTER (WHERE d.estado_en_m = 'BAJA')                       AS bajas,
-            COUNT(*) FILTER (WHERE d.baja_tipo = 'BAJA_REAL')                    AS bajas_real,
-            COUNT(*) FILTER (WHERE d.baja_tipo = 'BAJA_BUYOUT')                  AS bajas_buyout,
-            COUNT(*) FILTER (WHERE d.estado_en_m = 'ACTIVO')                     AS activos_al_cierre
+            d.candidate_id,
+            BOOL_OR(d.estado_en_m = 'ACTIVO') AS is_active,
+            BOOL_OR(d.baja_tipo = 'BAJA_REAL') AS any_real,
+            BOOL_OR(d.baja_tipo = 'BAJA_BUYOUT') AS any_buyout
           FROM detalle d
-          WHERE (%(desde)s::date IS NULL OR d.mes >= DATE_TRUNC('month', %(desde)s::date))
-            AND (%(hasta)s::date IS NULL OR d.mes <= DATE_TRUNC('month', %(hasta)s::date))
-          GROUP BY d.mes
+          GROUP BY d.mes, d.candidate_id
+        ),
+        cand_state AS (
+          SELECT
+            mes,
+            CASE WHEN is_active THEN 'ACTIVO' ELSE 'BAJA' END AS estado,
+            CASE
+              WHEN is_active  THEN NULL
+              WHEN any_real   THEN 'BAJA_REAL'
+              WHEN any_buyout THEN 'BAJA_BUYOUT'
+              ELSE NULL
+            END AS baja_tipo
+          FROM per_cand_mes
+        ),
+        resumen AS (
+          SELECT
+            cs.mes,
+            COUNT(*)                                                AS starts,
+            COUNT(*) FILTER (WHERE cs.estado = 'BAJA')             AS bajas,
+            COUNT(*) FILTER (WHERE cs.baja_tipo = 'BAJA_REAL')     AS bajas_real,
+            COUNT(*) FILTER (WHERE cs.baja_tipo = 'BAJA_BUYOUT')   AS bajas_buyout,
+            COUNT(*) FILTER (WHERE cs.estado = 'ACTIVO')           AS activos_al_cierre
+          FROM cand_state cs
+          WHERE (%(desde)s::date IS NULL OR cs.mes >= DATE_TRUNC('month', %(desde)s::date))
+            AND (%(hasta)s::date IS NULL OR cs.mes <= DATE_TRUNC('month', %(hasta)s::date))
+          GROUP BY cs.mes
         )
         SELECT
           TO_CHAR(mes, 'YYYY-MM-DD')                                             AS mes,

@@ -61,8 +61,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             SELECT
               h.candidate_id,
               h.account_id,
-              NULLIF(h.start_date::text, '')::date AS start_d,
               CASE
+                WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
+                ELSE NULLIF(h.start_date::text, '')::date
+              END AS start_d,
+              CASE
+                WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
                 WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
                 ELSE h.end_date::date
               END AS end_d,
@@ -103,14 +107,41 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN ho h
             ON h.start_d BETWEEN v.win_ini AND v.corte_d
         ),
+        -- R7: roll-up a grano CANDIDATO antes de contar. Antes el numerador contaba
+        -- filas-hire (COUNT(*)) y el denominador candidatos distintos → si un
+        -- candidato tenía 2 hires en la ventana, el churn podía pasar de 100.
+        -- Un candidato está ACTIVO si CUALQUIER hire suyo sigue activo; si no, es
+        -- BAJA (real prioriza sobre buyout cuando tiene ambos). Antes el churn
+        -- podia superar el 100 por contar filas-hire sobre candidatos distintos.
+        per_candidate AS (
+          SELECT
+            candidate_id,
+            BOOL_OR(estado_en_corte = 'ACTIVO')  AS is_active,
+            BOOL_OR(baja_tipo = 'BAJA_REAL')     AS any_real,
+            BOOL_OR(baja_tipo = 'BAJA_BUYOUT')   AS any_buyout
+          FROM detalle
+          GROUP BY candidate_id
+        ),
+        cand_state AS (
+          SELECT
+            candidate_id,
+            CASE WHEN is_active THEN 'ACTIVO' ELSE 'BAJA' END AS estado,
+            CASE
+              WHEN is_active   THEN NULL
+              WHEN any_real    THEN 'BAJA_REAL'
+              WHEN any_buyout  THEN 'BAJA_BUYOUT'
+              ELSE NULL
+            END AS baja_tipo
+          FROM per_candidate
+        ),
         totals AS (
           SELECT
-            COUNT(DISTINCT candidate_id)::int                                    AS starts,
-            COUNT(*) FILTER (WHERE estado_en_corte = 'BAJA')::int                AS bajas,
-            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::int                 AS bajas_real,
-            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_BUYOUT')::int               AS bajas_buyout,
-            COUNT(*) FILTER (WHERE estado_en_corte = 'ACTIVO')::int              AS activos_al_corte
-          FROM detalle
+            COUNT(*)::int                                                AS starts,
+            COUNT(*) FILTER (WHERE estado = 'BAJA')::int                 AS bajas,
+            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::int         AS bajas_real,
+            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_BUYOUT')::int       AS bajas_buyout,
+            COUNT(*) FILTER (WHERE estado = 'ACTIVO')::int              AS activos_al_corte
+          FROM cand_state
         )
         SELECT
           starts                                                                 AS candidatos,

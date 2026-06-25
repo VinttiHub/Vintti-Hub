@@ -77,6 +77,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         detalle AS (
           SELECT
+            h.candidate_id,
+            CASE WHEN h.end_d IS NOT NULL AND h.end_d <= v.corte_d THEN 'BAJA' ELSE 'ACTIVO' END AS estado,
             CASE
               WHEN h.end_d IS NOT NULL
                 AND h.end_d <= v.corte_d
@@ -90,6 +92,27 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS baja_tipo
           FROM ventana v
           JOIN ho h ON h.start_d BETWEEN v.win_ini AND v.corte_d
+        ),
+        -- R7: roll-up a grano CANDIDATO. Antes `candidatos` contaba filas-hire
+        -- (un candidato con 2 hires contaba 2), pese a que el label dice Candidatos.
+        per_candidate AS (
+          SELECT
+            candidate_id,
+            BOOL_OR(estado = 'ACTIVO')         AS is_active,
+            BOOL_OR(baja_tipo = 'BAJA_REAL')   AS any_real,
+            BOOL_OR(baja_tipo = 'BAJA_BUYOUT') AS any_buyout
+          FROM detalle
+          GROUP BY candidate_id
+        ),
+        cand_state AS (
+          SELECT
+            CASE
+              WHEN is_active  THEN NULL
+              WHEN any_real   THEN 'BAJA_REAL'
+              WHEN any_buyout THEN 'BAJA_BUYOUT'
+              ELSE NULL
+            END AS baja_tipo
+          FROM per_candidate
         )
         SELECT
           COUNT(*)::int                                            AS candidatos,
@@ -99,7 +122,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 / NULLIF(COUNT(*), 0), 1)::float                   AS churn_real_pct,
           ROUND(100.0 - 100.0 * COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::numeric
                 / NULLIF(COUNT(*), 0), 1)::float                   AS retention_pct
-        FROM detalle;
+        FROM cand_state;
     """
 
     return sql, {"corte": corte, "window_days": window_days}
