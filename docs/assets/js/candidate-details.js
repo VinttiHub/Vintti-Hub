@@ -1745,17 +1745,10 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
         hireDniInput.addEventListener('blur', () => {
           const raw = hireDniInput.value.trim();
 
-          // Si está vacío, mandamos null; si es número, mandamos número; si no, string
-          let num = raw === '' ? null : Number(raw);
-          let payloadValue =
-            raw === ''            ? null :
-            Number.isFinite(num)  ? num  :
-                                    raw;
-
           fetch(`${API_CANDIDATES}/candidates/${candidateId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni: payloadValue })
+            body: JSON.stringify({ dni: raw || null })
           });
         });
       }
