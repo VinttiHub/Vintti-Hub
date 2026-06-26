@@ -18,6 +18,12 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dotenv import load_dotenv
+
+# R13/R15: cargar backend/.env para correr el seed en local (RDS_PASSWORD ya no está
+# hardcodeado en db.py). Igual que app.py. En prod (App Runner) las env ya existen.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from psycopg2.extras import Json
 
 from db import get_connection
