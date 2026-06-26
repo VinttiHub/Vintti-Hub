@@ -3,9 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from . import (
-    ts_history,
-    management_dashboard,
-    opportunities,
     op_close_wins_monthly,
     op_close_wins_monthly_detail,
     op_churn_reasons,
@@ -16,7 +13,6 @@ from . import (
     op_closewin_candidate_origin_detail,
     op_hunteo_vs_applicant_monthly,
     op_hunteo_vs_applicant_monthly_detail,
-    batch_sourcing,
     mrr_history,
     active_headcount_history,
     active_headcount_detail,
@@ -59,7 +55,6 @@ from . import (
     revenue_outbound_ytd,
     revenue_outbound_staffing_detail,
     revenue_outbound_recruiting_detail,
-    sales_mrr_staffing_ae,
     sales_mrr_staffing_ae_history,
     sales_mrr_staffing_ae_month_detail,
     client_wins_outbound_history,
@@ -230,7 +225,6 @@ from . import (
     mkt_sqls_by_origin_detail,
     mkt_new_clients_by_origin_detail,
     mkt_open_opps_by_industry_detail,
-    mkt_net_revenue_by_origin,
     mkt_net_revenue_by_origin_detail,
     mkt_net_revenue_history,
     mkt_net_revenue_history_detail,
@@ -243,10 +237,6 @@ from . import (
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
-    ts_history.DATASET["key"]: ts_history.DATASET,
-    management_dashboard.DATASET["key"]: management_dashboard.DATASET,
-    opportunities.DATASET["key"]: opportunities.DATASET,
-    batch_sourcing.DATASET["key"]: batch_sourcing.DATASET,
     mrr_history.DATASET["key"]: mrr_history.DATASET,
     active_headcount_history.DATASET["key"]: active_headcount_history.DATASET,
     active_headcount_detail.DATASET["key"]: active_headcount_detail.DATASET,
@@ -289,8 +279,6 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     revenue_outbound_ytd.DATASET["key"]: revenue_outbound_ytd.DATASET,
     revenue_outbound_staffing_detail.DATASET["key"]: revenue_outbound_staffing_detail.DATASET,
     revenue_outbound_recruiting_detail.DATASET["key"]: revenue_outbound_recruiting_detail.DATASET,
-    sales_mrr_staffing_ae.DATASET["key"]: sales_mrr_staffing_ae.DATASET,
-    sales_mrr_staffing_ae.DATASET_DETAIL["key"]: sales_mrr_staffing_ae.DATASET_DETAIL,
     sales_mrr_staffing_ae_history.DATASET["key"]: sales_mrr_staffing_ae_history.DATASET,
     sales_mrr_staffing_ae_month_detail.DATASET["key"]: sales_mrr_staffing_ae_month_detail.DATASET,
     client_wins_outbound_history.DATASET["key"]: client_wins_outbound_history.DATASET,
@@ -465,7 +453,6 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     mkt_sqls_by_origin_detail.DATASET["key"]: mkt_sqls_by_origin_detail.DATASET,
     mkt_new_clients_by_origin_detail.DATASET["key"]: mkt_new_clients_by_origin_detail.DATASET,
     mkt_open_opps_by_industry_detail.DATASET["key"]: mkt_open_opps_by_industry_detail.DATASET,
-    mkt_net_revenue_by_origin.DATASET["key"]: mkt_net_revenue_by_origin.DATASET,
     mkt_net_revenue_by_origin_detail.DATASET["key"]: mkt_net_revenue_by_origin_detail.DATASET,
     mkt_net_revenue_history.DATASET["key"]: mkt_net_revenue_history.DATASET,
     mkt_net_revenue_history_detail.DATASET["key"]: mkt_net_revenue_history_detail.DATASET,
