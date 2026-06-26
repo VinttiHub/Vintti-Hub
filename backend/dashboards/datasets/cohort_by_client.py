@@ -154,7 +154,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM per_client pc
         LEFT JOIN account a ON a.account_id = pc.account_id
         WHERE pc.total_employees > 0
-        ORDER BY pc.total_employees DESC, pc.mrr DESC NULLS LAST, client_name;
+        -- Orden por "Weight over" (= mrr / total_mrr) de mayor a menor.
+        ORDER BY pc.mrr DESC NULLS LAST, pc.total_employees DESC, client_name;
     """
 
     return sql, {"fin_mes": fin_mes}
