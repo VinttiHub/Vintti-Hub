@@ -30,42 +30,42 @@
 
   /* ---------- format ---------- */
   const fmt = {
-    int: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : Math.round(+v).toLocaleString('en-US'),
+    int: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : Math.round(+v).toLocaleString('en-US'),
     number: (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = +v;
       if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
       if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K';
       return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
     },
-    decimal: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(2),
-    currency: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : '$' + Math.round(+v).toLocaleString('en-US'),
+    decimal: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : (+v).toFixed(2),
+    currency: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : '$' + Math.round(+v).toLocaleString('en-US'),
     'currency-k': (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = +v;
       if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
       if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
       return '$' + n.toFixed(0);
     },
-    percent: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : Math.round(+v) + '%',
-    percent2: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(2) + '%',
+    percent: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : Math.round(+v) + '%',
+    percent2: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : (+v).toFixed(2) + '%',
     'percent-pp': (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = Math.round(+v);
       return (n > 0 ? '+' : '') + n + 'pp';
     },
     'delta-percent': (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = Math.round(+v);
       return (n > 0 ? '+' : '') + n + '%';
     },
     'delta-int': (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = Math.round(+v);
       return (n > 0 ? '+' : '') + n;
     },
     'delta-currency-k': (v) => {
-      if (v == null || v === '' || isNaN(+v)) return '—';
+      if (v == null || v === '' || !isFinite(+v)) return '—';
       const n = +v;
       const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
       const abs = Math.abs(n);
@@ -75,7 +75,7 @@
       else                 body = '$' + Math.round(abs).toLocaleString('en-US');
       return n === 0 ? 'Sin cambio' : sign + body;
     },
-    months: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(1) + ' mo',
+    months: (v) => (v == null || v === '' || !isFinite(+v)) ? '—' : (+v).toFixed(1) + ' mo',
     raw: (v) => (v == null || v === '') ? '—' : String(v),
     pick(name) { return this[name] || this.raw; }
   };
@@ -3672,6 +3672,7 @@
   // el channel/pestaña activa). Idempotente: lo ya cacheado se re-renderiza desde
   // cache (sin re-fetch) salvo force. Esto evita cargar las 4 pestañas + drawers de
   // una; cada pestaña/drawer carga on-demand → muchísimas menos queries por load.
+  let _hydrateGen = 0;  // R14 (#3): token de generación para descartar pasadas viejas (race)
   async function hydrate(scope, opts) {
     opts = opts || {};
     scope = scope || activeChannelEl();
@@ -3681,6 +3682,7 @@
       rerenderChartsInScope(scope); // ya cargado → solo re-pinta desde cache
       return;
     }
+    const myGen = ++_hydrateGen;  // R14: esta pasada; si arranca otra hydrate, esta se descarta
     hydrateInflight++;
     document.body.classList.add('is-loading');
 
@@ -3707,16 +3709,28 @@
         const compKey = compKeyFor(chartKey, overrides);
         try {
           const r = await fetchChart(chartKey, overrides);
+          if (myGen !== _hydrateGen) return;  // R14 (#3): pasada superada por un filtro más nuevo → descartar
           const rows = r.rows || [];
           lastFetchedRows.set(compKey, rows);
-          els.forEach(el => renderBinding(el, rows));
+          els.forEach(el => {
+            // R14 (#7): limpiar marca de error si la había
+            if (el.hasAttribute('data-fetch-error')) { el.removeAttribute('data-fetch-error'); el.removeAttribute('title'); }
+            renderBinding(el, rows);
+          });
         } catch (e) {
+          if (myGen !== _hydrateGen) return;  // R14 (#3): pasada superada → no pisar con un error viejo
           console.error(`fetch ${chartKey}`, e);
           if (!lastFetchedRows.has(compKey)) lastFetchedRows.set(compKey, []);
-          els.forEach(el => renderBinding(el, lastFetchedRows.get(compKey)));
+          // R14 (#7): marcar el error visualmente (distinto de "sin datos").
+          els.forEach(el => {
+            el.setAttribute('data-fetch-error', '1');
+            el.title = 'Error al cargar datos';
+            renderBinding(el, lastFetchedRows.get(compKey));
+          });
         }
       }));
 
+      if (myGen !== _hydrateGen) return;  // R14 (#3): llegó una hydrate más nueva → no pisar tablas/cohorts
       hydratedScopes.add(scopeKey);
       renderDetailTable();
       renderAmDetailTable();

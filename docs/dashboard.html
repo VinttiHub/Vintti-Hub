@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=79">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=80">
 </head>
 <body>
 
@@ -120,7 +120,7 @@
     <span class="filter-bar__sep"></span>
 
     <!-- Modelo (visible only on tabs WITHOUT a Staffing/Recruiting subtab) -->
-    <label class="filter-pill filter-pill--lime" data-filter-key="modelo" data-tabs="growth am sales ops">
+    <label class="filter-pill filter-pill--lime" data-filter-key="modelo" data-tabs="am sales ops">
       <span class="k">Modelo</span>
       <span class="v" data-filter-slot data-filter-placeholder>Total</span>
       <span class="chev">▾</span>
@@ -534,7 +534,7 @@
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">YTD</span>
-              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-ftes-recruiting" aria-label="Ver detalle New FTEs placed">Ver detalle</button>
@@ -563,7 +563,7 @@
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">YTD</span>
-              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-clients-recruiting" aria-label="Ver detalle New clients Recruiting">Ver detalle</button>
@@ -8758,6 +8758,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=98" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=99" defer></script>
 </body>
 </html>

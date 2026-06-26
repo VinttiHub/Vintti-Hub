@@ -40,7 +40,7 @@
   --chart-grid: #ecf0f5;
 
   /* Status hues used in light mode */
-  --pos: #16a34a;
+  --pos: #3a6b00;  /* R14: verde oscuro de marca (legible como texto); antes esmeralda #16a34a fuera de paleta */
   --neg: #e23d6f;
 
   /* Type */
@@ -1276,7 +1276,11 @@ body.is-loading .kpi-card::after {
   font-size: 12px;
   font-weight: 600;
 }
-.delta--up    { color: var(--pos); background: rgba(22,163,74,0.12); }
+.delta--up    { color: var(--pos); background: rgba(58,107,0,0.12); }
+
+/* R14 (#7): error de fetch — visualmente distinto de "sin datos" (—). */
+[data-fetch-error] { opacity: .5; }
+[data-bind="text"][data-fetch-error]::after { content: " ⚠"; color: var(--neg); font-size: .8em; }
 .delta--down  { color: var(--neg); background: rgba(226,61,111,0.10); }
 .delta--flat  { color: var(--ink-2); background: rgba(13,18,30,0.05); }
 
