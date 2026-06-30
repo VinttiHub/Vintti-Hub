@@ -14,6 +14,7 @@ from typing import List, Optional, Dict, Any
 bp = Blueprint("reminders", __name__)
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
+GUATEMALA_TZ = timezone(timedelta(hours=-6))
 JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
@@ -463,6 +464,10 @@ def _candidate_link(candidate_id:int):
     return f"https://vinttihub.vintti.com/candidate-details.html?id={candidate_id}"
 
 
+def _profile_link():
+    return "https://vinttihub.vintti.com/profile.html"
+
+
 def _send_email(subject: str, html_body: str, to: List[str]):
     payload = {"to": to, "subject": subject, "body": html_body}
     r = requests.post(
@@ -473,6 +478,148 @@ def _send_email(subject: str, html_body: str, to: List[str]):
     if not r.ok:
         logging.error("Send email failed: %s %s", r.status_code, r.text)
     return r.ok
+
+
+def _ensure_timeoff_approval_reminder_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS time_off_approval_reminders (
+            request_id BIGINT PRIMARY KEY REFERENCES time_off_requests(id) ON DELETE CASCADE,
+            last_sent_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_time_off_approval_reminders_last_sent
+        ON time_off_approval_reminders (last_sent_at)
+    """)
+
+
+def _timeoff_days_between(kind: str, start_value, end_value) -> int:
+    try:
+        if hasattr(start_value, "date"):
+            start_value = start_value.date()
+        if hasattr(end_value, "date"):
+            end_value = end_value.date()
+        if isinstance(start_value, str):
+            start_value = datetime.strptime(start_value[:10], "%Y-%m-%d").date()
+        if isinstance(end_value, str):
+            end_value = datetime.strptime(end_value[:10], "%Y-%m-%d").date()
+        if end_value < start_value:
+            return 0
+        return (end_value - start_value).days + 1
+    except Exception:
+        return 0
+
+
+def _timeoff_approval_reminder_html(leader_name: str, requests_rows: List[Dict[str, Any]]) -> str:
+    rows_html = []
+    for row in requests_rows:
+        kind = str(row.get("kind") or "").replace("_", " ").title()
+        start = html.escape(str(row.get("start_date") or "—"))
+        end = html.escape(str(row.get("end_date") or "—"))
+        requester = html.escape(str(row.get("user_name") or "Someone"))
+        reason = html.escape(str(row.get("reason") or "").strip())
+        days = _timeoff_days_between(row.get("kind"), row.get("start_date"), row.get("end_date"))
+        days_label = f"{days} day{'s' if days != 1 else ''}" if days else "—"
+        note_html = f"<br><span style='color:#64748b'>Note: {reason}</span>" if reason else ""
+        rows_html.append(f"""
+          <li style="margin:0 0 12px">
+            <b>{requester}</b> — {html.escape(kind)}<br>
+            <span>{start} → {end}</span><br>
+            <span>{html.escape(days_label)}</span>{note_html}
+          </li>
+        """)
+
+    intro_name = html.escape(leader_name or "there")
+    requests_count = len(requests_rows)
+    plural = "request" if requests_count == 1 else "requests"
+    return f"""
+    <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0f172a">
+      <p>Hi {intro_name},</p>
+      <p>You still have <b>{requests_count} pending time off {plural}</b> waiting for approval.</p>
+      <ul style="padding-left:20px;margin:16px 0">
+        {''.join(rows_html)}
+      </ul>
+      <p>Please review them in the Team PTO approvals section:<br>
+        {_anchor("Open Vintti Hub Profile", _profile_link())}
+      </p>
+      <p>Thank you!<br>— Vintti Hub</p>
+    </div>
+    """
+
+
+def run_due_timeoff_approval_reminders(cur, *, today=None) -> List[Dict[str, Any]]:
+    today = today or datetime.now(tz=GUATEMALA_TZ).date()
+    _ensure_timeoff_approval_reminder_table(cur)
+    cur.execute("""
+        SELECT
+          r.id,
+          r.user_id,
+          r.kind,
+          r.start_date,
+          r.end_date,
+          r.reason,
+          r.created_at,
+          u.user_name,
+          u.email_vintti AS user_email,
+          l.user_id AS leader_id,
+          l.user_name AS leader_name,
+          LOWER(TRIM(l.email_vintti)) AS leader_email,
+          tr.last_sent_at
+        FROM time_off_requests r
+        JOIN users u ON u.user_id = r.user_id
+        JOIN users l ON l.user_id = u.lider
+        LEFT JOIN time_off_approval_reminders tr ON tr.request_id = r.id
+        WHERE LOWER(r.status) = 'pending'
+          AND l.email_vintti IS NOT NULL
+          AND (
+            tr.last_sent_at IS NULL
+            OR (tr.last_sent_at AT TIME ZONE 'America/Guatemala')::date < %s
+          )
+        ORDER BY l.user_id, r.created_at ASC
+    """, (today,))
+    pending_rows = [dict(row) for row in (cur.fetchall() or [])]
+    grouped: Dict[int, Dict[str, Any]] = {}
+    for row in pending_rows:
+        leader_id = int(row["leader_id"])
+        grouped.setdefault(leader_id, {
+            "leader_id": leader_id,
+            "leader_name": row.get("leader_name"),
+            "leader_email": row.get("leader_email"),
+            "requests": [],
+        })["requests"].append(row)
+
+    sent = []
+    for payload in grouped.values():
+        leader_email = payload.get("leader_email")
+        if not leader_email:
+            continue
+        requests_rows = payload["requests"]
+        subject = f"Time off approvals pending: {len(requests_rows)} request{'s' if len(requests_rows) != 1 else ''}"
+        ok = _send_email(
+            subject=subject,
+            html_body=_timeoff_approval_reminder_html(payload.get("leader_name"), requests_rows),
+            to=[leader_email],
+        )
+        if not ok:
+            continue
+        request_ids = [int(row["id"]) for row in requests_rows]
+        for req_id in request_ids:
+            cur.execute("""
+                INSERT INTO time_off_approval_reminders (request_id, last_sent_at, updated_at)
+                VALUES (%s, NOW(), NOW())
+                ON CONFLICT (request_id)
+                DO UPDATE SET last_sent_at = EXCLUDED.last_sent_at,
+                              updated_at = EXCLUDED.updated_at
+            """, (req_id,))
+        sent.append({
+            "leader_id": payload["leader_id"],
+            "to": leader_email,
+            "request_ids": request_ids,
+            "count": len(request_ids),
+        })
+    return sent
 
 
 def _is_stage_close_win(value) -> bool:
@@ -1320,6 +1467,14 @@ def send_due_client_check_reminders():
         return jsonify({"sent": sent}), 200
 
 
+@bp.route("/reminders/time_off_approvals/due", methods=["POST"])
+def send_due_timeoff_approval_reminders():
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        sent = run_due_timeoff_approval_reminders(cur)
+        conn.commit()
+        return jsonify({"sent": sent}), 200
+
+
 @bp.route("/candidates/<int:candidate_id>/hire_reminders/ensure", methods=["POST","GET"])
 def ensure_reminder_row(candidate_id):
     """Crea una fila en hire_reminders si no existe todavía (por candidato).
@@ -1452,6 +1607,7 @@ def send_due_reminders():
         hr_lead_signed_resig_ref_sent = _run_due_hr_lead_signed_resig_ref_reminders(cur)
         credit_loop_sent = run_due_credit_loop_reminders(cur)
         client_check_sent = run_due_client_check_reminders(cur)
+        timeoff_approval_sent = run_due_timeoff_approval_reminders(cur)
 
         conn.commit()
         return jsonify({
@@ -1459,6 +1615,7 @@ def send_due_reminders():
             "hr_lead_signed_resig_ref_sent": hr_lead_signed_resig_ref_sent,
             "credit_loop_sent": credit_loop_sent,
             "client_check_sent": client_check_sent,
+            "timeoff_approval_sent": timeoff_approval_sent,
         })
 
 
