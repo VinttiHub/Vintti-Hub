@@ -17,6 +17,10 @@ from . import (
     op_churn_recruiters,
     op_rejection_accounts,
     op_churn_accounts,
+    op_one_shot_kill_summary,
+    op_one_shot_kill_by_recruiter,
+    op_one_shot_kill_detail,
+    op_one_shot_kill_history,
     mrr_history,
     active_headcount_history,
     active_headcount_detail,
@@ -482,6 +486,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     op_churn_recruiters.DATASET["key"]: op_churn_recruiters.DATASET,
     op_rejection_accounts.DATASET["key"]: op_rejection_accounts.DATASET,
     op_churn_accounts.DATASET["key"]: op_churn_accounts.DATASET,
+    op_one_shot_kill_summary.DATASET["key"]: op_one_shot_kill_summary.DATASET,
+    op_one_shot_kill_by_recruiter.DATASET["key"]: op_one_shot_kill_by_recruiter.DATASET,
+    op_one_shot_kill_detail.DATASET["key"]: op_one_shot_kill_detail.DATASET,
+    op_one_shot_kill_history.DATASET["key"]: op_one_shot_kill_history.DATASET,
 }
 
 

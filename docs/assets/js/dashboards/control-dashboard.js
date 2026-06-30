@@ -512,6 +512,10 @@
       // Only meaningful if x looks like a month (YYYY-MM)
       if (xVal && /^\d{4}-\d{2}/.test(String(xVal))) {
         const m = String(xVal).slice(0, 7);
+        // Si la línea declara un panel de detalle, abrir el drawer lateral filtrado a
+        // ese mes (override `mes`); si no, comportamiento histórico (month-detail inline).
+        const panel = svg.dataset.lineDetailPanel;
+        if (panel) { openCategoryDrawer(panel, 'mes', m); return; }
         setSelectedMonth(m);
       }
     });
@@ -1836,6 +1840,31 @@
     // Cache de las filas completas (sin filtrar) para re-render al cambiar un dropdown.
     el._dtableRows = rows;
 
+    // ---- Drill por fila: click en una fila setea un multi-filtro en otra dtable ----
+    // data-row-drill-target = chart key destino; data-row-drill-field = columna a leer;
+    // data-row-drill-target-field = campo del multi-filtro destino (default = field).
+    if (el.dataset.rowDrillTarget && !el._rowDrillBound) {
+      el._rowDrillBound = true;
+      el.addEventListener('click', (ev) => {
+        const tr = ev.target.closest('tbody tr[data-drill-val]');
+        if (!tr) return;
+        const val = tr.getAttribute('data-drill-val') || '';
+        const targetKey = el.dataset.rowDrillTarget;
+        const tField = el.dataset.rowDrillTargetField || el.dataset.rowDrillField;
+        const target = document.querySelector(`[data-chart="${targetKey}"][data-bind="dtable"]`);
+        if (!target || !tField) return;
+        let st = {};
+        try { st = JSON.parse(target.dataset.mfState || '{}'); } catch (_e) { st = {}; }
+        if (val) st[tField] = val; else delete st[tField];
+        target.dataset.mfState = JSON.stringify(st);
+        const trows = target._dtableRows
+          || lastFetchedRows.get(compKeyFor(target.dataset.chart, readOverridesFor(target)))
+          || [];
+        renderDtable(target, trows);
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+
     // ---- Multi-filtro por dropdown: data-multi-filter="field|Label,field2|Label2,..." ----
     // Cada campo se vuelve un <select> con los valores distintos de la columna; las
     // selecciones se combinan (AND) y se guardan en data-mf-state. 100% client-side.
@@ -1907,8 +1936,13 @@
     const head = cols.map(c => {
       return `<th${isNumFmt(c.fmt) ? ' class="num"' : ''}>${esc(c.label)}</th>`;
     }).join('');
+    // Drill por fila: si data-row-drill-field está, cada <tr> lleva el valor de esa
+    // columna para filtrar otra tabla al hacer click (ver listener abajo).
+    const drillField = el.dataset.rowDrillField || '';
     const body = viewRows.map(r => {
-      return '<tr>' + cols.map(c => {
+      const dv = drillField ? ` data-drill-val="${esc(String(r[drillField] == null ? '' : r[drillField]))}"` : '';
+      const trCls = drillField ? ' class="dtable-row--drill"' : '';
+      return `<tr${trCls}${dv}>` + cols.map(c => {
         if (c.fmt === 'chip') return `<td>${originChipHtml(r[c.field])}</td>`;
         if (c.fmt === 'eff') {
           const v = String(r[c.field] == null ? '' : r[c.field]);

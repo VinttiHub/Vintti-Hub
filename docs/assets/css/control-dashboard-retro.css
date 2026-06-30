@@ -2691,6 +2691,10 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   background: none;
 }
 
+/* Filas clickeables (drill) en dtable */
+.dtable tbody tr.dtable-row--drill { cursor: pointer; }
+.dtable tbody tr.dtable-row--drill:hover { background: rgba(108,56,255,0.06); }
+
 /* Pill de Close Win (Sí / No) */
 .cw-pill {
   display: inline-block;

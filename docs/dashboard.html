@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=88">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=89">
 </head>
 <body>
 
@@ -4864,6 +4864,74 @@
         <p class="card__sub" style="margin:8px 4px 0;">Efectividad derivada de # de perfiles: Alta ≥6 · Media 3–5 · Baja &lt;3. Rubro = industria de la cuenta. Close Win = la oportunidad está en stage "Close Win".</p>
       </div>
 
+      <!-- ===== One shot, one kill (candidato contratado del batch N°1) ===== -->
+      <div class="section s-12">
+        <div>
+          <h2>One shot, one kill</h2>
+          <p>% de close win cuyo candidato contratado estaba en el <strong>batch N°1</strong></p>
+        </div>
+      </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">One shot, one kill<br/>· <span data-window-label>30d</span></div>
+          </div>
+          <div>
+            <div class="hero-kpi__value" data-chart="op_kpi_one_shot_kill" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="op_kpi_one_shot_kill" data-bind="text" data-field="one_shot_count" data-reduce="first" data-fmt="int">—</span> de
+              <span data-chart="op_kpi_one_shot_kill" data-bind="text" data-field="placements" data-reduce="first" data-fmt="int">—</span> close win con candidato del batch N°1
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Por recruiter</h3>
+            <p class="card__sub">Close win, one-shot y % por recruiter · click en un recruiter para ver su detalle · <span data-window-label>30d</span></p>
+          </div>
+        </div>
+        <div class="dtable-wrap" data-chart="op_table_one_shot_kill_by_recruiter" data-bind="dtable"
+             data-row-drill-field="recruiter" data-row-drill-target="op_table_one_shot_kill_detail" data-row-drill-target-field="recruiter"
+             data-cols="recruiter|Recruiter|raw,placements|Close Win|int,one_shot_count|One-shot|int,conversion_pct|% one-shot|percent"
+             data-empty-text="No hay close win con batches en esta ventana."></div>
+      </div>
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">One shot, one kill · mensual</h3>
+            <p class="card__sub">% de one-shot por mes (mes de contratación)</p>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="op_line_one_shot_kill" data-bind="line"
+               data-x="mes" data-y="conversion_pct" data-color="violet"
+               data-labels="% one-shot" data-fmt-y="percent" data-line-detail-panel="op-one-shot-month-detail"
+               data-tooltip-extras="one_shot_count|One-shot|int,placements|Close Win|int"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Detalle de placements</h3>
+            <p class="card__sub">Una fila por close win · filtrá por recruiter, cliente o one-shot · <span data-window-label>30d</span></p>
+          </div>
+        </div>
+        <div class="dtable-wrap" data-chart="op_table_one_shot_kill_detail" data-bind="dtable" data-scroll
+             data-multi-filter="recruiter|Recruiter,client_name|Cliente,one_shot|One-shot"
+             data-cols="hire_date|Fecha hire|raw,opp_position_name|Posición|raw,client_name|Cliente|raw,recruiter|Recruiter|raw,candidate_name|Candidato|raw,batch_num|Batch del hire|int,one_shot|One-shot|cw"
+             data-empty-text="No hay close win con batches en esta ventana."></div>
+        <p class="card__sub" style="margin:8px 4px 0;">"Batch del hire" = primer batch donde apareció el candidato contratado. One-shot = Sí cuando ese batch es el N°1.</p>
+      </div>
+
       <!-- ===== Close wins mensuales (YTD · Staffing/Recruiting) ===== -->
       <div class="section s-12">
         <div>
@@ -8549,6 +8617,24 @@
           </div>
         </div>
 
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-one-shot-month-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · one shot one kill</span>
+            <h3 class="kpi-drawer__title">Detalle del mes</h3>
+            <p class="kpi-drawer__sub">Close win del mes seleccionado · si el candidato contratado venía del batch N°1 (one-shot) o no.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Close win <span class="count" data-chart="op_table_one_shot_kill_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dtable-wrap" data-chart="op_table_one_shot_kill_detail" data-bind="dtable"
+                   data-multi-filter="recruiter|Recruiter,client_name|Cliente,one_shot|One-shot"
+                   data-cols="hire_date|Fecha hire|raw,opp_position_name|Posición|raw,client_name|Cliente|raw,recruiter|Recruiter|raw,candidate_name|Candidato|raw,batch_num|Batch del hire|int,one_shot|One-shot|cw"
+                   data-empty-text="Sin close win este mes."></div>
+            </section>
+          </div>
+        </div>
+
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-closewin-origin-detail">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · close wins por origen</span>
@@ -8799,6 +8885,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=106" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=108" defer></script>
 </body>
 </html>
