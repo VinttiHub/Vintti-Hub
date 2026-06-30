@@ -10,6 +10,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           a.client_name,
           COALESCE(NULLIF(TRIM(a.industry), ''), '(Sin industria)') AS industry,
+          COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin,
           o.opp_position_name,
           TRIM(o.opp_stage) AS opp_stage,
           COALESCE(o.expected_revenue, 0)::bigint AS expected_revenue
@@ -29,6 +30,7 @@ DATASET = {
     "dimensions": [
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "industry", "label": "Industria", "type": "string"},
+        {"key": "origin", "label": "Origen", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "opp_stage", "label": "Stage", "type": "string"},
     ],

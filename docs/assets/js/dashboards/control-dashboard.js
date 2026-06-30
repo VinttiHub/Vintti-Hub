@@ -4221,15 +4221,29 @@
     hydrate();
   }
 
-  // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla).
+  // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla) y
+  // publica su altura en --sticky-head-h para que otras barras (ej. filtros de Marketing)
+  // se peguen justo por debajo.
   function bindStickyHead() {
     const head = document.querySelector('.sticky-head');
     if (!head) return;
-    const onScroll = () => {
-      head.classList.toggle('is-stuck', head.getBoundingClientRect().top <= 0);
+    const root = document.documentElement;
+    const mktHead = document.querySelector('.channel[data-channel="marketing"] .mkt-metrics-head');
+    const update = () => {
+      const hr = head.getBoundingClientRect();
+      root.style.setProperty('--sticky-head-h', Math.round(hr.height) + 'px');
+      head.classList.toggle('is-stuck', hr.top <= 0);
+      if (mktHead) {
+        const r = mktHead.getBoundingClientRect();
+        // visible solo en Marketing; se pega cuando su top alcanza el borde inferior del head fijo.
+        mktHead.classList.toggle('is-stuck', r.height > 0 && r.top <= hr.height + 0.5);
+      }
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update, { passive: true });
+    // Recalcular al cambiar de pestaña (la altura del head cambia: en Marketing se oculta la filter-bar).
+    document.querySelectorAll('.tab-radios').forEach(r => r.addEventListener('change', () => requestAnimationFrame(update)));
+    update();
   }
 
   if (document.readyState === 'loading') {
