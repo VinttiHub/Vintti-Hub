@@ -13,6 +13,10 @@ from . import (
     op_closewin_candidate_origin_detail,
     op_hunteo_vs_applicant_monthly,
     op_hunteo_vs_applicant_monthly_detail,
+    op_rejection_recruiters,
+    op_churn_recruiters,
+    op_rejection_accounts,
+    op_churn_accounts,
     mrr_history,
     active_headcount_history,
     active_headcount_detail,
@@ -474,6 +478,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     op_closewin_candidate_origin_detail.DATASET["key"]: op_closewin_candidate_origin_detail.DATASET,
     op_hunteo_vs_applicant_monthly.DATASET["key"]: op_hunteo_vs_applicant_monthly.DATASET,
     op_hunteo_vs_applicant_monthly_detail.DATASET["key"]: op_hunteo_vs_applicant_monthly_detail.DATASET,
+    op_rejection_recruiters.DATASET["key"]: op_rejection_recruiters.DATASET,
+    op_churn_recruiters.DATASET["key"]: op_churn_recruiters.DATASET,
+    op_rejection_accounts.DATASET["key"]: op_rejection_accounts.DATASET,
+    op_churn_accounts.DATASET["key"]: op_churn_accounts.DATASET,
 }
 
 

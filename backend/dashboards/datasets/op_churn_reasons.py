@@ -13,18 +13,28 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Ventana estándar del dashboard: Desde/Hasta > Mes > rolling 30d (corte).
     # Ancla en la fecha de baja `carga_inactive`.
     lo, hi = window_bounds(filters)
+    recruiter = str(filters.get("recruiter") or "").strip().lower()
+    account = str(filters.get("account") or "").strip()
+    reason = str(filters.get("reason") or "").strip()
     sql = """
         SELECT
-          TRIM(inactive_reason) AS reason,
+          TRIM(ho.inactive_reason) AS reason,
           COUNT(*)::int AS count,
           ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS share_pct
-        FROM hire_opportunity
-        WHERE NULLIF(TRIM(inactive_reason), '') IS NOT NULL
-          AND carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
-        GROUP BY TRIM(inactive_reason)
+        FROM hire_opportunity ho
+        LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+        LEFT JOIN account a     ON a.account_id      = ho.account_id
+        WHERE NULLIF(TRIM(ho.inactive_reason), '') IS NOT NULL
+          AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
+          AND (%(recruiter)s = '' OR LOWER(TRIM(o.opp_hr_lead)) = %(recruiter)s)
+          AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
+          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+          AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+          AND (%(reason)s = '' OR TRIM(ho.inactive_reason) = %(reason)s)
+        GROUP BY TRIM(ho.inactive_reason)
         ORDER BY count DESC, reason;
     """
-    return sql, {"w_lo": lo, "w_hi": hi}
+    return sql, {"w_lo": lo, "w_hi": hi, "recruiter": recruiter, "account": account, "reason": reason}
 
 
 DATASET = {

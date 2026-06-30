@@ -2595,6 +2595,102 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .eff-pill.eff-media { background: rgba(255,196,0,0.18);  color: #8a6d00; }
 .eff-pill.eff-baja  { background: rgba(255,31,219,0.12); color: #b00079; }
 
+/* Dropdowns de filtro (recruiter / account) en los donuts (rechazo / caída) */
+.donut-filter {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.donut-filter .recruiter-filter {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 6px 26px 6px 10px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.donut-filter .recruiter-filter:hover { border-color: var(--c-violet, #6c38ff); }
+.donut-filter .recruiter-filter:focus { outline: none; border-color: var(--c-violet, #6c38ff); box-shadow: 0 0 0 2px rgba(108,56,255,0.15); }
+
+/* Filtro buscable (account): input con autocompletado + botón limpiar */
+.donut-filter .filter-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.donut-filter .filter-search .filter-input {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 6px 24px 6px 10px;
+  min-width: 180px;
+  box-sizing: border-box;
+}
+.donut-filter .filter-search .filter-input:hover { border-color: var(--c-violet, #6c38ff); }
+.donut-filter .filter-search .filter-input:focus { outline: none; border-color: var(--c-violet, #6c38ff); box-shadow: 0 0 0 2px rgba(108,56,255,0.15); }
+.donut-filter .filter-search .filter-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-3, #6b7280);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.donut-filter .filter-search .filter-clear:hover { color: var(--ink); }
+
+/* Menú desplegable del combobox de account */
+.donut-filter .filter-search .filter-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 100%;
+  max-width: 280px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(13,18,30,0.16);
+}
+.donut-filter .filter-search .filter-menu[hidden] { display: none; }
+.donut-filter .filter-search .filter-menu li {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.donut-filter .filter-search .filter-menu li:hover,
+.donut-filter .filter-search .filter-menu li.is-active {
+  background: rgba(108,56,255,0.10);
+}
+.donut-filter .filter-search .filter-menu .filter-menu__empty {
+  color: var(--ink-3, #6b7280);
+  cursor: default;
+  background: none;
+}
+
 /* Pill de Close Win (Sí / No) */
 .cw-pill {
   display: inline-block;

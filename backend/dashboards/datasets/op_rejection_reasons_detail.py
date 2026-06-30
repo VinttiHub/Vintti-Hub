@@ -11,6 +11,8 @@ from ._periods import window_bounds
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     reason = str(filters.get("reason") or "").strip()
+    recruiter = str(filters.get("recruiter") or "").strip().lower()
+    account = str(filters.get("account") or "").strip()
     lo, hi = window_bounds(filters)
     sql = f"""
         WITH base AS (
@@ -18,21 +20,32 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             {REASON_CASE.format(col='cb.status')} AS reason,
             COALESCE(c.name, '—') AS candidate_name,
             COALESCE(a.client_name, '—') AS client_name,
-            COALESCE(o.opp_position_name, '—') AS opp_position_name
+            TRIM(a.client_name) AS client_name_key,
+            COALESCE(o.opp_position_name, '—') AS opp_position_name,
+            COALESCE(NULLIF(TRIM(u.nickname), ''),
+                     NULLIF(TRIM(u.user_name), ''),
+                     NULLIF(TRIM(o.opp_hr_lead), ''),
+                     '—') AS recruiter,
+            LOWER(TRIM(o.opp_hr_lead)) AS recruiter_email
           FROM candidates_batches cb
           LEFT JOIN batch b       ON b.batch_id       = cb.batch_id
           LEFT JOIN opportunity o ON o.opportunity_id = b.opportunity_id
           LEFT JOIN account a     ON a.account_id      = o.account_id
           LEFT JOIN candidates c  ON c.candidate_id    = cb.candidate_id
+          LEFT JOIN users u       ON LOWER(TRIM(u.email_vintti)) = LOWER(TRIM(o.opp_hr_lead))
           WHERE b.presentation_date BETWEEN %(w_lo)s AND %(w_hi)s
+            -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+            AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
         )
-        SELECT reason, candidate_name, client_name, opp_position_name
+        SELECT reason, candidate_name, client_name, opp_position_name, recruiter
         FROM base
         WHERE reason IS NOT NULL
           AND (%(reason)s = '' OR reason = %(reason)s)
+          AND (%(recruiter)s = '' OR recruiter_email = %(recruiter)s)
+          AND (%(account)s = '' OR client_name_key = %(account)s)
         ORDER BY reason, candidate_name;
     """
-    return sql, {"reason": reason, "w_lo": lo, "w_hi": hi}
+    return sql, {"reason": reason, "recruiter": recruiter, "account": account, "w_lo": lo, "w_hi": hi}
 
 
 DATASET = {
@@ -43,6 +56,7 @@ DATASET = {
         {"key": "candidate_name", "label": "Candidato", "type": "string"},
         {"key": "client_name", "label": "Account", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
+        {"key": "recruiter", "label": "Recruiter", "type": "string"},
     ],
     "measures": [],
     "default_filters": {},

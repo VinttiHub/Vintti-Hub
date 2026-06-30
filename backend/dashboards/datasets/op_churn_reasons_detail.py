@@ -12,6 +12,8 @@ from ._periods import window_bounds
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # `reason` = razón clickeada en la dona (vacío = todas).
     reason = str(filters.get("reason") or "").strip()
+    recruiter = str(filters.get("recruiter") or "").strip().lower()
+    account = str(filters.get("account") or "").strip()
     lo, hi = window_bounds(filters)
     sql = """
         SELECT
@@ -19,17 +21,26 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COALESCE(c.name, '—') AS candidate_name,
           COALESCE(a.client_name, '—') AS client_name,
           COALESCE(o.opp_position_name, '—') AS opp_position_name,
-          TO_CHAR(ho.carga_inactive::date, 'YYYY-MM-DD') AS inactive_date
+          TO_CHAR(ho.carga_inactive::date, 'YYYY-MM-DD') AS inactive_date,
+          COALESCE(NULLIF(TRIM(u.nickname), ''),
+                   NULLIF(TRIM(u.user_name), ''),
+                   NULLIF(TRIM(o.opp_hr_lead), ''),
+                   '—') AS recruiter
         FROM hire_opportunity ho
         LEFT JOIN candidates c  ON c.candidate_id  = ho.candidate_id
         LEFT JOIN account a     ON a.account_id     = ho.account_id
         LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+        LEFT JOIN users u       ON LOWER(TRIM(u.email_vintti)) = LOWER(TRIM(o.opp_hr_lead))
         WHERE NULLIF(TRIM(ho.inactive_reason), '') IS NOT NULL
           AND (%(reason)s = '' OR TRIM(ho.inactive_reason) = %(reason)s)
+          AND (%(recruiter)s = '' OR LOWER(TRIM(o.opp_hr_lead)) = %(recruiter)s)
+          AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
+          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+          AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
           AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
         ORDER BY TRIM(ho.inactive_reason), ho.carga_inactive DESC NULLS LAST, c.name;
     """
-    return sql, {"reason": reason, "w_lo": lo, "w_hi": hi}
+    return sql, {"reason": reason, "recruiter": recruiter, "account": account, "w_lo": lo, "w_hi": hi}
 
 
 DATASET = {
@@ -41,6 +52,7 @@ DATASET = {
         {"key": "client_name", "label": "Account", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "inactive_date", "label": "Fecha baja", "type": "date"},
+        {"key": "recruiter", "label": "Recruiter", "type": "string"},
     ],
     "measures": [],
     "default_filters": {},

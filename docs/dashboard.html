@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=84">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=88">
 </head>
 <body>
 
@@ -4902,6 +4902,19 @@
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-rejection-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones de rechazo">Ver detalle</button>
         </div>
+        <div class="donut-filter">
+          <select class="recruiter-filter" data-chart="op_select_rejection_reasons" data-bind="filter-select"
+                  data-filter-field="reason" data-opt-value="reason" data-opt-label="reason" data-all-label="Razón: Todas"
+                  data-target-chart="op_donut_rejection_reasons" data-target-panel="op-rejection-reasons-detail"
+                  aria-label="Filtrar rechazos por razón"></select>
+          <select class="recruiter-filter" data-chart="op_select_rejection_recruiters" data-bind="filter-select"
+                  data-filter-field="recruiter" data-all-label="Recruiter: Todos"
+                  data-target-chart="op_donut_rejection_reasons" data-target-panel="op-rejection-reasons-detail"
+                  aria-label="Filtrar rechazos por recruiter"></select>
+          <div class="filter-search" data-chart="op_select_rejection_accounts" data-bind="filter-search"
+                  data-filter-field="account" data-placeholder="Account: escribí o elegí…"
+                  data-target-chart="op_donut_rejection_reasons" data-target-panel="op-rejection-reasons-detail"></div>
+        </div>
         <div class="donut" style="margin-top:8px">
           <svg data-chart="op_donut_rejection_reasons" data-bind="donut" data-label="reason" data-value="count"
                data-detail-panel="op-rejection-reasons-detail" data-detail-key="reason" viewBox="0 0 180 180"></svg>
@@ -4919,6 +4932,19 @@
             <p class="card__sub"><span data-chart="op_donut_churn_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> candidatos<span data-window-label>30d</span></p>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-churn-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones">Ver detalle</button>
+        </div>
+        <div class="donut-filter">
+          <select class="recruiter-filter" data-chart="op_select_churn_reasons" data-bind="filter-select"
+                  data-filter-field="reason" data-opt-value="reason" data-opt-label="reason" data-all-label="Razón: Todas"
+                  data-target-chart="op_donut_churn_reasons" data-target-panel="op-churn-reasons-detail"
+                  aria-label="Filtrar caídas por razón"></select>
+          <select class="recruiter-filter" data-chart="op_select_churn_recruiters" data-bind="filter-select"
+                  data-filter-field="recruiter" data-all-label="Recruiter: Todos"
+                  data-target-chart="op_donut_churn_reasons" data-target-panel="op-churn-reasons-detail"
+                  aria-label="Filtrar caídas por recruiter"></select>
+          <div class="filter-search" data-chart="op_select_churn_accounts" data-bind="filter-search"
+                  data-filter-field="account" data-placeholder="Account: escribí o elegí…"
+                  data-target-chart="op_donut_churn_reasons" data-target-panel="op-churn-reasons-detail"></div>
         </div>
         <div class="donut" style="margin-top:8px">
           <svg data-chart="op_donut_churn_reasons" data-bind="donut" data-label="reason" data-value="count"
@@ -8499,7 +8525,7 @@
               <h4 class="kpi-drawer__section-title">Caídas con razón <span class="count" data-chart="op_table_churn_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <input type="text" class="dtable-filter" data-dtable-filter="op_table_churn_reasons_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
               <div class="dtable-wrap" data-chart="op_table_churn_reasons_detail" data-bind="dtable" data-filter-col="2"
-                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,inactive_date|Fecha baja|raw"
+                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,inactive_date|Fecha baja|raw,recruiter|Recruiter|raw"
                    data-empty-text="Sin caídas con razón cargada."></div>
             </section>
           </div>
@@ -8517,7 +8543,7 @@
               <h4 class="kpi-drawer__section-title">Rechazos <span class="count" data-chart="op_table_rejection_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <input type="text" class="dtable-filter" data-dtable-filter="op_table_rejection_reasons_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
               <div class="dtable-wrap" data-chart="op_table_rejection_reasons_detail" data-bind="dtable" data-filter-col="2"
-                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw"
+                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,recruiter|Recruiter|raw"
                    data-empty-text="Sin rechazos."></div>
             </section>
           </div>
@@ -8773,6 +8799,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=102" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=106" defer></script>
 </body>
 </html>

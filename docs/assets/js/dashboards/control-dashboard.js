@@ -894,6 +894,8 @@
       if (bind === 'list') return renderList(el, scopedRows);
       if (bind === 'rollup-list') return renderRollupList(el, scopedRows);
       if (bind === 'dtable') return renderDtable(el, scopedRows);
+      if (bind === 'filter-select' || bind === 'recruiter-select') return renderFilterSelect(el, scopedRows);
+      if (bind === 'filter-search') return renderFilterSearch(el, scopedRows);
       if (bind === 'cohort') return renderCohort(el, scopedRows);
       if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
@@ -1949,6 +1951,147 @@
         scope.querySelectorAll(`.count[data-chart="${chartKey}"]`).forEach(c => { c.textContent = String(n); });
       });
     });
+  }
+
+  /* ---------- filter-select (dropdown que filtra un donut + su detalle por un campo) ----------
+     El <select> se hidrata con una lista (rows: value, label — configurable con
+     data-opt-value / data-opt-label). Al elegir un valor, setea data-override-<field>
+     (field = data-filter-field, ej. recruiter / account) en los charts target (donut +
+     count + legend) y en el panel de detalle, y refetchea el donut. data-target-chart y
+     data-target-panel indican a quién filtrar. */
+  function renderFilterSelect(el, rows) {
+    const current = el.dataset.current || '';
+    const allLabel = el.dataset.allLabel || 'Todos';
+    const valCol = el.dataset.optValue || 'value';
+    const labCol = el.dataset.optLabel || 'label';
+    const opts = [`<option value="">${esc(allLabel)}</option>`].concat(
+      (rows || [])
+        .filter(r => r && r[valCol] != null && String(r[valCol]).trim() !== '')
+        .map(r => {
+          const val = String(r[valCol]);
+          const name = String(r[labCol] != null && String(r[labCol]).trim() !== '' ? r[labCol] : r[valCol]);
+          return `<option value="${esc(val)}"${val === current ? ' selected' : ''}>${esc(name)}</option>`;
+        })
+    ).join('');
+    el.innerHTML = opts;
+    el.value = current;
+    if (!el._filterBound) {
+      el._filterBound = true;
+      el.addEventListener('change', () => applyFilter(el, el.value || ''));
+    }
+  }
+
+  /* Variante "buscable" (combobox propio): el host es un <div>; renderiza un <input> +
+     un menú <ul> que se abre al hacer foco y filtra por coincidencia (substring) a
+     medida que se escribe. Click o teclado (↑/↓/Enter) para elegir. Solo válida cuando
+     value === label (ej. account). */
+  function renderFilterSearch(el, rows) {
+    const valCol = el.dataset.optValue || 'value';
+    const labCol = el.dataset.optLabel || 'label';
+    const ph = el.dataset.placeholder || 'Buscar…';
+    const current = el.dataset.current || '';
+    el._fsOptions = (rows || [])
+      .filter(r => r && r[valCol] != null && String(r[valCol]).trim() !== '')
+      .map(r => {
+        const value = String(r[valCol]);
+        const label = String(r[labCol] != null && String(r[labCol]).trim() !== '' ? r[labCol] : r[valCol]);
+        return { value, label };
+      });
+    el.innerHTML =
+      `<input class="filter-input" type="text" placeholder="${esc(ph)}" value="${esc(current)}" autocomplete="off" aria-label="${esc(ph)}">` +
+      `<button type="button" class="filter-clear" title="Limpiar" aria-label="Limpiar">×</button>` +
+      `<ul class="filter-menu" hidden></ul>`;
+    if (!el._searchBound) {
+      el._searchBound = true;
+      el.addEventListener('focusin', (ev) => { if (ev.target.matches('input.filter-input')) openFilterMenu(el); });
+      el.addEventListener('input', (ev) => { if (ev.target.matches('input.filter-input')) openFilterMenu(el); });
+      el.addEventListener('keydown', (ev) => {
+        if (!ev.target.matches('input.filter-input')) return;
+        const m = el.querySelector('.filter-menu');
+        if (ev.key === 'Escape') { if (m) m.hidden = true; return; }
+        const items = (m && !m.hidden) ? [...m.querySelectorAll('li[data-val]')] : [];
+        if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          if (!items.length) { openFilterMenu(el); return; }
+          let idx = items.findIndex(li => li.classList.contains('is-active'));
+          idx = ev.key === 'ArrowDown' ? Math.min(items.length - 1, idx + 1) : Math.max(0, idx - 1);
+          items.forEach(li => li.classList.remove('is-active'));
+          if (items[idx]) { items[idx].classList.add('is-active'); items[idx].scrollIntoView({ block: 'nearest' }); }
+          return;
+        }
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const pick = items.find(li => li.classList.contains('is-active')) || items[0];
+          if (pick) selectFilterOption(el, pick.dataset.val, pick.dataset.label);
+          else { applyFilter(el, ev.target.value.trim()); if (m) m.hidden = true; }
+        }
+      });
+      el.addEventListener('mousedown', (ev) => {
+        const li = ev.target.closest('.filter-menu li[data-val]');
+        if (li) { ev.preventDefault(); selectFilterOption(el, li.dataset.val, li.dataset.label); return; }
+        if (ev.target.closest('.filter-clear')) {
+          ev.preventDefault();
+          const inp = el.querySelector('input.filter-input');
+          if (inp) inp.value = '';
+          applyFilter(el, '');
+          const m = el.querySelector('.filter-menu'); if (m) m.hidden = true;
+        }
+      });
+      el.addEventListener('focusout', () => {
+        setTimeout(() => {
+          if (!el.contains(document.activeElement)) {
+            const m = el.querySelector('.filter-menu'); if (m) m.hidden = true;
+          }
+        }, 120);
+      });
+    }
+  }
+
+  function openFilterMenu(el) {
+    const inp = el.querySelector('input.filter-input');
+    const m = el.querySelector('.filter-menu');
+    if (!inp || !m) return;
+    const q = (inp.value || '').trim().toLowerCase();
+    const opts = (el._fsOptions || []).filter(o => !q || o.label.toLowerCase().includes(q)).slice(0, 80);
+    m.innerHTML = opts.length
+      ? opts.map(o => `<li data-val="${esc(o.value)}" data-label="${esc(o.label)}">${esc(o.label)}</li>`).join('')
+      : `<li class="filter-menu__empty" aria-disabled="true">Sin resultados</li>`;
+    m.hidden = false;
+  }
+
+  function selectFilterOption(el, value, label) {
+    const inp = el.querySelector('input.filter-input');
+    if (inp) inp.value = (label != null ? label : value);
+    const m = el.querySelector('.filter-menu'); if (m) m.hidden = true;
+    applyFilter(el, value);
+  }
+
+  async function applyFilter(el, value) {
+    value = value || '';
+    el.dataset.current = value;
+    const targetChart = el.dataset.targetChart;
+    const panelKey = el.dataset.targetPanel;
+    const field = (el.dataset.filterField || 'recruiter').trim();
+    const attr = 'data-override-' + field;
+    if (!targetChart) return;
+    const card = el.closest('.card') || document;
+    // 1) Setear/limpiar el override en los elementos del donut (svg, leyenda, count).
+    const cardEls = [...card.querySelectorAll(`[data-chart="${targetChart}"]`)];
+    cardEls.forEach(t => { if (value) t.setAttribute(attr, value); else t.removeAttribute(attr); });
+    // 2) Propagar al panel de detalle (drawer) para que la lista quede filtrada al abrir.
+    if (panelKey) {
+      document.querySelectorAll(`[data-kpi-detail-panel="${panelKey}"] [data-chart]`).forEach(t => {
+        if (value) t.setAttribute(attr, value); else t.removeAttribute(attr);
+      });
+    }
+    // 3) Refetchear el donut con el override y re-renderizar sus elementos.
+    if (!cardEls.length) return;
+    const overrides = readOverridesFor(cardEls[0]);
+    try {
+      const r = await fetchChart(targetChart, overrides);
+      lastFetchedRows.set(compKeyFor(targetChart, overrides), r.rows || []);
+      cardEls.forEach(t => renderBinding(t, r.rows || []));
+    } catch (e) { console.error('filter-select', field, targetChart, e); }
   }
 
   /* ---------- cohort by contractor (pivot long → wide month-by-month table) ---------- */
