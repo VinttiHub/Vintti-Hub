@@ -1,8 +1,9 @@
-"""Marketing · Oportunidades abiertas segmentadas por industria — ranking por período.
+"""Marketing · Oportunidades GENERADAS segmentadas por industria — ranking por período.
 
-Opps abiertas = stage ∉ {Close Win, Close Lost, Closed Lost}. Segmentadas por
-account.industry. Filtradas a cuentas que entraron al CRM (account.creation_date)
-en el período en curso (a la fecha): semana / mes / q / anio.
+Opps generadas = TODAS las opps (sin filtro de stage) de cuentas que entraron al CRM
+(account.creation_date) en el período en curso. Mide demanda por industria: un cliente
+de una industria puede generar varias opps (ej. pidió 3 puestos → 3 opps).
+Segmentadas por account.industry. Filtra el origen marketing (excluye outbound, etc.).
 Devuelve count + expected_revenue por industria, con totales (constantes).
 """
 from __future__ import annotations
@@ -46,8 +47,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(o.expected_revenue, 0)::numeric AS rev
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
-          WHERE TRIM(COALESCE(o.opp_stage, '')) NOT IN ('Close Win', 'Close Lost', 'Closed Lost')
-            AND a.creation_date IS NOT NULL
+          WHERE a.creation_date IS NOT NULL
             AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
             AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ),
@@ -71,13 +71,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "mkt_open_opps_by_industry",
-    "label": "Marketing · Open opps por industria (ranking, período)",
+    "label": "Marketing · Opps generadas por industria (ranking, período)",
     "dimensions": [
         {"key": "industry", "label": "Industria", "type": "string"},
         {"key": "period_label", "label": "Período", "type": "string"},
     ],
     "measures": [
-        {"key": "count", "label": "Opps abiertas", "type": "number"},
+        {"key": "count", "label": "Opps generadas", "type": "number"},
         {"key": "expected_revenue", "label": "Expected revenue", "type": "currency"},
         {"key": "share_pct", "label": "% del total", "type": "percent"},
         {"key": "total", "label": "Total opps", "type": "number"},

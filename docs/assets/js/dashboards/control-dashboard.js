@@ -1312,8 +1312,8 @@
       ln.setAttribute('x2', edgeX.toFixed(1)); ln.setAttribute('y2', midY.toFixed(1));
       ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', '1'); ln.setAttribute('data-rendered', '');
       svg.appendChild(ln);
-      txt(labelX, midY - 1.5, `${s.name} · ${s.v}`, { size: '9.5', weight: '700', anchor: 'end' });
-      txt(labelX, midY + 9, pct(s.pct), { size: '8.5', weight: '600', anchor: 'end', fill: '#8a93a3' });
+      txt(labelX, midY - 5, `${s.name} · ${s.v}`, { size: '17', weight: '700', anchor: 'end' });
+      txt(labelX, midY + 17, pct(s.pct), { size: '15', weight: '700', anchor: 'end', fill: '#8a93a3' });
     });
   }
 
