@@ -53,20 +53,34 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
         opps_turbo AS (
-          SELECT DISTINCT
+          SELECT
             t.opportunity_id,
-            TRIM(o.opp_stage) AS opp_stage
+            TRIM(o.opp_stage)       AS opp_stage,
+            o.opp_close_date,
+            MIN(t.meeting_date::date) AS first_turbo
           FROM turvo t
           JOIN opportunity o ON o.opportunity_id = t.opportunity_id
           CROSS JOIN ventana v
           WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+            AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
+          GROUP BY t.opportunity_id, TRIM(o.opp_stage), o.opp_close_date
         )
         SELECT
           COUNT(*)::int                                                   AS opps_con_turbo,
-          COUNT(*) FILTER (WHERE opp_stage = 'Close Win')::int            AS opps_close_win,
+          -- Close Win solo si el cierre es posterior (o igual) al primer turbo de la opp
+          COUNT(*) FILTER (
+            WHERE opp_stage = 'Close Win'
+              AND opp_close_date IS NOT NULL
+              AND opp_close_date::date >= first_turbo
+          )::int                                                          AS opps_close_win,
           ROUND(
-            100.0 * COUNT(*) FILTER (WHERE opp_stage = 'Close Win')
+            100.0 * COUNT(*) FILTER (
+              WHERE opp_stage = 'Close Win'
+                AND opp_close_date IS NOT NULL
+                AND opp_close_date::date >= first_turbo
+            )
             / NULLIF(COUNT(*), 0), 1
           )::float                                                        AS conversion_pct
         FROM opps_turbo;

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=80">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=84">
 </head>
 <body>
 
@@ -4849,6 +4849,21 @@
         </div>
       </div>
 
+      <!-- ===== Detalle de cada turbo (tabla filtrable) ===== -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Detalle de cada turbo</h3>
+            <p class="card__sub">Una fila por reunión de presentación · filtrá por recruiter, posición, cliente, rubro o efectividad · <span data-window-label>30d</span></p>
+          </div>
+        </div>
+        <div class="dtable-wrap" data-chart="op_table_turbo_detail_full" data-bind="dtable" data-scroll
+             data-multi-filter="hr_lead|Recruiter,opp_position_name|Posición,client_name|Cliente,rubro|Rubro,efectividad|Efectividad,close_win|Close Win"
+             data-cols="meeting_date|Fecha|raw,opp_position_name|Posición|raw,client_name|Cliente|raw,rubro|Rubro|raw,hr_lead|Recruiter|raw,candidates|Perfiles obtenidos|int,efectividad|Efectividad|eff,close_win|Close Win|cw"
+             data-empty-text="No hay turbos en esta ventana."></div>
+        <p class="card__sub" style="margin:8px 4px 0;">Efectividad derivada de # de perfiles: Alta ≥6 · Media 3–5 · Baja &lt;3. Rubro = industria de la cuenta. Close Win = la oportunidad está en stage "Close Win".</p>
+      </div>
+
       <!-- ===== Close wins mensuales (YTD · Staffing/Recruiting) ===== -->
       <div class="section s-12">
         <div>
@@ -8758,6 +8773,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=99" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=102" defer></script>
 </body>
 </html>

@@ -56,7 +56,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           t.opportunity_id::text                                AS opportunity_id,
           a.client_name,
           o.opp_position_name,
-          TRIM(o.opp_stage)                                     AS opp_stage,
+          -- "Close Win" solo cuenta si el cierre es posterior (o igual) al primer
+          -- turbo de la opp; si cerró antes, se marca como previo al turbo.
+          CASE
+            WHEN TRIM(o.opp_stage) = 'Close Win'
+                 AND o.opp_close_date IS NOT NULL
+                 AND o.opp_close_date::date >= MIN(t.meeting_date::date)
+              THEN 'Close Win'
+            WHEN TRIM(o.opp_stage) = 'Close Win'
+              THEN 'Close Win (previo al turbo)'
+            ELSE TRIM(o.opp_stage)
+          END                                                   AS opp_stage,
           COUNT(*)::int                                         AS turbos,
           TO_CHAR(MAX(t.meeting_date)::date, 'YYYY-MM-DD')      AS last_meeting_date
         FROM turvo t
@@ -65,7 +75,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN ventana v
         WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
           AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
-        GROUP BY 1, 2, 3, 4
+          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+          AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
+        GROUP BY t.opportunity_id, a.client_name, o.opp_position_name,
+                 TRIM(o.opp_stage), o.opp_close_date
         ORDER BY a.client_name, last_meeting_date DESC;
     """
 

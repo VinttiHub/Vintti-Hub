@@ -1830,18 +1830,76 @@
       el.innerHTML = `<div class="muted" style="padding:18px;text-align:center">${esc(empty)}</div>`;
       return;
     }
+    rows = rows || [];
+    // Cache de las filas completas (sin filtrar) para re-render al cambiar un dropdown.
+    el._dtableRows = rows;
+
+    // ---- Multi-filtro por dropdown: data-multi-filter="field|Label,field2|Label2,..." ----
+    // Cada campo se vuelve un <select> con los valores distintos de la columna; las
+    // selecciones se combinan (AND) y se guardan en data-mf-state. 100% client-side.
+    let toolbarHtml = '';
+    let mfState = {};
+    const mfSpec = (el.dataset.multiFilter || '').trim();
+    if (mfSpec) {
+      try { mfState = JSON.parse(el.dataset.mfState || '{}'); } catch (_e) { mfState = {}; }
+      const mfFields = mfSpec.split(',').map(s => {
+        const [field, label] = s.trim().split('|');
+        return { field: (field || '').trim(), label: (label || field || '').trim() };
+      }).filter(f => f.field);
+      const selectsHtml = mfFields.map(f => {
+        const vals = [...new Set((rows || [])
+          .map(r => r[f.field])
+          .filter(v => v != null && String(v).trim() !== '')
+          .map(String))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        const cur = mfState[f.field] || '';
+        const opts = [`<option value="">${esc(f.label)}: Todos</option>`]
+          .concat(vals.map(v => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(v)}</option>`))
+          .join('');
+        return `<select class="dtable-mf" data-mf-field="${esc(f.field)}" aria-label="${esc(f.label)}">${opts}</select>`;
+      }).join('');
+      const hasActive = Object.keys(mfState).length > 0;
+      toolbarHtml = `<div class="dtable-toolbar">${selectsHtml}` +
+        (hasActive ? `<button type="button" class="dtable-mf-clear" data-mf-clear>Limpiar</button>` : '') +
+        `</div>`;
+      if (!el._mfBound) {
+        el._mfBound = true;
+        el.addEventListener('change', (ev) => {
+          const sel = ev.target.closest('select.dtable-mf');
+          if (!sel) return;
+          let st = {};
+          try { st = JSON.parse(el.dataset.mfState || '{}'); } catch (_e) { st = {}; }
+          if (sel.value) st[sel.dataset.mfField] = sel.value; else delete st[sel.dataset.mfField];
+          el.dataset.mfState = JSON.stringify(st);
+          renderDtable(el, el._dtableRows || []);
+        });
+        el.addEventListener('click', (ev) => {
+          if (!ev.target.closest('[data-mf-clear]')) return;
+          el.dataset.mfState = '{}';
+          renderDtable(el, el._dtableRows || []);
+        });
+      }
+    }
+
     // Filtro client-side por columna (ej. account): si el dtable tiene data-filter-col
     // y data-filter-value, mostramos solo las filas que matchean (sin pegarle al backend).
-    let viewRows = rows || [];
+    let viewRows = rows;
     const fVal = (el.dataset.filterValue || '').trim().toLowerCase();
     const fColIdx = (el.dataset.filterCol != null && el.dataset.filterCol !== '') ? +el.dataset.filterCol : null;
     if (fVal && fColIdx != null && cols[fColIdx]) {
       const ff = cols[fColIdx].field;
       viewRows = viewRows.filter(r => String(r[ff] == null ? '' : r[ff]).toLowerCase().includes(fVal));
     }
+    // Aplicar multi-filtro (match exacto por campo).
+    const mfKeys = Object.keys(mfState);
+    if (mfKeys.length) {
+      viewRows = viewRows.filter(r => mfKeys.every(f => String(r[f] == null ? '' : r[f]) === mfState[f]));
+    }
+    // Si data-scroll está presente, la tabla va dentro de un contenedor con
+    // alto máximo + scroll interno (los filtros quedan fijos arriba).
+    const wrapTable = (t) => ('scroll' in el.dataset) ? `<div class="dtable-scroll">${t}</div>` : t;
     if (!viewRows.length) {
-      el.innerHTML = `<table class="dtable"><thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>` +
-        `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(empty)}</td></tr></tbody></table>`;
+      el.innerHTML = toolbarHtml + wrapTable(`<table class="dtable"><thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>` +
+        `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(empty)}</td></tr></tbody></table>`);
       return;
     }
     const head = cols.map(c => {
@@ -1850,13 +1908,23 @@
     const body = viewRows.map(r => {
       return '<tr>' + cols.map(c => {
         if (c.fmt === 'chip') return `<td>${originChipHtml(r[c.field])}</td>`;
+        if (c.fmt === 'eff') {
+          const v = String(r[c.field] == null ? '' : r[c.field]);
+          const cls = { 'Alta': 'eff-alta', 'Media': 'eff-media', 'Baja': 'eff-baja' }[v] || '';
+          return `<td><span class="eff-pill ${cls}">${esc(v || '—')}</span></td>`;
+        }
+        if (c.fmt === 'cw') {
+          const v = String(r[c.field] == null ? '' : r[c.field]);
+          const cls = (v === 'Sí' || v === 'Si') ? 'cw-yes' : 'cw-no';
+          return `<td><span class="cw-pill ${cls}">${esc(v || '—')}</span></td>`;
+        }
         const f = fmt.pick(c.fmt);
         const isNum = isNumFmt(c.fmt);
         const cell = f(r[c.field]);
         return `<td${isNum ? ' class="num"' : ''}>${esc(cell)}</td>`;
       }).join('') + '</tr>';
     }).join('');
-    el.innerHTML = `<table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    el.innerHTML = toolbarHtml + wrapTable(`<table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`);
   }
 
   // Filtro client-side (ej. por account) para las tablas de detalle del drawer: el

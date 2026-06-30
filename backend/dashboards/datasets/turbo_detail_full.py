@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from ._now import today_ar
 
 from ._periods import window_bounds
@@ -48,23 +48,40 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
 
     win_ini, win_fin = window_bounds(filters)
+    # Una fila por turbo (reunión). Efectividad derivada de # perfiles obtenidos:
+    #   Alta ≥ 6, Media 3–5, Baja < 3.
     sql = """
         WITH ventana AS (
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         )
         SELECT
+          TO_CHAR(t.meeting_date::date, 'YYYY-MM-DD')           AS meeting_date,
+          o.opp_position_name,
           a.client_name,
-          t.meeting_name,
-          t.hr_lead,
+          a.industry                                            AS rubro,
+          COALESCE(NULLIF(TRIM(u.nickname), ''),
+                   NULLIF(TRIM(u.user_name), ''),
+                   t.hr_lead)                                    AS hr_lead,
           t.candidates::int                                     AS candidates,
-          TO_CHAR(t.meeting_date::date, 'YYYY-MM-DD')           AS meeting_date
+          CASE
+            WHEN t.candidates >= 6 THEN 'Alta'
+            WHEN t.candidates >= 3 THEN 'Media'
+            ELSE 'Baja'
+          END                                                   AS efectividad,
+          -- Close Win solo si la opp está en stage Close Win Y su fecha de cierre
+          -- es posterior (o igual) a la fecha del turbo.
+          CASE WHEN TRIM(o.opp_stage) = 'Close Win'
+                AND o.opp_close_date IS NOT NULL
+                AND o.opp_close_date::date >= t.meeting_date::date
+               THEN 'Sí' ELSE 'No' END                          AS close_win
         FROM turvo t
         JOIN opportunity o ON o.opportunity_id = t.opportunity_id
         LEFT JOIN account a ON a.account_id = o.account_id
+        LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = LOWER(TRIM(t.hr_lead))
         CROSS JOIN ventana v
         WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
           AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
-          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+          -- Excluir recruiters que ya no trabajan en Vintti
           AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
         ORDER BY t.meeting_date DESC, a.client_name;
     """
@@ -73,16 +90,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 
 DATASET = {
-    "key": "turbo_avg_candidates_detail",
-    "label": "Promedio candidatos por turbo — Detalle por turbo (ventana)",
+    "key": "turbo_detail_full",
+    "label": "Detalle de cada turbo (fecha, posición, cliente, rubro, recruiter, perfiles, efectividad)",
     "dimensions": [
-        {"key": "client_name", "label": "Cliente", "type": "string"},
-        {"key": "meeting_name", "label": "Reunión", "type": "string"},
-        {"key": "hr_lead", "label": "HR lead", "type": "string"},
         {"key": "meeting_date", "label": "Fecha", "type": "date"},
+        {"key": "opp_position_name", "label": "Posición", "type": "string"},
+        {"key": "client_name", "label": "Cliente", "type": "string"},
+        {"key": "rubro", "label": "Rubro", "type": "string"},
+        {"key": "hr_lead", "label": "Recruiter", "type": "string"},
+        {"key": "efectividad", "label": "Efectividad", "type": "string"},
+        {"key": "close_win", "label": "Close Win", "type": "string"},
     ],
     "measures": [
-        {"key": "candidates", "label": "Candidatos", "type": "number"},
+        {"key": "candidates", "label": "Perfiles obtenidos", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

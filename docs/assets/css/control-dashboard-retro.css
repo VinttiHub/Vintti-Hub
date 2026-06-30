@@ -2548,6 +2548,106 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .dtable-wrap .dtable th.num { text-align: right; }
 .dtable-wrap .dtable tbody tr:hover { background: rgba(13,18,30,0.02); }
 
+/* Multi-filtro (dropdowns) para dtable */
+.dtable-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+.dtable-toolbar .dtable-mf {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 6px 26px 6px 10px;
+  cursor: pointer;
+}
+.dtable-toolbar .dtable-mf:hover { border-color: var(--c-violet, #6c38ff); }
+.dtable-toolbar .dtable-mf:focus { outline: none; border-color: var(--c-violet, #6c38ff); box-shadow: 0 0 0 2px rgba(108,56,255,0.15); }
+.dtable-toolbar .dtable-mf-clear {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.dtable-toolbar .dtable-mf-clear:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* Pill de efectividad (Alta / Media / Baja) */
+.eff-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.eff-pill.eff-alta  { background: rgba(193,255,114,0.45); color: #3a6b00; }
+.eff-pill.eff-media { background: rgba(255,196,0,0.18);  color: #8a6d00; }
+.eff-pill.eff-baja  { background: rgba(255,31,219,0.12); color: #b00079; }
+
+/* Pill de Close Win (Sí / No) */
+.cw-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.cw-pill.cw-yes { background: rgba(193,255,114,0.45); color: #3a6b00; }
+.cw-pill.cw-no  { background: rgba(13,18,30,0.06);    color: var(--ink-3, #6b7280); }
+
+/* dtable con scroll vertical interno + encabezado fijo (data-scroll) */
+.dtable-scroll {
+  max-height: 60vh;
+  overflow: auto;
+}
+.dtable-scroll .dtable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eef0f3; /* opaco para que no se transparenten las filas al scrollear */
+}
+
+/* "Detalle de cada turbo": que la tabla siempre quepa en el ancho disponible
+   (layout fijo + texto que envuelve), sin scroll horizontal. */
+[data-chart="op_table_turbo_detail_full"] .dtable {
+  table-layout: fixed;
+  width: 100%;
+}
+[data-chart="op_table_turbo_detail_full"] .dtable th,
+[data-chart="op_table_turbo_detail_full"] .dtable td {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(1),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(1) { width: 10%; }  /* Fecha */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(2),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(2) { width: 21%; }  /* Posición */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(3),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(3) { width: 21%; }  /* Cliente */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(4),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(4) { width: 13%; }  /* Rubro */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(5),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(5) { width: 11%; }  /* Recruiter */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(6),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(6) { width: 9%; }   /* Perfiles obtenidos */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(7),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(7) { width: 8%; }   /* Efectividad */
+[data-chart="op_table_turbo_detail_full"] .dtable th:nth-child(8),
+[data-chart="op_table_turbo_detail_full"] .dtable td:nth-child(8) { width: 7%; }   /* Close Win */
+
 @media (max-width: 720px) {
   .kpi-drawer__panel { width: 100%; }
   .kpi-drawer__head { padding: 22px 18px 14px; }

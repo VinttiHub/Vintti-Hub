@@ -65,6 +65,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN ventana v
         WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
           AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
+          AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
         ORDER BY t.meeting_date DESC, a.client_name;
     """
 

@@ -225,6 +225,7 @@ RESET_CHART_KEYS = {
         "op_kpi_turbo_avg_cands_30d",
         "op_line_turbo_avg_cands",
         "op_table_turbo_avg_cands_30d_detail",
+        "op_table_turbo_detail_full",
         "am_line_client_churn",
         "am_table_client_churn_detail",
         "am_kpi_client_churn_30d",
@@ -2968,6 +2969,31 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 95, "w": 6, "h": 5},
         "sort_order": 580,
+    },
+    # Detalle de cada turbo (tabla filtrable: fecha, posición, cliente, rubro,
+    # recruiter, perfiles obtenidos, efectividad)
+    {
+        "chart_key": "op_table_turbo_detail_full",
+        "tab_key": "operations",
+        "title": "Detalle de cada turbo",
+        "type": "table",
+        "dataset_key": "turbo_detail_full",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "meeting_date",
+                    "opp_position_name",
+                    "client_name",
+                    "rubro",
+                    "hr_lead",
+                    "candidates",
+                    "efectividad",
+                    "close_win",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 100, "w": 12, "h": 6},
+        "sort_order": 585,
     },
     {
         "chart_key": "op_line_interviewed_sent_30d",
