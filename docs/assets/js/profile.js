@@ -3088,6 +3088,13 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     );
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Saved. Done & dusted 💫");
+    if (typeof window.rememberUserAvatar === "function") {
+      window.rememberUserAvatar({
+        avatar_url: payload.avatar_url || "",
+        email_vintti: payload.email_vintti,
+        user_id: CURRENT_USER_ID
+      });
+    }
     if (payload.avatar_url) localStorage.setItem("user_avatar", payload.avatar_url);
     else localStorage.removeItem("user_avatar");
     PROFILE_CACHE = {
@@ -3276,6 +3283,13 @@ async function loadMe(uid){
   $("#fun_fact").value = PROFILE_CACHE.fun_fact || "";
   ensureAvatarField();
   setAvatarFieldValue(PROFILE_CACHE.avatar_url || "");
+  if (typeof window.rememberUserAvatar === "function") {
+    window.rememberUserAvatar({
+      avatar_url: PROFILE_CACHE.avatar_url || "",
+      email_vintti: PROFILE_CACHE.email_vintti,
+      user_id: PROFILE_CACHE.user_id
+    });
+  }
 
   const normalizedEmail = (PROFILE_CACHE.email_vintti || "").toLowerCase();
   if (ADMIN_ALLOWED_EMAILS.has(normalizedEmail)){

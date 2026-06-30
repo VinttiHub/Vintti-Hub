@@ -136,6 +136,7 @@ function getCurrentUserEmail(){
 const BIRTHDAY_CELEBRATION_PREFIX = 'birthday_celebration_seen';
 let birthdayCelebrationShownInSession = false;
 const birthdayCelebrationProfilePromises = new Map();
+const avatarLookupPromises = new Map();
 
 function getTodayLocalIso() {
   const now = new Date();
@@ -193,6 +194,47 @@ async function getCurrentUserProfileForBirthday(email) {
   }
 
   return birthdayCelebrationProfilePromises.get(normalizedEmail) || null;
+}
+
+async function hydrateAvatarForEmail(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return '';
+
+  if (!avatarLookupPromises.has(normalizedEmail)) {
+    const request = fetch(`${API_BASE}/users?email=${encodeURIComponent(normalizedEmail)}`, {
+      credentials: 'include'
+    })
+      .then(async (res) => {
+        if (!res.ok) return '';
+        const users = await res.json();
+        const user = Array.isArray(users)
+          ? users.find((row) => String(row?.email_vintti || '').trim().toLowerCase() === normalizedEmail)
+          : null;
+        if (user && typeof window.rememberUserAvatar === 'function') {
+          window.rememberUserAvatar({
+            avatar_url: user?.avatar_url || '',
+            email_vintti: user?.email_vintti || normalizedEmail,
+            user_id: user?.user_id ?? null
+          });
+        }
+        if (typeof window.resolveUserAvatar === 'function') {
+          return window.resolveUserAvatar({
+            avatar_url: user?.avatar_url || '',
+            email_vintti: user?.email_vintti || normalizedEmail,
+            email: user?.email_vintti || normalizedEmail,
+            user_id: user?.user_id ?? null
+          }) || '';
+        }
+        return user?.avatar_url || '';
+      })
+      .catch((error) => {
+        console.warn('Avatar email lookup failed:', error);
+        return '';
+      });
+    avatarLookupPromises.set(normalizedEmail, request);
+  }
+
+  return avatarLookupPromises.get(normalizedEmail) || '';
 }
 
 function ensureBirthdayCelebrationStyles() {
@@ -1087,10 +1129,18 @@ function normalizeRoleDirectory(users) {
     const email = String(user?.email_vintti || '').trim().toLowerCase();
     if (!email || seen.has(email)) return;
     seen.add(email);
+    if (typeof window.rememberUserAvatar === 'function') {
+      window.rememberUserAvatar({
+        avatar_url: user?.avatar_url || '',
+        email_vintti: email,
+        user_id: user?.user_id ?? null
+      });
+    }
     deduped.push({
       user_id: user.user_id,
       user_name: user.user_name || user.email_vintti || email,
-      email_vintti: email
+      email_vintti: email,
+      avatar_url: user?.avatar_url || null
     });
   });
   deduped.sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
@@ -1136,6 +1186,16 @@ async function fetchRoleDirectories() {
   if (!salesRes.ok) throw new Error(`Sales directory failed: ${salesRes.status}`);
   if (!usersRes.ok) throw new Error(`Users directory failed: ${usersRes.status}`);
   const [hrData, salesData, usersData] = await Promise.all([hrRes.json(), salesRes.json(), usersRes.json()]);
+  (Array.isArray(usersData) ? usersData : []).forEach((user) => {
+    const email = String(user?.email_vintti || '').trim().toLowerCase();
+    if (email && typeof window.rememberUserAvatar === 'function') {
+      window.rememberUserAvatar({
+        avatar_url: user?.avatar_url || '',
+        email_vintti: email,
+        user_id: user?.user_id ?? null
+      });
+    }
+  });
   window.allowedHRUsers = normalizeRoleDirectory(hrData);
   window.allowedSalesUsers = normalizeRoleDirectory(salesData);
   window.userDirectoryByEmail = buildUserDirectoryMap(usersData);
@@ -2215,7 +2275,11 @@ function paintLeadDots(selectedList) {
     span.setAttribute('tabindex',  '0');
 
     if (!isPlaceholder) {
-      const avatar = email ? resolveAvatar(email) : null;
+      const avatar = email
+        ? (typeof resolveUserAvatar === 'function'
+            ? resolveUserAvatar({ email_vintti: email, email })
+            : resolveAvatar(email))
+        : null;
       if (avatar) {
         span.innerHTML = `<img src="${avatar}" alt="${escapeHtml(tipText)}">`;
       } else {
@@ -3022,7 +3086,9 @@ if (finalUid != null) {
   console.warn('⚠️ [login] Could not resolve user_id for', email);
 }
 
-    const avatarSrc = resolveAvatar(email);
+    const avatarSrc = typeof resolveUserAvatar === 'function'
+      ? resolveUserAvatar({ email_vintti: email, email })
+      : resolveAvatar(email);
     if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
     document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
     document.getElementById('login-container').style.display = 'none';
@@ -3926,7 +3992,9 @@ function initialsForHRLead(emailOrName) {
 // HTML visible (inicial + avatar). El select va encima, invisible, para que abra con nombres completos.
 function hrDisplayHTML(email) {
   const initials = initialsForHRLead(email);
-  const avatar   = resolveAvatar(email);
+  const avatar   = typeof resolveUserAvatar === 'function'
+    ? resolveUserAvatar({ email_vintti: email, email })
+    : resolveAvatar(email);
   const nameTip  = displayNameForHR(email);
 
   const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
@@ -3942,7 +4010,9 @@ function salesDisplayHTML(emailOrName) {
   const key      = String(emailOrName || '').toLowerCase();
   const initials = initialsForSalesLead(key);
   const bubbleCl = badgeClassForSalesLead(key);
-  const avatar   = resolveAvatar(key);
+  const avatar   = typeof resolveUserAvatar === 'function'
+    ? resolveUserAvatar({ email_vintti: key, email: key })
+    : resolveAvatar(key);
   const nameTip  = displayNameForSales(emailOrName);
 
   const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
@@ -3974,7 +4044,10 @@ function getHRLeadCell(opp) {
 function showLoginAvatar(email) {
   const img = document.getElementById('login-avatar');
   if (!img) return;
-  const src = resolveAvatar(email);
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const src = typeof resolveUserAvatar === 'function'
+    ? resolveUserAvatar({ email_vintti: normalizedEmail, email: normalizedEmail })
+    : resolveAvatar(email);
   if (src) {
     img.src = src;
     img.style.display = 'block';
@@ -3982,12 +4055,21 @@ function showLoginAvatar(email) {
     img.removeAttribute('src');
     img.style.display = 'none';
   }
+  hydrateAvatarForEmail(normalizedEmail).then((fetchedSrc) => {
+    if (!fetchedSrc || !emailInputEl) return;
+    if (String(emailInputEl.value || '').trim().toLowerCase() !== normalizedEmail) return;
+    img.src = fetchedSrc;
+    img.style.display = 'block';
+  });
 }
 
 function showWelcomeAvatar(email) {
   const img = document.getElementById('welcome-avatar');
   if (!img) return;
-  const src = resolveAvatar(email);
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const src = typeof resolveUserAvatar === 'function'
+    ? resolveUserAvatar({ email_vintti: normalizedEmail, email: normalizedEmail })
+    : resolveAvatar(email);
   if (src) {
     img.src = src;
     img.style.display = 'inline-block';
@@ -3995,6 +4077,11 @@ function showWelcomeAvatar(email) {
     img.removeAttribute('src');
     img.style.display = 'none';
   }
+  hydrateAvatarForEmail(normalizedEmail).then((fetchedSrc) => {
+    if (!fetchedSrc) return;
+    img.src = fetchedSrc;
+    img.style.display = 'inline-block';
+  });
 }
 
 // Mientras el usuario escribe el email en el login

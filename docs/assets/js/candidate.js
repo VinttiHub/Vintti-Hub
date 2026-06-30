@@ -1712,6 +1712,14 @@ async function initSidebarProfileCandidates(){
       })
     : (user?.avatar_url || "");
 
+  if (typeof window.rememberUserAvatar === "function") {
+    window.rememberUserAvatar({
+      avatar_url: user?.avatar_url || "",
+      email_vintti: user?.email_vintti || email,
+      user_id: user?.user_id ?? uid
+    });
+  }
+
   if (avatarSrc) {
     localStorage.setItem("user_avatar", avatarSrc);
     showAvatar(avatarSrc);

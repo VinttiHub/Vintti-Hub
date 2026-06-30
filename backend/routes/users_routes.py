@@ -162,6 +162,7 @@ def _list_users_by_role(role_type: str):
                     u.user_id,
                     u.user_name,
                     u.email_vintti,
+                    u.avatar_url,
                     ur.role_type
                 FROM user_roles ur
                 JOIN users u ON u.user_id = ur.user_id
@@ -210,7 +211,8 @@ def list_sales_leads():
                   u.user_id,
                   n.email,
                   n.email AS email_vintti,
-                  COALESCE(NULLIF(u.user_name, ''), n.email) AS user_name
+                  COALESCE(NULLIF(u.user_name, ''), n.email) AS user_name,
+                  u.avatar_url
                 FROM normalized n
                 LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = n.email
                 ORDER BY COALESCE(NULLIF(u.user_name, ''), n.email) ASC;
@@ -223,7 +225,8 @@ def list_sales_leads():
                   user_id,
                   LOWER(TRIM(email_vintti)) AS email,
                   LOWER(TRIM(email_vintti)) AS email_vintti,
-                  COALESCE(NULLIF(user_name, ''), LOWER(TRIM(email_vintti))) AS user_name
+                  COALESCE(NULLIF(user_name, ''), LOWER(TRIM(email_vintti))) AS user_name,
+                  avatar_url
                 FROM users
                 WHERE LOWER(TRIM(email_vintti)) = ANY(%s)
                 """,
@@ -249,6 +252,7 @@ def list_sales_leads():
                     "email": email,
                     "email_vintti": email,
                     "user_name": SALES_LEAD_NAME_OVERRIDES.get(email, email),
+                    "avatar_url": None,
                 }
 
         result = sorted(deduped.values(), key=lambda row: str(row.get("user_name") or row.get("email_vintti") or "").lower())

@@ -321,7 +321,7 @@ localStorage.setItem('sidebarCollapsed', 'true');
     const userName = user?.user_name || '';
     if ($name) $name.textContent = userName || 'Profile';
 
-    const avatarSrc =
+  const avatarSrc =
       (typeof window.resolveUserAvatar === 'function')
         ? window.resolveUserAvatar({
             avatar_url: user?.avatar_url,
@@ -331,7 +331,15 @@ localStorage.setItem('sidebarCollapsed', 'true');
           })
         : (typeof window.resolveAvatar === 'function')
           ? window.resolveAvatar(user?.email_vintti || email)
-          : (user?.avatar_url || '');
+        : (user?.avatar_url || '');
+
+    if (typeof window.rememberUserAvatar === 'function') {
+      window.rememberUserAvatar({
+        avatar_url: user?.avatar_url || '',
+        email_vintti: user?.email_vintti || email,
+        user_id: user?.user_id ?? uid
+      });
+    }
 
     if (avatarSrc) {
       localStorage.setItem('user_avatar', avatarSrc);

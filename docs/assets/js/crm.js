@@ -376,6 +376,13 @@ async function loadSalesLeadFilterOptions() {
     (Array.isArray(payload) ? payload : []).forEach(lead => {
       const email = (lead?.email || lead?.email_vintti || '').toLowerCase().trim();
       const name = (lead?.user_name || lead?.name || '').trim();
+      if (email && typeof window.rememberUserAvatar === 'function') {
+        window.rememberUserAvatar({
+          avatar_url: lead?.avatar_url || '',
+          email_vintti: email,
+          user_id: lead?.user_id ?? null
+        });
+      }
       if (email) added = upsertSalesLeadOption(email, name || email) || added;
     });
     if (added) renderSalesLeadOptions();
@@ -1423,7 +1430,9 @@ function getAccountSalesLeadCell(item) {
 
   const initials = initialsForSalesLead(key);
   const bubbleCl = badgeClassForSalesLead(key);
-  const avatar = window.resolveAvatar(email);
+  const avatar = typeof window.resolveUserAvatar === 'function'
+    ? window.resolveUserAvatar({ email_vintti: email, email })
+    : window.resolveAvatar(email);
   const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
 
   return `
@@ -2100,6 +2109,14 @@ async function initSidebarProfileCRM(){
         user_id: user?.user_id ?? uid
       })
     : (user?.avatar_url || '');
+
+  if (typeof window.rememberUserAvatar === 'function') {
+    window.rememberUserAvatar({
+      avatar_url: user?.avatar_url || '',
+      email_vintti: user?.email_vintti || email,
+      user_id: user?.user_id ?? uid
+    });
+  }
 
   if (avatarSrc) {
     localStorage.setItem('user_avatar', avatarSrc);
