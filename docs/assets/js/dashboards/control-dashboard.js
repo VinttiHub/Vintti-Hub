@@ -4215,9 +4215,21 @@
     bindGlobalPeriodToggles();
     bindLeadTypeToggles();
     bindDtableFilters();
+    bindStickyHead();
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
+  }
+
+  // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla).
+  function bindStickyHead() {
+    const head = document.querySelector('.sticky-head');
+    if (!head) return;
+    const onScroll = () => {
+      head.classList.toggle('is-stuck', head.getBoundingClientRect().top <= 0);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   }
 
   if (document.readyState === 'loading') {

@@ -157,6 +157,31 @@ table { border-collapse: collapse; }
   margin-bottom: 24px;
   align-items: center;
   border: 1px solid var(--rule);
+  transition: background .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+/* Tabs + filtros se fijan arriba juntos al scrollear (todas las pestañas que los usan). */
+.sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding-top: 6px;
+}
+/* Al quedar fijada, el contenedor se vuelve frosted (tapa lo que pasa por detrás) y la
+   barra de filtros cambia de color + sombra para que se note bien. Clase la setea el JS. */
+.sticky-head.is-stuck {
+  background: rgba(232,228,246,0.82);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(13,18,30,0.10);
+}
+.sticky-head.is-stuck .filter-bar {
+  background: #efeafe;
+  border-color: var(--c-violet, #6c38ff);
+  box-shadow: 0 10px 26px rgba(108,56,255,0.20);
+}
+.sticky-head.is-stuck .tabs {
+  margin-bottom: 10px;
 }
 .filter-bar__lab {
   font-size: 11px;
