@@ -8,7 +8,7 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection
 import os
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email
+from sendgrid.helpers.mail import Mail, Email, Cc
 from calendar import monthrange
 from urllib.parse import urlparse, quote
 from werkzeug.utils import secure_filename
@@ -961,7 +961,7 @@ def leader_update_timeoff(req_id: int):
         )
         if new_status == "approved":
             for cc_email in ("lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com"):
-                msg.add_cc(Email(cc_email))
+                msg.add_cc(Cc(cc_email))
         sg = SendGridAPIClient(api_key)
         sg.send(msg)
     except Exception as e:
