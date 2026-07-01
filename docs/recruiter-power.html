@@ -14,7 +14,7 @@
     rel="stylesheet"
   />
 <link rel="stylesheet" href="./assets/css/sidebar.css" />
-  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=2" />
+  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=18" />
   <style>
     .metric-card[data-metric-detail] {
       cursor: pointer;
@@ -157,7 +157,8 @@
   </div>
 </header>
 
-<!-- ✅ filtros debajo del título -->
+<!-- ✅ filtros + tabs en una sola fila, sticky -->
+<div class="metrics-toolbar">
 <section class="metrics-filters" aria-label="Filters">
   <div class="metrics-filter">
     <label for="hrLeadSelect" class="filter-label">Recruiter</label>
@@ -196,9 +197,13 @@
         Historic trends
       </button>
     </div>
+    </div><!-- /.metrics-toolbar -->
 
     <section class="metrics-tabpanel is-active" data-tab-panel="summary" id="summaryTab">
-      <section class="metrics-cards" aria-live="polite">
+      <div class="metric-groups" aria-live="polite">
+      <div class="metric-group">
+        <div class="metric-group__head"><span class="metric-group__icon">🏆</span><span class="metric-group__label">Close win &amp; close lost</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-win-month metric-card--detail-disabled"
         data-metric-detail="closedWinRange"
@@ -266,7 +271,11 @@
           Lifetime <strong>Closed Lost</strong> opportunities for this recruiter.
         </p>
       </article>
-
+      </section>
+      </div>
+      <div class="metric-group metric-group--top">
+        <div class="metric-group__head"><span class="metric-group__icon">📊</span><span class="metric-group__label">Conversion rate</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-conversion metric-card--detail-disabled"
         data-metric-detail="conversionRange"
@@ -300,7 +309,11 @@
           Lifetime share of <strong>Closed Win</strong> over all closed opportunities.
         </p>
       </article>
-
+      </section>
+      </div>
+      <div class="metric-group">
+        <div class="metric-group__head"><span class="metric-group__icon">⏱️</span><span class="metric-group__label">Average days to close</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-close-win-avg metric-card--detail-disabled"
         data-metric-detail="avgCloseWin"
@@ -334,7 +347,11 @@
           From start date to <strong>Closed Lost</strong> within the selected range.
         </p>
       </article>
-
+      </section>
+      </div>
+      <div class="metric-group">
+        <div class="metric-group__head"><span class="metric-group__icon">📦</span><span class="metric-group__label">Time to first batch</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-batch-open metric-card--detail-disabled"
         data-metric-detail="avgBatchOpen"
@@ -368,7 +385,11 @@
           Closed opportunities where the first batch landed before closing.
         </p>
       </article>
-
+      </section>
+      </div>
+      <div class="metric-group">
+        <div class="metric-group__head"><span class="metric-group__icon">🎯</span><span class="metric-group__label">Candidate funnel</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-interview-rate metric-card--detail-disabled"
         data-metric-detail="interviewRate"
@@ -424,7 +445,11 @@
           No opportunities with recruiter interview counts yet.
         </p>
       </article>
-
+      </section>
+      </div>
+      <div class="metric-group">
+        <div class="metric-group__head"><span class="metric-group__icon">♻️</span><span class="metric-group__label">Churn</span><span class="metric-group__rule"></span></div>
+      <section class="metrics-cards">
       <article
         class="metric-card metric-churn-range metric-card--detail-disabled"
         data-metric-detail="churnRange"
@@ -460,6 +485,8 @@
         <p class="metric-caption metric-caption-subtle" id="left90RangeLabel"></p>
       </article>
       </section>
+      </div>
+      </div>
 
       <section class="meta-footer">
         <p id="periodInfo" class="meta-text"></p>

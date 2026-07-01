@@ -57,17 +57,148 @@ body {
 }
 .metrics-page {
   min-height: 100vh;
-  padding: 3rem 4rem 3.5rem;
+  padding: 1.4rem 4rem 3.5rem;
   display: flex;
   flex-direction: column;
-  gap: 3rem;
+  gap: 1.4rem;
+}
+
+/* Toolbar de filtros: Recruiter + Date range + tabs en UNA fila, sticky arriba. */
+.metrics-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: 0.9rem 0;
+  background: rgba(248, 245, 255, 0.9);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 .metrics-cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: 220px;
+  display: flex;
+  flex-wrap: wrap;
   gap: 2rem;
 }
+/* Las cards crecen para ocupar TODO el ancho de la fila (2 → 50%, 3 → 33%, 4 → 25%).
+   Basis chico (200px) para que un grupo de 4 entre en una sola fila en desktop. */
+.metrics-cards > .metric-card {
+  flex: 1 1 200px;
+  min-height: 0;
+}
+
+/* ===== Agrupación por secciones (estilo "weekly review") ===== */
+.metric-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+/* Orden de las secciones (DOM: 1=CloseWin&Lost, 2=Conversion, 3=Días, 4=Batch, 5=Funnel, 6=Churn):
+   Conversion → Close win&lost → Churn → Días → Batch → Funnel */
+.metric-groups .metric-group:nth-child(2) { order: 1; } /* Conversion rate (arriba) */
+.metric-groups .metric-group:nth-child(1) { order: 2; } /* Close win & close lost */
+.metric-groups .metric-group:nth-child(6) { order: 3; } /* Churn */
+.metric-groups .metric-group:nth-child(3) { order: 4; } /* Average days to close */
+.metric-groups .metric-group:nth-child(4) { order: 5; } /* Time to first batch */
+.metric-groups .metric-group:nth-child(5) { order: 6; } /* Candidate funnel */
+.metric-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.metric-group__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0 0.2rem;
+}
+.metric-group__icon { font-size: 1rem; line-height: 1; }
+.metric-group__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8479a6;
+  white-space: nowrap;
+}
+.metric-group__rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, rgba(120, 90, 180, 0.30), rgba(120, 90, 180, 0));
+}
+
+/* ===== Estética de cards ===== */
+/* Header: título a la izq (puede ocupar 2 líneas) + badge SIEMPRE arriba a la derecha.
+   min-height reserva el alto de 2 líneas para que los números queden alineados entre cards. */
+.metric-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+  min-height: 2.4rem;
+  margin-bottom: 0.35rem;
+}
+.metric-header > .metric-compare,
+.metric-header > .metric-pill { flex-shrink: 0; }
+/* Título de card: Title Case (no mayúsculas) para diferenciarlo del header de sección. */
+.metric-label {
+  flex: 1 1 auto;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #2a2148;
+  line-height: 1.3;
+}
+
+/* Número: color por defecto (violeta) → ninguno queda en negro */
+.metric-value { color: #5b3fd6; }
+
+/* Semántica: win/conversion = verde, lost = rojo, churn = dorado */
+.metric-win-month,  .metric-win-total,
+.metric-conversion, .metric-conversion-lifetime { --accent: #2fb673; }
+.metric-win-month .metric-value,
+.metric-win-total .metric-value,
+.metric-conversion .metric-value,
+.metric-conversion-lifetime .metric-value { color: #1f9d57; }
+
+.metric-lost-month, .metric-lost-total { --accent: #e8688a; }
+.metric-lost-month .metric-value,
+.metric-lost-total .metric-value { color: #d23a63; }
+
+.metric-churn-range, .metric-early-churn { --accent: #e6b84d; }
+.metric-churn-range .metric-value,
+.metric-early-churn .metric-value,
+.metric-early-churn .metric-number,
+.metric-early-churn .metric-percent { color: #b8860b; }
+
+/* Igualar la 2ª card de churn (90 días) al resto: número grande + descripción normal */
+.metric-early-churn .metric-value-combo {
+  font-size: 3rem;
+  align-items: baseline;
+  margin-top: 0.3rem;
+}
+.metric-early-churn .metric-number { font-weight: 900; }
+.metric-early-churn .metric-caption-subtle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0;
+}
+
+/* Números en negro (override sobre los colores semánticos) */
+.metric-card .metric-value,
+.metric-card .metric-number,
+.metric-card .metric-percent { color: #161320; }
+
+/* Días / batch / funnel: acento violeta (número ya hereda el violeta por defecto) */
+.metric-close-win-avg,  .metric-close-lost-avg,
+.metric-batch-open,     .metric-batch-closed,
+.metric-interview-rate, .metric-hire-rate,
+.metric-sent-vs-interview { --accent: #8f7be0; }
 .metric-pill {
   padding: 0.28rem 0.8rem;
   border-radius: 999px;
@@ -193,12 +324,15 @@ body {
   background: rgba(216, 204, 255, 0.25);
   border-color: rgba(180, 160, 255, 0.35);
 }
+.metrics-page .meta-footer {
+  margin-top: 1.5rem;
+}
 .metrics-page .meta-text {
-  margin: -0.5rem auto 1.5rem;
+  margin: 0 auto;
   text-align: center;
   font-size: 0.85rem;
-  color: #b2a7c8;
-  max-width: 520px;
+  color: #8b7ca8;
+  max-width: 620px;
 }
 body {
   margin: 0;
@@ -210,14 +344,14 @@ body {
 /* 💫 Cards con hover suave y micro interacciones */
 .metric-card {
   background: var(--card-bg);
-  border-radius: 26px;
+  border-radius: 22px;
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow-soft);
-  padding: 2.2rem;
+  padding: 1.5rem 1.7rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 0.7rem;
+  justify-content: flex-start;
+  gap: 0.4rem;
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(18px);
@@ -271,7 +405,7 @@ body {
 
 .metric-caption {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -571,36 +705,32 @@ body {
 
 /* ✅ fila de filtros debajo del título */
 .metrics-filters{
-  width: 100%;
-  max-width: 980px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  gap: 1.25rem;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin: 0;
 }
 
 @media (max-width: 900px){
   .metrics-filters{
-    grid-template-columns: 1fr;
+    width: 100%;
   }
 }
 
-/* opcional: que el dropdown se sienta centrado en desktop */
 .metrics-filters .metrics-filter{
-  justify-self: center;
-  width: 100%;
+  width: auto;
 }
 
 .metrics-filters .filter-select{
-  width: min(360px, 100%);
+  width: min(320px, 100%);
 }
 
 .metrics-tabs{
   display:flex;
-  justify-content:center;
-  gap:1rem;
-  margin-top:-1rem;
+  gap:0.75rem;
+  margin-top:0;
+  align-items:center;
 }
 
 .metrics-tab{
