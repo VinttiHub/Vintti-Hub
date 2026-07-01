@@ -643,10 +643,10 @@
           <div class="skpi-tile__progress-meta">
             <span>
               <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
-                    data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
-              abiertas /
-              <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
                     data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+              CW /
+              <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
+                    data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
               cerradas
             </span>
             <span class="skpi-tile__progress-target">Target: 80%</span>
@@ -1528,8 +1528,8 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">% reemplazos realizados <span data-window-label>30d</span></h3>
-            <p class="card__sub">Sobre el total de oportunidades cerradas como reemplazo.</p>
+            <h3 class="card__title">% reemplazos colocados <span data-window-label>30d</span></h3>
+            <p class="card__sub">De los replacements cerrados por mes, qué % fue Close Win.</p>
           </div>
           <span class="card__menu">⋯</span>
         </div>
@@ -1537,7 +1537,7 @@
           <svg data-chart="am_line_replacements_pct" data-bind="line"
                data-x="month" data-y="pct_replacements" data-color="cyan"
                data-labels="Replacements %" data-fmt-y="percent"
-               data-tooltip-extras="replacements|Reemplazos|int,total_closed|Cerrados|int,avg_days_to_replace|Días promedio|number"
+               data-tooltip-extras="replacements|Close Win|int,total_closed|Cerradas|int"
                viewBox="0 0 540 180" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -5995,12 +5995,12 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">C&amp;C Success · Last 30d</span>
             <h3 class="kpi-drawer__title">% Reemplazos colocados</h3>
-            <p class="kpi-drawer__sub">Replacements abiertas en la ventana sobre las que se cerraron en la ventana. Target: 80%.</p>
+            <p class="kpi-drawer__sub">De los replacements que se cerraron (Close Win o Closed Lost) en la ventana, qué % fue Close Win. Target: 80%.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--lime">
-              <span class="kpi-drawer__hero__label">Coverage · Last 30d</span>
+              <span class="kpi-drawer__hero__label">% Close Win · Last 30d</span>
               <span class="kpi-drawer__hero__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_pct" data-reduce="first" data-fmt="percent">—</span>
               <span class="kpi-drawer__hero__delta">Target: 80%</span>
             </div>
@@ -6008,14 +6008,14 @@
               <h4 class="kpi-drawer__section-title">Numerador / denominador</h4>
               <div class="kpi-drawer__stats">
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Total Replacements</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">numerador · cualquier stage</span>
+                  <span class="kpi-drawer__stat__label">Close Win</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">numerador · replacements ganados</span>
                 </div>
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Replacements cerradas</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">denominador · cualquier stage de cierre</span>
+                  <span class="kpi-drawer__stat__label">Cerradas (total)</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">denominador · Close Win + Closed Lost</span>
                 </div>
               </div>
             </section>
@@ -6036,13 +6036,12 @@
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle · Replacements Close Win <span class="count" data-chart="am_table_replacements_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <h4 class="kpi-drawer__section-title">Detalle · Replacements Close Win <span class="count" data-chart="am_table_replacements_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span> <span data-window-label>30d</span></h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_replacements_detail" data-bind="list"
-                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="close_date" data-limit="60"
-                   data-month-aware></div>
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="close_date" data-limit="60"></div>
             </section>
-            <p class="kpi-drawer__note">Numerador = Replacements abiertas en la ventana (`nda_signature_or_start_date` cae en el período). Denominador = Replacements cerradas en la ventana (cualquier stage de cierre — `opp_close_date` cae en el período). La tendencia mensual usa la misma fórmula, agrupando por mes.</p>
+            <p class="kpi-drawer__note">Numerador = Replacements cerrados como Close Win en la ventana. Denominador = Replacements cerrados (Close Win + Closed Lost) en la ventana, por `opp_close_date`. La tendencia mensual usa la misma fórmula, agrupando por mes.</p>
           </div>
         </div>
 

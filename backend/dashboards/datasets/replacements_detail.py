@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -39,20 +41,11 @@ def _norm_str(value) -> str | None:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _norm_model(filters.get("model") or filters.get("modelo"))
     cliente = _norm_str(filters.get("cliente"))
-    desde = _parse_date(filters.get("desde"))
-    hasta = _parse_date(filters.get("hasta"))
-    # Month-aware filter: when present, narrow to opps whose Close Win happened
-    # in the same calendar month as `corte` (end-of-month date passed by the JS
-    # `refetchMonthAwareElements` helper). Falls back to desde/hasta.
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-    )
+    # Alineado al KPI 30d: ventana estándar (Desde/Hasta > Mes > rolling 30d) por
+    # opp_close_date. Lista los Replacement 'Close Win' cerrados en la ventana
+    # (= el numerador del KPI). Joined a hire_opportunity para el candidato.
+    win_ini, win_fin = window_bounds(filters)
 
-    # Replacement events shown in the detail = Replacement opps with stage
-    # 'Close Win' whose `opp_close_date` falls in the selected month. Joined to
-    # `hire_opportunity` to pull the candidate that became the replacement.
     sql = """
         WITH replacement_close_wins AS (
           SELECT
@@ -94,21 +87,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM replacement_close_wins r
         LEFT JOIN hire_per_opp hp ON hp.opportunity_id = r.opportunity_id
         WHERE r.close_d IS NOT NULL
-          AND (
-            %(corte)s::date IS NULL
-            OR DATE_TRUNC('month', r.close_d) = DATE_TRUNC('month', %(corte)s::date)
-          )
-          AND (%(desde)s::date IS NULL OR r.close_d >= %(desde)s::date)
-          AND (%(hasta)s::date IS NULL OR r.close_d <= %(hasta)s::date)
+          AND r.close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ORDER BY r.close_d DESC, r.client_name;
     """
 
     return sql, {
         "modelo": modelo,
         "cliente": cliente,
-        "desde": desde,
-        "hasta": hasta,
-        "corte": corte,
+        "win_ini": win_ini,
+        "win_fin": win_fin,
     }
 
 

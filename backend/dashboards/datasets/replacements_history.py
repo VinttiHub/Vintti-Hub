@@ -34,61 +34,38 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # Monthly trend aligned with the 30d coverage tile:
-    #   - replacements  = Replacement opps OPENED in the month
-    #                     (nda_signature_or_start_date in month)
-    #   - total_closed  = Replacement opps CLOSED in the month
-    #                     (opp_close_date in month, any closing stage)
-    #   - pct_replacements = replacements / total_closed * 100
+    # Tendencia mensual alineada con el tile 30d (% CW de los replacements cerrados):
+    #   - total_closed  = Replacement opps CERRADAS en el mes (Close Win + Closed Lost,
+    #                     por opp_close_date) → denominador.
+    #   - replacements  = de esas, las Close Win → numerador.
+    #   - pct_replacements = Close Win / cerradas * 100.
     sql = """
-        WITH replacement_opps AS (
+        WITH replacement_closed AS (
           SELECT
-            o.opportunity_id,
-            NULLIF(o.nda_signature_or_start_date::text, '')::date AS opened_d,
-            NULLIF(o.opp_close_date::text, '')::date              AS closed_d
+            DATE_TRUNC('month', NULLIF(o.opp_close_date::text, '')::date)::date AS month,
+            (TRIM(o.opp_stage) = 'Close Win') AS won
           FROM opportunity o
           WHERE o.opp_type = 'Replacement'
+            AND TRIM(COALESCE(o.opp_stage, '')) IN ('Close Win', 'Closed Lost')
+            AND NULLIF(o.opp_close_date::text, '')::date IS NOT NULL
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
-        ),
-        opens_per_month AS (
-          SELECT
-            DATE_TRUNC('month', r.opened_d)::date AS month,
-            COUNT(*)::int AS replacements
-          FROM replacement_opps r
-          WHERE r.opened_d IS NOT NULL
-            AND (%(desde)s::date IS NULL OR r.opened_d >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR r.opened_d <= %(hasta)s::date)
-          GROUP BY 1
-        ),
-        closes_per_month AS (
-          SELECT
-            DATE_TRUNC('month', r.closed_d)::date AS month,
-            COUNT(*)::int AS total_closed
-          FROM replacement_opps r
-          WHERE r.closed_d IS NOT NULL
-            AND (%(desde)s::date IS NULL OR r.closed_d >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR r.closed_d <= %(hasta)s::date)
-          GROUP BY 1
-        ),
-        months AS (
-          SELECT month FROM opens_per_month
-          UNION
-          SELECT month FROM closes_per_month
+            AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date <= %(hasta)s::date)
         )
         SELECT
-          TO_CHAR(m.month, 'YYYY-MM-DD')                                          AS month,
+          TO_CHAR(month, 'YYYY-MM-DD')                                            AS month,
           NULL::text                                                              AS opp_model,
-          COALESCE(o.replacements, 0)                                             AS replacements,
-          COALESCE(c.total_closed, 0)                                             AS total_closed,
+          COUNT(*) FILTER (WHERE won)::int                                        AS replacements,
+          COUNT(*)::int                                                           AS total_closed,
           ROUND(
-            (COALESCE(o.replacements, 0)::numeric / NULLIF(c.total_closed, 0)) * 100,
+            CASE WHEN COUNT(*) = 0 THEN NULL
+                 ELSE 100.0 * COUNT(*) FILTER (WHERE won)::numeric / COUNT(*) END,
             2
           )::float                                                                AS pct_replacements,
           NULL::float                                                             AS avg_days_to_replace
-        FROM months m
-        LEFT JOIN opens_per_month  o ON o.month = m.month
-        LEFT JOIN closes_per_month c ON c.month = m.month
-        ORDER BY m.month;
+        FROM replacement_closed
+        GROUP BY month
+        ORDER BY month;
     """
 
     return sql, {"modelo": modelo, "desde": desde, "hasta": hasta}

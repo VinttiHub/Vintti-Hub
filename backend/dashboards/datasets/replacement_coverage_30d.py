@@ -56,51 +56,40 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = _window_bounds(filters, corte)
 
-    # % Reemplazos colocados = cerradas ÷ abiertas (de los reemplazos ABIERTOS en
-    # la ventana, qué % ya se cerró/colocó):
-    #   - Denominator `placed_count`: Replacement opps OPENED in the window.
-    #                                  "Opened" = nda_signature_or_start_date in window.
-    #   - Numerator   `churn_count` : Replacement opps CLOSED in the window (any
-    #                                  closing stage, not only Close Win).
-    #                                  "Closed" = opp_close_date in window.
+    # % Reemplazos colocados = de los REEMPLAZOS QUE SE CERRARON en la ventana, qué %
+    # fue Close Win.
+    #   - Denominator `placed_count`: Replacement opps CLOSED (decididas) en la ventana
+    #                                  = stage IN (Close Win, Closed Lost) y opp_close_date en ventana.
+    #   - Numerator   `churn_count` : de esas, las que son Close Win.
+    #   - placed_pct  = Close Win ÷ cerradas.
     sql = """
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
             %(win_fin)s::date AS win_fin
         ),
-        replacement_opps AS (
+        replacement_closed AS (
           SELECT
             o.opportunity_id,
-            TRIM(COALESCE(o.opp_stage, '')) AS stage,
-            NULLIF(o.nda_signature_or_start_date::text, '')::date AS opened_d,
-            NULLIF(o.opp_close_date::text, '')::date              AS closed_d
+            (TRIM(o.opp_stage) = 'Close Win') AS won
           FROM opportunity o
-          WHERE o.opp_type = 'Replacement'
-        ),
-        replacement_totals AS (
-          SELECT
-            COUNT(*) FILTER (
-              WHERE r.opened_d BETWEEN v.win_ini AND v.win_fin
-            )::int AS placed_count,
-            COUNT(*) FILTER (
-              WHERE r.closed_d BETWEEN v.win_ini AND v.win_fin
-            )::int AS churn_count
-          FROM replacement_opps r
           CROSS JOIN ventana v
+          WHERE o.opp_type = 'Replacement'
+            AND TRIM(COALESCE(o.opp_stage, '')) IN ('Close Win', 'Closed Lost')
+            AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin
         )
         SELECT
-          (SELECT win_ini FROM ventana)              AS ventana_desde,
-          (SELECT win_fin FROM ventana)              AS ventana_hasta,
-          rt.churn_count                             AS churn_count,
-          rt.placed_count                            AS placed_count,
+          (SELECT win_ini FROM ventana)                          AS ventana_desde,
+          (SELECT win_fin FROM ventana)                          AS ventana_hasta,
+          COUNT(*) FILTER (WHERE won)::int                       AS churn_count,
+          COUNT(*)::int                                          AS placed_count,
           ROUND(
             CASE
-              WHEN rt.placed_count = 0 THEN NULL
-              ELSE 100.0 * rt.churn_count::numeric / rt.placed_count
+              WHEN COUNT(*) = 0 THEN NULL
+              ELSE 100.0 * COUNT(*) FILTER (WHERE won)::numeric / COUNT(*)
             END, 2
-          )::float                                   AS placed_pct
-        FROM replacement_totals rt;
+          )::float                                               AS placed_pct
+        FROM replacement_closed;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}
@@ -114,9 +103,9 @@ DATASET = {
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "placed_count", "label": "Replacements abiertas en ventana", "type": "number"},
-        {"key": "churn_count", "label": "Replacements cerradas en ventana", "type": "number"},
-        {"key": "placed_pct", "label": "% Reemplazos colocados (cerradas / abiertas)", "type": "percent"},
+        {"key": "placed_count", "label": "Replacements cerrados en ventana", "type": "number"},
+        {"key": "churn_count", "label": "Replacements Close Win en ventana", "type": "number"},
+        {"key": "placed_pct", "label": "% Reemplazos colocados (Close Win / cerrados)", "type": "percent"},
     ],
     "default_filters": {"window": "30d"},
     "query": query,
