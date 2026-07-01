@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=95">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=96">
 </head>
 <body>
 
@@ -2763,9 +2763,10 @@
       </div>
 
       <!-- ============================================================
-           SQL → Close Win por canal (AE · ventana) = WIN RATE sobre las DECIDIDAS:
-           Close Win / (Close Win + Closed Lost), a nivel opp, por canal
-           (where_come_from), M+B por opp_sales_lead. Window por opp_close_date.
+           SQL → Close Win por canal (AE · ventana) = WIN RATE a nivel CLIENTE:
+           de los clientes que cerraron ≥1 opp (Close Win/Closed Lost) en la ventana,
+           qué % ganó (≥1 Close Win). Dedupe por account (20 opps = 1 cliente).
+           Por canal (where_come_from), M+B por opp_sales_lead. Window por opp_close_date.
            ============================================================ -->
         <div class="card wrchan-card wr-blue setupfee-card">
         <div class="card__head">
@@ -8217,22 +8218,22 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-clientwin">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">SQL → Close Win · win rate sobre las cerradas</h3>
-            <p class="kpi-drawer__sub">De las opps TOTALES (Close Win + Closed Lost, M+B) cerradas en la ventana, qué % son Close Win. Por deal. Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
+            <h3 class="kpi-drawer__title">SQL → Close Win · win rate por cliente</h3>
+            <p class="kpi-drawer__sub">De los clientes que cerraron al menos una opp en la ventana, qué % ganó (tiene ≥1 Close Win). Por cliente, no por deal. Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
               <span class="kpi-drawer__hero__label">SQL → Close Win · <span data-window-label>30d</span></span>
               <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> cerradas</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> clientes ganados de <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> que cerraron</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Totales por canal</h4>
+              <h4 class="kpi-drawer__section-title">Clientes por canal</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_clientwin_30d_detail" data-bind="dtable"
-                   data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,estado|Estado|raw"
-                   data-empty-text="Sin opps cerradas (M+B) en la ventana."></div>
+                   data-cols="close_date|Última close|raw,channel|Canal|raw,client_name|Cliente|raw,opps|Opps|int,estado|Estado|raw"
+                   data-empty-text="Sin clientes cerrados (M+B) en la ventana."></div>
             </section>
           </div>
         </div>

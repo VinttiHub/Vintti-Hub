@@ -32,24 +32,27 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # SQL → Close Win = WIN RATE sobre las DECIDIDAS (cerradas) en la ventana:
-    # Close Win / (Close Win + Closed Lost), a nivel OPP (deal), por canal
-    # (where_come_from), M+B por opp_sales_lead. Window por opp_close_date.
+    # SQL → Close Win = WIN RATE a nivel CLIENTE (account), no por opp:
+    # de los clientes que DECIDIERON (cerraron ≥1 opp: Close Win o Closed Lost) en la
+    # ventana, qué % se ganó (tiene ≥1 Close Win). Dedupe: 20 opps de un cliente = 1.
+    # Por canal (account.where_come_from), M+B por opp_sales_lead, window por opp_close_date.
     win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH cur AS (
           SELECT
+            o.account_id,
             CASE
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
               ELSE 'marketing'
             END AS channel,
-            (TRIM(o.opp_stage) = 'Close Win') AS won
+            BOOL_OR(TRIM(o.opp_stage) = 'Close Win') AS won
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
             AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com', 'mariano@vintti.com')
+          GROUP BY o.account_id, a.where_come_from
         )
         SELECT
           COUNT(*) FILTER (WHERE channel='sales')::int             AS sales_sql,
@@ -80,7 +83,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "sql_to_clientwin_30d",
-    "label": "SQL → Close Win (funnel completo, 30d, AE)",
+    "label": "SQL → Close Win por CLIENTE (30d, AE)",
     "dimensions": [],
     "measures": [
         {"key": "sales_sql", "label": "Sales · SQLs", "type": "number"},

@@ -4150,7 +4150,7 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 .funnel-row > .card { grid-column: span 1; }                    /* 4 en una sola línea */
 @media (max-width: 980px) {
