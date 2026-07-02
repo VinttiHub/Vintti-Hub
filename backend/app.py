@@ -14,6 +14,7 @@ from ai_routes import register_ai_routes
 from coresignal_routes import bp as coresignal_bp
 from interviewing_routes import register_interviewing_routes
 from profile_routes import bp as profile_bp, users_bp as profile_users_bp
+from offboarding_routes import bp as offboarding_bp
 from recruiter_metrics_routes import register_recruiter_metrics_routes
 from reminders_routes import bp as reminders_bp
 from reset_password import register_password_reset_routes
@@ -83,6 +84,7 @@ def create_app() -> Flask:
     app.register_blueprint(profile_bp)
     app.register_blueprint(profile_users_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(offboarding_bp)
     app.register_blueprint(google_calendar_bp)
     app.register_blueprint(hubspot_bp)
     app.register_blueprint(turvo_bp)

@@ -4973,3 +4973,127 @@ input:focus, select:focus, textarea:focus{
     align-items: center !important;
   }
 }
+
+/* ============================================================
+   OFFBOARDING (soft-delete) UI
+   ============================================================ */
+.admin-user-inactive-badge{
+  display:inline-flex; align-items:center; margin-left:8px;
+  padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700;
+  background:#fee2e2; color:#b91c1c;
+}
+.btn.tiny{ padding:5px 10px; font-size:12px; border-radius:8px; }
+.btn.ghost{ background:transparent; }
+.btn.ghost:hover{ background:#f1f5f9; }
+
+/* Botón Offboarding: DEBAJO de la tabla, alineado a la derecha (no tapa ninguna fila). */
+.offb-fab{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:max-content; margin:18px 0 2px auto;
+  padding:12px 22px; border:none; border-radius:999px; cursor:pointer;
+  background:#111827; color:#fff; font-weight:700; font-size:14px;
+  box-shadow:0 10px 24px rgba(17,24,39,.22);
+}
+.offb-fab:hover{ background:#0b1220; }
+
+/* Tabla de Inactive Employees — ocupa TODO el ancho, sin scroll horizontal. */
+.offb-table-host{
+  border:1px solid #eef0f4; border-radius:14px; overflow:hidden;
+}
+.offb-table{
+  display:grid; width:100%;
+  grid-template-columns:
+    1.5fr  /* Name */
+    .7fr   /* Role */
+    1.1fr  /* Hiring Manager */
+    .8fr   /* End date */
+    1fr    /* Reason */
+    .6fr   /* Pick up */
+    1fr    /* Address */
+    1.2fr  /* Comments */
+    .9fr   /* Status */
+    1.3fr; /* Actions */
+  gap:0;
+}
+.offb-th{
+  background:#f8fafc; font-size:11px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.05em; color:#64748b; padding:12px; border-bottom:1px solid #eef0f4;
+  display:flex; align-items:center;
+}
+.offb-cell{
+  padding:12px; font-size:13px; color:#0f172a; border-bottom:1px solid #f1f5f9;
+  display:flex; align-items:center; white-space:normal; word-break:break-word;
+}
+.offb-actions{ gap:6px; flex-wrap:wrap; justify-content:flex-start; }
+.offb-empty{ padding:18px; text-align:center; color:#94a3b8; }
+.offb-badge{
+  display:inline-block; white-space:nowrap; padding:3px 12px; border-radius:999px;
+  font-size:11px; font-weight:700; line-height:1.4;
+}
+.offb-badge--pending{ background:#fef3c7; color:#92600a; }
+.offb-badge--done{ background:#dcfce7; color:#166534; }
+
+/* Modales offboarding */
+.offb-modal{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; }
+.offb-modal[hidden]{ display:none; }
+.offb-modal__overlay{ position:absolute; inset:0; background:rgba(15,23,42,.5); backdrop-filter:blur(3px); }
+.offb-modal__panel{
+  position:relative; z-index:1; width:min(600px,94vw); max-height:90vh; overflow:auto;
+  background:#fff; border-radius:22px; padding:30px 32px 28px;
+  box-shadow:0 40px 120px rgba(15,23,42,.35);
+}
+.offb-modal__close{
+  position:absolute; top:16px; right:16px; width:34px; height:34px; border:none; border-radius:999px;
+  background:#f1f5f9; color:#475569; font-size:18px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:background .15s, color .15s;
+}
+.offb-modal__close:hover{ background:#e2e8f0; color:#0f172a; }
+.offb-modal__title{
+  margin:0 0 4px; font-size:22px; font-weight:800; letter-spacing:-.01em; color:#0f172a;
+}
+.offb-modal__sub{ margin:0 0 18px; color:#64748b; font-size:13px; }
+.offb-list{ display:flex; flex-direction:column; gap:10px; }
+.offb-list__row{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 14px; border:1px solid #eef0f4; border-radius:12px; background:#fafbff;
+  transition:border-color .15s, background .15s;
+}
+.offb-list__row:hover{ border-color:#d9def0; background:#f5f7ff; }
+.offb-list__name{ font-weight:700; font-size:14px; }
+.offb-list__sub{ font-size:12px; color:#64748b; }
+.offb-list__view{ font-size:12px; color:#94a3b8; }
+
+/* Form de offboarding — grilla de 2 columnas, campos agrupados */
+.offb-form{
+  display:grid; grid-template-columns:1fr 1fr; gap:16px 18px; margin-top:4px;
+}
+.offb-field{
+  display:flex; flex-direction:column; gap:7px;
+  font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#64748b;
+}
+/* Comments, Address y las acciones ocupan la fila completa */
+.offb-field:has(textarea),
+.offb-field:has(#offbAddress),
+.offb-field.offb-full,
+.offb-form__actions{ grid-column:1 / -1; }
+.offb-field input, .offb-field select, .offb-field textarea{
+  font:inherit; font-size:14px; font-weight:400; letter-spacing:normal; text-transform:none;
+  color:#0f172a; padding:11px 13px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;
+  transition:border-color .15s, box-shadow .15s;
+}
+.offb-field input::placeholder, .offb-field textarea::placeholder{ color:#94a3b8; }
+.offb-field input:focus, .offb-field select:focus, .offb-field textarea:focus{
+  outline:none; border-color:#6c38ff; box-shadow:0 0 0 3px rgba(108,56,255,.15);
+}
+.offb-field textarea{ min-height:88px; resize:vertical; }
+/* selects: sacar el look nativo + flecha custom */
+.offb-field select{
+  appearance:none; -webkit-appearance:none; cursor:pointer; padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 13px center;
+}
+.offb-form__actions{
+  display:flex; align-items:center; justify-content:flex-end; gap:12px;
+  margin-top:6px; padding-top:16px; border-top:1px solid #f1f5f9;
+}
+.offb-status{ font-size:12px; color:#64748b; margin-right:auto; letter-spacing:normal; text-transform:none; }

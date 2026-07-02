@@ -376,8 +376,40 @@ def create_hub_user():
     )
 
 
-@bp.delete("/users/<int:user_id>")
-def delete_hub_user(user_id: int):
+def _soft_deactivate_user(cur, user_id: int, by_email: str) -> None:
+    """Soft delete: marca al usuario Inactive (bloquea login) y crea/reinicia su
+    fila de offboarding pendiente (snapshot del Hiring Manager = users.lider).
+    NO borra nada de la base. Ver offboarding_routes."""
+    from offboarding_routes import _ensure_offboarding_schema  # import diferido
+
+    _ensure_offboarding_schema(cur)
+    cur.execute(
+        """
+        INSERT INTO admin_user_access (user_id, is_active, deactivated_at, deactivated_by_email, created_by_email)
+        VALUES (%s, FALSE, NOW(), %s, %s)
+        ON CONFLICT (user_id) DO UPDATE
+          SET is_active = FALSE, deactivated_at = NOW(),
+              deactivated_by_email = EXCLUDED.deactivated_by_email, updated_at = NOW()
+        """,
+        (user_id, by_email, by_email),
+    )
+    cur.execute("SELECT lider FROM users WHERE user_id = %s", (user_id,))
+    lider = (cur.fetchone() or {}).get("lider")
+    cur.execute(
+        """
+        INSERT INTO offboarding (user_id, hiring_manager_id, created_by_email, status)
+        VALUES (%s, %s, %s, 'pending')
+        ON CONFLICT (user_id) DO UPDATE
+          SET hiring_manager_id = EXCLUDED.hiring_manager_id,
+              status = 'pending', computer_pickup_done = FALSE,
+              form_submitted_at = NULL, offboarding_last_sent_at = NULL, pickup_last_sent_at = NULL,
+              completed_at = NULL, completed_by_email = NULL, updated_at = NOW()
+        """,
+        (user_id, lider, by_email),
+    )
+
+
+def _deactivate_endpoint(user_id: int):
     requester_id = _current_user_id()
     if not requester_id:
         return _friendly_error("Please log in again to continue.", 401)
@@ -398,7 +430,7 @@ def delete_hub_user(user_id: int):
                 return _friendly_error("You do not have access to this tool.", 403)
 
             if int(user_id) == int(requester_id):
-                return _friendly_error("You cannot delete your own account.", 400)
+                return _friendly_error("You cannot deactivate your own account.", 400)
 
             cur.execute(
                 "SELECT user_id, user_name, email_vintti FROM users WHERE user_id = %s",
@@ -408,16 +440,28 @@ def delete_hub_user(user_id: int):
             if not target:
                 return _friendly_error("User not found.", 404)
 
-            cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+            _soft_deactivate_user(cur, user_id, requester_email)
         conn.commit()
     except Exception:
         conn.rollback()
-        logging.exception("Failed to delete Hub user via admin route")
-        return _friendly_error("We could not delete that user right now. Please try again later.", 500)
+        logging.exception("Failed to deactivate Hub user via admin route")
+        return _friendly_error("We could not deactivate that user right now. Please try again later.", 500)
     finally:
         conn.close()
 
-    return jsonify({"ok": True, "deleted_user_id": user_id}), 200
+    return jsonify({"ok": True, "deactivated_user_id": user_id}), 200
+
+
+@bp.post("/users/<int:user_id>/deactivate")
+def deactivate_hub_user(user_id: int):
+    return _deactivate_endpoint(user_id)
+
+
+@bp.delete("/users/<int:user_id>")
+def delete_hub_user(user_id: int):
+    # Ya NO hace hard delete: ahora es un soft delete (deactivate). Se mantiene el
+    # verbo DELETE por compatibilidad, pero el efecto es desactivar, no borrar.
+    return _deactivate_endpoint(user_id)
 
 
 def _send_invite_email(

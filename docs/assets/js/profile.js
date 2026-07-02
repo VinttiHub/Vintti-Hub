@@ -663,7 +663,8 @@ async function loadOrgChart(){
     const res = await api(`/users`, { method: "GET", cache: "no-store" });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    const rows = Array.isArray(data) ? data : [];
+    // Ocultar empleados desactivados (soft delete) del org chart.
+    const rows = (Array.isArray(data) ? data : []).filter(u => u?.is_active !== false);
     const hasLeaderData = rows.some((row)=> Object.prototype.hasOwnProperty.call(row || {}, "lider"));
     if (hasLeaderData){
       renderOrgChart(rows);
@@ -1358,7 +1359,9 @@ async function loadTeamPto(){
     const r = await api(`/users`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
-    const filtered = filterTeamPtoUsers(arr);
+    // Ocultar empleados desactivados (soft delete) de la tabla de balances.
+    const activeOnly = (Array.isArray(arr) ? arr : []).filter(u => u?.is_active !== false);
+    const filtered = filterTeamPtoUsers(activeOnly);
     // include vacation, vintti days AND holidays
     const slim = filtered.map(u => ({
       user_id: u.user_id,
@@ -2037,18 +2040,30 @@ function renderAdminUsers(users){
     }
     meta.append(name, details);
 
+    const isInactive = user?.is_active === false;
+    if (isInactive){
+      const badge = document.createElement("span");
+      badge.className = "admin-user-inactive-badge";
+      badge.textContent = "Inactive";
+      details.appendChild(badge);
+    }
+
     const actions = document.createElement("div");
     actions.className = "admin-user-actions";
     const del = document.createElement("button");
     del.type = "button";
     del.className = "btn danger";
-    del.textContent = "Delete";
+    del.textContent = "Deactivate";
     del.setAttribute("data-admin-delete", String(user?.user_id || ""));
     del.setAttribute("data-user-name", String(user?.user_name || ""));
     del.setAttribute("data-user-email", String(user?.email_vintti || ""));
     if (CURRENT_USER_ID && Number(user?.user_id) === Number(CURRENT_USER_ID)){
       del.disabled = true;
-      del.title = "You cannot delete your own account.";
+      del.title = "You cannot deactivate your own account.";
+    } else if (isInactive){
+      del.disabled = true;
+      del.textContent = "Deactivated";
+      del.title = "This user is already inactive.";
     }
     actions.appendChild(del);
 
@@ -2083,21 +2098,22 @@ async function onAdminDeleteConfirm(){
   const userId = Number(ADMIN_DELETE_TARGET.user_id);
   if (!userId) return;
   if (confirmBtn) confirmBtn.disabled = true;
-  setAdminDeleteStatus("Deleting user…", true);
+  setAdminDeleteStatus("Deactivating user…", true);
   try{
-    const res = await api(`/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
+    const res = await api(`/admin/users/${encodeURIComponent(userId)}/deactivate`, { method: "POST" });
     const data = await res.json().catch(()=>null);
     if (!res.ok || !data?.ok){
-      const msg = data?.error || data?.message || "Could not delete user.";
+      const msg = data?.error || data?.message || "Could not deactivate user.";
       throw new Error(msg);
     }
-    setAdminDeleteStatus("User deleted.", true);
+    setAdminDeleteStatus("User deactivated.", true);
     closeModal(document.getElementById("adminDeleteModal"));
     await loadAdminUsersList();
     await ensureAdminLeaderOptions(true);
+    if (typeof loadInactiveEmployees === "function") { try { await loadInactiveEmployees(); } catch(_e){} }
   }catch(err){
-    console.error("admin delete error:", err);
-    setAdminDeleteStatus(err?.message || "Could not delete user.", false);
+    console.error("admin deactivate error:", err);
+    setAdminDeleteStatus(err?.message || "Could not deactivate user.", false);
   }finally{
     if (confirmBtn) confirmBtn.disabled = false;
   }
@@ -3156,6 +3172,8 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       // await loadLeaderApprovals();
     }
 
+    try { await initOffboarding(); } catch(e){ console.error("initOffboarding", e); }
+
     const form = document.getElementById("timeoffForm");
     if (form && !form.dataset.bound){
       form.addEventListener("submit", onTimeoffSubmit);
@@ -3521,3 +3539,272 @@ document.addEventListener("click", async (e) => {
     btn.disabled = false;
   }
 });
+
+/* ============================================================
+   OFFBOARDING (soft-delete) — visible solo para Jazmín y el
+   Hiring Manager (users.lider) del empleado. El server (offboarding_routes)
+   es la autoridad de permisos; el cliente solo refleja lo que devuelve.
+   ============================================================ */
+const OFFBOARDING_JAZ = "jazmin@vintti.com";
+const OFFBOARDING_REASONS = [
+  "Received a better offer",
+  "Poor performance",
+  "Employee decided to leave",
+  "Layoff",
+];
+let OFFBOARDING_INACTIVE = [];
+const _offEsc = (s)=>String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+// Jazmín es view-only; un manager solo ve sus reportes (el server ya scopea),
+// así que puede actuar. Fallback: si el registro no tiene manager, Jazmín puede actuar.
+function offbCanAct(rec){
+  return currentProfileEmail() !== OFFBOARDING_JAZ || !rec?.hiring_manager_id;
+}
+
+async function offbFetch(path, opts){
+  const res = await api(path, opts || { method: "GET" });
+  const data = await res.json().catch(()=>null);
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || "Request failed");
+  return data;
+}
+
+async function initOffboarding(){
+  try{
+    OFFBOARDING_INACTIVE = await offbFetch("/offboarding/inactive");
+  }catch(e){ OFFBOARDING_INACTIVE = []; }
+  const isViewer = currentProfileEmail() === OFFBOARDING_JAZ || (Array.isArray(OFFBOARDING_INACTIVE) && OFFBOARDING_INACTIVE.length > 0);
+  if (!isViewer) return;
+  ensureOffboardingModals();
+  enableInactiveTab();
+  renderInactiveTable(OFFBOARDING_INACTIVE);
+  // El botón flotante vive en Team PTO → habilitamos la pestaña para los viewers.
+  try { enableTeamTab(); loadTeamPto(); } catch(_e){}
+  ensureOffboardingFab();
+}
+
+function enableInactiveTab(){
+  const tabsBar = document.getElementById("tabsBar");
+  const panel = document.getElementById("panel-inactive");
+  if (!tabsBar || !panel) return;
+  if (tabsBar.querySelector('[data-tab="inactive"]')) return;
+  const btn = document.createElement("button");
+  btn.className = "tab";
+  btn.dataset.tab = "inactive";
+  btn.id = "tab-inactive";
+  btn.type = "button";
+  btn.setAttribute("aria-selected", "false");
+  btn.textContent = "Inactive Employees";
+  tabsBar.appendChild(btn);
+  wireTabs();
+}
+
+function ensureOffboardingFab(){
+  const panel = document.getElementById("panel-teampto");
+  if (!panel || document.getElementById("offbFab")) return;
+  const fab = document.createElement("button");
+  fab.id = "offbFab";
+  fab.type = "button";
+  fab.className = "offb-fab";
+  fab.textContent = "🚪 Offboarding";
+  fab.addEventListener("click", openOffboardingList);
+  panel.appendChild(fab);  // dentro del panel Team PTO → solo visible en esa pestaña
+}
+
+async function loadInactiveEmployees(){
+  try{
+    OFFBOARDING_INACTIVE = await offbFetch("/offboarding/inactive");
+    renderInactiveTable(OFFBOARDING_INACTIVE);
+  }catch(e){ console.error("loadInactiveEmployees", e); }
+}
+
+function renderInactiveTable(rows){
+  const host = document.getElementById("inactiveEmployeesTable");
+  if (!host) return;
+  rows = Array.isArray(rows) ? rows : [];
+  if (!rows.length){
+    host.innerHTML = `<div class="offb-empty">No inactive employees yet.</div>`;
+    return;
+  }
+  const head = ["Name","Role","Hiring Manager","End date","Reason","Pick up","Address","Comments","Status",""];
+  const th = head.map(h=>`<div class="offb-th">${_offEsc(h)}</div>`).join("");
+  const body = rows.map(r=>{
+    const canAct = offbCanAct(r);
+    const statusBadge = r.status === "completed"
+      ? `<span class="offb-badge offb-badge--done">Completed</span>`
+      : `<span class="offb-badge offb-badge--pending">Pending</span>`;
+    const pickup = r.computer_pickup ? (r.computer_pickup_done ? "Yes · done" : "Yes") : "No";
+    let actions = "";
+    if (canAct){
+      if (!r.form_submitted){
+        actions += `<button class="btn tiny" data-offb-fill="${r.user_id}">Fill</button>`;
+      }
+      if (r.status !== "completed"){
+        actions += `<button class="btn tiny" data-offb-complete="${r.user_id}">Complete</button>`;
+      }
+      if (r.computer_pickup && !r.computer_pickup_done){
+        actions += `<button class="btn tiny ghost" data-offb-pickup="${r.user_id}">Pickup ✓</button>`;
+      }
+    }
+    return `
+      <div class="offb-cell">${_offEsc(r.user_name)}</div>
+      <div class="offb-cell">${_offEsc(r.role||"—")}</div>
+      <div class="offb-cell">${_offEsc(r.manager_name||"—")}</div>
+      <div class="offb-cell">${_offEsc(r.end_date||"—")}</div>
+      <div class="offb-cell">${_offEsc(r.reason||"—")}</div>
+      <div class="offb-cell">${_offEsc(pickup)}</div>
+      <div class="offb-cell">${_offEsc(r.address||"—")}</div>
+      <div class="offb-cell">${_offEsc(r.comments||"—")}</div>
+      <div class="offb-cell">${statusBadge}</div>
+      <div class="offb-cell offb-actions">${actions}</div>`;
+  }).join("");
+  host.innerHTML = `<div class="offb-table">${th}${body}</div>`;
+  host.querySelectorAll("[data-offb-complete]").forEach(b=> b.addEventListener("click", ()=> offbMark(b.getAttribute("data-offb-complete"), "complete")));
+  host.querySelectorAll("[data-offb-pickup]").forEach(b=> b.addEventListener("click", ()=> offbMark(b.getAttribute("data-offb-pickup"), "pickup_done")));
+  host.querySelectorAll("[data-offb-fill]").forEach(b=> b.addEventListener("click", ()=> openOffboardingForm(b.getAttribute("data-offb-fill"))));
+}
+
+async function offbMark(userId, action){
+  try{
+    await offbFetch(`/offboarding/${encodeURIComponent(userId)}/${action}`, { method: "POST" });
+    await loadInactiveEmployees();
+  }catch(e){ alert(e.message || "Could not update offboarding."); }
+}
+
+/* ---- Modales (creados una vez, appended al body) ---- */
+function ensureOffboardingModals(){
+  if (document.getElementById("offbListModal")) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="offb-modal" id="offbListModal" hidden>
+      <div class="offb-modal__overlay" data-offb-close></div>
+      <div class="offb-modal__panel" role="dialog" aria-modal="true">
+        <button class="offb-modal__close" data-offb-close aria-label="Close">×</button>
+        <h3 class="offb-modal__title">Offboarding · pending</h3>
+        <p class="offb-modal__sub">Deactivated employees with a pending offboarding.</p>
+        <div id="offbListBody" class="offb-list"></div>
+      </div>
+    </div>
+    <div class="offb-modal" id="offbFormModal" hidden>
+      <div class="offb-modal__overlay" data-offb-close></div>
+      <div class="offb-modal__panel" role="dialog" aria-modal="true">
+        <button class="offb-modal__close" data-offb-close aria-label="Close">×</button>
+        <h3 class="offb-modal__title" id="offbFormTitle">Offboarding</h3>
+        <form id="offbForm" class="offb-form">
+          <input type="hidden" id="offbUserId">
+          <label class="offb-field"><span>End Date</span>
+            <input type="date" id="offbEndDate" required></label>
+          <label class="offb-field"><span>Reason</span>
+            <select id="offbReason" required>
+              <option value="">Select…</option>
+              ${OFFBOARDING_REASONS.map(r=>`<option value="${_offEsc(r)}">${_offEsc(r)}</option>`).join("")}
+            </select></label>
+          <label class="offb-field"><span>Computer Pick Up</span>
+            <select id="offbPickup">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select></label>
+          <label class="offb-field" id="offbAddressField" hidden><span>Address</span>
+            <input type="text" id="offbAddress" placeholder="Pick up address"></label>
+          <label class="offb-field"><span>Comments</span>
+            <textarea id="offbComments" rows="3"></textarea></label>
+          <div class="offb-form__actions">
+            <span class="offb-status" id="offbFormStatus"></span>
+            <button type="submit" class="btn primary" id="offbSendBtn">Send</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.querySelectorAll("[data-offb-close]").forEach(el=> el.addEventListener("click", (e)=>{
+    const m = e.target.closest(".offb-modal"); if (m) m.hidden = true;
+  }));
+  document.getElementById("offbPickup").addEventListener("change", (e)=>{
+    const yes = e.target.value === "yes";
+    const f = document.getElementById("offbAddressField");
+    f.hidden = !yes;
+    document.getElementById("offbAddress").required = yes;
+  });
+  document.getElementById("offbForm").addEventListener("submit", onOffboardingSubmit);
+}
+
+async function openOffboardingList(){
+  ensureOffboardingModals();
+  const modal = document.getElementById("offbListModal");
+  const body = document.getElementById("offbListBody");
+  body.innerHTML = `<div class="offb-empty">Loading…</div>`;
+  modal.hidden = false;
+  try{
+    const rows = await offbFetch("/offboarding/pending");
+    if (!rows.length){ body.innerHTML = `<div class="offb-empty">No pending offboardings.</div>`; return; }
+    body.innerHTML = rows.map(r=>`
+      <div class="offb-list__row">
+        <div>
+          <div class="offb-list__name">${_offEsc(r.user_name)}</div>
+          <div class="offb-list__sub">${_offEsc(r.role||"")} · Manager: ${_offEsc(r.manager_name||"—")}${r.form_submitted?" · <b>submitted</b>":""}</div>
+        </div>
+        ${offbCanAct(r) ? `<button class="btn tiny" data-offb-open="${r.user_id}">${r.form_submitted?"Edit":"Fill"}</button>` : `<span class="offb-list__view">view only</span>`}
+      </div>`).join("");
+    body.querySelectorAll("[data-offb-open]").forEach(b=> b.addEventListener("click", ()=>{
+      modal.hidden = true;
+      openOffboardingForm(b.getAttribute("data-offb-open"));
+    }));
+  }catch(e){ body.innerHTML = `<div class="offb-empty">${_offEsc(e.message||"Could not load.")}</div>`; }
+}
+
+async function openOffboardingForm(userId){
+  ensureOffboardingModals();
+  let rec = {};
+  try{ rec = await offbFetch(`/offboarding/${encodeURIComponent(userId)}`); }catch(e){ alert(e.message); return; }
+  const canAct = offbCanAct(rec);
+  document.getElementById("offbUserId").value = userId;
+  document.getElementById("offbFormTitle").textContent = `Offboarding · ${rec.user_name || ""}`;
+  document.getElementById("offbEndDate").value = rec.end_date || "";
+  document.getElementById("offbReason").value = rec.reason || "";
+  document.getElementById("offbPickup").value = rec.computer_pickup ? "yes" : "no";
+  // Autollena con la address guardada del pickup; si no hay, con la del empleado (users.address). Editable.
+  document.getElementById("offbAddress").value = rec.address || rec.employee_address || "";
+  const addrField = document.getElementById("offbAddressField");
+  addrField.hidden = !rec.computer_pickup;
+  document.getElementById("offbAddress").required = !!rec.computer_pickup;
+  document.getElementById("offbComments").value = rec.comments || "";
+  document.getElementById("offbFormStatus").textContent = "";
+  // Jazmín (view-only): deshabilita todo y oculta Send.
+  const form = document.getElementById("offbForm");
+  form.querySelectorAll("input,select,textarea").forEach(el=> el.disabled = !canAct);
+  document.getElementById("offbSendBtn").style.display = canAct ? "" : "none";
+  document.getElementById("offbFormModal").hidden = false;
+}
+
+async function onOffboardingSubmit(e){
+  e.preventDefault();
+  const userId = document.getElementById("offbUserId").value;
+  const pickup = document.getElementById("offbPickup").value === "yes";
+  const address = document.getElementById("offbAddress").value.trim();
+  if (pickup && !address){
+    document.getElementById("offbFormStatus").textContent = "Address is required when Pick Up is Yes.";
+    return;
+  }
+  const payload = {
+    end_date: document.getElementById("offbEndDate").value,
+    reason: document.getElementById("offbReason").value,
+    computer_pickup: pickup,
+    address: address || null,
+    comments: document.getElementById("offbComments").value.trim() || null,
+  };
+  const btn = document.getElementById("offbSendBtn");
+  btn.disabled = true;
+  document.getElementById("offbFormStatus").textContent = "Sending…";
+  try{
+    await offbFetch(`/offboarding/${encodeURIComponent(userId)}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    document.getElementById("offbFormModal").hidden = true;
+    await loadInactiveEmployees();
+  }catch(err){
+    document.getElementById("offbFormStatus").textContent = err.message || "Could not send.";
+  }finally{
+    btn.disabled = false;
+  }
+}

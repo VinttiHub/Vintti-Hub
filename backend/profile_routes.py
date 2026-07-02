@@ -1002,14 +1002,42 @@ def list_time_off():
 @bp.get("/users")
 def list_users():
     email = request.args.get("email")
+    # Por defecto la lista muestra SOLO activos → los empleados desactivados (soft
+    # delete) desaparecen de todo el hub. Las vistas de offboarding usan sus propios
+    # endpoints. `?include_inactive=1` trae también los inactivos si se necesita.
+    include_inactive = str(request.args.get("include_inactive") or "").strip().lower() in {"1", "true", "yes"}
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
         _maybe_apply_current_year_vacation_rollover(cur)
         if email:
-            cur.execute("SELECT * FROM users WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
+            # Lookup puntual por email: devuelve el usuario aunque esté inactivo (con is_active).
+            cur.execute(
+                """
+                SELECT u.*, COALESCE(aua.is_active, TRUE) AS is_active
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE LOWER(u.email_vintti) = LOWER(%s)
+                """,
+                (email,),
+            )
+        elif include_inactive:
+            cur.execute(
+                """
+                SELECT u.*, COALESCE(aua.is_active, TRUE) AS is_active
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                """
+            )
         else:
-            cur.execute("SELECT * FROM users")
+            cur.execute(
+                """
+                SELECT u.*, COALESCE(aua.is_active, TRUE) AS is_active
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE COALESCE(aua.is_active, TRUE) = TRUE
+                """
+            )
         rows = cur.fetchall()
         rows = [_apply_computed_timeoff_usage(cur, dict(row)) for row in rows]
     conn.commit()

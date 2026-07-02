@@ -1608,6 +1608,8 @@ def send_due_reminders():
         credit_loop_sent = run_due_credit_loop_reminders(cur)
         client_check_sent = run_due_client_check_reminders(cur)
         timeoff_approval_sent = run_due_timeoff_approval_reminders(cur)
+        from offboarding_routes import run_due_offboarding_reminders  # import diferido: evita ciclo
+        offboarding_sent = run_due_offboarding_reminders(cur)
 
         conn.commit()
         return jsonify({
@@ -1616,6 +1618,7 @@ def send_due_reminders():
             "credit_loop_sent": credit_loop_sent,
             "client_check_sent": client_check_sent,
             "timeoff_approval_sent": timeoff_approval_sent,
+            "offboarding_sent": offboarding_sent,
         })
 
 
