@@ -31,10 +31,12 @@ SALES_LEAD_NAME_OVERRIDES = {
 def users_list_or_by_email():
     """
     GET /users
-    - sin params -> lista usuarios (campos clave, incluye user_id)
-    - ?email=foo@bar.com -> filtra por email exacto (case-insensitive)
+    - sin params -> lista usuarios ACTIVOS (los desactivados/soft-delete se ocultan)
+    - ?email=foo@bar.com -> filtra por email exacto (case-insensitive), aunque esté inactivo
+    - ?include_inactive=1 -> incluye también los inactivos
     """
     email = request.args.get("email")
+    include_inactive = str(request.args.get("include_inactive") or "").strip().lower() in {"1", "true", "yes"}
 
     try:
         conn = get_connection()
@@ -86,15 +88,21 @@ def users_list_or_by_email():
                   COALESCE(pto_usage.approved_vintti_days, 0) AS vintti_days_consumidos,
                   COALESCE(pto_usage.approved_holidays, 0) AS feriados_consumidos,
                   u.team,
-                  u.lider
+                  u.lider,
+                  COALESCE(aua.is_active, TRUE) AS is_active
                 FROM users u
                 LEFT JOIN pto_usage ON pto_usage.user_id = u.user_id
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
             """
 
             if email:
+                # Lookup puntual: devuelve el usuario aunque esté inactivo.
                 cur.execute(base_select + " WHERE LOWER(u.email_vintti) = LOWER(%s)", (email,))
-            else:
+            elif include_inactive:
                 cur.execute(base_select)
+            else:
+                # Por defecto ocultamos los desactivados (soft delete) de todo el hub.
+                cur.execute(base_select + " WHERE COALESCE(aua.is_active, TRUE) = TRUE")
 
             rows = cur.fetchall()
 
@@ -129,17 +137,19 @@ def users_by_leader():
             cur.execute(
                 """
                 SELECT
-                  user_id,
-                  user_name,
-                  nickname,
-                  email_vintti,
-                  role,
-                  avatar_url,
-                  team,
-                  lider
-                FROM users
-                WHERE lider = %s
-                ORDER BY LOWER(user_name) ASC
+                  u.user_id,
+                  u.user_name,
+                  u.nickname,
+                  u.email_vintti,
+                  u.role,
+                  u.avatar_url,
+                  u.team,
+                  u.lider
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE u.lider = %s
+                  AND COALESCE(aua.is_active, TRUE) = TRUE
+                ORDER BY LOWER(u.user_name) ASC
                 """,
                 (leader_id,),
             )
