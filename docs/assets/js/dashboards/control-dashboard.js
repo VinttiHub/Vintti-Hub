@@ -1877,9 +1877,19 @@
         const [field, label] = s.trim().split('|');
         return { field: (field || '').trim(), label: (label || field || '').trim() };
       }).filter(f => f.field);
+      // data-mf-all="field:chartKey,..." → inyecta TODAS las opciones de ese chart
+      // (columna `label`) aunque no haya filas con data (ej. mostrar todos los recruiters).
+      const mfAll = {};
+      (el.dataset.mfAll || '').split(',').forEach(s => {
+        const [fld, ck] = s.trim().split(':');
+        if (fld && ck) mfAll[fld.trim()] = ck.trim();
+      });
       const selectsHtml = mfFields.map(f => {
-        const vals = [...new Set((rows || [])
-          .map(r => r[f.field])
+        const raw = (rows || []).map(r => r[f.field]);
+        if (mfAll[f.field]) {
+          (lastFetchedRows.get(mfAll[f.field]) || []).forEach(r => raw.push(r && r.label));
+        }
+        const vals = [...new Set(raw
           .filter(v => v != null && String(v).trim() !== '')
           .map(String))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const cur = mfState[f.field] || '';
@@ -3976,6 +3986,11 @@
       }));
 
       if (myGen !== _hydrateGen) return;  // R14 (#3): llegó una hydrate más nueva → no pisar tablas/cohorts
+      // Re-render dtables con data-mf-all: ahora que la lista de opciones (ej. la de
+      // recruiters) ya está en cache, reconstruye sus dropdowns con TODAS las opciones.
+      scope.querySelectorAll('[data-mf-all][data-bind="dtable"]').forEach(el => {
+        if (el._dtableRows) renderDtable(el, el._dtableRows);
+      });
       hydratedScopes.add(scopeKey);
       renderDetailTable();
       renderAmDetailTable();

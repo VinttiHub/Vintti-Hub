@@ -7,13 +7,18 @@ conversion_pct. Excluye recruiters inactivos.
 from __future__ import annotations
 
 from ._periods import window_bounds
+from ._recruiters import RECRUITERS_CTE
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     lo, hi = window_bounds(filters)
-    sql = """
-        WITH hires AS (
-          SELECT DISTINCT ho.opportunity_id, ho.candidate_id, o.opp_hr_lead
+    # Muestra TODOS los recruiters activos (FULL JOIN con la lista canónica): los que
+    # no tienen placements aparecen con 0 / 0 / 0%.
+    sql = f"""
+        WITH {RECRUITERS_CTE.strip()},
+        hires AS (
+          SELECT DISTINCT ho.opportunity_id, ho.candidate_id,
+                 LOWER(TRIM(o.opp_hr_lead)) AS email
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE ho.carga_active BETWEEN %(w_lo)s AND %(w_hi)s
@@ -29,23 +34,34 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT DISTINCT opportunity_id FROM batch WHERE batch_number = 1
         ),
         scored AS (
-          SELECT h.opp_hr_lead, (fb.batch_num = 1) AS one_shot
+          SELECT h.email, (fb.batch_num = 1) AS one_shot
           FROM hires h
           JOIN oppb1 ON oppb1.opportunity_id = h.opportunity_id
           LEFT JOIN firstbatch fb
             ON fb.opportunity_id = h.opportunity_id AND fb.candidate_id = h.candidate_id
+        ),
+        agg AS (
+          SELECT email,
+            COUNT(*)::int                         AS placements,
+            COUNT(*) FILTER (WHERE one_shot)::int AS one_shot_count
+          FROM scored
+          GROUP BY email
         )
         SELECT
-          COALESCE(NULLIF(TRIM(u.nickname), ''),
+          COALESCE(r.label,
+                   NULLIF(TRIM(u.nickname), ''),
                    NULLIF(TRIM(u.user_name), ''),
-                   s.opp_hr_lead, '—')                         AS recruiter,
-          COUNT(*)::int                                        AS placements,
-          COUNT(*) FILTER (WHERE one_shot)::int                AS one_shot_count,
-          ROUND(100.0 * COUNT(*) FILTER (WHERE one_shot)
-                / NULLIF(COUNT(*), 0), 1)::float               AS conversion_pct
-        FROM scored s
-        LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = LOWER(TRIM(s.opp_hr_lead))
-        GROUP BY 1
+                   a.email, '—')                                AS recruiter,
+          COALESCE(a.placements, 0)                            AS placements,
+          COALESCE(a.one_shot_count, 0)                        AS one_shot_count,
+          ROUND(
+            CASE WHEN COALESCE(a.placements, 0) = 0 THEN 0
+                 ELSE 100.0 * a.one_shot_count / a.placements END,
+            1
+          )::float                                             AS conversion_pct
+        FROM recruiters r
+        FULL OUTER JOIN agg a ON a.email = r.email
+        LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = COALESCE(r.email, a.email)
         ORDER BY placements DESC, recruiter;
     """
     return sql, {"w_lo": lo, "w_hi": hi}
