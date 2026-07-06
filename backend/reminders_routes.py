@@ -23,7 +23,8 @@ BAHIA_EMAIL = "bahia@vintti.com"
 MIA_EMAIL = "mia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 PGONZALES_EMAIL = "pgonzales@vintti.com"
-CLIENT_CHECK_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]
+CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]
+CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS = [JAZ_EMAIL, PGONZALES_EMAIL]
 
 
 def _fetch_opportunity_type(opportunity_id: int, cur) -> str:
@@ -920,7 +921,7 @@ def _client_check_email_html(row: Dict[str, Any]) -> str:
         ("Position", row.get("opp_position_name") or "—"),
         ("Client", row.get("client_name") or "—"),
         ("Start date", row.get("start_date") or "—"),
-        ("Check month", f"Month {row.get('check_month')} of 6"),
+        ("Check month", f"Month {row.get('check_month')}"),
         ("Suggested check date", row.get("check_date") or "—"),
         ("Client email", row.get("client_mail") or "—"),
         ("Opportunity ID", row.get("opportunity_id") or "—"),
@@ -971,7 +972,17 @@ def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
                 (h.start_date::date + (gs.check_month || ' months')::interval)::date AS original_check_date
             FROM hire_opportunity h
             LEFT JOIN opportunity o ON o.opportunity_id = h.opportunity_id
-            CROSS JOIN generate_series(1, 6) AS gs(check_month)
+            CROSS JOIN LATERAL generate_series(
+                1,
+                GREATEST(
+                    1,
+                    (
+                        EXTRACT(YEAR FROM AGE(CURRENT_DATE + INTERVAL '2 days', h.start_date::date))::int * 12
+                    )
+                    + EXTRACT(MONTH FROM AGE(CURRENT_DATE + INTERVAL '2 days', h.start_date::date))::int
+                    + 1
+                )
+            ) AS gs(check_month)
             WHERE h.start_date IS NOT NULL
               AND LOWER(COALESCE(o.opp_model, '')) = 'staffing'
               AND (
@@ -1120,11 +1131,21 @@ def _create_client_check_todos(cur, row: Dict[str, Any], recipients: List[str]) 
     }
 
 
+def _client_check_recipients(row: Dict[str, Any]) -> List[str]:
+    try:
+        check_month = int(row.get("check_month") or 0)
+    except Exception:
+        check_month = 0
+    if 1 <= check_month <= 6:
+        return _dedupe_emails(CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS)
+    return _dedupe_emails(CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS)
+
+
 def run_due_client_check_reminders(cur) -> List[Dict[str, Any]]:
     _ensure_client_check_reminders_table(cur)
-    recipients = _dedupe_emails(CLIENT_CHECK_EMAIL_RECIPIENTS)
     sent: List[Dict[str, Any]] = []
     for row in _fetch_due_client_check_rows(cur):
+        recipients = _client_check_recipients(row)
         todos = _create_client_check_todos(cur, row, recipients)
         ok = _send_email(
             subject=_client_check_subject(
@@ -1553,10 +1574,27 @@ def _should_send(now, press_date, last_sent_at):
     base = last_sent_at or press_date
     return (now - base) >= timedelta(hours=24)
 
+
+def _is_guatemala_morning_window(now: Optional[datetime] = None) -> bool:
+    local_now = now or datetime.now(tz=GUATEMALA_TZ)
+    return 5 <= local_now.hour < 8
+
+
 @bp.route("/reminders/due", methods=["POST"])
 def send_due_reminders():
     """Idempotente para correr en un cron externo: envía recordatorios por cada persona con flag = false
        si han pasado 24h desde press_date o desde su último envío."""
+    data = request.get_json(silent=True) or {}
+    force = _normalize_bool(data.get("force") or request.args.get("force"))
+    guatemala_now = datetime.now(tz=GUATEMALA_TZ)
+    if not force and not _is_guatemala_morning_window(guatemala_now):
+        return jsonify({
+            "skipped": True,
+            "reason": "outside_guatemala_morning_window",
+            "guatemala_time": guatemala_now.isoformat(),
+            "window": "05:00-07:59 America/Guatemala",
+        }), 200
+
     now = datetime.now(tz=BOGOTA_TZ)
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:

@@ -11,7 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vintti Hub reminders
+        if: github.event_name == 'schedule'
         run: |
           curl --fail-with-body --retry 3 --retry-delay 10 \
             -X POST \
             https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/due
+      - name: Trigger Vintti Hub reminders manually
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          curl --fail-with-body --retry 3 --retry-delay 10 \
+            -X POST \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/due?force=true"
