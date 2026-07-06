@@ -22,8 +22,10 @@ from db import get_connection
 bp = Blueprint("offboarding", __name__)
 
 JAZ_EMAIL = "jazmin@vintti.com"
+AGUS_EMAIL = "agustin@vintti.com"
 PGONZALES_EMAIL = "pgonzales@vintti.com"
 LAR_EMAIL = "lara@vintti.com"
+INACTIVE_VIEWER_EMAILS = {JAZ_EMAIL, AGUS_EMAIL}
 
 VALID_REASONS = {
     "Received a better offer",
@@ -102,13 +104,17 @@ def _manager_id(row: dict):
     return hm if hm is not None else row.get("lider")
 
 
-def _can_view(requester: Optional[dict], row: dict) -> bool:
+def _can_view_pending(requester: Optional[dict], row: dict) -> bool:
     if not requester:
         return False
     if requester["email"] == JAZ_EMAIL:
         return True
     mgr = _manager_id(row)
     return mgr is not None and int(requester["user_id"]) == int(mgr)
+
+
+def _can_view_inactive(requester: Optional[dict]) -> bool:
+    return bool(requester and requester["email"] in INACTIVE_VIEWER_EMAILS)
 
 
 def _can_act(requester: Optional[dict], row: dict) -> bool:
@@ -300,7 +306,7 @@ def offboarding_pending():
         conn.commit()
     finally:
         conn.close()
-    out = [_serialize(r) for r in rows if _can_view(requester, r)]
+    out = [_serialize(r) for r in rows if _can_view_pending(requester, r)]
     return jsonify(out)
 
 
@@ -313,6 +319,8 @@ def offboarding_inactive():
             requester = _requester(cur)
             if not requester:
                 return _err("Please log in again.", 401)
+            if not _can_view_inactive(requester):
+                return _err("You do not have access to inactive employees.", 403)
             cur.execute(_SELECT_JOIN + " ORDER BY (o.status='completed'), u.user_name")
             rows = [dict(r) for r in (cur.fetchall() or [])]
         conn.commit()
@@ -320,8 +328,6 @@ def offboarding_inactive():
         conn.close()
     out = []
     for r in rows:
-        if not _can_view(requester, r):
-            continue
         item = _serialize(r)
         item["can_act"] = _can_act(requester, r)
         out.append(item)
@@ -345,7 +351,7 @@ def offboarding_get(user_id: int):
     if not row:
         return _err("Offboarding not found.", 404)
     row = dict(row)
-    if not _can_view(requester, row):
+    if not _can_view_pending(requester, row):
         return _err("You do not have access to this offboarding.", 403)
     item = _serialize(row)
     item["can_act"] = _can_act(requester, row)

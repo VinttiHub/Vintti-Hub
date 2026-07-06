@@ -474,7 +474,7 @@
   </div>
 </section>
 
-<!-- ===== Inactive Employees (Jazmín + Hiring Manager only) ===== -->
+<!-- ===== Inactive Employees (Jazmín + Agustín only) ===== -->
 <section class="panel" id="panel-inactive" role="tabpanel" aria-labelledby="tab-inactive" hidden>
   <header class="teampto-head">
     <h2 class="teampto-title">Inactive Employees</h2>
@@ -573,8 +573,9 @@
         </label>
         <label class="field field-span">
           <span class="label">Leader</span>
-          <input id="adminLeaderInput" name="leader_display" placeholder="Start typing a name" list="adminLeaderOptions" autocomplete="off" />
+          <input id="adminLeaderInput" name="leader_display" placeholder="Start typing a name" list="adminManagerOptions" autocomplete="off" />
           <input type="hidden" id="adminLeaderUserId" name="leader_user_id" />
+          <datalist id="adminManagerOptions"></datalist>
           <datalist id="adminLeaderOptions"></datalist>
         </label>
         <label class="field field-span">
@@ -624,6 +625,17 @@
     </header>
 
     <div id="adminUsersList" class="admin-users" aria-live="polite"></div>
+  </div>
+
+  <div class="admin-card admin-card--users" id="adminOffboardingCard" hidden>
+    <header class="admin-card__head">
+      <div>
+        <p class="eyebrow">Offboarding</p>
+        <h2 class="admin-card__title">Pending offboarding</h2>
+        <p class="admin-card__sub">Open the offboarding queue and complete pending forms for deactivated teammates.</p>
+      </div>
+      <button type="button" class="btn primary" id="adminOffboardingBtn" hidden>Offboarding</button>
+    </header>
   </div>
 </section>
 
@@ -775,6 +787,6 @@
 <script src="./assets/js/avatar-map.js?v=20260630-1" defer></script>
 <script src="./assets/js/monthly-mood.js?v=13" defer></script>
 <script src="./assets/js/main.js?v=20260630-1" defer></script>
-<script src="./assets/js/profile.js?v=20260702-offboarding7" defer></script>
+<script src="./assets/js/profile.js?v=20260706-admin-offboarding3" defer></script>
 </body>
 </html>

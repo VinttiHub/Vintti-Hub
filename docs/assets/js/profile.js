@@ -693,6 +693,15 @@ const TEAM_GLOBAL_EMAILS = LEADER_ACCESS_EMAILS;
 const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
+const ADMIN_MANAGER_INCLUDE_EMAILS = new Set([
+  "jazmin@vintti.com",
+  "mia@vintti.com",
+]);
+const ADMIN_MANAGER_EXCLUDE_EMAILS = new Set([
+  "camila@vintti.com",
+]);
+const ADMIN_MANAGER_LOOKUP = new Map();
+const ADMIN_MANAGER_BY_ID = new Map();
 const ADMIN_LEADER_LOOKUP = new Map();
 const ADMIN_LEADER_BY_ID = new Map();
 const ADMIN_LEADER_OF_SELECTED = new Map();
@@ -730,9 +739,33 @@ function collectDirectReportIds(users, leaderId){
   return directReports;
 }
 
+function collectLeaderIds(users){
+  const leaderIds = new Set();
+  (Array.isArray(users) ? users : []).forEach((user)=>{
+    const email = normalizeEmail(user?.email_vintti);
+    const userId = Number(user?.user_id);
+    if (userId > 0 && ADMIN_MANAGER_INCLUDE_EMAILS.has(email)) {
+      leaderIds.add(userId);
+    }
+    const leaderId = toLeaderId(user?.lider);
+    if (Number.isFinite(leaderId) && leaderId > 0) leaderIds.add(leaderId);
+  });
+  return leaderIds;
+}
+
 function filterTeamPtoUsers(allUsers){
   const rows = Array.isArray(allUsers) ? allUsers : [];
   if (canViewWholeCompanyPto()) return rows;
+
+  const visibleIds = collectDirectReportIds(rows, CURRENT_USER_ID);
+  if (!visibleIds.size) return [];
+
+  return rows.filter((user)=> visibleIds.has(Number(user?.user_id)));
+}
+
+function filterAdminUsers(allUsers){
+  const rows = Array.isArray(allUsers) ? allUsers : [];
+  if (currentProfileEmail() === "jazmin@vintti.com") return rows;
 
   const visibleIds = collectDirectReportIds(rows, CURRENT_USER_ID);
   if (!visibleIds.size) return [];
@@ -1789,7 +1822,7 @@ function syncAdminLeaderSelection(){
   const hidden = document.getElementById("adminLeaderUserId");
   if (!input || !hidden) return;
   const key = (input.value || "").trim().toLowerCase();
-  const leaderId = ADMIN_LEADER_LOOKUP.get(key);
+  const leaderId = ADMIN_MANAGER_LOOKUP.get(key);
   hidden.value = leaderId ? String(leaderId) : "";
 }
 
@@ -1817,28 +1850,43 @@ function wireAdminLeaderInput(){
 
 async function ensureAdminLeaderOptions(force=false){
   if (ADMIN_LEADER_LOADED && !force) return;
+  const managerListEl = document.getElementById("adminManagerOptions");
   const listEl = document.getElementById("adminLeaderOptions");
   const input = document.getElementById("adminLeaderInput");
-  if (!listEl || !input) return;
+  if (!managerListEl || !listEl || !input) return;
   try{
     const res = await api(`/users`, { method: "GET" });
     if (!res.ok) throw new Error("Could not load leaders");
     const rows = await res.json();
     ADMIN_LEADER_OPTIONS = Array.isArray(rows) ? rows : [];
+    const leaderIds = collectLeaderIds(ADMIN_LEADER_OPTIONS);
+    ADMIN_MANAGER_LOOKUP.clear();
+    ADMIN_MANAGER_BY_ID.clear();
     ADMIN_LEADER_LOOKUP.clear();
     ADMIN_LEADER_BY_ID.clear();
+    managerListEl.replaceChildren();
     listEl.replaceChildren();
+    const managerFrag = document.createDocumentFragment();
     const frag = document.createDocumentFragment();
     ADMIN_LEADER_OPTIONS.forEach((user)=>{
       if (!user?.user_id) return;
       const label = buildLeaderLabel(user);
       const idNum = Number(user.user_id);
+      const email = normalizeEmail(user?.email_vintti);
+      if (leaderIds.has(idNum) && !ADMIN_MANAGER_EXCLUDE_EMAILS.has(email)){
+        ADMIN_MANAGER_LOOKUP.set(label.toLowerCase(), idNum);
+        ADMIN_MANAGER_BY_ID.set(idNum, label);
+        const managerOpt = document.createElement("option");
+        managerOpt.value = label;
+        managerFrag.appendChild(managerOpt);
+      }
       ADMIN_LEADER_LOOKUP.set(label.toLowerCase(), idNum);
       ADMIN_LEADER_BY_ID.set(idNum, label);
       const opt = document.createElement("option");
       opt.value = label;
       frag.appendChild(opt);
     });
+    managerListEl.appendChild(managerFrag);
     listEl.appendChild(frag);
     ADMIN_LEADER_LOADED = true;
     syncAdminLeaderSelection();
@@ -2083,7 +2131,7 @@ async function loadAdminUsersList(){
     if (!res.ok) throw new Error("Could not load users.");
     const rows = await res.json();
     ADMIN_USERS_CACHE = Array.isArray(rows) ? rows : [];
-    renderAdminUsers(ADMIN_USERS_CACHE);
+    renderAdminUsers(filterAdminUsers(ADMIN_USERS_CACHE));
   }catch(err){
     console.error("admin user list error:", err);
     if (host){
@@ -3546,6 +3594,8 @@ document.addEventListener("click", async (e) => {
    es la autoridad de permisos; el cliente solo refleja lo que devuelve.
    ============================================================ */
 const OFFBOARDING_JAZ = "jazmin@vintti.com";
+const OFFBOARDING_AGUS = "agustin@vintti.com";
+const OFFBOARDING_INACTIVE_VIEWERS = new Set([OFFBOARDING_JAZ, OFFBOARDING_AGUS]);
 const OFFBOARDING_REASONS = [
   "Received a better offer",
   "Poor performance",
@@ -3569,17 +3619,35 @@ async function offbFetch(path, opts){
 }
 
 async function initOffboarding(){
+  let pendingRows = [];
+  let inactiveRows = [];
+  const isJaz = currentProfileEmail() === OFFBOARDING_JAZ;
+  const card = document.getElementById("adminOffboardingCard");
+  const btn = document.getElementById("adminOffboardingBtn");
   try{
-    OFFBOARDING_INACTIVE = await offbFetch("/offboarding/inactive");
-  }catch(e){ OFFBOARDING_INACTIVE = []; }
-  const isViewer = currentProfileEmail() === OFFBOARDING_JAZ || (Array.isArray(OFFBOARDING_INACTIVE) && OFFBOARDING_INACTIVE.length > 0);
+    pendingRows = await offbFetch("/offboarding/pending");
+  }catch(e){ pendingRows = []; }
+  const isInactiveViewer = OFFBOARDING_INACTIVE_VIEWERS.has(currentProfileEmail());
+  if (isInactiveViewer){
+    try{
+      inactiveRows = await offbFetch("/offboarding/inactive");
+    }catch(e){ inactiveRows = []; }
+  }
+  OFFBOARDING_INACTIVE = inactiveRows;
+  const canSeePending = isJaz || (Array.isArray(pendingRows) && pendingRows.length > 0);
+  if (card) card.hidden = !canSeePending;
+  if (btn) btn.hidden = !canSeePending;
+  const isViewer = isInactiveViewer || canSeePending;
   if (!isViewer) return;
   ensureOffboardingModals();
-  enableInactiveTab();
-  renderInactiveTable(OFFBOARDING_INACTIVE);
-  // El botón flotante vive en Team PTO → habilitamos la pestaña para los viewers.
-  try { enableTeamTab(); loadTeamPto(); } catch(_e){}
-  ensureOffboardingFab();
+  if (isInactiveViewer){
+    enableInactiveTab();
+    renderInactiveTable(OFFBOARDING_INACTIVE);
+  }
+  if (btn && !btn.dataset.bound){
+    btn.addEventListener("click", openOffboardingList);
+    btn.dataset.bound = "1";
+  }
 }
 
 function enableInactiveTab(){
@@ -3598,23 +3666,15 @@ function enableInactiveTab(){
   wireTabs();
 }
 
-function ensureOffboardingFab(){
-  const panel = document.getElementById("panel-teampto");
-  if (!panel || document.getElementById("offbFab")) return;
-  const fab = document.createElement("button");
-  fab.id = "offbFab";
-  fab.type = "button";
-  fab.className = "offb-fab";
-  fab.textContent = "🚪 Offboarding";
-  fab.addEventListener("click", openOffboardingList);
-  panel.appendChild(fab);  // dentro del panel Team PTO → solo visible en esa pestaña
-}
-
 async function loadInactiveEmployees(){
   try{
     OFFBOARDING_INACTIVE = await offbFetch("/offboarding/inactive");
     renderInactiveTable(OFFBOARDING_INACTIVE);
-  }catch(e){ console.error("loadInactiveEmployees", e); }
+  }catch(e){
+    console.error("loadInactiveEmployees", e);
+    const host = document.getElementById("inactiveEmployeesTable");
+    if (host) host.innerHTML = `<div class="offb-empty">Could not load inactive employees.</div>`;
+  }
 }
 
 function renderInactiveTable(rows){
