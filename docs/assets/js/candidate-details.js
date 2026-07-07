@@ -4058,6 +4058,54 @@ if (drop) {
 if (clientBtn && candidateId) {
   clientBtn.href = `resume-readonly.html?id=${candidateId}`;
 }
+
+// Indicador de "visto por el cliente": muestra si/ cuántas veces el cliente abrió este CV.
+// Solo cuenta aperturas externas (las vistas internas del equipo se excluyen en el backend).
+(function loadClientViewStats() {
+  if (!candidateId) return;
+  const row = document.querySelector('.header-buttons-row');
+  if (!row) return;
+
+  const badge = document.createElement('span');
+  badge.id = 'client-view-indicator';
+  badge.className = 'pill';
+  badge.style.cssText =
+    'display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:default;';
+  badge.textContent = '👁️ …';
+  row.appendChild(badge);
+
+  const fmt = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return `today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidate/${candidateId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      const count = (data && data.view_count) || 0;
+      if (count > 0) {
+        const times = count === 1 ? '1 time' : `${count} times`;
+        const when = fmt(data.last_viewed_at);
+        badge.textContent = `👁️ Seen by client · ${times}`;
+        badge.title = when ? `Last opened: ${when}` : '';
+        badge.style.background = '#e6f7ed';
+        badge.style.color = '#1a7a44';
+      } else {
+        badge.textContent = '👁️ Not opened by client yet';
+        badge.style.background = '#f0f0f3';
+        badge.style.color = '#888';
+      }
+    })
+    .catch(() => {
+      badge.remove();
+    });
+})();
 if (talentDropBtn && candidateId) {
   talentDropBtn.href = `resume-readonly.html?id=${candidateId}&view=talent-drop`;
 }

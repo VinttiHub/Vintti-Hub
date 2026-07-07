@@ -4,6 +4,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   const isPdfExport = urlParams.has("pdf_export");
   const isTalentDrop = urlParams.get("view") === "talent-drop";
   const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+
+  // Track that this CV link was opened. Skipped for internal PDF generation.
+  // Opens by a logged-in Hub user (team previewing) are flagged internal — same origin,
+  // so localStorage is shared — and excluded from the client-facing counts.
+  // Fire-and-forget: never blocks or errors the page.
+  if (candidateId && !isPdfExport) {
+    try {
+      const isInternal = !!localStorage.getItem("user_email");
+      fetch(`${API_BASE}/resume-tracking/view`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate_id: candidateId, internal: isInternal }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (_) {}
+  }
   const bodyEl = document.body;
   const downloadBtn = document.getElementById("readonly-download-btn");
   const ratingEl = document.getElementById("resume-rating");

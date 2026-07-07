@@ -3961,6 +3961,7 @@ async function loadBatchesForOpportunity(opportunityId) {
 
   const requestId = ++batchDetailRequestId;
   container.innerHTML = '';
+  window.__clientViewsMap = {};
 
   try {
     const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
@@ -3968,17 +3969,38 @@ async function loadBatchesForOpportunity(opportunityId) {
 
     if (requestId !== batchDetailRequestId) return;
 
+    // Fetch all batches' candidates first so we can look up client CV-view stats in one call.
+    const batchCandidatesById = {};
+    const candidateIds = new Set();
+    for (const batch of batches) {
+      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
+      const batchCandidates = await batchCandidatesRes.json();
+      if (requestId !== batchDetailRequestId) return;
+      batchCandidatesById[batch.batch_id] = batchCandidates;
+      batchCandidates.forEach(c => candidateIds.add(c.candidate_id));
+    }
+
+    // Client CV-view stats (candidate_id -> {view_count, last_viewed_at}); external opens only.
+    if (candidateIds.size) {
+      try {
+        const idsParam = Array.from(candidateIds).join(',');
+        const viewsRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidates?ids=${idsParam}`);
+        if (viewsRes.ok) {
+          const viewsData = await viewsRes.json();
+          window.__clientViewsMap = viewsData.candidates || {};
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not load client CV views', err);
+      }
+    }
+    if (requestId !== batchDetailRequestId) return;
+
     for (const batch of batches) {
       if (requestId !== batchDetailRequestId) return;
       const box = createBatchBox(batch);
       const candidateContainer = box.querySelector('.batch-candidates');
 
-      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
-      const batchCandidates = await batchCandidatesRes.json();
-
-      if (requestId !== batchDetailRequestId) return;
-
-      for (const candidate of batchCandidates) {
+      for (const candidate of (batchCandidatesById[batch.batch_id] || [])) {
         if (requestId !== batchDetailRequestId) return;
         const cardElement = createCandidateCard(candidate, batch.batch_id);
         candidateContainer.appendChild(cardElement);
@@ -4057,6 +4079,18 @@ function createBatchBox(batch) {
   return box;
 }
 
+function formatViewDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) {
+    return `today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 function createCandidateCard(c, batchId) {
   const template = document.getElementById('candidate-card-template');
   const cardFragment = template.content.cloneNode(true);
@@ -4080,6 +4114,29 @@ function createCandidateCard(c, batchId) {
   cardElement.querySelector('.candidate-email').textContent = emailText;
   cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
   cardElement.querySelector('.candidate-img').alt = `${candidateName} avatar`;
+
+  // Client CV-view badge (populated in loadBatchesForOpportunity).
+  const viewsMap = window.__clientViewsMap || {};
+  const viewInfo = viewsMap[String(c.candidate_id)];
+  const primaryCell = cardElement.querySelector('.candidate-primary');
+  if (primaryCell) {
+    const badge = document.createElement('span');
+    badge.className = 'client-view-badge';
+    badge.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-top:3px;font-size:0.72rem;font-weight:600;padding:2px 8px;border-radius:999px;width:fit-content;';
+    if (viewInfo && viewInfo.view_count > 0) {
+      const times = viewInfo.view_count === 1 ? '1 time' : `${viewInfo.view_count} times`;
+      const when = formatViewDate(viewInfo.last_viewed_at);
+      badge.style.background = '#e6f7ed';
+      badge.style.color = '#1a7a44';
+      badge.textContent = `👁️ Seen by client · ${times}${when ? ' · ' + when : ''}`;
+      badge.title = `Last opened: ${when || '—'}`;
+    } else {
+      badge.style.background = '#f0f0f3';
+      badge.style.color = '#888';
+      badge.textContent = '👁️ Not opened yet';
+    }
+    primaryCell.appendChild(badge);
+  }
 
   if (isBlacklisted) {
     if (typeof applyBlacklistStyles === 'function') {
