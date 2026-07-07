@@ -9,6 +9,7 @@ Opens by logged-in Hub users (the team previewing the CV) are flagged is_interna
 excluded from the client-facing counts.
 """
 
+import requests
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
@@ -17,6 +18,9 @@ from db import get_connection
 
 bp = Blueprint('resume_tracking', __name__, url_prefix='/resume-tracking')
 
+# Cap geo lookups per detail request so a slow provider can't stall the popover.
+_MAX_GEO_LOOKUPS_PER_REQUEST = 12
+
 
 def _client_ip():
     # Behind App Runner the real client IP is in X-Forwarded-For (first hop).
@@ -24,6 +28,75 @@ def _client_ip():
     if forwarded:
         return forwarded.split(',')[0].strip()
     return request.remote_addr
+
+
+def _is_public_ip(ip):
+    ip = (ip or '').strip()
+    if not ip or ip in ('127.0.0.1', '::1', 'localhost'):
+        return False
+    # Skip obvious private ranges (dev / internal).
+    if ip.startswith(('10.', '192.168.', '172.16.', '172.17.', '172.18.', '172.19.',
+                      '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.',
+                      '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.',
+                      '169.254.', 'fc', 'fd', 'fe80')):
+        return False
+    return True
+
+
+def _geo_lookup(ip):
+    """Best-effort city/region/country from an IP. Returns a dict (possibly empty)."""
+    if not _is_public_ip(ip):
+        return {}
+    try:
+        resp = requests.get(
+            f'http://ip-api.com/json/{ip}',
+            params={'fields': 'status,country,regionName,city'},
+            timeout=3,
+        )
+        data = resp.json()
+        if data.get('status') == 'success':
+            return {
+                'city': data.get('city') or None,
+                'region': data.get('regionName') or None,
+                'country': data.get('country') or None,
+            }
+    except Exception:
+        pass
+    return {}
+
+
+def _parse_device(user_agent):
+    """Friendly 'OS · Browser' string from a User-Agent."""
+    ua = user_agent or ''
+    low = ua.lower()
+    if 'iphone' in low:
+        os_name = 'iPhone'
+    elif 'ipad' in low:
+        os_name = 'iPad'
+    elif 'android' in low:
+        os_name = 'Android'
+    elif 'windows' in low:
+        os_name = 'Windows'
+    elif 'mac os' in low or 'macintosh' in low:
+        os_name = 'Mac'
+    elif 'linux' in low:
+        os_name = 'Linux'
+    else:
+        os_name = None
+
+    if 'edg' in low:
+        browser = 'Edge'
+    elif 'chrome' in low and 'chromium' not in low:
+        browser = 'Chrome'
+    elif 'firefox' in low:
+        browser = 'Firefox'
+    elif 'safari' in low:
+        browser = 'Safari'
+    else:
+        browser = None
+
+    parts = [p for p in (os_name, browser) if p]
+    return ' · '.join(parts) if parts else None
 
 
 @bp.route('/view', methods=['POST', 'OPTIONS'])
@@ -133,6 +206,68 @@ def candidates_views():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         return jsonify({'candidates': _summarize(cur, ids)})
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _location_str(row):
+    parts = [p for p in (row.get('city'), row.get('region'), row.get('country')) if p]
+    return ', '.join(parts) if parts else None
+
+
+@bp.route('/candidate/<int:candidate_id>/events', methods=['GET'])
+def candidate_events(candidate_id):
+    """Individual external (client) opens for a candidate: time, location, device.
+
+    Resolves any not-yet-checked IPs to a location on the fly and caches the result.
+    """
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            """
+            SELECT id, viewed_at, ip_address, user_agent, city, region, country, geo_checked
+            FROM resume_view_events
+            WHERE candidate_id = %s
+              AND is_internal = FALSE
+            ORDER BY viewed_at DESC
+            LIMIT 100
+            """,
+            (candidate_id,),
+        )
+        rows = cur.fetchall() or []
+
+        # Lazily resolve geolocation for rows we haven't looked up yet (bounded).
+        lookups = 0
+        for row in rows:
+            if row['geo_checked'] or lookups >= _MAX_GEO_LOOKUPS_PER_REQUEST:
+                continue
+            lookups += 1
+            geo = _geo_lookup(row['ip_address'])
+            row['city'] = geo.get('city')
+            row['region'] = geo.get('region')
+            row['country'] = geo.get('country')
+            cur.execute(
+                """
+                UPDATE resume_view_events
+                SET city = %s, region = %s, country = %s, geo_checked = TRUE
+                WHERE id = %s
+                """,
+                (row['city'], row['region'], row['country'], row['id']),
+            )
+        if lookups:
+            conn.commit()
+
+        events = [
+            {
+                'viewed_at': row['viewed_at'].isoformat() if row['viewed_at'] else None,
+                'location': _location_str(row),
+                'device': _parse_device(row['user_agent']),
+            }
+            for row in rows
+        ]
+        return jsonify({'candidate_id': candidate_id, 'events': events})
     finally:
         cur.close()
         conn.close()

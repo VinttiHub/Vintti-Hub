@@ -4085,17 +4085,93 @@ if (clientBtn && candidateId) {
     return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const fmtLong = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString([], {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  let popover = null;
+  const closePopover = () => {
+    if (popover) { popover.remove(); popover = null; }
+    document.removeEventListener('click', onDocClick, true);
+  };
+  const onDocClick = (e) => {
+    if (popover && !popover.contains(e.target) && e.target !== badge) closePopover();
+  };
+
+  const positionPopover = () => {
+    if (!popover) return;
+    const rect = badge.getBoundingClientRect();
+    const width = popover.offsetWidth || 300;
+    // Keep it inside the viewport horizontally (flip/clamp near the right edge).
+    let left = rect.left + window.scrollX;
+    const maxLeft = window.scrollX + document.documentElement.clientWidth - width - 12;
+    if (left > maxLeft) left = Math.max(window.scrollX + 12, maxLeft);
+    popover.style.top = `${rect.bottom + window.scrollY + 8}px`;
+    popover.style.left = `${left}px`;
+  };
+
+  const openPopover = async () => {
+    if (popover) { closePopover(); return; }
+    popover = document.createElement('div');
+    popover.style.cssText =
+      'position:absolute;z-index:99999;width:300px;max-width:calc(100vw - 24px);max-height:340px;overflow-y:auto;' +
+      'background:#fff;border:1px solid #e2e6ef;border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.20);' +
+      'padding:14px 16px;font-size:0.82rem;line-height:1.35;color:#2a2f45;box-sizing:border-box;';
+    popover.innerHTML = '<div style="color:#888;">Loading…</div>';
+    document.body.appendChild(popover);
+    positionPopover();
+    setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+
+    try {
+      const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidate/${candidateId}/events`);
+      if (!r.ok) throw new Error('http ' + r.status);
+      const data = await r.json();
+      const events = (data && data.events) || [];
+      if (!events.length) {
+        popover.innerHTML = '<div style="color:#888;">No detailed records yet.</div>';
+        positionPopover();
+        return;
+      }
+      const header = `<div style="font-weight:700;margin-bottom:8px;color:#1a7a44;">👁️ Client opens (${events.length})</div>`;
+      const rows = events.map((ev) => {
+        const loc = ev.location ? `📍 ${ev.location}` : '📍 Location unknown';
+        const dev = ev.device ? ` · ${ev.device}` : '';
+        return (
+          `<div style="padding:7px 0;border-top:1px solid #f0f2f7;">` +
+          `<div style="font-weight:600;">${fmtLong(ev.viewed_at)}</div>` +
+          `<div style="color:#6b7280;font-size:0.76rem;margin-top:2px;">${loc}${dev}</div>` +
+          `</div>`
+        );
+      }).join('');
+      const note = '<div style="color:#9aa0ad;font-size:0.7rem;margin-top:8px;">Location is approximate (from IP).</div>';
+      popover.innerHTML = header + rows + note;
+      positionPopover();
+    } catch (_) {
+      if (popover) {
+        popover.innerHTML = '<div style="color:#c0392b;">Could not load view details.</div>';
+        positionPopover();
+      }
+    }
+  };
+
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidate/${candidateId}`)
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
       const count = (data && data.view_count) || 0;
       if (count > 0) {
         const times = count === 1 ? '1 time' : `${count} times`;
-        const when = fmt(data.last_viewed_at);
         badge.textContent = `👁️ Seen by client · ${times}`;
-        badge.title = when ? `Last opened: ${when}` : '';
+        badge.title = 'Click to see when & where';
         badge.style.background = '#e6f7ed';
         badge.style.color = '#1a7a44';
+        badge.style.cursor = 'pointer';
+        badge.addEventListener('click', (e) => { e.stopPropagation(); openPopover(); });
       } else {
         badge.textContent = '👁️ Not opened by client yet';
         badge.style.background = '#f0f0f3';
