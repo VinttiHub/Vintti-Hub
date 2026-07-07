@@ -3605,10 +3605,16 @@ const OFFBOARDING_REASONS = [
 let OFFBOARDING_INACTIVE = [];
 const _offEsc = (s)=>String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// Jazmín es view-only; un manager solo ve sus reportes (el server ya scopea),
-// así que puede actuar. Fallback: si el registro no tiene manager, Jazmín puede actuar.
+// La autoridad real viene del backend (`can_act`). Dejamos un fallback solo
+// para no romper la UI si llega un registro viejo sin esa propiedad.
 function offbCanAct(rec){
-  return currentProfileEmail() !== OFFBOARDING_JAZ || !rec?.hiring_manager_id;
+  if (typeof rec?.can_act === "boolean") return rec.can_act;
+  return currentProfileEmail() === OFFBOARDING_JAZ || Number(rec?.hiring_manager_id) === Number(CURRENT_USER_ID);
+}
+
+function offbCanSubmit(rec){
+  if (typeof rec?.can_submit === "boolean") return rec.can_submit;
+  return Number(rec?.hiring_manager_id) === Number(CURRENT_USER_ID);
 }
 
 async function offbFetch(path, opts){
@@ -3689,13 +3695,14 @@ function renderInactiveTable(rows){
   const th = head.map(h=>`<div class="offb-th">${_offEsc(h)}</div>`).join("");
   const body = rows.map(r=>{
     const canAct = offbCanAct(r);
+    const canSubmit = offbCanSubmit(r);
     const statusBadge = r.status === "completed"
       ? `<span class="offb-badge offb-badge--done">Completed</span>`
       : `<span class="offb-badge offb-badge--pending">Pending</span>`;
     const pickup = r.computer_pickup ? (r.computer_pickup_done ? "Yes · done" : "Yes") : "No";
     let actions = "";
-    if (canAct){
-      if (!r.form_submitted){
+    if (canAct || canSubmit){
+      if (canSubmit && !r.form_submitted){
         actions += `<button class="btn tiny" data-offb-fill="${r.user_id}">Fill</button>`;
       }
       if (r.status !== "completed"){
@@ -3727,6 +3734,11 @@ async function offbMark(userId, action){
   try{
     await offbFetch(`/offboarding/${encodeURIComponent(userId)}/${action}`, { method: "POST" });
     await loadInactiveEmployees();
+    const listModal = document.getElementById("offbListModal");
+    const listBody = document.getElementById("offbListBody");
+    if (listModal && !listModal.hidden && listBody){
+      await loadOffboardingListBody(listBody);
+    }
   }catch(e){ alert(e.message || "Could not update offboarding."); }
 }
 
@@ -3787,12 +3799,9 @@ function ensureOffboardingModals(){
   document.getElementById("offbForm").addEventListener("submit", onOffboardingSubmit);
 }
 
-async function openOffboardingList(){
-  ensureOffboardingModals();
-  const modal = document.getElementById("offbListModal");
-  const body = document.getElementById("offbListBody");
+async function loadOffboardingListBody(body){
+  if (!body) return;
   body.innerHTML = `<div class="offb-empty">Loading…</div>`;
-  modal.hidden = false;
   try{
     const rows = await offbFetch("/offboarding/pending");
     if (!rows.length){ body.innerHTML = `<div class="offb-empty">No pending offboardings.</div>`; return; }
@@ -3802,20 +3811,36 @@ async function openOffboardingList(){
           <div class="offb-list__name">${_offEsc(r.user_name)}</div>
           <div class="offb-list__sub">${_offEsc(r.role||"")} · Manager: ${_offEsc(r.manager_name||"—")}${r.form_submitted?" · <b>submitted</b>":""}</div>
         </div>
-        ${offbCanAct(r) ? `<button class="btn tiny" data-offb-open="${r.user_id}">${r.form_submitted?"Edit":"Fill"}</button>` : `<span class="offb-list__view">view only</span>`}
+        <div class="offb-list__actions">
+          ${offbCanSubmit(r) ? `<button class="btn tiny" data-offb-open="${r.user_id}">${r.form_submitted?"Edit":"Fill"}</button>` : ""}
+          ${offbCanAct(r) && r.status !== "completed" ? `<button class="btn tiny" data-offb-complete="${r.user_id}">Complete</button>` : ""}
+          ${offbCanAct(r) && r.computer_pickup && !r.computer_pickup_done ? `<button class="btn tiny ghost" data-offb-pickup="${r.user_id}">Pickup ✓</button>` : ""}
+          ${!offbCanSubmit(r) && !offbCanAct(r) ? `<span class="offb-list__view">view only</span>` : ""}
+        </div>
       </div>`).join("");
     body.querySelectorAll("[data-offb-open]").forEach(b=> b.addEventListener("click", ()=>{
-      modal.hidden = true;
+      const modal = document.getElementById("offbListModal");
+      if (modal) modal.hidden = true;
       openOffboardingForm(b.getAttribute("data-offb-open"));
     }));
+    body.querySelectorAll("[data-offb-complete]").forEach(b=> b.addEventListener("click", ()=> offbMark(b.getAttribute("data-offb-complete"), "complete")));
+    body.querySelectorAll("[data-offb-pickup]").forEach(b=> b.addEventListener("click", ()=> offbMark(b.getAttribute("data-offb-pickup"), "pickup_done")));
   }catch(e){ body.innerHTML = `<div class="offb-empty">${_offEsc(e.message||"Could not load.")}</div>`; }
+}
+
+async function openOffboardingList(){
+  ensureOffboardingModals();
+  const modal = document.getElementById("offbListModal");
+  const body = document.getElementById("offbListBody");
+  modal.hidden = false;
+  await loadOffboardingListBody(body);
 }
 
 async function openOffboardingForm(userId){
   ensureOffboardingModals();
   let rec = {};
   try{ rec = await offbFetch(`/offboarding/${encodeURIComponent(userId)}`); }catch(e){ alert(e.message); return; }
-  const canAct = offbCanAct(rec);
+  const canSubmit = offbCanSubmit(rec);
   document.getElementById("offbUserId").value = userId;
   document.getElementById("offbFormTitle").textContent = `Offboarding · ${rec.user_name || ""}`;
   document.getElementById("offbEndDate").value = rec.end_date || "";
@@ -3828,10 +3853,10 @@ async function openOffboardingForm(userId){
   document.getElementById("offbAddress").required = !!rec.computer_pickup;
   document.getElementById("offbComments").value = rec.comments || "";
   document.getElementById("offbFormStatus").textContent = "";
-  // Jazmín (view-only): deshabilita todo y oculta Send.
+  // Solo el hiring manager puede editar/enviar el formulario.
   const form = document.getElementById("offbForm");
-  form.querySelectorAll("input,select,textarea").forEach(el=> el.disabled = !canAct);
-  document.getElementById("offbSendBtn").style.display = canAct ? "" : "none";
+  form.querySelectorAll("input,select,textarea").forEach(el=> el.disabled = !canSubmit);
+  document.getElementById("offbSendBtn").style.display = canSubmit ? "" : "none";
   document.getElementById("offbFormModal").hidden = false;
 }
 

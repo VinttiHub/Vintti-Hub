@@ -117,14 +117,21 @@ def _can_view_inactive(requester: Optional[dict]) -> bool:
     return bool(requester and requester["email"] in INACTIVE_VIEWER_EMAILS)
 
 
-def _can_act(requester: Optional[dict], row: dict) -> bool:
+def _can_submit(requester: Optional[dict], row: dict) -> bool:
     if not requester:
         return False
     mgr = _manager_id(row)
     if mgr is None:
-        # Sin Hiring Manager → fallback: Jazmín puede actuar para no dejarlo trabado.
-        return requester["email"] == JAZ_EMAIL
+        return False
     return int(requester["user_id"]) == int(mgr)
+
+
+def _can_act(requester: Optional[dict], row: dict) -> bool:
+    if not requester:
+        return False
+    if requester["email"] == JAZ_EMAIL:
+        return True
+    return _can_submit(requester, row)
 
 
 def _bool(v) -> bool:
@@ -330,6 +337,7 @@ def offboarding_inactive():
     for r in rows:
         item = _serialize(r)
         item["can_act"] = _can_act(requester, r)
+        item["can_submit"] = _can_submit(requester, r)
         out.append(item)
     return jsonify(out)
 
@@ -355,6 +363,7 @@ def offboarding_get(user_id: int):
         return _err("You do not have access to this offboarding.", 403)
     item = _serialize(row)
     item["can_act"] = _can_act(requester, row)
+    item["can_submit"] = _can_submit(requester, row)
     return jsonify(item)
 
 
@@ -384,7 +393,7 @@ def offboarding_submit(user_id: int):
             if not row:
                 return _err("Offboarding not found.", 404)
             row = dict(row)
-            if not _can_act(requester, row):
+            if not _can_submit(requester, row):
                 return _err("Only the Hiring Manager can submit this offboarding.", 403)
 
             cur.execute(
