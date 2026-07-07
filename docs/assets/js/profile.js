@@ -689,7 +689,9 @@ const LEADER_ACCESS_EMAILS = new Set([
   "camila@vintti.com",
   "mia@vintti.com",
 ]);
-const TEAM_GLOBAL_EMAILS = LEADER_ACCESS_EMAILS;
+const TEAM_GLOBAL_EMAILS = new Set([
+  "jazmin@vintti.com",
+]);
 const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
