@@ -5672,7 +5672,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Last 30d · Staffing</span>
             <h3 class="kpi-drawer__title">Buyouts</h3>
-            <p class="kpi-drawer__sub">Candidatos que migraron a buyout (compra directa por el cliente) en la ventana de 30 días.</p>
+            <p class="kpi-drawer__sub">Candidatos que migraron a buyout (compra directa por el cliente) en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5682,7 +5682,7 @@
               <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Composición del churn (30d)</h4>
+              <h4 class="kpi-drawer__section-title">Composición del churn (<span data-window-label>30d</span>)</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Churn real</span>
@@ -6536,7 +6536,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations excellence · Funnel</span>
             <h3 class="kpi-drawer__title">Conversion rates · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Las 4 conversiones del funnel comercial completo, todas en ventana de 30 días.</p>
+            <p class="kpi-drawer__sub">Las 4 conversiones del funnel comercial completo, todas en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body" data-funnel-detail-root="conversion-rates">
@@ -6957,7 +6957,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">SQL → NDA Sent</h3>
-            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = AE's), cuántas ya tienen una opp con `nda_sent_date` poblado.</p>
+            <p class="kpi-drawer__sub">De las accounts creadas en el período (<span data-window-label>30d</span>) (AM = AE's), cuántas ya tienen una opp con `nda_sent_date` poblado.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -6970,7 +6970,7 @@
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, AE's)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle SQL (<span data-window-label>30d</span>, AE's)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_nda_sent|NDA sent|raw,nda_sent_d|Fecha sent|raw,has_nda_signed|NDA signed|raw"
@@ -6984,7 +6984,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">NDA Sent → Sourcing</h3>
-            <p class="kpi-drawer__sub">De las opps con `nda_sent_date` en los últimos 30 días (account AM = AE's), cuántas ya firmaron (`nda_signature_or_start_date` no nulo).</p>
+            <p class="kpi-drawer__sub">De las opps con `nda_sent_date` en el período (<span data-window-label>30d</span>) (account AM = AE's), cuántas ya firmaron (`nda_signature_or_start_date` no nulo).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -6997,7 +6997,7 @@
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle opps (NDA sent 30d, AE's)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle opps (NDA sent <span data-window-label>30d</span>, AE's)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_nda_to_sourcing_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,nda_sent_d|NDA sent|raw,has_nda_signed|NDA signed|raw,nda_signed_d|Fecha sign|raw,opp_stage|Stage|raw"
@@ -7011,7 +7011,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">Sourcing → Close Win</h3>
-            <p class="kpi-drawer__sub">De las opps cerradas (CW + Lost) en los últimos 30 días con NDA firmado (AE's), qué % fueron Close Win.</p>
+            <p class="kpi-drawer__sub">De las opps cerradas (CW + Lost) en el período (<span data-window-label>30d</span>) con NDA firmado (AE's), qué % fueron Close Win.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7025,7 +7025,7 @@
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle opps cerradas (30d, AE's)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle opps cerradas (<span data-window-label>30d</span>, AE's)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_nda_30d_detail" data-bind="dtable"
                    data-override-opp_stage="Total"
@@ -7040,7 +7040,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">SQL → Close Win</h3>
-            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = AE's), cuántas ya cerraron Close Win en alguna opp (sin tope de fecha).</p>
+            <p class="kpi-drawer__sub">De las accounts creadas en el período (<span data-window-label>30d</span>) (AM = AE's), cuántas ya cerraron Close Win en alguna opp (sin tope de fecha).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7053,7 +7053,7 @@
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, AE's)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle SQL (<span data-window-label>30d</span>, AE's)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_close_win|Close Win|raw,close_win_d|Fecha CW|raw,has_nda_signed|NDA signed|raw"
@@ -7073,7 +7073,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-staffing-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">AE's Metrics</span>
-            <h3 class="kpi-drawer__title">Staffing · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Staffing · <span data-window-label>30d</span></h3>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7104,7 +7104,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-recruiting-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">AE's Metrics</span>
-            <h3 class="kpi-drawer__title">Recruiting · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Recruiting · <span data-window-label>30d</span></h3>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7230,7 +7230,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-recruiting-fee">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">Avg Recruiting Fee · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Avg Recruiting Fee · <span data-window-label>30d</span></h3>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7405,8 +7405,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-staffing-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
-            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Staffing · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Primer Close Win Staffing cerrados en últimos 30 días · AM + AE.</p>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Staffing · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Primer Close Win Staffing cerrados en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7426,8 +7426,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-recruiting-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
-            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Recruiting · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">pPrimer Close Win Recruiting cerrados en últimos 30 días · AM + AE.</p>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Recruiting · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">pPrimer Close Win Recruiting cerrados en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7491,8 +7491,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-staffing-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
-            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Staffing · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Close wins Staffing de origen Outbound cerrados en últimos 30 días · AM + AE.</p>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Staffing · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Close wins Staffing de origen Outbound cerrados en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7512,8 +7512,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-recruiting-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
-            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Recruiting · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Close wins Recruiting de origen Outbound cerrados en últimos 30 días · AM + AE.</p>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Recruiting · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Close wins Recruiting de origen Outbound cerrados en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7578,7 +7578,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
             <h3 class="kpi-drawer__title">KR3 · Avg Staffing Fee por candidato · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Fee mensual de Vintti (sin salario) por candidato colocado en deals Staffing Close Win de los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Fee mensual de Vintti (sin salario) por candidato colocado en deals Staffing Close Win del período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7599,7 +7599,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
             <h3 class="kpi-drawer__title">KR4 · Avg Recruiting Fee por candidato · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Fee de Vintti (placement) por candidato colocado en deals Recruiting Close Win de los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Fee de Vintti (placement) por candidato colocado en deals Recruiting Close Win del período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7622,7 +7622,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
             <h3 class="kpi-drawer__title">KR5 · New Clients Generated · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Clientes nuevos (Primer Close Win de la cuenta) cerrados en los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Clientes nuevos (Primer Close Win de la cuenta) cerrados en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7643,7 +7643,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
             <h3 class="kpi-drawer__title">KR6 · New Candidates Allocated · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Candidatos colocados (por fecha de inicio) en los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Candidatos colocados (por fecha de inicio) en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7689,7 +7689,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
             <h3 class="kpi-drawer__title">KR1 · NDA → Close Win · Total · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Win rate de deals cerrados (Close Win + Closed Lost) en los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Win rate de deals cerrados (Close Win + Closed Lost) en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7699,7 +7699,7 @@
               <span class="kpi-drawer__hero__delta"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Deals cerrados (últimos 30 días)</h4>
+              <h4 class="kpi-drawer__section-title">Deals cerrados (<span data-window-label>30d</span>)</h4>
               <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
                    data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
                    data-empty-text="Sin deals cerrados (AM+AE) en los últimos 30 días."></div>
@@ -7710,7 +7710,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
             <h3 class="kpi-drawer__title">KR2 · NDA → Close Win · Outbound · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Win rate de deals cerrados de origen Outbound en los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Win rate de deals cerrados de origen Outbound en el período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7720,7 +7720,7 @@
               <span class="kpi-drawer__hero__delta"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Deals cerrados Outbound (últimos 30 días)</h4>
+              <h4 class="kpi-drawer__section-title">Deals cerrados Outbound (<span data-window-label>30d</span>)</h4>
               <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-override-channel="outbound" data-bind="dtable"
                    data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
                    data-empty-text="Sin deals cerrados Outbound (AM+AE) en los últimos 30 días."></div>
@@ -7732,7 +7732,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
             <h3 class="kpi-drawer__title">KR3 · Time to Close Win desde NDA · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Días desde NDA firmado hasta Close Win, para cierres (opp New) de los últimos 30 días · AM + AE.</p>
+            <p class="kpi-drawer__sub">Días desde NDA firmado hasta Close Win, para cierres (opp New) del período (<span data-window-label>30d</span>) · AM + AE.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7965,8 +7965,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-30d">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Referrals · AE's</span>
-            <h3 class="kpi-drawer__title">Referrals Generated · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Accounts de origen Referral (AE's) creadas en los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Referrals Generated · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Accounts de origen Referral (AE's) creadas en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8032,8 +8032,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-cand-m1">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Retention · AE's · Candidato</span>
-            <h3 class="kpi-drawer__title">M1 Churn · Candidato (30d)</h3>
-            <p class="kpi-drawer__sub">Candidatos (Staffing, AE's) que arrancaron en los últimos 30 días y su estado al corte. Churn = baja real (excluye buyout).</p>
+            <h3 class="kpi-drawer__title">M1 Churn · Candidato (<span data-window-label>30d</span>)</h3>
+            <p class="kpi-drawer__sub">Candidatos (Staffing, AE's) que arrancaron en el período (<span data-window-label>30d</span>) y su estado al corte. Churn = baja real (excluye buyout).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8078,8 +8078,8 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-client-m1">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Retention · AE's · Cliente</span>
-            <h3 class="kpi-drawer__title">M1 Churn · Cliente (30d)</h3>
-            <p class="kpi-drawer__sub">Cuentas (AE's) cuyo primer hire arrancó en los últimos 30 días. Churn = sin contractors activos al corte (excluye buyout).</p>
+            <h3 class="kpi-drawer__title">M1 Churn · Cliente (<span data-window-label>30d</span>)</h3>
+            <p class="kpi-drawer__sub">Cuentas (AE's) cuyo primer hire arrancó en el período (<span data-window-label>30d</span>). Churn = sin contractors activos al corte (excluye buyout).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8126,7 +8126,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
             <h3 class="kpi-drawer__title">Days to Close Win · Total</h3>
-            <p class="kpi-drawer__sub">Todos los deals Close Win (AE's) de los últimos 30d, días desde NDA firmado hasta cierre, con su canal.</p>
+            <p class="kpi-drawer__sub">Todos los deals Close Win (AE's) del período (<span data-window-label>30d</span>), días desde NDA firmado hasta cierre, con su canal.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8243,7 +8243,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-deepdive-nda">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">Deep Dive → NDA Signed · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Deep Dive → NDA Signed · <span data-window-label>30d</span></h3>
             <p class="kpi-drawer__sub">Cada deep dive (opp con deep_dive_date) por origen, y si firmó NDA (nda_signature_or_start_date). Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
@@ -8274,7 +8274,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-deepdive">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">SQL → Deep Dive · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">SQL → Deep Dive · <span data-window-label>30d</span></h3>
             <p class="kpi-drawer__sub">Cada SQL (account creada) clasificada por origen, y si avanzó a Deep Dive (opp con deep_dive_date). Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
@@ -8305,7 +8305,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-lead-channel-winrate">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">Soucing → Close Win · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Soucing → Close Win · <span data-window-label>30d</span></h3>
             <p class="kpi-drawer__sub">Cada cerrada (Close Win / Closed Lost) clasificada por origen: Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
@@ -8336,7 +8336,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-staffing-fee">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">Avg Staffing Fee · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Avg Staffing Fee · <span data-window-label>30d</span></h3>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8400,7 +8400,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-setup-fee">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">Avg Setup Fee · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Avg Setup Fee · <span data-window-label>30d</span></h3>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8464,13 +8464,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-client-churn">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · churn</span>
-            <h3 class="kpi-drawer__title">Client churn · 30d</h3>
-            <p class="kpi-drawer__sub">Clientes dados de baja en los últimos 30 días, sobre el total de clientes activos.</p>
+            <h3 class="kpi-drawer__title">Client churn · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Clientes dados de baja en el período (<span data-window-label>30d</span>), sobre el total de clientes activos.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Clients · last 30d <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Clients · <span data-window-label>30d</span> <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_client_churn_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="80"></div>
             </section>
@@ -8480,13 +8480,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-candidate-churn">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · churn</span>
-            <h3 class="kpi-drawer__title">Candidate churn · 30d</h3>
-            <p class="kpi-drawer__sub">Candidatos dados de baja en los últimos 30 días, sobre el total de candidatos activos.</p>
+            <h3 class="kpi-drawer__title">Candidate churn · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Candidatos dados de baja en el período (<span data-window-label>30d</span>), sobre el total de candidatos activos.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Candidates · last 30d <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Candidates · <span data-window-label>30d</span> <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="estado" data-limit="120"></div>
             </section>
@@ -8496,7 +8496,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-cohort-churn">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · churn</span>
-            <h3 class="kpi-drawer__title">3 / 6m Churn · 30d</h3>
+            <h3 class="kpi-drawer__title">3 / 6m Churn · <span data-window-label>30d</span></h3>
             <p class="kpi-drawer__sub">Bajas de candidatos en la cohorte de 3 / 6 meses.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
@@ -8512,13 +8512,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-crr-grr">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · retención</span>
-            <h3 class="kpi-drawer__title">CRR + GRR · 30d</h3>
-            <p class="kpi-drawer__sub">Clientes retenidos en los últimos 30 días (gross y net retention).</p>
+            <h3 class="kpi-drawer__title">CRR + GRR · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Clientes retenidos en el período (<span data-window-label>30d</span>) (gross y net retention).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">CRR / GRR · last 30d <span class="count" data-chart="am_table_crr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">CRR / GRR · <span data-window-label>30d</span> <span class="count" data-chart="am_table_crr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_crr_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="tipo" data-limit="80"></div>
             </section>
@@ -8528,13 +8528,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-nrr">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · retención</span>
-            <h3 class="kpi-drawer__title">NRR · 30d</h3>
-            <p class="kpi-drawer__sub">Net Revenue Retention: upsells menos churn en los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">NRR · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Net Revenue Retention: upsells menos churn en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">NRR · last 30d <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">NRR · <span data-window-label>30d</span> <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_nrr_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="componente" data-list-date="end_d" data-limit="120"></div>
             </section>
@@ -8544,13 +8544,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-clients-multi">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · retención</span>
-            <h3 class="kpi-drawer__title">Clients > 1 candidate · 30d</h3>
+            <h3 class="kpi-drawer__title">Clients > 1 candidate · <span data-window-label>30d</span></h3>
             <p class="kpi-drawer__sub">Clientes con más de un candidato activo, sobre el total de clientes activos.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Multi · last 30d <span class="count" data-chart="am_table_clients_multi_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Multi · <span data-window-label>30d</span> <span class="count" data-chart="am_table_clients_multi_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_clients_multi_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-limit="120"></div>
             </section>
@@ -8560,13 +8560,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-conversion-rate">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management</span>
-            <h3 class="kpi-drawer__title">Account Management Conversion Rate · 30d</h3>
-            <p class="kpi-drawer__sub">Oportunidades cerradas en los últimos 30 días: wins sobre el total cerrado.</p>
+            <h3 class="kpi-drawer__title">Account Management Conversion Rate · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Oportunidades cerradas en el período (<span data-window-label>30d</span>): wins sobre el total cerrado.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Conversion Rate · last 30d <span class="count" data-chart="am_table_lara_winrate_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Conversion Rate · <span data-window-label>30d</span> <span class="count" data-chart="am_table_lara_winrate_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_lara_winrate_30d_detail" data-bind="list"
                    data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="close_d" data-limit="80"></div>
             </section>
@@ -8576,13 +8576,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-headcount-growth">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management</span>
-            <h3 class="kpi-drawer__title">Headcount growth · 30d</h3>
-            <p class="kpi-drawer__sub">Clientes que aumentaron su headcount en los últimos 30 días, sobre el total de clientes activos.</p>
+            <h3 class="kpi-drawer__title">Headcount growth · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Clientes que aumentaron su headcount en el período (<span data-window-label>30d</span>), sobre el total de clientes activos.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Headcount ↑ · last 30d <span class="count" data-chart="am_table_headcount_growth_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Headcount ↑ · <span data-window-label>30d</span> <span class="count" data-chart="am_table_headcount_growth_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="am_table_headcount_growth_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="aumento" data-list-date="candidatos_activos" data-limit="80"></div>
             </section>
@@ -8699,13 +8699,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sa-new-clients">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · clientes</span>
-            <h3 class="kpi-drawer__title">New clients · 30d</h3>
-            <p class="kpi-drawer__sub">Clientes que arrancaron en los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">New clients · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Clientes que arrancaron en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">New clients · last 30d <span class="count" data-chart="sa_table_new_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">New clients · <span data-window-label>30d</span> <span class="count" data-chart="sa_table_new_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="sa_table_new_clients_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"></div>
             </section>
@@ -8715,13 +8715,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sa-lead-source">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · lead source</span>
-            <h3 class="kpi-drawer__title">Top lead source · 30d</h3>
-            <p class="kpi-drawer__sub">Origen de los leads de las opps cerradas en los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Top lead source · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Origen de los leads de las opps cerradas en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Lead sources · last 30d <span class="count" data-chart="sa_donut_lead_source_30d" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Lead sources · <span data-window-label>30d</span> <span class="count" data-chart="sa_donut_lead_source_30d" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="sa_donut_lead_source_30d" data-bind="list"
                    data-list-name="lead_source" data-list-sub="pct_of_total" data-list-date="total_closed_opps" data-limit="20"></div>
             </section>
@@ -8732,13 +8732,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-placement-time">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · placement</span>
-            <h3 class="kpi-drawer__title">New placement time · 30d</h3>
-            <p class="kpi-drawer__sub">Oportunidades nuevas cerradas en los últimos 30 días y sus días de colocación.</p>
+            <h3 class="kpi-drawer__title">New placement time · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Oportunidades nuevas cerradas en el período (<span data-window-label>30d</span>) y sus días de colocación.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">New placements · last 30d <span class="count" data-chart="op_table_placement_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">New placements · <span data-window-label>30d</span> <span class="count" data-chart="op_table_placement_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_placement_time_30d_detail" data-bind="list"
                    data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="avg_days" data-limit="80"></div>
             </section>
@@ -8748,13 +8748,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-placement-time-repl">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · placement</span>
-            <h3 class="kpi-drawer__title">Replacement placement time · 30d</h3>
-            <p class="kpi-drawer__sub">Reemplazos cerrados en los últimos 30 días y sus días de colocación.</p>
+            <h3 class="kpi-drawer__title">Replacement placement time · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Reemplazos cerrados en el período (<span data-window-label>30d</span>) y sus días de colocación.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Replacements · last 30d <span class="count" data-chart="op_table_placement_time_30d_detail_repl" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Replacements · <span data-window-label>30d</span> <span class="count" data-chart="op_table_placement_time_30d_detail_repl" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_placement_time_30d_detail_repl" data-bind="list"
                    data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="avg_days" data-limit="80"></div>
             </section>
@@ -8764,13 +8764,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-batch-delivery">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · batches</span>
-            <h3 class="kpi-drawer__title">Batch delivery · 30d</h3>
-            <p class="kpi-drawer__sub">Días desde la creación de la opp hasta el primer batch presentado, últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Batch delivery · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Días desde la creación de la opp hasta el primer batch presentado, período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Batches · last 30d <span class="count" data-chart="op_table_batch_delivery_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Batches · <span data-window-label>30d</span> <span class="count" data-chart="op_table_batch_delivery_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_batch_delivery_time_30d_detail" data-bind="list"
                    data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="dias_entrega" data-limit="80"></div>
             </section>
@@ -8780,13 +8780,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-nda-close-win">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · conversión</span>
-            <h3 class="kpi-drawer__title">NDA → Close Win · 30d</h3>
-            <p class="kpi-drawer__sub">Oportunidades cerradas (Win / Lost) en los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">NDA → Close Win · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Oportunidades cerradas (Win / Lost) en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">NDA → Win · last 30d <span class="count" data-chart="op_table_nda_close_win_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">NDA → Win · <span data-window-label>30d</span> <span class="count" data-chart="op_table_nda_close_win_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_nda_close_win_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="opp_stage" data-list-date="close_d" data-limit="80"></div>
             </section>
@@ -8796,13 +8796,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-sent-hired">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · conversión</span>
-            <h3 class="kpi-drawer__title">Sent → Hired · 30d</h3>
-            <p class="kpi-drawer__sub">Candidatos enviados en opps Close Win de los últimos 30 días y si fueron contratados.</p>
+            <h3 class="kpi-drawer__title">Sent → Hired · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Candidatos enviados en opps Close Win del período (<span data-window-label>30d</span>) y si fueron contratados.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Sent → Hired · last 30d <span class="count" data-chart="op_table_sent_hired_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Sent → Hired · <span data-window-label>30d</span> <span class="count" data-chart="op_table_sent_hired_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_sent_hired_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="contratado" data-limit="120"></div>
             </section>
@@ -8812,13 +8812,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-interviewed-sent">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · conversión</span>
-            <h3 class="kpi-drawer__title">Interviewed → Sent · 30d</h3>
-            <p class="kpi-drawer__sub">Candidatos enviados que avanzaron a entrevista con cliente, últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Interviewed → Sent · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Candidatos enviados que avanzaron a entrevista con cliente, período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Interviewed → Sent · last 30d <span class="count" data-chart="op_table_interviewed_sent_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Interviewed → Sent · <span data-window-label>30d</span> <span class="count" data-chart="op_table_interviewed_sent_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_interviewed_sent_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="status_final" data-limit="120"></div>
             </section>
@@ -8828,13 +8828,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-interview-conversion">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · conversión</span>
-            <h3 class="kpi-drawer__title">Interview conversion · 30d</h3>
-            <p class="kpi-drawer__sub">Conversión presentados / entrevistados por opp Close Win, últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Interview conversion · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Conversión presentados / entrevistados por opp Close Win, período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Interview conv · last 30d <span class="count" data-chart="op_line_interview_conversion_30d" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Interview conv · <span data-window-label>30d</span> <span class="count" data-chart="op_line_interview_conversion_30d" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_line_interview_conversion_30d" data-bind="list"
                    data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="conversion_pct" data-limit="40"></div>
             </section>
@@ -8844,13 +8844,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-turbo-closewin">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · efectividad turbo</span>
-            <h3 class="kpi-drawer__title">Turbo → Close Win · 30d</h3>
-            <p class="kpi-drawer__sub">Oportunidades con al menos una turbo en los últimos 30 días y su stage.</p>
+            <h3 class="kpi-drawer__title">Turbo → Close Win · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Oportunidades con al menos una turbo en el período (<span data-window-label>30d</span>) y su stage.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Turbo → Close Win · last 30d <span class="count" data-chart="op_table_turbo_closewin_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Turbo → Close Win · <span data-window-label>30d</span> <span class="count" data-chart="op_table_turbo_closewin_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_turbo_closewin_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="opp_stage" data-list-date="last_meeting_date" data-limit="80"></div>
             </section>
@@ -8860,13 +8860,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-turbo-with-cands">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · efectividad turbo</span>
-            <h3 class="kpi-drawer__title">% turbos con candidatos · 30d</h3>
-            <p class="kpi-drawer__sub">Turbos de los últimos 30 días y cuántos candidatos presentó cada una.</p>
+            <h3 class="kpi-drawer__title">% turbos con candidatos · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Turbos del período (<span data-window-label>30d</span>) y cuántos candidatos presentó cada una.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Turbos · last 30d <span class="count" data-chart="op_table_turbo_with_cands_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Turbos · <span data-window-label>30d</span> <span class="count" data-chart="op_table_turbo_with_cands_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_turbo_with_cands_30d_detail" data-bind="list"
                    data-list-name="meeting_name" data-list-sub="hr_lead" data-list-date="meeting_date" data-limit="120"></div>
             </section>
@@ -8876,13 +8876,13 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-turbo-avg-cands">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · efectividad turbo</span>
-            <h3 class="kpi-drawer__title">Candidatos por turbo · 30d</h3>
-            <p class="kpi-drawer__sub">Candidatos presentados en cada turbo de los últimos 30 días.</p>
+            <h3 class="kpi-drawer__title">Candidatos por turbo · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Candidatos presentados en cada turbo del período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Turbos · last 30d <span class="count" data-chart="op_table_turbo_avg_cands_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Turbos · <span data-window-label>30d</span> <span class="count" data-chart="op_table_turbo_avg_cands_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_turbo_avg_cands_30d_detail" data-bind="list"
                    data-list-name="meeting_name" data-list-sub="hr_lead" data-list-date="meeting_date" data-limit="120"></div>
             </section>

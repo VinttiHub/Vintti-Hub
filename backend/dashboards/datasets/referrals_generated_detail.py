@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from ._now import today_ar
+
+from ._periods import window_bounds
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -22,27 +24,19 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or today_ar()
-    )
-    win = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
+    hoy = today_ar()
+    win = str(filters.get("window") or filters.get("ventana") or "").strip().lower()
+    # Explicit week/MTD sub-windows anchor to today (match the card's cnt_week/cnt_month).
+    # Default window honors desde/hasta > mes > rolling 30d via window_bounds, so the
+    # drawer reconciles with the card's headline cnt_30d.
     if win in ("week", "semana", "7d", "7"):
-        win = "week"
+        win_ini, win_fin = hoy - timedelta(days=6), hoy
     elif win in ("month", "mes", "mtd"):
-        win = "month"
+        win_ini, win_fin = hoy.replace(day=1), hoy
     else:
-        win = "30d"
+        win_ini, win_fin = window_bounds(filters)
 
-    # win_ini según la ventana; para 'month' se usa date_trunc en el SQL.
-    bounds = {
-        "30d": "(%(corte)s::date - INTERVAL '29 days')::date",
-        "week": "(%(corte)s::date - INTERVAL '6 days')::date",
-        "month": "DATE_TRUNC('month', %(corte)s::date)::date",
-    }[win]
-
-    sql = f"""
+    sql = """
         SELECT
           a.client_name,
           TO_CHAR(a.creation_date, 'YYYY-MM-DD') AS creation_d,
@@ -52,11 +46,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE a.creation_date IS NOT NULL
           AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'referral'
           AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-          AND a.creation_date BETWEEN {bounds} AND %(corte)s::date
+          AND a.creation_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ORDER BY a.creation_date DESC, a.client_name;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

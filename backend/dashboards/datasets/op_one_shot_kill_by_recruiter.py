@@ -1,8 +1,9 @@
 """Operations · "One shot, one kill" — por recruiter.
 
-Mismo cálculo que el KPI global, agrupado por recruiter (opp_hr_lead resuelto a
-nickname vía `users`). Una fila por recruiter con placements / one_shot_count /
-conversion_pct. Excluye recruiters inactivos.
+Mismo cálculo que el KPI global (población = wins de NDA→CW: Close Win · sales_lead
+M+B+Lara · por opp_close_date), agrupado por recruiter (opp_hr_lead resuelto a nickname
+vía `users`). Una fila por recruiter con close-win / one_shot_count / conversion_pct.
+La suma de `placements` reconcilia con el KPI global.
 """
 from __future__ import annotations
 
@@ -10,19 +11,40 @@ from ._periods import window_bounds
 from ._recruiters import RECRUITERS_CTE
 
 
+SALES_LEADS = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
+
+
+def _resolve_modelo(filters: dict) -> str | None:
+    raw = (
+        filters.get("modelo")
+        or filters.get("modelo1")
+        or filters.get("model")
+        or filters.get("opp_model")
+        or ""
+    ).strip().lower()
+    if raw in {"staffing", "staff"}:
+        return "Staffing"
+    if raw in {"recruiting", "recru"}:
+        return "Recruiting"
+    return None
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     lo, hi = window_bounds(filters)
-    # Muestra TODOS los recruiters activos (FULL JOIN con la lista canónica): los que
-    # no tienen placements aparecen con 0 / 0 / 0%.
+    modelo = _resolve_modelo(filters)
+    canal = (filters.get("canal") or filters.get("channel") or "").strip().lower() or None
     sql = f"""
         WITH {RECRUITERS_CTE.strip()},
-        hires AS (
-          SELECT DISTINCT ho.opportunity_id, ho.candidate_id,
-                 LOWER(TRIM(o.opp_hr_lead)) AS email
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE ho.carga_active BETWEEN %(w_lo)s AND %(w_hi)s
-            AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+        wins AS (
+          SELECT o.opportunity_id, LOWER(TRIM(o.opp_hr_lead)) AS email
+          FROM opportunity o
+          JOIN account a ON a.account_id = o.account_id
+          WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            AND NULLIF(o.opp_close_date::text,'')::date BETWEEN %(w_lo)s AND %(w_hi)s
+            AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            AND (%(canal)s::text IS NULL OR LOWER(TRIM(COALESCE(a.where_come_from,''))) = %(canal)s)
         ),
         firstbatch AS (
           SELECT b.opportunity_id, cb.candidate_id, MIN(b.batch_number) AS batch_num
@@ -30,15 +52,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN candidates_batches cb ON cb.batch_id = b.batch_id
           GROUP BY b.opportunity_id, cb.candidate_id
         ),
-        oppb1 AS (
-          SELECT DISTINCT opportunity_id FROM batch WHERE batch_number = 1
-        ),
-        scored AS (
-          SELECT h.email, (fb.batch_num = 1) AS one_shot
-          FROM hires h
-          JOIN oppb1 ON oppb1.opportunity_id = h.opportunity_id
+        scored AS (   -- una fila por win, con su recruiter
+          SELECT w.email, BOOL_OR(fb.batch_num = 1) AS one_shot
+          FROM wins w
+          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
           LEFT JOIN firstbatch fb
-            ON fb.opportunity_id = h.opportunity_id AND fb.candidate_id = h.candidate_id
+            ON fb.opportunity_id = ho.opportunity_id AND fb.candidate_id = ho.candidate_id
+          GROUP BY w.opportunity_id, w.email
         ),
         agg AS (
           SELECT email,
@@ -64,7 +84,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = COALESCE(r.email, a.email)
         ORDER BY placements DESC, recruiter;
     """
-    return sql, {"w_lo": lo, "w_hi": hi}
+    return sql, {"w_lo": lo, "w_hi": hi, "sales_leads": SALES_LEADS,
+                 "modelo": modelo, "canal": canal}
 
 
 DATASET = {
@@ -72,7 +93,7 @@ DATASET = {
     "label": "Operations · One shot one kill por recruiter",
     "dimensions": [{"key": "recruiter", "label": "Recruiter", "type": "string"}],
     "measures": [
-        {"key": "placements", "label": "Placements", "type": "number"},
+        {"key": "placements", "label": "Close Win", "type": "number"},
         {"key": "one_shot_count", "label": "One-shot", "type": "number"},
         {"key": "conversion_pct", "label": "% one-shot", "type": "percent"},
     ],

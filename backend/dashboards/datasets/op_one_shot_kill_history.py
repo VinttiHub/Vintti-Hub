@@ -1,12 +1,15 @@
 """Operations · "One shot, one kill" — tendencia mensual.
 
-% de one-shot por mes (mes de la fecha de contratación). Misma definición que el KPI:
-denominador = contrataciones cuya opp tiene batch N°1; numerador = candidato contratado
-en el batch N°1. Acota opcionalmente con desde/hasta. Excluye recruiters inactivos.
+% de one-shot por mes (mes de opp_close_date). Misma definición/población que el KPI:
+población = wins de NDA→CW (Close Win · sales_lead M+B+Lara), numerador = wins cuyo
+candidato contratado provino del batch N°1. Acota opcionalmente con desde/hasta.
 """
 from __future__ import annotations
 
 from datetime import date
+
+
+SALES_LEADS = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
 
 
 def _parse_date(value) -> date | None:
@@ -23,21 +26,40 @@ def _parse_date(value) -> date | None:
     return None
 
 
+def _resolve_modelo(filters: dict) -> str | None:
+    raw = (
+        filters.get("modelo")
+        or filters.get("modelo1")
+        or filters.get("model")
+        or filters.get("opp_model")
+        or ""
+    ).strip().lower()
+    if raw in {"staffing", "staff"}:
+        return "Staffing"
+    if raw in {"recruiting", "recru"}:
+        return "Recruiting"
+    return None
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
+    modelo = _resolve_modelo(filters)
+    canal = (filters.get("canal") or filters.get("channel") or "").strip().lower() or None
     sql = """
-        WITH hires AS (
+        WITH wins AS (
           SELECT
-            ho.opportunity_id,
-            ho.candidate_id,
-            DATE_TRUNC('month', MIN(ho.carga_active))::date AS mes
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
-            AND (%(desde)s::date IS NULL OR ho.carga_active::date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR ho.carga_active::date <= %(hasta)s::date)
-          GROUP BY ho.opportunity_id, ho.candidate_id
+            o.opportunity_id,
+            DATE_TRUNC('month', NULLIF(o.opp_close_date::text,'')::date)::date AS mes
+          FROM opportunity o
+          JOIN account a ON a.account_id = o.account_id
+          WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
+            AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            AND (%(canal)s::text IS NULL OR LOWER(TRIM(COALESCE(a.where_come_from,''))) = %(canal)s)
         ),
         firstbatch AS (
           SELECT b.opportunity_id, cb.candidate_id, MIN(b.batch_number) AS batch_num
@@ -45,15 +67,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN candidates_batches cb ON cb.batch_id = b.batch_id
           GROUP BY b.opportunity_id, cb.candidate_id
         ),
-        oppb1 AS (
-          SELECT DISTINCT opportunity_id FROM batch WHERE batch_number = 1
-        ),
         scored AS (
-          SELECT h.mes, (fb.batch_num = 1) AS one_shot
-          FROM hires h
-          JOIN oppb1 ON oppb1.opportunity_id = h.opportunity_id
+          SELECT w.opportunity_id, w.mes, BOOL_OR(fb.batch_num = 1) AS one_shot
+          FROM wins w
+          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
           LEFT JOIN firstbatch fb
-            ON fb.opportunity_id = h.opportunity_id AND fb.candidate_id = h.candidate_id
+            ON fb.opportunity_id = ho.opportunity_id AND fb.candidate_id = ho.candidate_id
+          GROUP BY w.opportunity_id, w.mes
         )
         SELECT
           TO_CHAR(mes, 'YYYY-MM-DD')                           AS mes,
@@ -65,7 +85,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY mes
         ORDER BY mes;
     """
-    return sql, {"desde": desde, "hasta": hasta}
+    return sql, {"desde": desde, "hasta": hasta, "sales_leads": SALES_LEADS,
+                 "modelo": modelo, "canal": canal}
 
 
 DATASET = {
@@ -75,7 +96,7 @@ DATASET = {
     "measures": [
         {"key": "conversion_pct", "label": "% one-shot", "type": "percent"},
         {"key": "one_shot_count", "label": "One-shot", "type": "number"},
-        {"key": "placements", "label": "Contrataciones", "type": "number"},
+        {"key": "placements", "label": "Close Win", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

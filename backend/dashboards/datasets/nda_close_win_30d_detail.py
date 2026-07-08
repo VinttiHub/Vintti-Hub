@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 SALES_LEADS = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
 
@@ -59,12 +61,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or today_ar()
     )
 
+    # Same effective window as the card (nda_close_win_30d_summary): honors
+    # desde/hasta > mes > rolling 30d, so the detail reconciles with the card.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH ventana AS (
           SELECT
             %(corte)s::date                              AS corte_d,
-            (%(corte)s::date - INTERVAL '29 days')::date AS win_ini,
-            (%(corte)s::date + INTERVAL '1 day')::date   AS win_fin_excl
+            %(win_ini)s::date                            AS win_ini,
+            (%(win_fin)s::date + INTERVAL '1 day')::date AS win_fin_excl
         ),
         base AS (
           SELECT
@@ -100,6 +105,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,
         "sales_leads": SALES_LEADS,
         "modelo": modelo,
         "canal": canal,
