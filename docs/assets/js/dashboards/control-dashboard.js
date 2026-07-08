@@ -2670,6 +2670,52 @@
     refetchMonthAwareElements(document, monthState.selected);
   }
 
+  // Modo RANGO para drawers "by window": cuando hay Desde/Hasta o Mes activo, el
+  // detalle debe reflejar ESE período (no las ventanas). Oculta la sección "Por
+  // ventana", reetiqueta el chip/hero al rango, y refetchea las tablas/listas del
+  // drawer SIN override de ventana → el dataset cae en window_bounds (= el rango).
+  async function setDrawerRange(target) {
+    const rangeTxt = windowLabelText();
+    document.querySelectorAll(`[data-drawer-window-group="${target}"] [data-drawer-window]`).forEach(btn => {
+      btn.classList.remove('is-active');
+    });
+    const monthChip = document.querySelector(`[data-drawer-window-target="${target}"][data-kpi-drawer-month-chip]`);
+    const winChip = document.querySelector(`[data-drawer-window-chip="${target}"]`);
+    if (monthChip) monthChip.hidden = true;
+    if (winChip) { winChip.hidden = false; winChip.textContent = rangeTxt; }
+    const heroLabel = document.querySelector(`[data-drawer-window-label="${target}"]`);
+    if (heroLabel) {
+      const baseLabel = heroLabel.dataset.drawerBaseLabel || heroLabel.textContent.replace(/\s*·\s*\S+$/, '');
+      heroLabel.dataset.drawerBaseLabel = baseLabel;
+      heroLabel.textContent = `${baseLabel} · ${rangeTxt}`;
+    }
+
+    const els = document.querySelectorAll(`[data-month-aware][data-drawer-window-target="${target}"]`);
+    if (!els.length) return;
+    const groups = new Map();
+    els.forEach(el => {
+      el.dataset.activeWindow = '__range__';  // que refetchMonthAwareElements lo saltee
+      const chartKey = el.dataset.chart;
+      if (!chartKey) return;
+      const overrides = readOverridesFor(el);
+      delete overrides.event_window;   // sin ventana → dataset usa window_bounds (rango)
+      delete overrides.corte;          // sin corte → window_bounds toma desde/hasta
+      const compKey = compKeyFor(chartKey, overrides);
+      if (!groups.has(compKey)) groups.set(compKey, { chartKey, overrides, els: [] });
+      groups.get(compKey).els.push(el);
+    });
+    await Promise.all([...groups.values()].map(async ({ chartKey, overrides, els }) => {
+      try {
+        const r = await fetchChart(chartKey, overrides);
+        const rows = r.rows || [];
+        els.forEach(el => renderBinding(el, rows));
+      } catch (e) {
+        console.error(`range fetch ${chartKey}`, e);
+        els.forEach(el => renderBinding(el, []));
+      }
+    }));
+  }
+
   function bindCohortMetricToggle() {
     const rerender = (card) => {
       card.querySelectorAll('[data-bind="cohort"]').forEach(el => {
@@ -3411,6 +3457,19 @@
         rerenderChartsInScope(activePanel);
         // Sync any [data-month-aware] elements in this panel to the currently-selected month
         refetchMonthAwareElements(activePanel);
+        // Drawer "by window" + rango/mes activo → mostrar el detalle del período
+        // (un solo número, como la card colapsada) y ocultar la sección "Por ventana".
+        const grp = activePanel.querySelector('[data-drawer-window-group]');
+        if (grp) {
+          const sec = grp.closest('.kpi-drawer__section');
+          const ranged = !!(state.desde || state.hasta || state.mes);
+          if (ranged) {
+            if (sec) sec.style.display = 'none';
+            setDrawerRange(grp.getAttribute('data-drawer-window-group'));
+          } else if (sec) {
+            sec.style.display = '';
+          }
+        }
       });
     };
     const closeDrawer = () => {
@@ -3581,8 +3640,11 @@
         // (e.g. clicking the "Last week" card opens the drawer with the
         // Last week tile already highlighted + table filtered), trigger it
         // after the drawer is visible so the hero, table and chip refresh.
+        // Con rango/mes activo, el drawer entra en modo RANGO (lo maneja openDrawer);
+        // no forzamos la ventana inicial para no pisarlo.
         const initialWindow = btn.dataset.initialWindow;
-        if (initialWindow) {
+        const rangedNow = !!(state.desde || state.hasta || state.mes);
+        if (initialWindow && !rangedNow) {
           requestAnimationFrame(() => {
             try { setDrawerWindow(panelKey, initialWindow); }
             catch (err) { console.error('initial window apply failed', err); }
@@ -3857,6 +3919,58 @@
     document.querySelectorAll('[data-window-label]').forEach(el => {
       el.textContent = txt;
       el.classList.toggle('is-filtered', filtered);
+    });
+    updateWindowedCards();
+  }
+
+  // Cards "By window" (New clients / contractors / Churn ...) muestran 4 ventanas
+  // fijas (Last week / 30d / Last month / MTD). Cuando el usuario elige un rango
+  // Desde/Hasta o un Mes, esas ventanas dejan de tener sentido (solo la de 30d sigue
+  // el rango vía window_bounds). Para evitar confusión: colapsamos la card a UN solo
+  // número — la tile rodante (30d) — reetiquetada al período elegido, y ocultamos las
+  // de calendario. Sin filtro, se muestran las 4 como siempre.
+  function updateWindowedCards() {
+    const ranged = !!(state.desde || state.hasta || state.mes);
+    const rangeTxt = windowLabelText();
+    document.querySelectorAll('.skpi-group__grid').forEach(grid => {
+      const subs = Array.from(grid.querySelectorAll('.skpi-sub'));
+      const rangeTile = grid.querySelector('.skpi-sub--range');
+      const hasOverride = subs.some(s => s.querySelector('[data-override-window]'));
+      if (!rangeTile && !hasOverride) return;  // no es una card "by window"
+
+      if (rangeTile) {
+        // Patrón B (SQL Sales / Opps AM): campos fijos + una tile dedicada `--range`
+        // que trae el conteo del período (window_bounds). Con rango: solo la range.
+        subs.forEach(sub => {
+          const isRange = sub.classList.contains('skpi-sub--range');
+          sub.style.display = (ranged ? isRange : !isRange) ? '' : 'none';
+        });
+        if (ranged) {
+          const lbl = rangeTile.querySelector('.skpi-sub__label');
+          if (lbl) lbl.textContent = rangeTxt;  // texto plano, igual que patrón A
+        }
+        grid.style.gridTemplateColumns = ranged ? '1fr' : '';
+        return;
+      }
+
+      // Patrón A (New clients / churn ...): la tile rodante (30d) ya sigue el rango.
+      subs.forEach(sub => {
+        const valEl = sub.querySelector('[data-override-window]');
+        const win = valEl ? String(valEl.getAttribute('data-override-window') || '').toLowerCase() : '';
+        const isRolling = win === '30d';  // la única que sigue window_bounds (el rango)
+        const lbl = sub.querySelector('.skpi-sub__label');
+        if (ranged) {
+          sub.style.display = isRolling ? '' : 'none';
+          if (isRolling && lbl) {
+            if (!lbl.dataset.origLabel) lbl.dataset.origLabel = lbl.textContent;
+            lbl.textContent = rangeTxt;
+          }
+        } else {
+          sub.style.display = '';
+          if (lbl && lbl.dataset.origLabel) lbl.textContent = lbl.dataset.origLabel;
+        }
+      });
+      grid.style.gridTemplateColumns = ranged ? '1fr' : '';
     });
   }
   // Etiqueta de período para cards all-time/YTD que pueden filtrarse (donas Ops,

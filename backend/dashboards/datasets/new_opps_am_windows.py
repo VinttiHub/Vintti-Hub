@@ -16,6 +16,8 @@ import os
 from datetime import date, datetime, timedelta
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 _DEFAULT_AM_EMAILS = ("lara@vintti.com",)
 
@@ -65,6 +67,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     wt_ini, wt_fin = this_week_monday, corte
     lm_ini, lm_fin = last_month_start, last_month_end
     mt_ini, mt_fin = month_start,      corte
+    # Ventana del filtro Desde/Hasta > Mes > rolling 30d (para colapsar a un solo número).
+    rg_ini, rg_fin = window_bounds(filters)
 
     sql = """
         WITH opps AS (
@@ -86,7 +90,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*) FILTER (WHERE opened_d BETWEEN %(lm_ini)s::date AND %(lm_fin)s::date)::int
             AS opps_last_month,
           COUNT(*) FILTER (WHERE opened_d BETWEEN %(mt_ini)s::date AND %(mt_fin)s::date)::int
-            AS opps_mtd
+            AS opps_mtd,
+          COUNT(*) FILTER (WHERE opened_d BETWEEN %(rg_ini)s::date AND %(rg_fin)s::date)::int
+            AS opps_range
         FROM opps;
     """
 
@@ -97,6 +103,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         "wt_ini": wt_ini, "wt_fin": wt_fin,
         "lm_ini": lm_ini, "lm_fin": lm_fin,
         "mt_ini": mt_ini, "mt_fin": mt_fin,
+        "rg_ini": rg_ini, "rg_fin": rg_fin,
     }
 
 
@@ -111,6 +118,7 @@ DATASET = {
         {"key": "opps_wtd",        "label": "WTD",        "type": "number"},
         {"key": "opps_last_month", "label": "Last month", "type": "number"},
         {"key": "opps_mtd",        "label": "MTD",        "type": "number"},
+        {"key": "opps_range",      "label": "Rango",      "type": "number"},
     ],
     "default_filters": {},
     "query": query,

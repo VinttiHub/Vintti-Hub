@@ -845,6 +845,11 @@
             <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
                   data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
           </button>
+          <div class="skpi-sub skpi-sub--range" style="display:none">
+            <span class="skpi-sub__label">Last 30d</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
+                  data-field="sql_range" data-reduce="first" data-fmt="int">—</span>
+          </div>
         </div>
         <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="sql-sales" data-initial-window="last_week" aria-label="Ver detalle SQL Sales">Ver detalle</button>
       </div>
@@ -876,6 +881,11 @@
             <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
                   data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
           </button>
+          <div class="skpi-sub skpi-sub--range" style="display:none">
+            <span class="skpi-sub__label">Last 30d</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
+                  data-field="opps_range" data-reduce="first" data-fmt="int">—</span>
+          </div>
         </div>
         <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-opps-am" data-initial-window="last_week" aria-label="Ver detalle New opportunities by AM">Ver detalle</button>
       </div>
@@ -8893,6 +8903,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=112" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=116" defer></script>
 </body>
 </html>

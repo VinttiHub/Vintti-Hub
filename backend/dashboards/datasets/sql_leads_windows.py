@@ -15,6 +15,8 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -55,6 +57,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     wt_ini, wt_fin = this_week_monday, corte
     lm_ini, lm_fin = last_month_start, last_month_end
     mt_ini, mt_fin = month_start,      corte
+    # Ventana del filtro Desde/Hasta > Mes > rolling 30d (para colapsar a un solo número).
+    rg_ini, rg_fin = window_bounds(filters)
 
     # SQL SALES = solo Outbound (los SQL generados por Sales, no inbound/marketing) y
     # owner ∈ {Mariano, Bahía} (regla del tab Sales). Ancla = fecha real del meeting
@@ -76,9 +80,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*) FILTER (WHERE sql_d BETWEEN %(lm_ini)s::date AND %(lm_fin)s::date)::int
             AS sql_last_month,
           COUNT(*) FILTER (WHERE sql_d BETWEEN %(mt_ini)s::date AND %(mt_fin)s::date)::int
-            AS sql_mtd
+            AS sql_mtd,
+          COUNT(*) FILTER (WHERE sql_d BETWEEN %(rg_ini)s::date AND %(rg_fin)s::date)::int
+            AS sql_range
         FROM sql_acc
-        WHERE sql_d >= LEAST(%(lw_ini)s::date, %(lm_ini)s::date);
+        WHERE sql_d >= LEAST(%(lw_ini)s::date, %(lm_ini)s::date, %(rg_ini)s::date);
     """
 
     return sql, {
@@ -87,6 +93,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         "wt_ini": wt_ini, "wt_fin": wt_fin,
         "lm_ini": lm_ini, "lm_fin": lm_fin,
         "mt_ini": mt_ini, "mt_fin": mt_fin,
+        "rg_ini": rg_ini, "rg_fin": rg_fin,
     }
 
 
@@ -101,6 +108,7 @@ DATASET = {
         {"key": "sql_wtd",        "label": "WTD",        "type": "number"},
         {"key": "sql_last_month", "label": "Last month", "type": "number"},
         {"key": "sql_mtd",        "label": "MTD",        "type": "number"},
+        {"key": "sql_range",      "label": "Rango",      "type": "number"},
     ],
     "default_filters": {},
     "query": query,

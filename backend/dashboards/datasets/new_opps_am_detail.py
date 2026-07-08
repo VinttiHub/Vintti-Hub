@@ -14,6 +14,8 @@ import os
 from datetime import date, datetime, timedelta
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 _DEFAULT_AM_EMAILS = ("lara@vintti.com",)
 
@@ -42,6 +44,10 @@ def _am_emails() -> list[str]:
 
 
 def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
+    # Si hay un rango Desde/Hasta o un Mes activo, el detalle sigue ESE período
+    # (coincide con la card colapsada), ignorando las ventanas de calendario.
+    if filters.get("desde") or filters.get("hasta") or filters.get("mes"):
+        return window_bounds(filters)
     raw = str(
         filters.get("event_window")
         or filters.get("window")
