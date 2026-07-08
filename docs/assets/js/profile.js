@@ -691,6 +691,7 @@ const LEADER_ACCESS_EMAILS = new Set([
 ]);
 const TEAM_GLOBAL_EMAILS = new Set([
   "jazmin@vintti.com",
+  "lara@vintti.com",
 ]);
 const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
