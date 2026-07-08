@@ -696,6 +696,10 @@ const TEAM_GLOBAL_EMAILS = new Set([
 const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
+const ADMIN_GLOBAL_EMAILS = new Set([
+  "jazmin@vintti.com",
+  "agustin@vintti.com",
+]);
 const ADMIN_MANAGER_INCLUDE_EMAILS = new Set([
   "jazmin@vintti.com",
   "mia@vintti.com",
@@ -768,7 +772,7 @@ function filterTeamPtoUsers(allUsers){
 
 function filterAdminUsers(allUsers){
   const rows = Array.isArray(allUsers) ? allUsers : [];
-  if (currentProfileEmail() === "jazmin@vintti.com") return rows;
+  if (ADMIN_GLOBAL_EMAILS.has(currentProfileEmail())) return rows;
 
   const visibleIds = collectDirectReportIds(rows, CURRENT_USER_ID);
   if (!visibleIds.size) return [];
