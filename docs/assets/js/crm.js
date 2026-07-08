@@ -2199,7 +2199,8 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'mariano@vintti.com',
     'agostina@vintti.com',
     'mia@vintti.com',
-    'jazmin@vintti.com'
+    'jazmin@vintti.com',
+    'camila@vintti.com'
   ]);
 
   const dash = document.getElementById('dashboardLink');
