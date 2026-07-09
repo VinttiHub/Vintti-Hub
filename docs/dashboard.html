@@ -5043,6 +5043,37 @@
         </div>
         <p class="card__sub" style="margin:8px 4px 0;">Click en una porción para ver los candidatos de esa razón.</p>
       </div>
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Razones de Close Lost</h3>
+            <p class="card__sub"><span data-chart="op_donut_close_lost_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> opps<span data-window-label>30d</span></p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-close-lost-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones de Close Lost">Ver detalle</button>
+        </div>
+        <div class="donut-filter">
+          <select class="recruiter-filter" data-chart="op_select_close_lost_reasons" data-bind="filter-select"
+                  data-filter-field="reason" data-opt-value="reason" data-opt-label="reason" data-all-label="Razón: Todas"
+                  data-target-chart="op_donut_close_lost_reasons" data-target-panel="op-close-lost-reasons-detail"
+                  aria-label="Filtrar Close Lost por razón"></select>
+          <select class="recruiter-filter" data-chart="op_select_close_lost_recruiters" data-bind="filter-select"
+                  data-filter-field="recruiter" data-all-label="Recruiter: Todos"
+                  data-target-chart="op_donut_close_lost_reasons" data-target-panel="op-close-lost-reasons-detail"
+                  aria-label="Filtrar Close Lost por recruiter"></select>
+          <div class="filter-search" data-chart="op_select_close_lost_accounts" data-bind="filter-search"
+                  data-filter-field="account" data-placeholder="Account: escribí o elegí…"
+                  data-target-chart="op_donut_close_lost_reasons" data-target-panel="op-close-lost-reasons-detail"></div>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="op_donut_close_lost_reasons" data-bind="donut" data-label="reason" data-value="count"
+               data-detail-panel="op-close-lost-reasons-detail" data-detail-key="reason" viewBox="0 0 180 180"></svg>
+          <div class="donut__legend" data-chart="op_donut_close_lost_reasons" data-bind="donut-legend" data-label="reason" data-value="count"
+               data-detail-panel="op-close-lost-reasons-detail" data-detail-key="reason">
+            <ul></ul>
+          </div>
+        </div>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción para ver las opps de esa razón.</p>
+      </div>
 
       <!-- ===== Close wins por origen del candidato (Hunteo vs Applicant) ===== -->
       <div class="section s-12">
@@ -8613,6 +8644,24 @@
               <div class="dtable-wrap" data-chart="op_table_churn_reasons_detail" data-bind="dtable" data-filter-col="2"
                    data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,inactive_date|Fecha baja|raw,recruiter|Recruiter|raw"
                    data-empty-text="Sin caídas con razón cargada."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-close-lost-reasons-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · Close Lost de opps</span>
+            <h3 class="kpi-drawer__title">Razones de Close Lost · detalle</h3>
+            <p class="kpi-drawer__sub">Oportunidades Closed Lost con motivo cargado, ordenadas por razón · con account, posición y owner.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Close Lost con razón <span class="count" data-chart="op_table_close_lost_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <input type="text" class="dtable-filter" data-dtable-filter="op_table_close_lost_reasons_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
+              <div class="dtable-wrap" data-chart="op_table_close_lost_reasons_detail" data-bind="dtable" data-filter-col="1"
+                   data-cols="reason|Razón|chip,client_name|Account|raw,opp_position_name|Posición|raw,close_date|Fecha cierre|raw,owner|Owner|raw,recruiter|Recruiter|raw"
+                   data-empty-text="Sin Close Lost con motivo cargado."></div>
             </section>
           </div>
         </div>
