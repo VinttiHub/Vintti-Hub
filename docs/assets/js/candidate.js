@@ -1,31 +1,34 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
-const PHONE_CODE_BY_COUNTRY = {
-  Argentina: '54',
-  Bolivia: '591',
-  Brazil: '55',
-  Chile: '56',
-  Colombia: '57',
-  'Costa Rica': '506',
-  Cuba: '53',
-  Ecuador: '593',
-  'El Salvador': '503',
-  Guatemala: '502',
-  Honduras: '504',
-  Mexico: '52',
-  Nicaragua: '505',
-  Panama: '507',
-  Paraguay: '595',
-  Peru: '51',
-  'Puerto Rico': '1',
-  'Dominican Republic': '1',
-  Uruguay: '598',
-  Venezuela: '58',
-  'United States': '1',
-  Canada: '1'
+// Código telefónico (dial code) por ISO 2-letras. Cubre todo el mundo, para que el
+// dropdown de teléfono de "Add Candidate" ofrezca cualquier país (con su banderita).
+const DIAL_BY_ISO = {
+  AF: '93', AL: '355', DZ: '213', AD: '376', AO: '244', AG: '1', AR: '54', AM: '374',
+  AU: '61', AT: '43', AZ: '994', BS: '1', BH: '973', BD: '880', BB: '1', BY: '375',
+  BE: '32', BZ: '501', BJ: '229', BT: '975', BO: '591', BA: '387', BW: '267', BR: '55',
+  BN: '673', BG: '359', BF: '226', BI: '257', CV: '238', KH: '855', CM: '237', CA: '1',
+  CF: '236', TD: '235', CL: '56', CN: '86', CO: '57', KM: '269', CG: '242', CR: '506',
+  CI: '225', HR: '385', CU: '53', CY: '357', CZ: '420', CD: '243', DK: '45', DJ: '253',
+  DM: '1', DO: '1', EC: '593', EG: '20', SV: '503', GQ: '240', ER: '291', EE: '372',
+  SZ: '268', ET: '251', FJ: '679', FI: '358', FR: '33', GA: '241', GM: '220', GE: '995',
+  DE: '49', GH: '233', GR: '30', GD: '1', GT: '502', GN: '224', GW: '245', GY: '592',
+  HT: '509', HN: '504', HU: '36', IS: '354', IN: '91', ID: '62', IR: '98', IQ: '964',
+  IE: '353', IL: '972', IT: '39', JM: '1', JP: '81', JO: '962', KZ: '7', KE: '254',
+  KI: '686', KW: '965', KG: '996', LA: '856', LV: '371', LB: '961', LS: '266', LR: '231',
+  LY: '218', LI: '423', LT: '370', LU: '352', MG: '261', MW: '265', MY: '60', MV: '960',
+  ML: '223', MT: '356', MH: '692', MR: '222', MU: '230', MX: '52', FM: '691', MD: '373',
+  MC: '377', MN: '976', ME: '382', MA: '212', MZ: '258', MM: '95', NA: '264', NR: '674',
+  NP: '977', NL: '31', NZ: '64', NI: '505', NE: '227', NG: '234', KP: '850', MK: '389',
+  NO: '47', OM: '968', PK: '92', PW: '680', PS: '970', PA: '507', PG: '675', PY: '595',
+  PE: '51', PH: '63', PL: '48', PT: '351', PR: '1', QA: '974', RO: '40', RU: '7',
+  RW: '250', KN: '1', LC: '1', VC: '1', WS: '685', SM: '378', ST: '239', SA: '966',
+  SN: '221', RS: '381', SC: '248', SL: '232', SG: '65', SK: '421', SI: '386', SB: '677',
+  SO: '252', ZA: '27', KR: '82', SS: '211', ES: '34', LK: '94', SD: '249', SR: '597',
+  SE: '46', CH: '41', SY: '963', TW: '886', TJ: '992', TZ: '255', TH: '66', TL: '670',
+  TG: '228', TO: '676', TT: '1', TN: '216', TR: '90', TM: '993', TV: '688', UG: '256',
+  UA: '380', AE: '971', GB: '44', US: '1', UY: '598', UZ: '998', VU: '678', VA: '39',
+  VE: '58', VN: '84', YE: '967', ZM: '260', ZW: '263',
 };
-
-const PHONE_CODE_COUNTRIES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
 const WORLD_COUNTRIES = [
   { name: 'Afghanistan', code: 'AF' },
   { name: 'Albania', code: 'AL' },
@@ -167,6 +170,7 @@ const WORLD_COUNTRIES = [
   { name: 'Philippines', code: 'PH' },
   { name: 'Poland', code: 'PL' },
   { name: 'Portugal', code: 'PT' },
+  { name: 'Puerto Rico', code: 'PR' },
   { name: 'Qatar', code: 'QA' },
   { name: 'Romania', code: 'RO' },
   { name: 'Russia', code: 'RU' },
@@ -229,6 +233,16 @@ const COUNTRY_CODE_BY_NAME = WORLD_COUNTRIES.reduce((acc, item) => {
   return acc;
 }, {});
 const COUNTRY_NAMES = WORLD_COUNTRIES.map((item) => item.name);
+
+// Dial code por nombre de país, derivado de WORLD_COUNTRIES + DIAL_BY_ISO → así el
+// dropdown de teléfono ofrece TODOS los países (con banderita), no solo unos pocos.
+const PHONE_CODE_BY_COUNTRY = WORLD_COUNTRIES.reduce((acc, item) => {
+  const dial = DIAL_BY_ISO[item.code];
+  if (dial) acc[item.name] = dial;
+  return acc;
+}, {});
+const PHONE_CODE_COUNTRIES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
+
 const DEFAULT_PHONE_COUNTRY = 'Argentina';
 const CANDIDATE_US_STATES = [
   { code: 'AL', name: 'Alabama' },
@@ -1148,7 +1162,11 @@ function renderPhoneCountryOptions() {
     const option = document.createElement('option');
     option.value = country;
     option.dataset.code = PHONE_CODE_BY_COUNTRY[country];
-    option.textContent = `${getCountryLabel(country)} +${PHONE_CODE_BY_COUNTRY[country]}`;
+    // Nombre PRIMERO (después la bandera) para que el type-ahead nativo del <select>
+    // funcione: al teclear "Ho" el navegador salta a "Honduras" (antes arrancaba con
+    // el emoji de bandera y no matcheaba nunca).
+    const flag = getCountryFlag(country);
+    option.textContent = `${country}${flag ? ' ' + flag : ''} +${PHONE_CODE_BY_COUNTRY[country]}`;
     fragment.appendChild(option);
   });
   candidateModalRefs.phoneCodeSelect.innerHTML = '';
