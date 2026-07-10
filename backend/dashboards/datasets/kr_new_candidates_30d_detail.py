@@ -41,6 +41,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         JOIN account a ON a.account_id = o.account_id
         LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id
         WHERE o.opp_model IN ('Staffing', 'Recruiting')
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(o.opp_stage) = 'Close Win'
           AND ho.candidate_id IS NOT NULL
           AND (CASE WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date

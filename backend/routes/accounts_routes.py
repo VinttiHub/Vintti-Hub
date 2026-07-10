@@ -419,7 +419,8 @@ def get_opportunities():
             SELECT o.*, 
                 u.user_name AS sales_lead_name,
                 a.client_name AS client_name,
-                COALESCE(a.vintti_ai, FALSE) AS vintti_ai
+                COALESCE(a.vintti_ai, FALSE) AS vintti_ai,
+                COALESCE(a.vintti_internal, FALSE) AS vintti_internal
             FROM opportunity o
             LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
             LEFT JOIN account a ON o.account_id = a.account_id

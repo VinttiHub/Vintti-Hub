@@ -38,6 +38,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE o.opp_model = 'Staffing'
           AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
           AND TRIM(o.opp_stage) = 'Close Win'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND ho.candidate_id IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(year_start)s::date AND %(today)s::date
         ORDER BY has_pc DESC,

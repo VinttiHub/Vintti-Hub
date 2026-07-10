@@ -63,12 +63,15 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE a.sql_meeting_date IS NOT NULL
             AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         accounts_with_cw AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND o.account_id IS NOT NULL
         )
@@ -96,7 +99,9 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH accounts_with_cw AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND o.account_id IS NOT NULL
         ),
@@ -107,6 +112,7 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             DATE_TRUNC('month', a.sql_meeting_date)::date AS mes
           FROM account a
           WHERE a.sql_meeting_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         bounds AS (

@@ -66,6 +66,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE o.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(o.opp_stage) IN ('Close Win','Closed Lost')
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')

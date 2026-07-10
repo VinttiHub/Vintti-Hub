@@ -34,7 +34,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS has_pc
           FROM opportunity o
           JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND TRIM(o.opp_stage) = 'Close Win'
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(year_start)s::date AND %(today)s::date

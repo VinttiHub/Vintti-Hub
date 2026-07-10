@@ -61,6 +61,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           CROSS JOIN mes_objetivo mo
           WHERE o.opportunity_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND LOWER(TRIM(o.opp_sales_lead)) = %(lara)s
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL

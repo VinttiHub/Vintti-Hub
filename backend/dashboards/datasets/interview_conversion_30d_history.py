@@ -56,6 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) IN ('Close Win','Closed Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.cantidad_entrevistados::text, '') IS NOT NULL
             AND (%(resultado)s = 'Total' OR TRIM(o.opp_stage) = %(resultado)s)
         ),

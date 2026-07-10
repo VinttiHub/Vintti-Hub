@@ -48,6 +48,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         JOIN account a ON a.account_id = o.account_id
         WHERE TRUE
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           {PIPELINE_EXCLUDE_STAGES_SQL}
         ORDER BY a.client_name, o.opp_position_name;
     """

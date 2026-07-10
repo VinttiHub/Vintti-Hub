@@ -74,6 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL
           AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
           AND TRIM(o.opp_stage) = 'Close Win'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND o.opp_type = 'New'
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND NULLIF(o.opp_close_date::text,'')::date >= NULLIF(o.nda_signature_or_start_date::text,'')::date

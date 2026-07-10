@@ -55,9 +55,11 @@ HISTORY_CTE = """
             COALESCE(ho.fee, 0)::numeric    AS fee
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Staffing'
             AND ho.candidate_id IS NOT NULL
             AND ho.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
             -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
             AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
@@ -161,6 +163,7 @@ SNAPSHOT_CTE = """
           WHERE o.opp_model = 'Staffing'
             AND ho.candidate_id IS NOT NULL
             AND ho.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
             -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
             AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date

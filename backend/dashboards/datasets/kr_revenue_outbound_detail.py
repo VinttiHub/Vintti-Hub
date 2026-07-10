@@ -42,6 +42,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_model IN ('Staffing','Recruiting')
             AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
             AND ( LOWER(TRIM(COALESCE(o.opp_sales_lead,''))) IN %(ae_leads)s

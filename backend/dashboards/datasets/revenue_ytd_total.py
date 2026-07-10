@@ -68,7 +68,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(ho.fee,0)::numeric AS fee
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND ho.candidate_id IS NOT NULL
             AND ho.account_id IS NOT NULL
         ),
@@ -156,8 +158,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                AND o.opp_close_date <= p.corte_py THEN ho.revenue END), 0)::numeric AS revenue_recruiting_ytd_py
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           CROSS JOIN params p
           WHERE o.opp_model = 'Recruiting'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(o.opp_stage) = 'Close Win'   -- R10: solo revenue de opps ganadas
             AND o.opp_close_date IS NOT NULL
             AND o.opp_close_date >= p.year_start_py

@@ -243,7 +243,7 @@ function doesRowMatchCrmFilters(row) {
   const ds = row?.dataset || {};
   // Workspace classification comes from HubSpot's vintti_ai property.
   if (window.Workspace && typeof window.Workspace.matchRecord === 'function') {
-    if (!window.Workspace.matchRecord(ds.vinttiAi, ds.salesLeadCode || '')) return false;
+    if (!window.Workspace.matchRecord(ds.vinttiAi, ds.vinttiInternal, ds.salesLeadCode || '')) return false;
   }
   if (CRM_FILTER_STATE.salesLead) {
     const code = ds.salesLeadCode || CRM_UNASSIGNED_SALES_LEAD_VALUE;
@@ -423,6 +423,7 @@ function decorateRowFilterMeta(row, item) {
   row.dataset.salesLeadLabel = leadMeta.label;
   row.dataset.salesLeadCode = leadMeta.code;
   row.dataset.vinttiAi = String(item?.vintti_ai ?? '');
+  row.dataset.vinttiInternal = String(item?.vintti_internal ?? '');
 
   const statusRaw = getPreferredAccountStatus(item);
   row.dataset.statusLabel = statusRaw || '—';

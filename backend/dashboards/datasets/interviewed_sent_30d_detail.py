@@ -88,6 +88,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           LEFT JOIN candidates c ON c.candidate_id = cb.candidate_id
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(b.presentation_date::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND (%(opportunity_id)s::int IS NULL OR b.opportunity_id = %(opportunity_id)s)

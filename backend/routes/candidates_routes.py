@@ -2358,6 +2358,20 @@ def get_candidates_light_fast():
                 WHERE h_ai.candidate_id = c.candidate_id
                   AND COALESCE(a_ai.vintti_ai, FALSE)
               ) AS vintti_ai,
+              EXISTS (
+                SELECT 1
+                FROM opportunity_candidates oc_in
+                JOIN opportunity o_in ON o_in.opportunity_id = oc_in.opportunity_id
+                JOIN account a_in ON a_in.account_id = o_in.account_id
+                WHERE oc_in.candidate_id = c.candidate_id
+                  AND COALESCE(a_in.vintti_internal, FALSE)
+              ) OR EXISTS (
+                SELECT 1
+                FROM hire_opportunity h_in
+                JOIN account a_in ON a_in.account_id = h_in.account_id
+                WHERE h_in.candidate_id = c.candidate_id
+                  AND COALESCE(a_in.vintti_internal, FALSE)
+              ) AS vintti_internal,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id

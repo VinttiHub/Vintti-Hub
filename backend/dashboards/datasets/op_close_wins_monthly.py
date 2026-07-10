@@ -43,8 +43,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT TRIM(o.opp_model) AS model,
                  DATE_TRUNC('month', NULLIF(o.opp_close_date::text, '')::date)::date AS mes,
                  COUNT(*)::int AS wins
-          FROM opportunity o, params p
+          FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id, params p
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND TRIM(o.opp_model) IN ('Staffing', 'Recruiting')
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN p.lo_real AND p.hi_d

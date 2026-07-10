@@ -15,7 +15,7 @@
   if (window.Workspace) return;
 
   const KEY   = 'workspace';
-  const VALID = new Set(['all', 'vintti', 'vintti_ai']);
+  const VALID = new Set(['all', 'vintti', 'vintti_ai', 'vintti_internal']);
 
   // Emails que pertenecen a vintti.ai. Para sumar gente al equipo
   // vintti.ai basta con agregar su email aquí.
@@ -43,41 +43,58 @@
     return null;
   }
 
-  function matchRecord(vinttiAi, ...fallbackEmails) {
+  // `vinttiInternal` = flag de "Vintti Interno" (búsquedas internas de Vintti). Es
+  // mutuamente excluyente con vintti_ai (una cuenta es AI o interna o ninguna).
+  function matchRecord(vinttiAi, vinttiInternal, ...fallbackEmails) {
     const ws = get();
     if (ws === 'all') return true;
     const parsed = parseBoolean(vinttiAi);
     const isAi = parsed === null ? fallbackEmails.some(isVinttiAiEmail) : parsed;
-    return ws === 'vintti_ai' ? isAi : !isAi;
+    const isInternal = parseBoolean(vinttiInternal) === true;
+    if (ws === 'vintti_ai') return isAi;
+    if (ws === 'vintti_internal') return isInternal;
+    // ws === 'vintti' → Vintti core: ni AI ni interna.
+    return !isAi && !isInternal;
   }
 
-  function decorateRow(row, vinttiAi, targetCell, ...fallbackEmails) {
-    if (!row) return false;
-    const parsed = parseBoolean(vinttiAi);
-    const isAi = parsed === null ? fallbackEmails.some(isVinttiAiEmail) : parsed;
-    if (!isAi) return false;
-    row.classList.add('vintti-ai-row');
-    const badgeCell = targetCell || row.querySelector('.vintti-ai-badge-cell');
-    if (!badgeCell || badgeCell.querySelector('.vintti-ai-row-badge')) return true;
+  function _addRowBadge(row, badgeCell, rowClass, badgeClass, text, title) {
+    row.classList.add(rowClass);
+    if (!badgeCell || badgeCell.querySelector('.' + badgeClass)) return true;
     const badge = document.createElement('span');
-    badge.className = 'vintti-ai-row-badge';
-    badge.textContent = '✨🤖';
-    badge.title = 'Vintti AI';
-    badge.setAttribute('aria-label', 'Vintti AI');
+    badge.className = badgeClass;
+    badge.textContent = text;
+    badge.title = title;
+    badge.setAttribute('aria-label', title);
     badgeCell.classList.add('vintti-ai-badge-cell');
     badgeCell.insertBefore(badge, badgeCell.firstChild);
     return true;
   }
 
+  // Decora la fila con el badge del workspace al que pertenece (AI o Interno). El flag
+  // interno se lee del dataset de la fila (row.dataset.vinttiInternal), que las páginas
+  // setean antes de llamar acá.
+  function decorateRow(row, vinttiAi, targetCell, ...fallbackEmails) {
+    if (!row) return false;
+    const badgeCell = targetCell || row.querySelector('.vintti-ai-badge-cell');
+    const isInternal = parseBoolean(row.dataset && row.dataset.vinttiInternal) === true;
+    if (isInternal) {
+      return _addRowBadge(row, badgeCell, 'vintti-internal-row', 'vintti-internal-row-badge', '🏠', 'Vintti Interno');
+    }
+    const parsed = parseBoolean(vinttiAi);
+    const isAi = parsed === null ? fallbackEmails.some(isVinttiAiEmail) : parsed;
+    if (!isAi) return false;
+    return _addRowBadge(row, badgeCell, 'vintti-ai-row', 'vintti-ai-row-badge', '✨🤖', 'Vintti AI');
+  }
+
   /* ¿este registro pertenece al workspace activo? Recibe el/los
      email(s) de owner (sales lead, account manager, etc.). */
   function matchEmails(...emails) {
-    return matchRecord(null, ...emails);
+    return matchRecord(null, null, ...emails);
   }
 
   /* Helper específico para una oportunidad (filtra por sales lead). */
   function matchOpp(opp) {
-    return matchRecord(opp && opp.vintti_ai, opp && opp.opp_sales_lead);
+    return matchRecord(opp && opp.vintti_ai, opp && opp.vintti_internal, opp && opp.opp_sales_lead);
   }
 
   function set(value) {
@@ -94,9 +111,10 @@
 
   /* -------- UI: badge en el título del header (por página) -------- */
   const BADGE = {
-    all:       'All ⚡️',
-    vintti:    'Vintti 🚀',
-    vintti_ai: 'Vintti.ai ✨',
+    all:             'All ⚡️',
+    vintti:          'Vintti 🚀',
+    vintti_ai:       'Vintti.ai ✨',
+    vintti_internal: 'Vintti Interno 🏠',
   };
 
   function injectHeaderBadge() {
@@ -115,9 +133,10 @@
 
   /* -------- UI: segmented control dentro del sidebar -------- */
   const OPTIONS = [
-    { value: 'all',       label: 'All',     short: 'All' },
-    { value: 'vintti',    label: 'Vintti',    short: 'V'   },
-    { value: 'vintti_ai', label: 'Vintti.ai', short: 'AI'  },
+    { value: 'all',             label: 'All',            short: 'All' },
+    { value: 'vintti',          label: 'Vintti',         short: 'V'   },
+    { value: 'vintti_ai',       label: 'Vintti.ai',      short: 'AI'  },
+    { value: 'vintti_internal', label: 'Vintti Interno', short: 'IN'  },
   ];
 
   function injectSwitch() {

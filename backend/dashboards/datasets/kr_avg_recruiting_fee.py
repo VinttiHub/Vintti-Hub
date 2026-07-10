@@ -51,6 +51,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model = %(model)s
             AND TRIM(o.opp_stage) = 'Close Win'
             AND ho.candidate_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND ( LOWER(TRIM(COALESCE(o.opp_sales_lead, ''))) IN %(ae_leads)s
                   OR LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(am_leads)s )
         ),

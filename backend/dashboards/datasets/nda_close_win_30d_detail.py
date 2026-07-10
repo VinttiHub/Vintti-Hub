@@ -81,6 +81,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
             AND (%(canal)s::text IS NULL OR LOWER(TRIM(COALESCE(a.where_come_from,''))) = %(canal)s)

@@ -31,7 +31,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity op ON op.opportunity_id = ho.opportunity_id
             AND TRIM(op.opp_stage) = 'Close Win'
           JOIN candidates ca  ON ca.candidate_id = ho.candidate_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE NULLIF(op.opp_close_date::text, '')::date BETWEEN %(w_lo)s AND %(w_hi)s
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT origin,
                COUNT(*)::int AS count,

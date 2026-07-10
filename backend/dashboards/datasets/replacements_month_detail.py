@@ -56,6 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE o.opp_type = 'Replacement'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_stage IN ('Close Win', 'Close Lost')
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
         ),

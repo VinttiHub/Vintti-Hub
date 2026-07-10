@@ -48,6 +48,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE a.creation_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
             AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ),

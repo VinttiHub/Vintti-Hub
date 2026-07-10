@@ -67,7 +67,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(ho.fee, 0)::numeric AS fee_m
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND LOWER(TRIM(o.opp_model)) IN ('staffing', 'recruiting')
         ),
         buyout_rows AS (

@@ -85,6 +85,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           CROSS JOIN ventana v
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
             AND (%(cliente)s::text IS NULL OR a.client_name = %(cliente)s)

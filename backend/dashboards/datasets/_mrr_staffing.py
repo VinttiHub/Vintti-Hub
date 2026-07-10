@@ -35,7 +35,9 @@ HIRES_FULL_CTE = """
             o.opp_close_date::date AS opp_close_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND (
               CASE
                 WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date

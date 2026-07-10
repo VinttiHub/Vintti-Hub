@@ -81,7 +81,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_model,
             NULLIF(o.opp_close_date::text, '')::date AS close_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_model IN ('Staffing', 'Recruiting')
             AND TRIM(o.opp_stage) = 'Close Win'
         ),

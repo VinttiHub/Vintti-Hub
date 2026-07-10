@@ -69,6 +69,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND LOWER(TRIM(COALESCE(o.opp_sales_lead, ''))) IN %(ae_leads)s
             {PIPELINE_EXCLUDE_STAGES_SQL}
         ),

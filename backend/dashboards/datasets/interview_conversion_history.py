@@ -19,7 +19,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             TRIM(o.opp_stage) AS opp_stage,
             NULLIF(o.opp_close_date::text,'')::date AS close_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) IN ('Close Win','Closed Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.cantidad_entrevistados::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND (%(resultado)s = 'Total' OR TRIM(o.opp_stage) = %(resultado)s)

@@ -555,6 +555,7 @@ function buildCandidateRow(candidate) {
   // Sales lead remains available as a fallback during rollout.
   tr.dataset.salesLead = (candidate.opp_sales_lead || '').toLowerCase();
   tr.dataset.vinttiAi = String(candidate.vintti_ai ?? '');
+  tr.dataset.vinttiInternal = String(candidate.vintti_internal ?? '');
 
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
@@ -1404,6 +1405,7 @@ function installAdvancedFilters(table) {
       const tr = table.row(dataIndex).node();
       return window.Workspace.matchRecord(
         tr?.dataset?.vinttiAi,
+        tr?.dataset?.vinttiInternal,
         tr?.dataset?.salesLead || ''
       );
     });

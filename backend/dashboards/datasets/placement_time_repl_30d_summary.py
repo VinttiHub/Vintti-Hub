@@ -69,7 +69,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             NULLIF(o.nda_signature_or_start_date::text,'')::date AS pedido_d,
             NULLIF(o.opp_close_date::text,'')::date              AS close_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.opportunity_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND TRIM(o.opp_stage) IN ('Close Win','Closed Lost')

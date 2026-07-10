@@ -48,7 +48,9 @@ _BASE_CTE = """
             NULLIF(o.nda_signature_or_start_date::text, '')::date AS nda_d,
             NULLIF(o.opp_close_date::text, '')::date              AS close_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.opportunity_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
             AND (
               TRIM(LOWER(o.opp_hr_lead))    = ANY(%(sales_leads)s)

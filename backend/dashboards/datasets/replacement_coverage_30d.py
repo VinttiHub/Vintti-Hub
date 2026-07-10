@@ -73,8 +73,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opportunity_id,
             (TRIM(o.opp_stage) = 'Close Win') AS won
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           CROSS JOIN ventana v
           WHERE o.opp_type = 'Replacement'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(COALESCE(o.opp_stage, '')) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin
         )

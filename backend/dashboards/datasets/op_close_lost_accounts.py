@@ -19,6 +19,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
         WHERE TRIM(o.opp_stage) = 'Closed Lost'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND NULLIF(TRIM(o.motive_close_lost), '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(w_lo)s AND %(w_hi)s

@@ -68,6 +68,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE o.opportunity_id IS NOT NULL
             AND LOWER(TRIM(o.opp_sales_lead)) = %(lara)s
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin

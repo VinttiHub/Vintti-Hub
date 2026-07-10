@@ -80,7 +80,12 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
 
 # Outcomes (a hoy) por cuenta, para un set de account_ids dado.
 _OUTCOMES_SQL = """
-    WITH ids AS (SELECT UNNEST(%(aids)s::int[]) AS account_id),
+    WITH ids AS (
+      SELECT aid AS account_id
+      FROM UNNEST(%(aids)s::int[]) AS aid
+      LEFT JOIN account a ON a.account_id = aid
+      WHERE COALESCE(a.vintti_internal, FALSE) = FALSE
+    ),
     opp_agg AS (
       SELECT i.account_id,
              BOOL_OR(TRIM(o.opp_stage) = 'Close Win')                      AS won,

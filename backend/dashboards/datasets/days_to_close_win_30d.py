@@ -68,6 +68,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           CROSS JOIN ventana v
           WHERE NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND TRIM(o.opp_stage) = 'Close Win'
             AND o.opp_type = 'New'

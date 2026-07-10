@@ -128,6 +128,7 @@ _PG_SQL = """
       FROM first_close fc
       JOIN account a ON a.account_id = fc.account_id
       WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
+        AND COALESCE(a.vintti_internal, FALSE) = FALSE
     ),
     dec AS (
       SELECT a.account_id,
@@ -142,6 +143,7 @@ _PG_SQL = """
       FROM account a
       JOIN opportunity o ON o.account_id = a.account_id
       WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
+        AND COALESCE(a.vintti_internal, FALSE) = FALSE
         AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
         AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
       GROUP BY a.account_id
@@ -162,6 +164,7 @@ _PG_SQL = """
       JOIN account a ON a.account_id = o.account_id
       LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
       WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
+        AND COALESCE(a.vintti_internal, FALSE) = FALSE
         AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
       GROUP BY o.opportunity_id, cdte

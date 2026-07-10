@@ -16,6 +16,7 @@ SALES_LEAD_EMAILS = {
     'lara@vintti.com',
     'mariano@vintti.com',
     'mia@vintti.com',
+    'jazmin@vintti.com',  # sales lead de las búsquedas internas (Vintti Interno)
 }
 
 SALES_LEAD_NAME_OVERRIDES = {

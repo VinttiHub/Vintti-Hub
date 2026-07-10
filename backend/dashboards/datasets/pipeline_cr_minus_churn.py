@@ -57,7 +57,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(o.expected_fee, 0)::numeric     AS exp_fee,
             COALESCE(o.expected_revenue, 0)::numeric AS exp_rev
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRUE
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             {PIPELINE_EXCLUDE_STAGES_SQL}
         ),
         pipeline_counts AS (
@@ -73,8 +75,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         closed_30d AS (
           SELECT o.opp_model, TRIM(o.opp_stage) AS stage
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           CROSS JOIN params p
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost', 'Close Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.win_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
@@ -116,8 +120,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.candidate_id IS NOT NULL
             AND o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         activos_inicio AS (
           SELECT DISTINCT c.candidate_id, c.end_d, c.buyout_d
@@ -191,8 +197,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               END AS end_d
             FROM hire_opportunity ho
             JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+            LEFT JOIN account a ON a.account_id = ho.account_id
             WHERE ho.account_id IS NOT NULL
               AND o.opp_model = 'Staffing'
+              AND COALESCE(a.vintti_internal, FALSE) = FALSE
           ) c
           WHERE c.start_d IS NOT NULL
         ),
@@ -231,8 +239,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT COUNT(*)::numeric AS bajas_real_30d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           CROSS JOIN params p
           WHERE o.opp_model = 'Recruiting'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(ho.end_date::text, '') IS NOT NULL
             AND NULLIF(ho.end_date::text, '')::date BETWEEN p.win_ini AND p.corte_d
         ),

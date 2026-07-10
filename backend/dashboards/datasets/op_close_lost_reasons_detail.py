@@ -34,6 +34,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN users us  ON LOWER(TRIM(us.email_vintti)) = LOWER(TRIM(o.opp_sales_lead))
         LEFT JOIN users ur  ON LOWER(TRIM(ur.email_vintti)) = LOWER(TRIM(o.opp_hr_lead))
         WHERE TRIM(o.opp_stage) = 'Closed Lost'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND NULLIF(TRIM(o.motive_close_lost), '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(w_lo)s AND %(w_hi)s

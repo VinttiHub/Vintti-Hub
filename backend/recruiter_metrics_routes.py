@@ -141,10 +141,15 @@ def register_recruiter_metrics_routes(app):
                 COALESCE(
                     o.nda_signature_or_start_date::date,
                     o.opp_close_date::date
-                ) AS start_reference_date
+                ) AS start_reference_date,
+                -- Búsquedas internas de Vintti: se INCLUYEN en las métricas de delivery
+                -- (batches, candidatos, tiempo) pero se EXCLUYEN de las de close win/lost.
+                COALESCE(a.vintti_internal, FALSE) AS is_internal
             FROM opportunity o
             LEFT JOIN users u
                 ON u.email_vintti = o.opp_hr_lead
+            LEFT JOIN account a
+                ON a.account_id = o.account_id
             WHERE o.opp_hr_lead IS NOT NULL
         ),
         first_batches AS (
@@ -281,12 +286,14 @@ def register_recruiter_metrics_routes(app):
                     WHERE b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
                       AND b.opp_stage = 'Close Win'
+                      AND NOT b.is_internal
                 ) AS closed_win_month,
 
                 COUNT(*) FILTER (
                     WHERE b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
                       AND b.opp_stage = 'Closed Lost'
+                      AND NOT b.is_internal
                 ) AS closed_lost_month,
 
                 -- ✅ RANGO ANTERIOR (mismo tamaño) para comparación
@@ -294,17 +301,19 @@ def register_recruiter_metrics_routes(app):
                     WHERE b.close_date >= %(prev_start)s
                       AND b.close_date <  %(prev_end)s
                       AND b.opp_stage = 'Close Win'
+                      AND NOT b.is_internal
                 ) AS prev_closed_win_month,
 
                 COUNT(*) FILTER (
                     WHERE b.close_date >= %(prev_start)s
                       AND b.close_date <  %(prev_end)s
                       AND b.opp_stage = 'Closed Lost'
+                      AND NOT b.is_internal
                 ) AS prev_closed_lost_month,
 
                 -- ✅ TOTALES LIFETIME
-                COUNT(*) FILTER (WHERE b.opp_stage = 'Close Win')  AS closed_win_total,
-                COUNT(*) FILTER (WHERE b.opp_stage = 'Closed Lost') AS closed_lost_total,
+                COUNT(*) FILTER (WHERE b.opp_stage = 'Close Win' AND NOT b.is_internal)  AS closed_win_total,
+                COUNT(*) FILTER (WHERE b.opp_stage = 'Closed Lost' AND NOT b.is_internal) AS closed_lost_total,
 
                 -- Promedios: close date usa el mismo filtro del dashboard; open cae al start_date documentado
                 AVG(
@@ -315,6 +324,7 @@ def register_recruiter_metrics_routes(app):
                       AND b.opp_stage = 'Close Win'
                       AND b.close_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
+                      AND NOT b.is_internal
                 ) AS avg_days_to_close_win,
 
                 AVG(
@@ -325,6 +335,7 @@ def register_recruiter_metrics_routes(app):
                       AND b.opp_stage = 'Closed Lost'
                       AND b.close_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
+                      AND NOT b.is_internal
                 ) AS avg_days_to_close_lost,
 
                 AVG(
@@ -363,11 +374,13 @@ def register_recruiter_metrics_routes(app):
                 COUNT(*) FILTER (
                     WHERE close_date >= %(win_start)s
                       AND close_date <  %(win_end)s
+                      AND NOT is_internal
                 ) AS last_20_count,
                 COUNT(*) FILTER (
                     WHERE close_date >= %(win_start)s
                       AND close_date <  %(win_end)s
                       AND opp_stage = 'Close Win'
+                      AND NOT is_internal
                 ) AS last_20_win
             FROM base
             GROUP BY opp_hr_lead

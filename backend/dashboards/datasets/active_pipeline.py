@@ -55,7 +55,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_type,
             COALESCE(o.expected_revenue, 0)::numeric AS exp_rev
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRUE
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             {PIPELINE_EXCLUDE_STAGES_SQL}
         ),
         closed AS (
@@ -63,8 +65,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_model,
             TRIM(o.opp_stage) AS stage
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           CROSS JOIN params p
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost', 'Close Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.cr_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d

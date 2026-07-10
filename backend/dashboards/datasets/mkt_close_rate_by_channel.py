@@ -54,6 +54,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                  COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
           FROM account a
           WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         acct_decided AS (
           SELECT

@@ -49,6 +49,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) = 'Close Win'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_model IN ('Staffing','Recruiting')
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
         ),

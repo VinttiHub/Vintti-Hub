@@ -52,6 +52,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
         CROSS JOIN params p
         WHERE o.opp_model = 'Recruiting'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(o.opp_stage) = 'Close Win'
           AND o.opp_close_date IS NOT NULL
           AND o.opp_close_date >= p.year_start AND o.opp_close_date <= p.corte_d

@@ -24,6 +24,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN candidates ca  ON ca.candidate_id = ho.candidate_id
           LEFT JOIN account a ON a.account_id = op.account_id
           WHERE NULLIF(op.opp_close_date::text, '')::date BETWEEN %(w_lo)s AND %(w_hi)s
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT origin, candidate_name, client_name, opp_position_name
         FROM base

@@ -1588,6 +1588,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           tr.dataset.filterDate = getOpportunityReferenceDate(opp);
           tr.dataset.salesLead = String(opp.opp_sales_lead || '').toLowerCase();
           tr.dataset.vinttiAi = String(opp.vintti_ai ?? '');
+          tr.dataset.vinttiInternal = String(opp.vintti_internal ?? '');
           window.Workspace?.decorateRow?.(
             tr,
             opp.vintti_ai,
@@ -1728,7 +1729,7 @@ if (!window.__workspaceFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
     if (!window.Workspace || typeof window.Workspace.matchRecord !== 'function') return true;
     const row = settings.aoData?.[rowIndex]?.nTr;
     const salesLead = row?.dataset?.salesLead || '';
-    return window.Workspace.matchRecord(row?.dataset?.vinttiAi, salesLead);
+    return window.Workspace.matchRecord(row?.dataset?.vinttiAi, row?.dataset?.vinttiInternal, salesLead);
   });
   window.__workspaceFilterExtRegistered = true;
 }

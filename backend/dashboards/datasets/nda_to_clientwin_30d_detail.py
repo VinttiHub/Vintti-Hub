@@ -52,6 +52,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         JOIN account a ON a.account_id = o.account_id
         WHERE NULLIF(o.nda_signature_or_start_date::text,'')::date IS NOT NULL
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND NULLIF(o.nda_signature_or_start_date::text,'')::date
               BETWEEN %(win_ini)s::date AND %(win_fin)s::date

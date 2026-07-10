@@ -116,6 +116,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM per_opp po
         LEFT JOIN account a ON a.account_id = po.account_id
         WHERE po.close_d IS NOT NULL
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND po.close_d >= %(win_ini)s::date
           AND po.close_d <= %(win_fin)s::date
         ORDER BY po.close_d DESC NULLS LAST,

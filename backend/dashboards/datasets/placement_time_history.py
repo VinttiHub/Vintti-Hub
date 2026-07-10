@@ -63,6 +63,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opportunity_id IS NOT NULL
             AND NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(o.opp_stage) IN ('Close Win','Closed Lost')
             AND o.opp_type = 'New'
             AND NULLIF(o.opp_close_date::text,'')::date >= NULLIF(o.nda_signature_or_start_date::text,'')::date

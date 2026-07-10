@@ -119,7 +119,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS opp_date,
             NULLIF(o.opp_close_date::text, '')::date AS close_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_stage IS NOT NULL
         ),
         hubspot_sql AS (

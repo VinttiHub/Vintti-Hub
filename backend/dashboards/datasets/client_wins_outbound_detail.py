@@ -45,6 +45,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         JOIN account a ON a.account_id = o.account_id
         CROSS JOIN params p
         WHERE TRIM(o.opp_stage) = 'Close Win'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
           AND o.opp_close_date >= p.year_start AND o.opp_close_date <= p.corte_d
           AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
