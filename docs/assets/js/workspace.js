@@ -135,7 +135,7 @@
   const OPTIONS = [
     { value: 'all',             label: 'All',            short: 'All' },
     { value: 'vintti',          label: 'Vintti',         short: 'V'   },
-    { value: 'vintti_ai',       label: 'Vintti.ai',      short: 'AI'  },
+    { value: 'vintti_ai',       label: 'AI',             short: 'AI'  },
     { value: 'vintti_internal', label: 'Interno', short: 'IN'  },
   ];
 
