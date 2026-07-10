@@ -136,7 +136,7 @@
     { value: 'all',             label: 'All',            short: 'All' },
     { value: 'vintti',          label: 'Vintti',         short: 'V'   },
     { value: 'vintti_ai',       label: 'Vintti.ai',      short: 'AI'  },
-    { value: 'vintti_internal', label: 'Vintti Interno', short: 'IN'  },
+    { value: 'vintti_internal', label: 'Interno', short: 'IN'  },
   ];
 
   function injectSwitch() {

@@ -78,7 +78,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               NULLIF(o.opp_close_date::text, '')::date
             ) AS opened_d
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.opp_type = 'New'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
         )
         SELECT

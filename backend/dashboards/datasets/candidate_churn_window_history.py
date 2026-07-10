@@ -58,7 +58,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               END AS buyout_d
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            LEFT JOIN account a ON a.account_id = h.account_id
             WHERE o.opp_model = 'Staffing'
+              AND COALESCE(a.vintti_internal, FALSE) = FALSE
           ) x
           WHERE start_d IS NOT NULL
         ),

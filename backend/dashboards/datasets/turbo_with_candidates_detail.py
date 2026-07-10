@@ -67,6 +67,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
           -- Excluir recruiters inactivos (ya no trabajan en Vintti)
           AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ORDER BY t.meeting_date DESC, a.client_name;
     """
 

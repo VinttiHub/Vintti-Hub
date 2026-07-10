@@ -54,7 +54,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o
             ON o.opportunity_id = ho.opportunity_id
            AND o.opp_model = 'Staffing'
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND (%(desde)s::date IS NULL OR COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) >= DATE_TRUNC('month', %(desde)s::date))
             AND (%(hasta)s::date IS NULL OR COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) <  (DATE_TRUNC('month', %(hasta)s::date) + INTERVAL '1 month'))
         ),

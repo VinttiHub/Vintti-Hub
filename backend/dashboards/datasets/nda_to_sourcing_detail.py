@@ -56,6 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         JOIN account a ON a.account_id = o.account_id
         WHERE NULLIF(o.nda_sent_date::text, '') IS NOT NULL
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND NULLIF(o.nda_sent_date::text, '')::date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ORDER BY NULLIF(o.nda_sent_date::text, '')::date DESC, a.client_name;

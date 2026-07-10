@@ -53,6 +53,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           ) THEN 'Deep Dive' ELSE '—' END AS status
         FROM account a
         WHERE a.sql_meeting_date IS NOT NULL
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)

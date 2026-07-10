@@ -46,6 +46,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE a.creation_date IS NOT NULL
           AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'referral'
           AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND a.creation_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ORDER BY a.creation_date DESC, a.client_name;
     """

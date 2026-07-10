@@ -48,6 +48,7 @@ _BASE_CTE = """
           JOIN account a ON a.account_id = o.account_id
           WHERE o.opportunity_id IS NOT NULL
             AND NULLIF(o.nda_sent_date::text, '') IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         )
 """

@@ -45,6 +45,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           %(week_label)s::text AS week_label
         FROM account a
         WHERE a.sql_meeting_date IS NOT NULL  -- R1: ancla = meeting real
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
           AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(ae_leads)s
           AND a.sql_meeting_date BETWEEN %(week_ini)s::date AND %(week_fin)s::date;

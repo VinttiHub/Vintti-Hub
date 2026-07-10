@@ -47,9 +47,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             t.candidates
           FROM turvo t
           JOIN opportunity o ON o.opportunity_id = t.opportunity_id
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
             -- Excluir recruiters inactivos (ya no trabajan en Vintti)
             AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND (%(desde)s::date IS NULL OR t.meeting_date::date >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR t.meeting_date::date <= %(hasta)s::date)
         )

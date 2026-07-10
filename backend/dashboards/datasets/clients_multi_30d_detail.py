@@ -80,6 +80,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
             AND LOWER(TRIM(o.opp_model)) IN ('staffing', 'recruiting')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         corte AS (
           SELECT

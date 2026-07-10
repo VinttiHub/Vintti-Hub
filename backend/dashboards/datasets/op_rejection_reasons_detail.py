@@ -36,6 +36,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE b.presentation_date BETWEEN %(w_lo)s AND %(w_hi)s
             -- Excluir recruiters inactivos (ya no trabajan en Vintti)
             AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT reason, candidate_name, client_name, opp_position_name, recruiter
         FROM base

@@ -87,6 +87,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         -- SQL SALES = solo Outbound + owner M+B; ancla = fecha real del meeting
         -- (sql_meeting_date), estricto: solo cuentas con reunión real. Mismo filtro que sql_leads_windows.
         WHERE a.sql_meeting_date IS NOT NULL
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
           AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN ('mariano@vintti.com', 'bahia@vintti.com')
           AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date

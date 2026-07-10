@@ -75,6 +75,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             LEFT JOIN account    a ON a.account_id   = h.account_id
             WHERE o.opp_model = 'Staffing'
               AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
+              AND COALESCE(a.vintti_internal, FALSE) = FALSE
           ) x
           WHERE start_d IS NOT NULL
         )

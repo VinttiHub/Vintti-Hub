@@ -83,6 +83,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           LEFT JOIN account a    ON a.account_id   = ho.account_id
           WHERE o.opp_model = 'Recruiting'
             AND ho.candidate_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT
           candidate_name,

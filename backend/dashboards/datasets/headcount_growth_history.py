@@ -50,10 +50,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_model AS model
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
             AND ho.start_date IS NOT NULL
             AND o.opp_model IN ('Staffing', 'Recruiting')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         meses AS (
           SELECT DATE_TRUNC('month', gs)::date AS mes

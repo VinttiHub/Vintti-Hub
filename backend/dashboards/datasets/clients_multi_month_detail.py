@@ -67,6 +67,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND ho.candidate_id IS NOT NULL
             AND ho.start_date IS NOT NULL
             AND o.opp_model IN ('Staffing', 'Recruiting')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         meses_filtrado AS (
           SELECT mo.mes_pick AS mes FROM mes_objetivo mo

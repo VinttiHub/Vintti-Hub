@@ -49,6 +49,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE h.candidate_id IS NOT NULL
             AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT
           TO_CHAR(h.start_d, 'YYYY-MM-DD') AS start_date,

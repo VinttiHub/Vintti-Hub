@@ -56,11 +56,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT t.candidates
           FROM turvo t
           JOIN opportunity o ON o.opportunity_id = t.opportunity_id
+          LEFT JOIN account a ON a.account_id = o.account_id
           CROSS JOIN ventana v
           WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
             -- Excluir recruiters inactivos (ya no trabajan en Vintti)
             AND LOWER(TRIM(t.hr_lead)) <> 'agustina.barbero@vintti.com'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT
           COUNT(*)::int                                          AS turbos_total,

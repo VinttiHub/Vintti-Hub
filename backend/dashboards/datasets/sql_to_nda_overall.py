@@ -59,6 +59,7 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM account a
           CROSS JOIN ventana v
           WHERE a.sql_meeting_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
@@ -103,6 +104,7 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             DATE_TRUNC('month', a.sql_meeting_date)::date AS mes
           FROM account a
           WHERE a.sql_meeting_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         bounds AS (

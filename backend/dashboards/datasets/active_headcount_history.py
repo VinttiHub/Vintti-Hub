@@ -75,8 +75,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           JOIN opportunity o
             ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
             AND LOWER(TRIM(o.opp_model)) IN ('staffing', 'recruiting')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         buyout_rows AS (
           SELECT
@@ -96,7 +98,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS end_d,
             'recruiting'::text AS model
           FROM buyouts b
+          LEFT JOIN account a ON a.account_id = b.account_id
           WHERE b.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         account_rows AS (
           SELECT * FROM hire_rows

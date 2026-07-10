@@ -23,6 +23,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
           AND NULLIF(TRIM(a.client_name), '') IS NOT NULL
           AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
         GROUP BY 1, 2
         ORDER BY label;
     """

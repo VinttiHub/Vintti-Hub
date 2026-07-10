@@ -69,7 +69,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             TRIM(o.opp_type) AS opp_type
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         activos_hoy AS (
           SELECT DISTINCT h.account_id
@@ -103,9 +105,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(DISTINCT o.opportunity_id) AS open_opps_count,
             STRING_AGG(DISTINCT o.opp_stage, ', ' ORDER BY o.opp_stage) AS open_opps_stages
           FROM opportunity o
+          LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.account_id IS NOT NULL
             AND o.opp_model = 'Staffing'
             AND o.opp_stage NOT IN ('Close Win', 'Closed Lost')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
           GROUP BY 1
         ),
         base AS (

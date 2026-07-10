@@ -70,9 +70,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
             AND o.opp_model = 'Staffing'
             AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         acct AS (
           SELECT

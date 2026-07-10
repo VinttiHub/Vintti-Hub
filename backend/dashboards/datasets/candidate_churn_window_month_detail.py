@@ -74,6 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             LEFT JOIN candidates c ON c.candidate_id = h.candidate_id
             LEFT JOIN account    a ON a.account_id   = h.account_id
             WHERE o.opp_model = 'Staffing'
+              AND COALESCE(a.vintti_internal, FALSE) = FALSE
           ) x
           WHERE start_d IS NOT NULL
         ),

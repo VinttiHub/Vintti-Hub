@@ -37,6 +37,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
           -- Excluir recruiters inactivos (ya no trabajan en Vintti)
           AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
         ORDER BY TRIM(ho.inactive_reason), ho.carga_inactive DESC NULLS LAST, c.name;
     """

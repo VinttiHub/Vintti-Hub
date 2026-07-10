@@ -71,6 +71,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_stage IN ('Sourcing','Interviewing','Negotiating')
             AND (%(modelo)s::text  IS NULL OR o.opp_model   = %(modelo)s)
             AND (%(cliente)s::text IS NULL OR a.client_name = %(cliente)s)
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         src AS (
           SELECT s.opportunity_id, NULLIF(s.since_sourcing::text,'')::date AS pedido_d

@@ -44,6 +44,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opportunity_id IS NOT NULL
             AND o.opp_stage IN ('Sourcing','Interviewing','Negotiating')
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         src AS (
           SELECT

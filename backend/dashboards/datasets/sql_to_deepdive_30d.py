@@ -56,6 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS reached_dd
           FROM account a
           WHERE a.sql_meeting_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
             AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)

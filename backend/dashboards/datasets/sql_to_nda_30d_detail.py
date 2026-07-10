@@ -49,6 +49,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM account a
           CROSS JOIN ventana v
           WHERE a.sql_meeting_date IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
         ),
         nda_per_account AS (

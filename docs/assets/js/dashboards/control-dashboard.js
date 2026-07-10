@@ -2513,6 +2513,11 @@
     let corte;
     if (isCorteMode()) {
       corte = state.corte;
+    } else if (state.hasta) {
+      // Rango Desde/Hasta activo (sin mes): el snapshot se evalúa al FIN del rango
+      // (hasta), para que los detalles snapshot (active clients/contractors, etc.)
+      // coincidan con las cards en vez de mostrar el día de hoy.
+      corte = state.hasta;
     } else {
       const m = month || monthState.selected;
       if (!m) return;

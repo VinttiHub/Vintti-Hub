@@ -80,8 +80,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o
             ON o.opportunity_id = ho.opportunity_id
            AND o.opp_model = 'Staffing'
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND (
               CASE
                 WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date

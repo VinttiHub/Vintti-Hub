@@ -41,6 +41,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
             -- Excluir recruiters inactivos (ya no trabajan en Vintti)
             AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         )
         SELECT reason,
                COUNT(*)::int AS count,

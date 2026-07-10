@@ -23,6 +23,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE b.presentation_date BETWEEN %(w_lo)s AND %(w_hi)s
           AND NULLIF(TRIM(a.client_name), '') IS NOT NULL
           AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND {REASON_CASE.format(col='cb.status')} IS NOT NULL
         GROUP BY 1, 2
         ORDER BY label;

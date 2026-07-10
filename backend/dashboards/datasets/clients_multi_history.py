@@ -56,10 +56,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_model AS model
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
             AND (ho.carga_active IS NOT NULL OR NULLIF(ho.start_date::text, '') IS NOT NULL)
             AND o.opp_model IN ('Staffing', 'Recruiting')
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
 
           UNION ALL
 
@@ -74,7 +76,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                  THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date END AS end_d,
             'Recruiting' AS model
           FROM buyouts b
+          LEFT JOIN account a ON a.account_id = b.account_id
           WHERE b.account_id IS NOT NULL
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
         ),
         meses AS (
           SELECT DATE_TRUNC('month', gs)::date AS mes
