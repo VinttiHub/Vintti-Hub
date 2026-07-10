@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # DQL (descalificados) se EXCLUYE del embudo (no son conversiones reales).
 _WON = {"active client", "inactive client"}
@@ -26,7 +26,7 @@ _IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Close
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
-        _resolve_account_property_maps, _first_mapped_value,
+        _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
     )
 
     ini, fin, label = period_bounds(filters)
@@ -57,6 +57,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         props = c.get("properties") or {}
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         if not is_marketing_mql_source(props.get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(_normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_MQL:

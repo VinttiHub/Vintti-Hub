@@ -12,7 +12,7 @@ import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
 from .mkt_funnel_mql_sql_cw import _WON, _REACHED_SQL, _REACHED_MQL, _IN_VALUES
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
@@ -62,6 +62,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(origin):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         ll = str(props.get(lead_life_property) or "").strip().lower()

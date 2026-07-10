@@ -20,7 +20,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from ._now import today_ar
 
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -128,6 +128,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         # El desglose se sigue agrupando por origin (MQL Source).
         if not SNAPSHOT_MODE and not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if not SNAPSHOT_MODE and is_non_marketing_origin(origin):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         counts[origin] = counts.get(origin, 0) + 1

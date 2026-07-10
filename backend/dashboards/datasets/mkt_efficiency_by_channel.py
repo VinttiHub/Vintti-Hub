@@ -40,7 +40,7 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
     )
     from .mkt_mqls_by_origin import _parse_hs_date_ms, _IN_VALUES, _REACHED_MQL
     from .mkt_funnel_mql_sql_cw import _REACHED_SQL
-    from ._marketing_scope import is_marketing_mql_source
+    from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
     # Ancla DOBLE: MQL por `date_of_meeting_scheduled` (se agendó), SQL por
@@ -67,6 +67,9 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
         if not is_marketing_mql_source(p.get("mql_source")):
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(origin):
+            continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         d_mql = _parse_hs_date_ms(p.get(mql_anchor))
         if d_mql is not None and ini <= d_mql <= fin:

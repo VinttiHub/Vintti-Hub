@@ -31,7 +31,7 @@ def _mql_sql_by_origin() -> tuple[dict, dict]:
     )
     from .mkt_mqls_by_origin import _IN_VALUES, _REACHED_MQL
     from .mkt_funnel_mql_sql_cw import _REACHED_SQL
-    from ._marketing_scope import is_marketing_mql_source
+    from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
@@ -49,6 +49,9 @@ def _mql_sql_by_origin() -> tuple[dict, dict]:
         if not is_marketing_mql_source(p.get("mql_source")):
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(origin):
+            continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         mql[origin] = mql.get(origin, 0) + 1
         if ll in _REACHED_SQL:

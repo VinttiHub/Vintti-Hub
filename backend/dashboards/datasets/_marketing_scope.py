@@ -18,3 +18,14 @@ MARKETING_MQL_SOURCES = ("inbound mql", "event mql")
 def is_marketing_mql_source(value) -> bool:
     """True si el contacto cuenta como marketing: mql_source ∈ {Inbound MQL, Event MQL}."""
     return str(value or "").strip().lower() in MARKETING_MQL_SOURCES
+
+
+# Orígenes que NO son marketing: se excluyen aunque el mql_source diga inbound
+# (caso: contactos Outbound —de Sales— que quedaron mal marcados como Inbound MQL en
+# HubSpot). Hoy solo Outbound; agregar acá si se quieren excluir más (referral/import…).
+NON_MARKETING_ORIGINS = ("outbound",)
+
+
+def is_non_marketing_origin(value) -> bool:
+    """True si el origin del contacto NO es de marketing (ej. Outbound = Sales)."""
+    return str(value or "").strip().lower() in NON_MARKETING_ORIGINS

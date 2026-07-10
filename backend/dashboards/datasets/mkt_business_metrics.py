@@ -28,7 +28,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 
 from .mkt_sqls_by_origin import period_bounds
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # Definición de SQL = etapa ALCANZADA en HubSpot (idéntica a mkt_funnel_mql_sql_cw):
 #   SQL = llegó a SQL (AE) o más (active/inactive client). NO cuenta Closed Lost.
@@ -101,6 +101,10 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
             continue
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir origins que no son marketing (Outbound = Sales), aunque el
+        # mql_source diga inbound (contactos mal marcados en HubSpot).
+        if is_non_marketing_origin(_first_mapped_value(pm, "where_come_from", contact=c)):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_SQL:

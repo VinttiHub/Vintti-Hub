@@ -12,7 +12,7 @@ import os
 
 from .mkt_sqls_by_origin import period_bounds
 from .mkt_mqls_by_origin import _parse_hs_date_ms, SNAPSHOT_MODE, _IN_VALUES
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # SQL = etapa ALCANZADA (idéntico a mkt_funnel_mql_sql_cw / mkt_business_metrics).
 _REACHED_SQL = {"active client", "inactive client", "sql (ae)"}
@@ -70,6 +70,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         )
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         if not SNAPSHOT_MODE and not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if not SNAPSHOT_MODE and is_non_marketing_origin(origin):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         name = (

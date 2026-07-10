@@ -16,7 +16,7 @@ import os
 from datetime import date, timedelta
 
 from .mkt_sqls_by_origin import period_bounds
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 _MES_ES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -96,6 +96,9 @@ def _sql_counts(ini: date, fin: date, unit: str):
         if not is_marketing_mql_source(p.get("mql_source")):
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(origin):
+            continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         b = _trunc(d, unit)
         counts[(b, origin)] = counts.get((b, origin), 0) + 1
@@ -132,6 +135,9 @@ def _mql_counts(ini: date, fin: date, unit: str):
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
         # Filtro de marketing OFICIAL del equipo: mql_source ∈ {Inbound MQL, Event MQL}.
         if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(origin):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         b = _trunc(d, unit)

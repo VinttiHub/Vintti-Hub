@@ -19,7 +19,7 @@ import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
 from .mkt_business_metrics import _prev_bounds
-from ._marketing_scope import is_marketing_mql_source
+from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # Etapa ALCANZADA = MQL (AE) o más allá (excluye DQL y los MQL pre-meeting como
 # MQL (BDRs) / MQL (MKT) TOFU-MOFU-BOFU, que NO agendaron reunión).
@@ -34,6 +34,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     from routes.hubspot_routes import (
         _resolve_account_property_maps,
         _first_mapped_value,
+        _normalize_lead_source,
     )
 
     ini, fin, label = period_bounds(filters)
@@ -64,6 +65,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             continue
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+            continue
+        # Excluir Outbound (= Sales), aunque el mql_source diga inbound.
+        if is_non_marketing_origin(_normalize_lead_source(_first_mapped_value(property_maps, "where_come_from", contact=c))):
             continue
         if ini <= d <= fin:
             cur += 1
