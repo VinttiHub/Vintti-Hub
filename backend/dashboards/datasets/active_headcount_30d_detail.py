@@ -223,6 +223,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 r.start_d IS NOT NULL
                 AND r.start_d <= v.win_fin
                 AND COALESCE(r.end_d, DATE '9999-12-31') >= v.win_fin
+                -- Snapshot actual: un hire de Staffing dado de baja HOY no cuenta como
+                -- activo (mismo criterio que el card active_headcount_30d_total, para
+                -- que card y detalle cuadren). Recruiting (status en blanco) y cortes
+                -- históricos se mantienen por fechas.
+                AND (v.win_fin < CURRENT_DATE OR r.model <> 'staffing' OR r.status = 'active')
               )
               OR (
                 v.is_current_month

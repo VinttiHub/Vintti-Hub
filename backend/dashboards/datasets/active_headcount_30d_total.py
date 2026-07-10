@@ -43,6 +43,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         hires AS (
           SELECT
             ho.candidate_id,
+            LOWER(TRIM(COALESCE(ho.status, ''))) AS status,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
               ELSE NULLIF(CAST(ho.start_date AS TEXT), '')::date
@@ -65,7 +66,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         JOIN hires h
           ON h.start_d IS NOT NULL
          AND h.start_d <= v.win_fin
-         AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_fin;
+         AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_fin
+         -- Snapshot actual (corte >= hoy): respetar el status de baja igual que el
+         -- historial/cohort (un hire dado de baja HOY no cuenta como activo). Para
+         -- cortes históricos se mantiene el criterio por fechas.
+         AND (v.win_fin < CURRENT_DATE OR h.status = 'active');
     """
 
     return sql, {
