@@ -2319,6 +2319,7 @@
           churn_month: r.churn_month || null,
           is_buyout: !!r.is_buyout,
           status: r.status || 'Active',
+          no_billing: !!r.no_billing,
           byMonth: {},
         };
         groups.set(key, g);
@@ -2330,6 +2331,7 @@
       if (r.churn_month) g.churn_month = r.churn_month;
       if (r.is_buyout != null) g.is_buyout = !!r.is_buyout;
       if (r.status) g.status = r.status;
+      if (r.no_billing != null) g.no_billing = !!r.no_billing;
     });
 
     // Pull bajas counts from the monthly churn chart (`am_line_candidate_churn`
@@ -2350,6 +2352,8 @@
     });
 
     let groupArr = [...groups.values()].sort((a, b) => {
+      // Los "sin facturación" (nunca facturaron) al fondo, sin ocultarlos.
+      if (!!a.no_billing !== !!b.no_billing) return a.no_billing ? 1 : -1;
       const fa = a.first_mes || '';
       const fb = b.first_mes || '';
       if (fa !== fb) return fa.localeCompare(fb);
@@ -2550,10 +2554,15 @@
         dotCls = 'cohort-rank__dot--active';
         subline = esc(fmtMonth(g.first_mes));
       }
-      return `<tr>
+      // Marca (no oculta) contractors que nunca facturaron un peso: pill + fila atenuada.
+      const nobillBadge = g.no_billing
+        ? ` <span title="Alta/baja sin facturación registrada" style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#f0f1f5;color:#8a93a3;font-size:10px;font-weight:700;vertical-align:middle;">sin facturación</span>`
+        : '';
+      const rowAttr = g.no_billing ? ' style="opacity:.55"' : '';
+      return `<tr${rowAttr}>
         <td class="cohort-td-name">
           <div class="cohort-td-name__primary">
-            <span class="cohort-rank__dot ${dotCls}" style="display:inline-block;margin-right:8px;vertical-align:middle"></span>${esc(g.candidate_name)}
+            <span class="cohort-rank__dot ${dotCls}" style="display:inline-block;margin-right:8px;vertical-align:middle"></span>${esc(g.candidate_name)}${nobillBadge}
           </div>
           <div class="cohort-td-name__sub">${esc(g.client_name)} · ${subline}</div>
         </td>

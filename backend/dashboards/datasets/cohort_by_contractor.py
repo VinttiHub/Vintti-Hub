@@ -186,6 +186,13 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hires
           WHERE candidate_id IS NOT NULL AND account_id IS NOT NULL
           GROUP BY candidate_id, account_id
+        ),
+        -- Total histórico pagado por el par (candidate, account). Sirve para ocultar
+        -- contractors que NUNCA facturaron un peso (ruido: alta+baja sin billing).
+        pair_total AS (
+          SELECT candidate_id, account_id, SUM(salary + fee) AS total_pago
+          FROM effective_in_month
+          GROUP BY candidate_id, account_id
         )
         SELECT
           TO_CHAR(em.mes, 'YYYY-MM')                      AS mes,
@@ -205,13 +212,16 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             WHEN cpp.churn_month_d IS NULL          THEN 'Active'
             WHEN COALESCE(cpp.is_buyout, FALSE)     THEN 'Buyout'
             ELSE 'Churned'
-          END                                             AS status
+          END                                             AS status,
+          -- Flag para marcar (no ocultar) contractors que nunca facturaron un peso.
+          CASE WHEN COALESCE(pt.total_pago, 0) = 0 THEN TRUE ELSE FALSE END AS no_billing
         FROM effective_in_month em
         LEFT JOIN candidates c ON c.candidate_id = em.candidate_id
         LEFT JOIN account a    ON a.account_id   = em.account_id
         JOIN first_seen fs ON fs.candidate_id = em.candidate_id AND fs.account_id = em.account_id
         JOIN last_seen  ls ON ls.candidate_id = em.candidate_id AND ls.account_id = em.account_id
         LEFT JOIN churn_per_pair cpp ON cpp.candidate_id = em.candidate_id AND cpp.account_id = em.account_id
+        JOIN pair_total pt ON pt.candidate_id = em.candidate_id AND pt.account_id = em.account_id
         ORDER BY fs.first_mes, em.candidate_id, em.mes;
     """
     return sql, {}
@@ -231,6 +241,7 @@ DATASET = {
         {"key": "churn_month", "label": "Mes de baja", "type": "date"},
         {"key": "is_buyout", "label": "Buyout", "type": "boolean"},
         {"key": "status", "label": "Estado", "type": "string"},
+        {"key": "no_billing", "label": "Sin facturación", "type": "boolean"},
     ],
     "measures": [
         {"key": "salary", "label": "Salary", "type": "currency"},
