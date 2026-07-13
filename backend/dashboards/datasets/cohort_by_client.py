@@ -145,19 +145,37 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             SUM(e.fee)::numeric                 AS mrr
           FROM effective e
           GROUP BY e.account_id
+        ),
+        per_client_f AS (
+          SELECT pc.account_id, pc.total_employees, pc.gmrr, pc.mrr
+          FROM per_client pc
+          WHERE pc.total_employees > 0
+        ),
+        weighted AS (
+          SELECT
+            f.account_id, f.total_employees, f.gmrr, f.mrr,
+            ROUND(100.0 * f.mrr / NULLIF(SUM(f.mrr) OVER (), 0), 2) AS w,
+            ROW_NUMBER() OVER (ORDER BY f.mrr DESC NULLS LAST, f.total_employees DESC) AS rn
+          FROM per_client_f f
+        ),
+        adj AS (
+          -- Largest-remainder simplificado: el residuo de redondeo (100 menos la
+          -- suma de los pesos redondeados) se absorbe en la fila de mayor MRR (rn=1)
+          -- para que "Weight over" cierre EXACTO en 100.00 y no arrastre a 100.04.
+          SELECT w.*, (100 - SUM(w.w) OVER ())::numeric AS residual
+          FROM weighted w
         )
         SELECT
-          COALESCE(a.client_name, '—')                          AS client_name,
-          pc.total_employees,
-          pc.gmrr::float                                        AS gmrr,
-          pc.mrr::float                                         AS mrr,
-          ROUND(100.0 * pc.mrr / NULLIF(pc.gmrr, 0), 2)::float  AS margin_pct,
-          ROUND(100.0 * pc.mrr / NULLIF(SUM(pc.mrr) OVER (), 0), 2)::float AS weight_pct
-        FROM per_client pc
-        LEFT JOIN account a ON a.account_id = pc.account_id
-        WHERE pc.total_employees > 0
+          COALESCE(a.client_name, '—')                           AS client_name,
+          adj.total_employees,
+          adj.gmrr::float                                        AS gmrr,
+          adj.mrr::float                                         AS mrr,
+          ROUND(100.0 * adj.mrr / NULLIF(adj.gmrr, 0), 2)::float AS margin_pct,
+          (adj.w + CASE WHEN adj.rn = 1 THEN adj.residual ELSE 0 END)::float AS weight_pct
+        FROM adj
+        LEFT JOIN account a ON a.account_id = adj.account_id
         -- Orden por "Weight over" (= mrr / total_mrr) de mayor a menor.
-        ORDER BY pc.mrr DESC NULLS LAST, pc.total_employees DESC, client_name;
+        ORDER BY adj.mrr DESC NULLS LAST, adj.total_employees DESC, client_name;
     """
 
     return sql, {"fin_mes": fin_mes}
