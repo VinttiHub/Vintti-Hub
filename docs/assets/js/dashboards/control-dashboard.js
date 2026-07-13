@@ -56,8 +56,14 @@
     },
     'delta-percent': (v) => {
       if (v == null || v === '' || !isFinite(+v)) return '—';
-      const n = Math.round(+v);
-      return (n > 0 ? '+' : '') + n + '%';
+      const n = +v;
+      // Cambios chicos (|n| < 10): 1 decimal para no distorsionar la dirección real.
+      // Con enteros, -0.4% se mostraba "0%" (pierde el signo) o -0.6% se redondeaba a
+      // "-1%" (exagera la caída). Cambios grandes (YoY tipo +103%) siguen en entero.
+      const small = Math.abs(n) < 10;
+      const r = small ? Math.round(n * 10) / 10 : Math.round(n);
+      const body = small ? r.toFixed(1) : String(r);
+      return (r > 0 ? '+' : '') + body + '%';
     },
     'delta-int': (v) => {
       if (v == null || v === '' || !isFinite(+v)) return '—';
