@@ -1,8 +1,12 @@
 """Annual Revenue (Sales · AE + AM) — canal Outbound, acumulado YTD.
 
-Misma lógica que el "Revenue YTD" del Management Dashboard (`revenue_ytd_total`):
-  - Staffing  = Σ del MRR mensual (salary + fee de contratos activos, con
-                salary_updates) de enero a corte.
+Ambos lados cuentan SOLO close wins del año en curso (opp_stage='Close Win' con
+opp_close_date dentro del período), para que el "acumulado YTD" no arrastre deals
+ganados en años anteriores:
+  - Staffing  = Σ del MRR mensual (salary + fee, con salary_updates) de enero a
+                corte, PERO solo de contratos cuya opp es Close Win con
+                opp_close_date en el año en curso (se acumula su MRR desde que
+                arrancan hasta el corte).
   - Recruiting = Σ ho.revenue (one-time) de close wins Recruiting del año.
 Pero filtrado al canal Outbound y al book AE+AM:
   account.where_come_from = 'Outbound'  AND
@@ -69,13 +73,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT 'py'::text AS period, corte_py, year_start_py FROM params
         ),
         meses AS (
-          SELECT p.period, DATE_TRUNC('month', gs)::date AS mes,
+          SELECT p.period, p.year_start_e, p.corte_e,
+                 DATE_TRUNC('month', gs)::date AS mes,
                  (DATE_TRUNC('month', gs) + INTERVAL '1 month - 1 day')::date AS fin_mes
           FROM periods p, generate_series(p.year_start_e, p.corte_e, INTERVAL '1 month') gs
         ),
         staffing_hires AS (
           SELECT
             ho.candidate_id, ho.account_id, ho.opportunity_id,
+            o.opp_close_date::date AS close_d,
             CASE WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
                  ELSE NULLIF(ho.start_date::text,'')::date END AS start_d,
             CASE WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
@@ -89,9 +95,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model = 'Staffing'
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND ho.candidate_id IS NOT NULL AND ho.account_id IS NOT NULL
+            AND TRIM(o.opp_stage) = 'Close Win'
+            AND o.opp_close_date IS NOT NULL
             AND {_SCOPE}
         ),
         opps_in_month AS (
+          -- Solo contratos cuyo Close Win cae en el período (año en curso / PY):
+          -- la ventana close_d ∈ [year_start_e, corte_e] hace el filtro period-aware.
           SELECT DISTINCT ON (m.period, m.mes, h.opportunity_id, h.candidate_id)
             m.period, m.mes, m.fin_mes, h.opportunity_id, h.candidate_id, h.account_id,
             h.start_d, h.salary AS hire_salary, h.fee AS hire_fee
@@ -99,6 +109,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN staffing_hires h
             ON h.start_d IS NOT NULL AND h.start_d <= m.fin_mes
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
+           AND h.close_d >= m.year_start_e AND h.close_d <= m.corte_e
           ORDER BY m.period, m.mes, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
         ),
         opps_marked AS (

@@ -1,8 +1,9 @@
-"""Detalle Staffing del Revenue Outbound (AE+AM) — contratos activos al corte.
+"""Detalle Staffing del Revenue Outbound (AE+AM) — close wins del año.
 
-Una fila por hire Staffing ACTIVO al corte, del canal Outbound y book AE+AM, con
-su MRR (salary + fee, con override de salary_updates vigente). Sirve para verificar
-de qué se compone el MRR Staffing acumulado.
+Una fila por hire Staffing cuya opp es Close Win con opp_close_date en el año en
+curso (canal Outbound + book AE+AM), con su MRR acumulado (salary + fee, con override
+de salary_updates vigente). Coincide con el total Staffing de la card: solo cuenta
+contratos ganados este año, no arrastra deals de años anteriores.
 """
 from __future__ import annotations
 
@@ -63,9 +64,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
           JOIN account a ON a.account_id = h.account_id
           LEFT JOIN candidates c ON c.candidate_id = h.candidate_id
+          CROSS JOIN params p
           WHERE o.opp_model = 'Staffing'
             AND h.candidate_id IS NOT NULL AND h.account_id IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
+            AND TRIM(o.opp_stage) = 'Close Win'
+            AND o.opp_close_date IS NOT NULL
+            AND o.opp_close_date >= p.year_start
+            AND o.opp_close_date <= p.corte_d
             AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
             AND (TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
                  OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s)
