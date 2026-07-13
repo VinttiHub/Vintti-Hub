@@ -112,7 +112,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT DISTINCT
             c.fecha_corte,
             r.account_id,
-            r.candidate_id
+            r.candidate_id,
+            r.model
           FROM corte c
           JOIN account_rows r
             ON (
@@ -133,11 +134,25 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(DISTINCT candidate_id) AS candidatos_activos
           FROM activos_al_corte
           GROUP BY 1, 2
+        ),
+        overlap AS (
+          -- Clientes activos en AMBAS líneas (Staffing y Recruiting) al corte. Como
+          -- clientes_activos = COUNT(DISTINCT account_id), estos se cuentan 1 sola vez
+          -- en el Total → el Total NO es la suma simple S+R. Para modelo != Total el
+          -- CTE trae una sola línea, así que da 0.
+          SELECT COUNT(*)::int AS both_lines
+          FROM (
+            SELECT account_id
+            FROM activos_al_corte
+            GROUP BY account_id
+            HAVING COUNT(DISTINCT model) > 1
+          ) x
         )
         SELECT
           TO_CHAR(fecha_corte, 'YYYY-MM-DD')                                                AS fecha_corte,
           COUNT(DISTINCT account_id)::int                                                   AS clientes_activos,
           COUNT(DISTINCT account_id) FILTER (WHERE candidatos_activos > 1)::int             AS mayor_a_1,
+          (SELECT both_lines FROM overlap)::int                                             AS both_lines,
           ROUND(
             100.0 * COUNT(DISTINCT account_id) FILTER (WHERE candidatos_activos > 1)
             / NULLIF(COUNT(DISTINCT account_id), 0)
@@ -156,6 +171,7 @@ DATASET = {
     "measures": [
         {"key": "clientes_activos", "label": "Clientes activos", "type": "number"},
         {"key": "mayor_a_1", "label": "Clientes > 1", "type": "number"},
+        {"key": "both_lines", "label": "Activos en ambas líneas", "type": "number"},
         {"key": "pct_percent", "label": "% > 1", "type": "percent"},
     ],
     "default_filters": {},
