@@ -123,6 +123,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE start_d IS NOT NULL AND account_id IS NOT NULL
           GROUP BY account_id
         ),
+        first_start_per_candidate AS (
+          -- Primer hire de Staffing de cada candidato → define "new contractor",
+          -- igual que el KPI new_contractors_history (rn=1 por menor start_d).
+          SELECT candidate_id, MIN(start_d) AS first_start_d
+          FROM hires
+          WHERE start_d IS NOT NULL AND candidate_id IS NOT NULL
+          GROUP BY candidate_id
+        ),
         last_baja_per_account AS (
           SELECT account_id, MAX(end_d) AS fecha_baja
           FROM hires
@@ -165,10 +173,21 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         new_clients_per_period AS (
           SELECT
             pr.period_start,
-            COUNT(*) AS new_clients
+            -- COUNT de la columna joineada (no COUNT(*)): con el LEFT JOIN, los
+            -- períodos sin alta emiten una fila con fh.* NULL y COUNT(*) daba 1 fijo.
+            COUNT(DISTINCT fh.account_id) AS new_clients
           FROM period_ranges pr
           LEFT JOIN first_hire_per_account fh
             ON fh.first_d BETWEEN pr.period_start AND pr.period_end
+          GROUP BY pr.period_start
+        ),
+        new_contractors_per_period AS (
+          SELECT
+            pr.period_start,
+            COUNT(DISTINCT fs.candidate_id) AS new_contractors
+          FROM period_ranges pr
+          LEFT JOIN first_start_per_candidate fs
+            ON fs.first_start_d BETWEEN pr.period_start AND pr.period_end
           GROUP BY pr.period_start
         ),
         churn_per_period AS (
@@ -203,16 +222,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           )::float                                        AS staffing_fee_avg,
           COALESCE(ae.active_clients, 0)::int             AS active_clients,
           COALESCE(ae.active_contractors, 0)::int         AS active_contractors,
+          COALESCE(ncc.new_contractors, 0)::int           AS new_contractors,
           COALESCE(nc.new_clients, 0)::int                AS new_clients,
           COALESCE(cp.churn_clients, 0)::int              AS churn_clients,
           COALESCE(cp.buyout_clients, 0)::int             AS buyout_clients,
           COALESCE(ccp.churn_contractors, 0)::int         AS churn_contractors,
           COALESCE(ccp.buyout_contractors, 0)::int        AS buyout_contractors
         FROM period_ranges pr
-        LEFT JOIN active_at_end                ae  ON ae.period_start  = pr.period_start
-        LEFT JOIN new_clients_per_period       nc  ON nc.period_start  = pr.period_start
-        LEFT JOIN churn_per_period             cp  ON cp.period_start  = pr.period_start
-        LEFT JOIN churn_contractors_per_period ccp ON ccp.period_start = pr.period_start
+        LEFT JOIN active_at_end                 ae  ON ae.period_start  = pr.period_start
+        LEFT JOIN new_clients_per_period        nc  ON nc.period_start  = pr.period_start
+        LEFT JOIN new_contractors_per_period    ncc ON ncc.period_start = pr.period_start
+        LEFT JOIN churn_per_period              cp  ON cp.period_start  = pr.period_start
+        LEFT JOIN churn_contractors_per_period  ccp ON ccp.period_start = pr.period_start
         ORDER BY pr.period_start;
     """
 
@@ -233,6 +254,7 @@ DATASET = {
         {"key": "staffing_fee_avg", "label": "Staffing Fee Avg", "type": "currency"},
         {"key": "active_clients", "label": "Active Clients", "type": "number"},
         {"key": "active_contractors", "label": "Active Contractors", "type": "number"},
+        {"key": "new_contractors", "label": "New Contractors", "type": "number"},
         {"key": "new_clients", "label": "New Clients", "type": "number"},
         {"key": "churn_clients", "label": "Churn Clients", "type": "number"},
         {"key": "buyout_clients", "label": "Buyout Clients", "type": "number"},

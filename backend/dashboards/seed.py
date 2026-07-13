@@ -3166,6 +3166,7 @@ MAIN_CHARTS = [
                     "new_clients",
                     "churn_clients",
                     "active_contractors",
+                    "new_contractors",
                     "churn_contractors",
                     "buyout_contractors",
                 ],
