@@ -178,6 +178,41 @@
         && parseInt(m[2], 10) === (now.getMonth() + 1);
   }
 
+  /* ---------- text sizing for scaled SVGs ----------
+     Los charts usan un viewBox chico estirado al ancho del contenedor (uniforme:
+     width:100% + height:auto). Un font-size fijo en unidades de viewBox se ve
+     enorme en cards anchas (factor 1.7x–3.7x según s-6/s-12). fitChartText mide el
+     factor real y setea font-size/stroke-width para que el texto quede en un tamaño
+     en PX constante. Los <text data-fit="PX"> son los que se reescalan (ejes,
+     "parcial", labels de barras). */
+  function fitChartText(svg) {
+    const vbW = svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width;
+    const cw = svg.getBoundingClientRect ? svg.getBoundingClientRect().width : 0;
+    if (!vbW || !cw) return false;   // oculto (tab/drawer cerrado) → aún no medible
+    const scale = cw / vbW;
+    svg.querySelectorAll('text[data-fit]').forEach((t) => {
+      const px = +t.getAttribute('data-fit') || 11;
+      t.setAttribute('font-size', (px / scale).toFixed(2));
+      if (t.hasAttribute('stroke')) t.setAttribute('stroke-width', (3 / scale).toFixed(2));
+    });
+    return true;
+  }
+  // Aplica ahora; si el chart está oculto, reintenta una vez cuando se vuelva visible.
+  function fitChartTextWhenReady(svg) {
+    if (fitChartText(svg)) return;
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { if (fitChartText(svg)) ro.disconnect(); });
+    ro.observe(svg);
+  }
+  // Reescala todos los charts al cambiar el ancho de ventana (debounce con rAF).
+  let _fitRaf = null;
+  window.addEventListener('resize', () => {
+    if (_fitRaf) cancelAnimationFrame(_fitRaf);
+    _fitRaf = requestAnimationFrame(() => {
+      document.querySelectorAll('svg[data-chart]').forEach(fitChartText);
+    });
+  });
+
   /* ---------- render: line / area ---------- */
   function renderLine(svg, rows, opts) {
     if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
@@ -247,18 +282,25 @@
       // (anillo punteado + etiqueta), para no leerlo como un mes completo.
       const lastRaw = last.raw && last.raw[xKey];
       if (isCurrentMonthX(lastRaw)) {
-        dot.setAttribute('stroke-dasharray', '3 2');
-        dot.setAttribute('fill', stroke);
-        dot.setAttribute('fill-opacity', '0.25');
+        // Mes en curso = dato PARCIAL. Antes: anillo punteado translúcido, que se
+        // leía como un loader roto/atascado. Ahora: dot hueco normal (un poco más
+        // chico) + etiqueta "parcial" con halo blanco (paint-order) para que sea
+        // legible sobre la línea sin caja que se deforme por preserveAspectRatio.
+        dot.setAttribute('r', '5');
         if (idx === 0) {
           const lbl = document.createElementNS(SVG_NS, 'text');
           lbl.setAttribute('x', last.x.toFixed(2));
-          lbl.setAttribute('y', Math.max(10, last.y - 10).toFixed(2));
+          lbl.setAttribute('y', Math.max(11, last.y - 12).toFixed(2));
           lbl.setAttribute('text-anchor', 'end');
           lbl.setAttribute('font-size', '9');
           lbl.setAttribute('font-family', 'Onest, system-ui, sans-serif');
           lbl.setAttribute('font-weight', '700');
           lbl.setAttribute('fill', stroke);
+          lbl.setAttribute('paint-order', 'stroke');
+          lbl.setAttribute('stroke', '#fff');
+          lbl.setAttribute('stroke-width', '3');
+          lbl.setAttribute('stroke-linejoin', 'round');
+          lbl.setAttribute('data-fit', '10');
           lbl.setAttribute('data-rendered', '');
           lbl.textContent = 'parcial';
           svg.appendChild(lbl);
@@ -277,7 +319,7 @@
 
     // Optional static axis labels (opt-in via data-axis="x" or "xy").
     // X-axis: prints first / middle / last x-value at the bottom of the chart.
-    // Y-axis: prints min and max y-value at the right edge.
+    // Y-axis: prints max / mid / floor (dominio con 0) sobre el borde izquierdo.
     const axisMode = (svg.dataset.axis || '').toLowerCase();
     if (axisMode && seriesInfo.length) {
       const refProj = seriesInfo[0].proj;
@@ -297,31 +339,50 @@
           t.setAttribute('font-weight', '600');
           t.setAttribute('fill', '#8a90a0');
           t.setAttribute('letter-spacing', '0.04em');
+          t.setAttribute('paint-order', 'stroke');
+          t.setAttribute('stroke', '#fff');
+          t.setAttribute('stroke-width', '3');
+          t.setAttribute('stroke-linejoin', 'round');
+          t.setAttribute('data-fit', '11');
           t.setAttribute('data-rendered', '');
           t.textContent = formatXLabel(p.raw[xKey]).toUpperCase();
           svg.appendChild(t);
         });
       }
       if (axisMode.includes('y')) {
-        const minY = seriesInfo[0].proj.reduce((m, p) => p.valid && (m == null || p.val < m) ? p.val : m, null);
-        const maxY = seriesInfo[0].proj.reduce((m, p) => p.valid && (m == null || p.val > m) ? p.val : m, null);
-        const fmtFn = fmt.pick(seriesInfo[0].fmt);
-        [[maxY, padY + 2], [minY, h - padY - 2]].forEach(([v, y]) => {
-          if (v == null) return;
-          const t = document.createElementNS(SVG_NS, 'text');
-          t.setAttribute('x', w - 4);
-          t.setAttribute('y', y);
-          t.setAttribute('text-anchor', 'end');
-          t.setAttribute('font-size', '9');
-          t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
-          t.setAttribute('font-weight', '600');
-          t.setAttribute('fill', '#8a90a0');
-          t.setAttribute('data-rendered', '');
-          t.textContent = fmtFn(v);
-          svg.appendChild(t);
-        });
+        // Eje Y con el MISMO dominio que projectPoints (incluye 0 como piso), sobre
+        // el borde izquierdo. 3 niveles (max · medio · piso) con el formato de la
+        // serie (percent → "%"). Halo blanco para que se lea sobre las gridlines.
+        const vals = seriesInfo[0].proj.filter(p => p.valid).map(p => p.val);
+        if (vals.length) {
+          const domMax = Math.max(...vals);
+          const domMin = Math.min(...vals, 0);
+          const span = (domMax - domMin) || 1;
+          const yOf = (v) => h - padY - ((v - domMin) / span) * (h - 2 * padY);
+          const fmtFn = fmt.pick(seriesInfo[0].fmt);
+          [domMax, (domMax + domMin) / 2, domMin].forEach((v) => {
+            const t = document.createElementNS(SVG_NS, 'text');
+            t.setAttribute('x', padX + 2);
+            t.setAttribute('y', Math.min(h - padY - 2, Math.max(padY + 6, yOf(v))).toFixed(2));
+            t.setAttribute('text-anchor', 'start');
+            t.setAttribute('font-size', '9');
+            t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+            t.setAttribute('font-weight', '600');
+            t.setAttribute('fill', '#8a90a0');
+            t.setAttribute('paint-order', 'stroke');
+            t.setAttribute('stroke', '#fff');
+            t.setAttribute('stroke-width', '3');
+            t.setAttribute('stroke-linejoin', 'round');
+            t.setAttribute('data-fit', '11');
+            t.setAttribute('data-rendered', '');
+            t.textContent = fmtFn(v);
+            svg.appendChild(t);
+          });
+        }
       }
     }
+
+    fitChartTextWhenReady(svg);
 
     // Attach interactive hover (vertical guide + tracking dots + tooltip).
     // tooltipExtras = "field|Label|fmt,field|Label|fmt,..." renders extra rows
@@ -649,7 +710,7 @@
     const padX = 8;
     // Reservar espacio extra arriba (valor) / abajo (eje X) si se piden labels.
     const padTop = opts.valueLabels ? 20 : 12;
-    const padBottom = opts.xLabels ? 22 : 12;
+    const padBottom = opts.xLabels ? 22 : 20;   // 20 deja lugar al eje X muestreado
     const yKey = opts.y;
     const xKey = opts.x;
     const col = opts.color || 'violet';
@@ -698,6 +759,7 @@
         t.setAttribute('font-size', '13');
         t.setAttribute('font-weight', '800');
         t.setAttribute('fill', isLast ? baseColor : '#0e1117');
+        t.setAttribute('data-fit', '12');
         t.setAttribute('data-rendered', '');
         t.textContent = fmt.pick(fmtName)(v);
         svg.appendChild(t);
@@ -710,6 +772,7 @@
         t.setAttribute('font-size', '11');
         t.setAttribute('font-weight', isLast ? '700' : '500');
         t.setAttribute('fill', isLast ? baseColor : '#8a93a3');
+        t.setAttribute('data-fit', '11');
         t.setAttribute('data-rendered', '');
         t.textContent = String(r[xKey] != null ? r[xKey] : '');
         svg.appendChild(t);
@@ -726,6 +789,55 @@
         cy: y,
       });
     });
+
+    // Ejes: Y (max / medio / 0 en el borde izquierdo) siempre; X (primero / medio /
+    // último) sólo si no se piden labels por-barra. Texto con data-fit → tamaño px
+    // constante y halo blanco para leerse sobre las barras.
+    {
+      const fmtFn = fmt.pick(fmtName);
+      const plotTop = padTop, plotBot = h - padBottom;
+      const yOf = (v) => plotBot - (v / maxV) * (plotBot - plotTop);
+      [maxV, maxV / 2, 0].forEach((v) => {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', '2');
+        t.setAttribute('y', Math.min(plotBot, Math.max(plotTop + 4, yOf(v))).toFixed(2));
+        t.setAttribute('text-anchor', 'start');
+        t.setAttribute('fill', '#8a90a0');
+        t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+        t.setAttribute('font-weight', '600');
+        t.setAttribute('paint-order', 'stroke');
+        t.setAttribute('stroke', '#fff');
+        t.setAttribute('stroke-linejoin', 'round');
+        t.setAttribute('data-fit', '11');
+        t.setAttribute('data-rendered', '');
+        t.textContent = fmtFn(v);
+        svg.appendChild(t);
+      });
+      if (!opts.xLabels && xKey && n) {
+        const idxs = n === 1 ? [0] : (n === 2 ? [0, n - 1] : [0, Math.floor((n - 1) / 2), n - 1]);
+        idxs.forEach((i, k) => {
+          const r = rows[i]; if (!r) return;
+          const cx = padX + slot * i + slot / 2;
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('x', cx.toFixed(2));
+          t.setAttribute('y', (h - 5).toFixed(2));
+          t.setAttribute('text-anchor', k === 0 ? 'start' : (k === idxs.length - 1 ? 'end' : 'middle'));
+          t.setAttribute('fill', '#8a90a0');
+          t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+          t.setAttribute('font-weight', '600');
+          t.setAttribute('letter-spacing', '0.04em');
+          t.setAttribute('paint-order', 'stroke');
+          t.setAttribute('stroke', '#fff');
+          t.setAttribute('stroke-linejoin', 'round');
+          t.setAttribute('data-fit', '11');
+          t.setAttribute('data-rendered', '');
+          t.textContent = formatXLabel(r[xKey]).toUpperCase();
+          svg.appendChild(t);
+        });
+      }
+    }
+
+    fitChartTextWhenReady(svg);
 
     if (barEntries.length) {
       attachBarHover(svg, barEntries, {
@@ -1105,17 +1217,49 @@
       if (opts.valueLabels && b.total > 0) {
         const t = document.createElementNS(SVG_NS, 'text');
         t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (yc - 5).toFixed(2)); t.setAttribute('text-anchor', 'middle');
-        t.setAttribute('font-size', '11'); t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#0e1117'); t.setAttribute('data-rendered', '');
+        t.setAttribute('font-size', '11'); t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#0e1117'); t.setAttribute('data-fit', '11'); t.setAttribute('data-rendered', '');
         t.textContent = fmtV(b.total); svg.appendChild(t);
       }
       if (opts.xLabels) {
         const t = document.createElementNS(SVG_NS, 'text');
         t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (h - 7).toFixed(2)); t.setAttribute('text-anchor', 'middle');
         t.setAttribute('font-size', '6.5'); t.setAttribute('font-weight', i === n - 1 ? '700' : '500');
-        t.setAttribute('fill', i === n - 1 ? '#0e1117' : '#8a93a3'); t.setAttribute('data-rendered', '');
+        t.setAttribute('fill', i === n - 1 ? '#0e1117' : '#8a93a3'); t.setAttribute('data-fit', '9'); t.setAttribute('data-rendered', '');
         t.textContent = String(b.label == null ? '' : b.label); svg.appendChild(t);
       }
     });
+
+    // Eje Y (max / medio / 0) a la izquierda + eje X muestreado si no hay labels por-bucket.
+    {
+      const yOf = (v) => (h - padBottom) - (v / maxTotal) * (h - padTop - padBottom);
+      [maxTotal, maxTotal / 2, 0].forEach((v) => {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', '2');
+        t.setAttribute('y', Math.min(h - padBottom, Math.max(padTop + 4, yOf(v))).toFixed(2));
+        t.setAttribute('text-anchor', 'start'); t.setAttribute('fill', '#8a90a0');
+        t.setAttribute('font-family', 'Onest, system-ui, sans-serif'); t.setAttribute('font-weight', '600');
+        t.setAttribute('paint-order', 'stroke'); t.setAttribute('stroke', '#fff'); t.setAttribute('stroke-linejoin', 'round');
+        t.setAttribute('data-fit', '11'); t.setAttribute('data-rendered', '');
+        t.textContent = fmtV(v); svg.appendChild(t);
+      });
+      if (!opts.xLabels && n) {
+        const idxs = n === 1 ? [0] : (n === 2 ? [0, n - 1] : [0, Math.floor((n - 1) / 2), n - 1]);
+        idxs.forEach((bi, k) => {
+          const b = buckets[bi]; if (!b) return;
+          const cx = padX + slot * bi + slot / 2;
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (h - 6).toFixed(2));
+          t.setAttribute('text-anchor', k === 0 ? 'start' : (k === idxs.length - 1 ? 'end' : 'middle'));
+          t.setAttribute('fill', '#8a90a0'); t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+          t.setAttribute('font-weight', '600'); t.setAttribute('letter-spacing', '0.04em');
+          t.setAttribute('paint-order', 'stroke'); t.setAttribute('stroke', '#fff'); t.setAttribute('stroke-linejoin', 'round');
+          t.setAttribute('data-fit', '11'); t.setAttribute('data-rendered', '');
+          t.textContent = formatXLabel(b.label != null ? b.label : b.key).toUpperCase(); svg.appendChild(t);
+        });
+      }
+    }
+
+    fitChartTextWhenReady(svg);
   }
 
   // Barras verticales AGRUPADAS (clustered): x = categoría (origin), varias series
@@ -1231,7 +1375,7 @@
       ln.setAttribute('stroke', '#eef1f5'); ln.setAttribute('stroke-width', '1'); ln.setAttribute('data-rendered', '');
       svg.appendChild(ln);
       const t = document.createElementNS(SVG_NS, 'text');
-      t.setAttribute('x', '2'); t.setAttribute('y', (y + 2.5).toFixed(1)); t.setAttribute('font-size', '7'); t.setAttribute('fill', '#9aa3b2'); t.setAttribute('data-rendered', '');
+      t.setAttribute('x', '2'); t.setAttribute('y', (y + 2.5).toFixed(1)); t.setAttribute('font-size', '7'); t.setAttribute('fill', '#9aa3b2'); t.setAttribute('data-fit', '10'); t.setAttribute('data-rendered', '');
       t.textContent = String(v); svg.appendChild(t);
     });
 
@@ -1261,7 +1405,7 @@
     buckets.forEach((b, i) => {
       const t = document.createElementNS(SVG_NS, 'text');
       t.setAttribute('x', xAt(i).toFixed(1)); t.setAttribute('y', (h - 8).toFixed(1)); t.setAttribute('text-anchor', 'middle');
-      t.setAttribute('font-size', '7'); t.setAttribute('font-weight', '500'); t.setAttribute('fill', '#8a93a3'); t.setAttribute('data-rendered', '');
+      t.setAttribute('font-size', '7'); t.setAttribute('font-weight', '500'); t.setAttribute('fill', '#8a93a3'); t.setAttribute('data-fit', '9'); t.setAttribute('data-rendered', '');
       t.textContent = labelOf.get(b); svg.appendChild(t);
     });
 
@@ -1270,6 +1414,7 @@
         `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#475569;"><span style="width:10px;height:10px;border-radius:50%;background:${originSeriesColor(s)};display:inline-block;"></span>${esc(s)}</span>`
       ).join('');
     }
+    fitChartTextWhenReady(svg);
   }
 
   // Embudo de conversión (pirámide invertida): trapecios decrecientes centrados,
@@ -1298,7 +1443,7 @@
       t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1));
       t.setAttribute('font-size', opts.size); t.setAttribute('font-weight', opts.weight || '600');
       t.setAttribute('fill', opts.fill || '#0e1117'); t.setAttribute('text-anchor', opts.anchor || 'start');
-      t.setAttribute('data-rendered', ''); t.textContent = s; svg.appendChild(t); return t;
+      t.setAttribute('data-fit', String(opts.size)); t.setAttribute('data-rendered', ''); t.textContent = s; svg.appendChild(t); return t;
     };
 
     stages.forEach((s, i) => {
@@ -1321,6 +1466,7 @@
       txt(labelX, midY - 5, `${s.name} · ${s.v}`, { size: '17', weight: '700', anchor: 'end' });
       txt(labelX, midY + 17, pct(s.pct), { size: '15', weight: '700', anchor: 'end', fill: '#8a93a3' });
     });
+    fitChartTextWhenReady(svg);
   }
 
   function renderStackedLegend(el, rows, opts) {

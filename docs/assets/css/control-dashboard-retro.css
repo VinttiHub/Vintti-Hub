@@ -1346,6 +1346,31 @@ body.is-loading .kpi-card::after {
 .sp-rose   { background: #f590ad; color: #fff; }
 .sp-ink    { background: var(--ink); color: #fff; }
 
+/* ---------- CHART LEGEND (standard row above the chart, non-overlapping) ---------- */
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 4px 8px;
+}
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2, #4a5163);
+}
+.chart-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
 /* ---------- CHART WRAP ---------- */
 .chart {
   position: relative;
