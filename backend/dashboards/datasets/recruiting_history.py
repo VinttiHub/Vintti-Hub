@@ -122,7 +122,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         new_clients_per_period AS (
           SELECT
             pr.period_start,
-            COUNT(*) AS new_clients
+            -- COUNT(fc.account_id), NO COUNT(*): con el LEFT JOIN, las semanas sin
+            -- ningún primer-close emiten una fila con fc.* NULL; COUNT(*) contaba esa
+            -- fila y daba 1 fijo todas las semanas. COUNT de la columna joineada
+            -- ignora los NULL → 0 real cuando no hubo cliente nuevo.
+            COUNT(DISTINCT fc.account_id) AS new_clients
           FROM period_ranges pr
           LEFT JOIN first_close_per_account fc
             ON fc.first_close_d BETWEEN pr.period_start AND pr.period_end
