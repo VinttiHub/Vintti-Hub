@@ -104,6 +104,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN account a ON a.account_id = o.account_id
         WHERE o.opp_type = 'New'
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
+          AND TRIM(LOWER(o.opp_stage)) <> 'closed lost'
           AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
           AND COALESCE(
             NULLIF(o.nda_signature_or_start_date::text, '')::date,
