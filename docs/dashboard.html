@@ -67,7 +67,8 @@
     </div>
     <div class="topbar__right">
       <span class="pill"><span class="dot"></span>All systems · live</span>
-      <span class="pill">Sync · <span data-sync-now>—</span></span>
+      <span class="pill" title="Última vez que el dashboard trajo datos del backend (consulta directa a la base)">Datos · <span data-data-synced>—</span></span>
+      <span class="pill" title="Hora local del navegador — no es una sincronización de datos">Hora actual · <span data-sync-now>—</span></span>
       <span class="pill pill--dark">Operator · info@vintti.com <span class="chev">▾</span></span>
     </div>
   </header>
@@ -5461,7 +5462,7 @@
             data-chart="op_kpi_placement_time_30d" data-bind="text"
             data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> d
     </div>
-    <div class="muted">Synced <span data-sync-now>—</span></div>
+    <div class="muted">Datos <span data-data-synced>—</span> · Hora actual <span data-sync-now>—</span></div>
   </footer>
 
   <script>
@@ -9018,6 +9019,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=122" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=123" defer></script>
 </body>
 </html>

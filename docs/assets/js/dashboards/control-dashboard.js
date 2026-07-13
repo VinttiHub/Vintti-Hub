@@ -87,6 +87,16 @@
   };
 
   /* ---------- API ---------- */
+  // Marca la hora del ÚLTIMO fetch real de datos al backend (evento genuino, no el
+  // reloj del cliente). Alimenta el indicador "Datos · …". Ver Hallazgo 14.
+  function markDataSynced() {
+    const p = (n) => String(n).padStart(2, '0');
+    const now = new Date();
+    const stamp = `${now.getUTCFullYear()}-${p(now.getUTCMonth() + 1)}-${p(now.getUTCDate())} `
+                + `${p(now.getUTCHours())}:${p(now.getUTCMinutes())} UTC`;
+    document.querySelectorAll('[data-data-synced]').forEach(el => { el.textContent = stamp; });
+  }
+
   async function fetchChart(chartKey, overrides) {
     const url = new URL(API_BASE + `/dashboards/${SLUG}/charts/${chartKey}/data`);
     const params = { ...state, ...(overrides || {}) };
@@ -98,7 +108,9 @@
     if (email) headers['X-User-Email'] = email;
     const res = await fetch(url.toString(), { method: 'GET', headers, credentials: 'omit' });
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${chartKey}`);
-    return res.json();
+    const data = await res.json();
+    markDataSynced();   // sólo se actualiza cuando REALMENTE se trajeron datos
+    return data;
   }
 
   /* ---------- math: smooth bezier path ----------
