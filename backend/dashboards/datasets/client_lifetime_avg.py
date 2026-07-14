@@ -82,7 +82,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           GROUP BY account_id
         )
         SELECT
-          AVG(active_months)::numeric(10, 0) AS promedio_meses_por_cliente
+          AVG(active_months)::numeric(10, 0) AS promedio_meses_por_cliente,
+          MAX(active_months)::int            AS max_meses_por_cliente,
+          COUNT(*)::int                      AS n_clientes
         FROM duracion_cliente;
     """
 
@@ -95,6 +97,8 @@ DATASET = {
     "dimensions": [],
     "measures": [
         {"key": "promedio_meses_por_cliente", "label": "Promedio meses por cliente", "type": "number"},
+        {"key": "max_meses_por_cliente", "label": "Máx meses por cliente", "type": "number"},
+        {"key": "n_clientes", "label": "N (clientes)", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

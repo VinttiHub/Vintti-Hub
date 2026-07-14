@@ -83,6 +83,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           AVG(active_months)::numeric(10, 0) AS promedio_meses_por_candidato_en_cliente,
+          MAX(active_months)::int            AS max_meses_candidato,
           COUNT(*)                           AS n_candidato_cliente
         FROM duracion_candidato_cliente;
     """
@@ -96,6 +97,7 @@ DATASET = {
     "dimensions": [],
     "measures": [
         {"key": "promedio_meses_por_candidato_en_cliente", "label": "Promedio meses por candidato en cliente", "type": "number"},
+        {"key": "max_meses_candidato", "label": "Máx meses por candidato", "type": "number"},
         {"key": "n_candidato_cliente", "label": "N (candidato × cliente)", "type": "number"},
     ],
     "default_filters": {},
