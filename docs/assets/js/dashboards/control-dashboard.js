@@ -1570,7 +1570,11 @@
       return;
     }
 
-    const total = rows.reduce((acc, r) => acc + (+r[valueKey] || 0), 0) || 1;
+    // realTotal = suma real (puede ser 0). total = denominador de los arcos con
+    // fallback a 1 para evitar división por 0. El centro muestra realTotal, así un
+    // total 0 se ve "$0" (no el "$1" de relleno). Ver Hallazgo 27.
+    const realTotal = rows.reduce((acc, r) => acc + (+r[valueKey] || 0), 0);
+    const total = realTotal || 1;
     const circumference = 2 * Math.PI * r;
     const gap = 4; // px gap between segments
 
@@ -1616,7 +1620,7 @@
     txt1.setAttribute('font-size', '26');
     txt1.setAttribute('font-weight', '700');
     txt1.setAttribute('font-family', 'Onest, system-ui, sans-serif');
-    txt1.textContent = fmt.pick(svg.dataset.centerFmt || 'int')(total);
+    txt1.textContent = fmt.pick(svg.dataset.centerFmt || 'int')(realTotal);
     svg.appendChild(txt1);
 
     const txt2 = document.createElementNS(SVG_NS, 'text');
