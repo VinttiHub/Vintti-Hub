@@ -1346,6 +1346,12 @@ body.is-loading .kpi-card::after {
 .sp-rose   { background: #f590ad; color: #fff; }
 .sp-ink    { background: var(--ink); color: #fff; }
 
+/* ---------- DLIST value badge (ej. candidatos por turbo) ---------- */
+.dlist__right { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+.dlist__val { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.dlist__val--pos  { background: rgba(108, 56, 255, 0.12); color: #6c38ff; }
+.dlist__val--zero { background: #f0f1f5; color: #8a93a3; }
+
 /* ---------- LOW-SAMPLE FLAG (aviso "muestra baja" cuando el denominador es chico) ---------- */
 .lowsample-flag {
   display: none;

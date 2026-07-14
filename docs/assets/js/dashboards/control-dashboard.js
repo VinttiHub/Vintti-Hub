@@ -1901,6 +1901,9 @@
     const nameField = el.dataset.listName || 'name';
     const subField  = el.dataset.listSub  || '';
     const dateField = el.dataset.listDate || '';
+    // Badge de valor opcional (ej. candidatos por turbo): verde/violeta si >0, gris si 0.
+    const valField  = el.dataset.listValue || '';
+    const valSuffix = el.dataset.listValueSuffix || '';
     const limit     = parseInt(el.dataset.limit || '500', 10);
     if (!rows.length) {
       el.innerHTML = '<div class="dlist__empty">No data</div>';
@@ -1911,7 +1914,16 @@
       const name = esc(r[nameField] || '—');
       const sub  = subField  ? `<span class="dlist__sub">${esc(r[subField] || '')}</span>` : '';
       const date = dateField ? `<span class="dlist__date">${esc(r[dateField] || '')}</span>` : '';
-      return `<div class="dlist__row"><div><span class="dlist__name">${name}</span>${sub}</div>${date}</div>`;
+      let val = '';
+      if (valField) {
+        const raw = r[valField];
+        const n = Number(raw);
+        const pos = isFinite(n) && n > 0;
+        const txt = (raw == null || raw === '') ? '—' : `${raw}${valSuffix ? ' ' + valSuffix : ''}`;
+        val = `<span class="dlist__val ${pos ? 'dlist__val--pos' : 'dlist__val--zero'}">${esc(txt)}</span>`;
+      }
+      const right = (val || date) ? `<div class="dlist__right">${val}${date}</div>` : '';
+      return `<div class="dlist__row"><div><span class="dlist__name">${name}</span>${sub}</div>${right}</div>`;
     }).join('');
   }
 
