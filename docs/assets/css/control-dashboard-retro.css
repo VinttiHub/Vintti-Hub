@@ -1346,6 +1346,24 @@ body.is-loading .kpi-card::after {
 .sp-rose   { background: #f590ad; color: #fff; }
 .sp-ink    { background: var(--ink); color: #fff; }
 
+/* ---------- LOW-SAMPLE FLAG (aviso "muestra baja" cuando el denominador es chico) ---------- */
+.lowsample-flag {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fdefc7;
+  color: #8a6a00;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  width: fit-content;
+  cursor: help;
+}
+.lowsample-flag.is-visible { display: inline-flex; }
+
 /* ---------- GLOSSARY (topbar dropdown, native <details>, no JS) ---------- */
 .glossary-pill { position: relative; display: inline-block; }
 .glossary-pill > summary { cursor: pointer; user-select: none; list-style: none; }

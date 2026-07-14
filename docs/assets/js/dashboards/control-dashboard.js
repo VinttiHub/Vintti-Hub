@@ -1001,6 +1001,17 @@
   }
 
   /* ---------- render dispatcher ---------- */
+  // Aviso de "muestra baja": muestra el elemento cuando el denominador (data-field)
+  // es menor a data-threshold (default 5). Un % con n chico es estadísticamente
+  // volátil (ver Hallazgo 17). Togglea la clase is-visible.
+  function renderLowSample(el, rows) {
+    const field = el.dataset.field;
+    const thr = +(el.dataset.threshold || 5);
+    const v = reduce(rows, field, el.dataset.reduce || 'first');
+    const low = (v != null && isFinite(+v) && +v < thr);
+    el.classList.toggle('is-visible', low);
+  }
+
   function renderBinding(el, rows) {
     const bind = el.dataset.bind;
     try {
@@ -1013,6 +1024,7 @@
         scopedRows = (rows || []).filter(r => String(r[wf]) === wv);
       }
       if (bind === 'text') return renderText(el, scopedRows);
+      if (bind === 'low-sample') return renderLowSample(el, scopedRows);
       if (bind === 'line' || bind === 'area') {
         return renderLine(el, scopedRows, {
           x: el.dataset.x,

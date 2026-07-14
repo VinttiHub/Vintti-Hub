@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=99">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=100">
 </head>
 <body>
 
@@ -659,6 +659,9 @@
         <div class="skpi-tile__value"
              data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
              data-field="placed_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="lowsample-flag" data-chart="gr_kpi_replacement_coverage_30d" data-bind="low-sample"
+             data-field="placed_count" data-threshold="5"
+             title="Muestra chica: pocas cerradas en la ventana (n&lt;5). El % es estadísticamente volátil — tomalo con cautela, no como tendencia.">⚠ Muestra baja (n&lt;5)</div>
         <div class="skpi-tile__progress">
           <div class="skpi-tile__progress-bar">
             <span class="skpi-tile__progress-fill"
@@ -9043,6 +9046,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=123" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=124" defer></script>
 </body>
 </html>
