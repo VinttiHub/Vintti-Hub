@@ -66,7 +66,7 @@ def _sql_for(model: str) -> str:
         sql = """
             WITH acct AS (
               SELECT a.account_id,
-                     COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
+                     CASE WHEN NULLIF(TRIM(a.where_come_from), '') IS NULL OR UPPER(TRIM(a.where_come_from)) IN ('NA', 'N/A') THEN '(Sin origen)' ELSE TRIM(a.where_come_from) END AS origin
               FROM account a
               WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
                 AND COALESCE(a.vintti_internal, FALSE) = FALSE
@@ -112,7 +112,7 @@ def _sql_for(model: str) -> str:
     sql = """
         WITH acct AS (
           SELECT a.account_id,
-                 COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
+                 CASE WHEN NULLIF(TRIM(a.where_come_from), '') IS NULL OR UPPER(TRIM(a.where_come_from)) IN ('NA', 'N/A') THEN '(Sin origen)' ELSE TRIM(a.where_come_from) END AS origin
           FROM account a
           WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
                 AND COALESCE(a.vintti_internal, FALSE) = FALSE

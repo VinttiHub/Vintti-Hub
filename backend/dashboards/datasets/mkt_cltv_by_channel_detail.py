@@ -14,14 +14,14 @@ def _model(filters: dict) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     model = _model(filters)
     channel = str(filters.get("channel") or filters.get("origin") or "").strip()
-    ch_clause = "AND COALESCE(NULLIF(TRIM(a.where_come_from, ''), ''), '(Sin origen)') = %(channel)s" if channel else ""
+    ch_clause = "AND CASE WHEN NULLIF(TRIM(a.where_come_from), '') IS NULL OR UPPER(TRIM(a.where_come_from)) IN ('NA', 'N/A') THEN '(Sin origen)' ELSE TRIM(a.where_come_from) END = %(channel)s" if channel else ""
     params = {"channel": channel} if channel else {}
 
     if model == "Recruiting":
         sql = f"""
             WITH acct AS (
               SELECT a.account_id, a.client_name,
-                     COALESCE(NULLIF(TRIM(a.where_come_from, ''), ''), '(Sin origen)') AS origin
+                     CASE WHEN NULLIF(TRIM(a.where_come_from), '') IS NULL OR UPPER(TRIM(a.where_come_from)) IN ('NA', 'N/A') THEN '(Sin origen)' ELSE TRIM(a.where_come_from) END AS origin
               FROM account a
               WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
                 AND COALESCE(a.vintti_internal, FALSE) = FALSE
@@ -51,7 +51,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = f"""
         WITH acct AS (
           SELECT a.account_id, a.client_name,
-                 COALESCE(NULLIF(TRIM(a.where_come_from, ''), ''), '(Sin origen)') AS origin
+                 CASE WHEN NULLIF(TRIM(a.where_come_from), '') IS NULL OR UPPER(TRIM(a.where_come_from)) IN ('NA', 'N/A') THEN '(Sin origen)' ELSE TRIM(a.where_come_from) END AS origin
           FROM account a
           WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
             AND COALESCE(a.vintti_internal, FALSE) = FALSE

@@ -5397,13 +5397,13 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">Resumen por canal</h3>
-            <p class="card__sub">CLTV promedio, MRR, vida y volumen por canal</p>
+            <p class="card__sub">CLTV/MRR/vida son <strong>all-time</strong> (incluyen clientes churned); "Activos" es el conteo actual. Por eso un canal puede tener 0 activos y aún así promedios (de clientes que ya se fueron).</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mkt-cltv-detail" aria-label="Ver detalle CLTV por cliente">Ver detalle por cliente</button>
         </div>
         <div class="dtable-wrap" data-chart="mk_rank_cltv_by_channel" data-bind="dtable"
-             data-cols="origin|Canal|chip,mql|MQL|int,sql|SQL|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
-             data-cols-staffing="origin|Canal|raw,mql|MQL|int,sql|SQL|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols="origin|Canal|chip,mql|MQL|int,sql|SQL|int,clients|Clientes|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols-staffing="origin|Canal|raw,mql|MQL|int,sql|SQL|int,clients|Clientes|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
              data-cols-recruiting="origin|Canal|raw,mql|MQL|int,sql|SQL|int,clients|Clientes|int,placements|# Placements|int,avg_fee|Fee prom|currency-k,avg_cltv|CLTV prom|currency-k"
              data-empty-text="Sin clientes."></div>
       </div>
