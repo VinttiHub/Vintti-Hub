@@ -1346,6 +1346,36 @@ body.is-loading .kpi-card::after {
 .sp-rose   { background: #f590ad; color: #fff; }
 .sp-ink    { background: var(--ink); color: #fff; }
 
+/* ---------- GLOSSARY (topbar dropdown, native <details>, no JS) ---------- */
+.glossary-pill { position: relative; display: inline-block; }
+.glossary-pill > summary { cursor: pointer; user-select: none; list-style: none; }
+.glossary-pill > summary::-webkit-details-marker { display: none; }
+.glossary-pill > summary::marker { content: ''; }
+.glossary-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  /* Por encima de la barra de filtros sticky (.sticky-head z-index:100), que si no
+     se pinta sobre el medio del panel y lo corta. */
+  z-index: 200;
+  width: 360px;
+  max-width: 88vw;
+  max-height: 72vh;
+  overflow-y: auto;
+  background: var(--card, #fff);
+  border: 1px solid var(--rule, #e6e8ee);
+  border-radius: 14px;
+  box-shadow: 0 14px 44px rgba(16, 17, 23, 0.16);
+  padding: 14px 16px;
+  cursor: default;
+  font-size: 12.5px;
+  color: var(--ink-2, #4a5163);
+}
+.glossary-panel__title { margin: 0 0 10px; font-size: 13px; font-weight: 800; color: var(--ink, #0e1117); }
+.glossary-panel__list { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.glossary-panel__list dt { font-weight: 700; color: var(--ink, #0e1117); white-space: nowrap; }
+.glossary-panel__list dd { margin: 0; line-height: 1.35; }
+
 /* ---------- CHART LEGEND (standard row above the chart, non-overlapping) ---------- */
 .chart-legend {
   display: flex;
