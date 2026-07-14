@@ -17,7 +17,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     lo, hi = window_bounds(filters)
     sql = """
         SELECT
-          TRIM(o.motive_close_lost) AS reason,
+          COALESCE(NULLIF(TRIM(o.motive_close_lost), ''), 'Sin razón') AS reason,
           COALESCE(a.client_name, '—') AS client_name,
           COALESCE(o.opp_position_name, '—') AS opp_position_name,
           TO_CHAR(NULLIF(o.opp_close_date::text, '')::date, 'YYYY-MM-DD') AS close_date,
@@ -35,13 +35,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN users ur  ON LOWER(TRIM(ur.email_vintti)) = LOWER(TRIM(o.opp_hr_lead))
         WHERE TRIM(o.opp_stage) = 'Closed Lost'
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
-          AND NULLIF(TRIM(o.motive_close_lost), '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(w_lo)s AND %(w_hi)s
-          AND (%(reason)s = '' OR TRIM(o.motive_close_lost) = %(reason)s)
+          AND (%(reason)s = '' OR COALESCE(NULLIF(TRIM(o.motive_close_lost), ''), 'Sin razón') = %(reason)s)
           AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
           AND (%(recruiter)s = '' OR LOWER(TRIM(o.opp_hr_lead)) = %(recruiter)s)
-        ORDER BY TRIM(o.motive_close_lost),
+        ORDER BY COALESCE(NULLIF(TRIM(o.motive_close_lost), ''), 'Sin razón'),
                  NULLIF(o.opp_close_date::text, '')::date DESC NULLS LAST,
                  a.client_name;
     """

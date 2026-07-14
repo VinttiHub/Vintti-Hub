@@ -1,8 +1,16 @@
 """Operations · % de razón por la que se caen los candidatos.
 
-Distribución de `hire_opportunity.inactive_reason` entre los hires que tienen una
-razón cargada (los '(sin razón)' se excluyen, por decisión del owner). Devuelve una
-fila por razón con count y % del total — para un donut.
+Población = la MISMA cohorte de bajas que la card "Candidate churn"
+(`candidate_churn_30d_summary`): candidatos de **Staffing** (cuenta no-interna)
+distintos cuyo `end_d = COALESCE(carga_inactive, end_date)` cae en la ventana. Así
+el total de la dona coincide 1:1 con las "bajas" de esa card.
+
+De cada candidato-baja se toma la razón (`inactive_reason`) del hire dado de baja
+más reciente; los que no tienen razón cargada se agrupan como 'Sin razón' — NO se
+excluyen — para que el total refleje el churn real. Una fila por razón (count + share).
+
+Nota: a diferencia de las donas de rechazo/close-lost, acá NO se excluye a
+`agustina.barbero` (la card de churn tampoco lo hace) para poder reconciliar exacto.
 """
 from __future__ import annotations
 
@@ -10,29 +18,61 @@ from ._periods import window_bounds
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    # Ventana estándar del dashboard: Desde/Hasta > Mes > rolling 30d (corte).
-    # Ancla en la fecha de baja `carga_inactive`.
+    # Ventana estándar del dashboard: Desde/Hasta > Mes > rolling 30d.
     lo, hi = window_bounds(filters)
     recruiter = str(filters.get("recruiter") or "").strip().lower()
     account = str(filters.get("account") or "").strip()
     reason = str(filters.get("reason") or "").strip()
     sql = """
+        WITH ventana AS (
+          SELECT %(w_lo)s::date AS win_ini, %(w_hi)s::date AS win_fin
+        ),
+        candidatos AS (
+          SELECT
+            ho.candidate_id,
+            ho.account_id,
+            ho.opportunity_id,
+            NULLIF(TRIM(ho.inactive_reason), '') AS reason_raw,
+            CASE
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              WHEN NULLIF(ho.start_date::text, '') IS NOT NULL THEN ho.start_date::date
+              ELSE NULL
+            END AS start_d,
+            CASE
+              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+              WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
+              ELSE ho.end_date::date
+            END AS end_d
+          FROM hire_opportunity ho
+          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          LEFT JOIN account a ON a.account_id = ho.account_id
+          WHERE ho.candidate_id IS NOT NULL
+            AND o.opp_model = 'Staffing'
+            AND COALESCE(a.vintti_internal, FALSE) = FALSE
+        ),
+        -- Una fila por candidato-baja (mismo criterio que candidate_churn_30d_summary):
+        -- end_d en la ventana. Se toma el hire dado de baja más reciente como
+        -- representante (su razón / account / opp).
+        bajas AS (
+          SELECT DISTINCT ON (c.candidate_id)
+            c.candidate_id, c.account_id, c.opportunity_id, c.reason_raw, c.end_d
+          FROM candidatos c
+          CROSS JOIN ventana v
+          WHERE c.start_d IS NOT NULL
+            AND c.end_d BETWEEN v.win_ini AND v.win_fin
+          ORDER BY c.candidate_id, c.end_d DESC NULLS LAST, c.opportunity_id DESC
+        )
         SELECT
-          TRIM(ho.inactive_reason) AS reason,
+          COALESCE(b.reason_raw, 'Sin razón') AS reason,
           COUNT(*)::int AS count,
           ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS share_pct
-        FROM hire_opportunity ho
-        LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-        LEFT JOIN account a     ON a.account_id      = ho.account_id
-        WHERE NULLIF(TRIM(ho.inactive_reason), '') IS NOT NULL
-          AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
-          AND (%(recruiter)s = '' OR LOWER(TRIM(o.opp_hr_lead)) = %(recruiter)s)
+        FROM bajas b
+        LEFT JOIN opportunity o ON o.opportunity_id = b.opportunity_id
+        LEFT JOIN account a     ON a.account_id      = b.account_id
+        WHERE (%(recruiter)s = '' OR LOWER(TRIM(o.opp_hr_lead)) = %(recruiter)s)
           AND (%(account)s = '' OR TRIM(a.client_name) = %(account)s)
-          -- Excluir recruiters inactivos (ya no trabajan en Vintti)
-          AND LOWER(TRIM(o.opp_hr_lead)) <> 'agustina.barbero@vintti.com'
-          AND COALESCE(a.vintti_internal, FALSE) = FALSE
-          AND (%(reason)s = '' OR TRIM(ho.inactive_reason) = %(reason)s)
-        GROUP BY TRIM(ho.inactive_reason)
+          AND (%(reason)s = '' OR COALESCE(b.reason_raw, 'Sin razón') = %(reason)s)
+        GROUP BY COALESCE(b.reason_raw, 'Sin razón')
         ORDER BY count DESC, reason;
     """
     return sql, {"w_lo": lo, "w_hi": hi, "recruiter": recruiter, "account": account, "reason": reason}
