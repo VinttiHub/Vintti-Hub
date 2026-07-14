@@ -54,12 +54,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           a.client_name,
+          TRIM(COALESCE(a.client_name, '—')) || ' · ' || TRIM(COALESCE(o.opp_position_name, '—')) AS turbo_label,
           t.meeting_name,
           t.hr_lead,
           t.candidates::int                                     AS candidates,
           CASE WHEN t.candidates > 0 THEN 'Sí' ELSE 'No' END    AS con_candidatos,
           TO_CHAR(t.meeting_date::date, 'YYYY-MM-DD')           AS meeting_date
-        FROM turvo t
+        FROM (
+          -- Dedupe: el sync de Turvo crea varios registros por reunión (mismo opp+día,
+          -- 0 candidatos). Colapsamos a 1 por (opp, día), quedándonos con el de MÁS
+          -- candidatos para no perder turbos reales. Ver Hallazgo 30.
+          SELECT DISTINCT ON (opportunity_id, meeting_date::date) *
+          FROM turvo
+          -- Solo reuniones turbo REALES: el nombre debe contener 'turbo'/'trbo'.
+          -- La tabla turvo sincroniza TODAS las reuniones del calendar (interviews,
+          -- calls, etc.); la mayoría no son turbos. Ver Hallazgo 30.
+          WHERE meeting_name ~* 'turbo|trbo'
+          ORDER BY opportunity_id, meeting_date::date, candidates DESC NULLS LAST, turvo_id DESC
+        ) t
         JOIN opportunity o ON o.opportunity_id = t.opportunity_id
         LEFT JOIN account a ON a.account_id = o.account_id
         CROSS JOIN ventana v

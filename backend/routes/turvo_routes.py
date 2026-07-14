@@ -25,6 +25,16 @@ RECRUITER_EMAILS = [
 INITIAL_SYNC_LOOKBACK_DAYS = 90
 REFRESH_OVERLAP_MINUTES = 5
 
+# Solo se sincronizan reuniones "turbo": la tabla `turvo` debe contener SOLO turbos,
+# no todas las reuniones del calendar (interviews, calls, 1:1, etc.). El título debe
+# contener "turbo" (o el typo frecuente "trbo"), case-insensitive.
+_TURBO_NAME_RE = re.compile(r"turbo|trbo", re.IGNORECASE)
+
+
+def _is_turbo_meeting(summary: str | None) -> bool:
+    """True si el título de la reunión la identifica como un turbo."""
+    return bool(summary) and _TURBO_NAME_RE.search(summary) is not None
+
 
 def _normalize_dt(value: datetime | None) -> datetime | None:
     if not value:
@@ -223,6 +233,8 @@ def list_turvo_meetings():
                     LEFT JOIN opportunity o
                       ON o.opportunity_id = t.opportunity_id
                     WHERE t.opportunity_id = %s
+                      -- Solo turbos (defensa: por si quedan reuniones no-turbo en la tabla).
+                      AND (t.meeting_name ~* 'turbo|trbo')
                 )
                 SELECT turvo_id,
                        opportunity_id,
@@ -301,6 +313,7 @@ def refresh_turvo_meetings():
             "duplicates": 0,
             "reassigned": 0,
             "deleted_duplicates": 0,
+            "skipped_non_turbo": 0,
         }
 
         for recruiter in recruiters:
@@ -335,6 +348,10 @@ def refresh_turvo_meetings():
             for event in events:
                 summary = (event.get("summary") or "").strip()
                 if not summary:
+                    continue
+                # Solo turbos: ignorar interviews, calls y demás reuniones del calendar.
+                if not _is_turbo_meeting(summary):
+                    stats["skipped_non_turbo"] += 1
                     continue
                 if not _event_matches_opportunity(event, opp_id):
                     continue
@@ -428,6 +445,8 @@ def refresh_turvo_meetings():
                     LEFT JOIN opportunity o
                       ON o.opportunity_id = t.opportunity_id
                     WHERE t.opportunity_id = %s
+                      -- Solo turbos (defensa: por si quedan reuniones no-turbo en la tabla).
+                      AND (t.meeting_name ~* 'turbo|trbo')
                 )
                 SELECT turvo_id,
                        opportunity_id,
