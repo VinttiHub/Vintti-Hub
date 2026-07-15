@@ -2424,6 +2424,17 @@ let statusInfoSubtitle = null;
 let statusInfoContent = null;
 let statusChipEventsBound = false;
 let statusInfoKeyListenerBound = false;
+let statusInfoActiveChip = null;
+
+// Reasons an employee can be flagged inactive. Kept in sync with the
+// offboarding dialog (docs/assets/js/inactive-info-dialog.js).
+const INACTIVE_REASONS = [
+  'Poor candidate performance',
+  'Candidate resigned',
+  'Buy out fee',
+  'Company layoffs / downsizing',
+  'Accepted a better offer'
+];
 
 function applyStatusChipMetadata(row, candidate = {}, statusValue) {
   if (!row) return;
@@ -2433,6 +2444,7 @@ function applyStatusChipMetadata(row, candidate = {}, statusValue) {
   chip.dataset.statusPopup = '1';
   chip.dataset.statusType = normalizedStatus;
   chip.dataset.candidateId = candidate.candidate_id ?? '';
+  chip.dataset.opportunityId = candidate.opportunity_id ?? '';
   chip.dataset.candidateName = candidate.name || '';
   chip.dataset.positionName = candidate.opp_position_name || '';
   chip.dataset.salary = candidate.employee_salary ?? '';
@@ -2468,13 +2480,16 @@ function handleStatusChipClick(chip) {
     inactiveReason: chip.dataset.inactiveReason || '',
     inactiveComments: chip.dataset.inactiveComments || '',
     inactiveVinttierror: chip.dataset.inactiveVinttierror || '',
-    clientName: chip.dataset.clientName || ''
-  });
+    clientName: chip.dataset.clientName || '',
+    candidateId: chip.dataset.candidateId || '',
+    opportunityId: chip.dataset.opportunityId || ''
+  }, chip);
 }
 
-function openStatusInfoPopup(meta = {}) {
+function openStatusInfoPopup(meta = {}, chip = null) {
   ensureStatusInfoUi();
   if (!statusInfoOverlay || !statusInfoTitle || !statusInfoSubtitle || !statusInfoContent) return;
+  statusInfoActiveChip = chip;
   const normalizedStatus = String(meta.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
   const candidateName = meta.name || 'Candidate';
   const clientName = meta.clientName || '';
@@ -2496,14 +2511,7 @@ function openStatusInfoPopup(meta = {}) {
     const subtitle = clientName ? `Offboarding info for ${clientName}` : 'Offboarding info';
     statusInfoSubtitle.textContent = subtitle;
     statusInfoSubtitle.style.display = 'block';
-    setStatusInfoRows([
-      { label: 'Reason', value: meta.inactiveReason || 'Not provided' },
-      { label: 'Comments', value: meta.inactiveComments || 'No comments added' },
-      {
-        label: 'Vintti process error?',
-        value: (meta.inactiveVinttierror === 'true' || meta.inactiveVinttierror === true) ? 'Yes' : 'No'
-      }
-    ]);
+    setStatusInfoEditForm(meta);
   } else {
     statusInfoTitle.textContent = `${candidateName} is active`;
     const subtitle = clientName ? `Working with ${clientName}` : 'Active engagement details';
@@ -2752,6 +2760,86 @@ function ensureStatusInfoStyles() {
     font-size: 16px;
   }
 }
+.status-info-input {
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 14px;
+  border: 1.5px solid #dbe3ff;
+  background: #fff;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.status-info-input:hover {
+  border-color: #c3ccff;
+}
+.status-info-input:focus {
+  outline: none;
+  border-color: #6c63ff;
+  box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.14);
+}
+select.status-info-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c63ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
+}
+textarea.status-info-input {
+  min-height: 76px;
+  resize: vertical;
+}
+.status-info-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+.status-info-check input {
+  width: 18px;
+  height: 18px;
+}
+.status-info-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.status-info-save {
+  border: none;
+  border-radius: 999px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(120deg, #4f46e5, #6c63ff);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.status-info-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.status-info-hint {
+  font-size: 13px;
+  color: #516074;
+}
+.status-info-hint.is-error {
+  color: #d6336c;
+}
 `;
   document.head.appendChild(style);
 }
@@ -2772,6 +2860,146 @@ function setStatusInfoRows(rows = []) {
     row.appendChild(valueEl);
     statusInfoContent.appendChild(row);
   });
+}
+
+// Editable offboarding form shown inside the status popup for inactive
+// employees. Lets the user set (or correct) the reason/comments/Vintti-error
+// after the fact and saves them to hire_opportunity via persistHireFields.
+function setStatusInfoEditForm(meta = {}) {
+  if (!statusInfoContent) return;
+
+  const currentReason = meta.inactiveReason || '';
+  const currentComments = meta.inactiveComments || '';
+  const currentVinttiError =
+    meta.inactiveVinttierror === 'true' || meta.inactiveVinttierror === true;
+  const canEdit = Boolean(meta.candidateId && meta.opportunityId);
+
+  // If we can't persist (missing ids), fall back to the read-only view.
+  if (!canEdit) {
+    setStatusInfoRows([
+      { label: 'Reason', value: currentReason || 'Not provided' },
+      { label: 'Comments', value: currentComments || 'No comments added' },
+      { label: 'Vintti process error?', value: currentVinttiError ? 'Yes' : 'No' }
+    ]);
+    return;
+  }
+
+  statusInfoContent.innerHTML = '';
+
+  // ----- Reason -----
+  const reasonRow = document.createElement('div');
+  reasonRow.className = 'status-info-row';
+  const reasonLabel = document.createElement('span');
+  reasonLabel.className = 'status-info-label';
+  reasonLabel.textContent = 'Reason';
+  const reasonSelect = document.createElement('select');
+  reasonSelect.className = 'status-info-input';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Select a reason';
+  reasonSelect.appendChild(placeholder);
+  INACTIVE_REASONS.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    if (r === currentReason) opt.selected = true;
+    reasonSelect.appendChild(opt);
+  });
+  // Preserve an out-of-list stored reason so it isn't silently dropped.
+  if (currentReason && !INACTIVE_REASONS.includes(currentReason)) {
+    const opt = document.createElement('option');
+    opt.value = currentReason;
+    opt.textContent = currentReason;
+    opt.selected = true;
+    reasonSelect.appendChild(opt);
+  }
+  reasonRow.appendChild(reasonLabel);
+  reasonRow.appendChild(reasonSelect);
+
+  // ----- Comments -----
+  const commentsRow = document.createElement('div');
+  commentsRow.className = 'status-info-row';
+  const commentsLabel = document.createElement('span');
+  commentsLabel.className = 'status-info-label';
+  commentsLabel.textContent = 'Comments';
+  const commentsInput = document.createElement('textarea');
+  commentsInput.className = 'status-info-input';
+  commentsInput.rows = 3;
+  commentsInput.placeholder = 'Add extra context';
+  commentsInput.value = currentComments;
+  commentsRow.appendChild(commentsLabel);
+  commentsRow.appendChild(commentsInput);
+
+  // ----- Vintti process error -----
+  const vinttiRow = document.createElement('label');
+  vinttiRow.className = 'status-info-check';
+  const vinttiInput = document.createElement('input');
+  vinttiInput.type = 'checkbox';
+  vinttiInput.checked = currentVinttiError;
+  const vinttiText = document.createElement('span');
+  vinttiText.textContent = 'This was a Vintti process error';
+  vinttiRow.appendChild(vinttiInput);
+  vinttiRow.appendChild(vinttiText);
+
+  // ----- Actions -----
+  const actions = document.createElement('div');
+  actions.className = 'status-info-actions';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'status-info-save';
+  saveBtn.textContent = 'Save changes';
+  const hint = document.createElement('span');
+  hint.className = 'status-info-hint';
+  actions.appendChild(saveBtn);
+  actions.appendChild(hint);
+
+  saveBtn.addEventListener('click', async () => {
+    const newReason = reasonSelect.value;
+    if (!newReason) {
+      hint.textContent = 'Please pick a reason first.';
+      hint.className = 'status-info-hint is-error';
+      return;
+    }
+    const trimmed = commentsInput.value.trim();
+    const newComments = trimmed ? trimmed : null;
+    const newVintti = Boolean(vinttiInput.checked);
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    hint.textContent = '';
+    hint.className = 'status-info-hint';
+
+    try {
+      await persistHireFields(
+        meta.candidateId,
+        {
+          inactive_reason: newReason,
+          inactive_comments: newComments,
+          inactive_vinttierror: newVintti
+        },
+        meta.opportunityId
+      );
+      // Keep the clicked chip in sync so re-opening shows the fresh values.
+      if (statusInfoActiveChip) {
+        statusInfoActiveChip.dataset.inactiveReason = newReason;
+        statusInfoActiveChip.dataset.inactiveComments = newComments || '';
+        statusInfoActiveChip.dataset.inactiveVinttierror = newVintti ? 'true' : 'false';
+      }
+      saveBtn.textContent = 'Saved ✓';
+      setTimeout(() => closeStatusInfoPopup(), 550);
+    } catch (err) {
+      console.error('❌ Failed to update inactive reason', err);
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save changes';
+      hint.textContent = 'Could not save. Please try again.';
+      hint.className = 'status-info-hint is-error';
+    }
+  });
+
+  statusInfoContent.appendChild(reasonRow);
+  statusInfoContent.appendChild(commentsRow);
+  statusInfoContent.appendChild(vinttiRow);
+  statusInfoContent.appendChild(actions);
 }
 
 function formatCurrencyDisplay(value) {
