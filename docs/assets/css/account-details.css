@@ -943,7 +943,7 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   font-size: 12.5px;
   font-weight: 600;
   border-radius: 999px;
@@ -953,7 +953,21 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   letter-spacing: 0.1px;
   user-select: none;
   white-space: nowrap;
-  cursor: default;              /* ❗ no luce como clickeable */
+  cursor: pointer;              /* ✅ ahora luce clickeable */
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+/* Iconito interactivo al final de la chip (indica que se puede clickear) */
+.status-chip::after {
+  content: "";
+  width: 13px;
+  height: 13px;
+  flex: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.6;
+  transition: opacity .15s ease, transform .15s ease;
 }
 
 /* Active (verde) */
@@ -962,6 +976,10 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   border-color: #cfeeda;
   color: #1f7a3a;
 }
+/* ⓘ info: la chip activa abre el detalle */
+.status-chip.active::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231f7a3a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E");
+}
 
 /* Inactive (rojo) */
 .status-chip.inactive {
@@ -969,13 +987,28 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   border-color: #ffd3d3;
   color: #b0182b;
 }
+/* ✏️ lápiz: la chip inactiva permite ver/editar la razón */
+.status-chip.inactive::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23b0182b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z'/%3E%3C/svg%3E");
+}
 
-/* Hover sutil (sin “botón”) */
+/* Hover: se levanta y resalta como un botón real */
 .status-chip:hover {
-  /* sin transform */
-  filter: saturate(108%) brightness(102%);
-  box-shadow: 0 1px 6px var(--shadow) inset, 0 3px 10px var(--shadow);
-  transition: filter .15s ease, box-shadow .15s ease;
+  transform: translateY(-1px);
+  filter: saturate(112%) brightness(102%);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.status-chip:hover::after {
+  opacity: 1;
+  transform: scale(1.08);
+}
+.status-chip:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+.status-chip:focus-visible {
+  outline: 2px solid #6c63ff;
+  outline-offset: 2px;
 }
 /* Rename: input visible y cómodo al editar */
 .contracts-list .contract-item .file-edit {

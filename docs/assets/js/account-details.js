@@ -2415,7 +2415,10 @@ function renderStatusChip(status) {
   const s = String(status || '').toLowerCase();
   const cls = (s === 'inactive') ? 'inactive' : 'active';
   const label = cls.charAt(0).toUpperCase() + cls.slice(1);
-  return `<span class="status-chip ${cls}">${label}</span>`;
+  const title = cls === 'inactive'
+    ? 'Click to view or edit the offboarding reason'
+    : 'Click to view status details';
+  return `<span class="status-chip ${cls}" role="button" tabindex="0" title="${title}">${label}</span>`;
 }
 
 let statusInfoOverlay = null;
@@ -2460,6 +2463,14 @@ function setupStatusChipEvents() {
   const employeesSection = document.getElementById('employees');
   if (!employeesSection) return;
   employeesSection.addEventListener('click', (event) => {
+    const chip = event.target.closest('.status-chip');
+    if (!chip || !employeesSection.contains(chip)) return;
+    if (!chip.dataset.statusPopup) return;
+    event.preventDefault();
+    handleStatusChipClick(chip);
+  });
+  employeesSection.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
     const chip = event.target.closest('.status-chip');
     if (!chip || !employeesSection.contains(chip)) return;
     if (!chip.dataset.statusPopup) return;
