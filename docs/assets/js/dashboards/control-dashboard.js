@@ -4091,7 +4091,15 @@
     return (ch && document.querySelector(`.channel[data-channel="${ch}"]`)) || document.body;
   }
   function scopeKeyOf(scope) {
-    return (scope && scope.dataset && (scope.dataset.channel || scope.dataset.kpiDetailPanel)) || 'doc';
+    return (scope && scope.dataset &&
+            (scope.dataset.channel || scope.dataset.kpiDetailPanel || scope.dataset.hydrateScope)) || 'doc';
+  }
+  // El footer vive fuera de los .channel, así que hydrate(activeChannelEl()) nunca lo
+  // alcanza: se hidrata como scope propio (una vez, y de nuevo en cada refetch).
+  // Sin guarda, hydrate(null) caería al channel activo y lo refetchearía de más.
+  function hydrateFooter(opts) {
+    const el = document.querySelector('[data-hydrate-scope="footer"]');
+    if (el) hydrate(el, opts);
   }
   // Invalidación: un cambio que afecta datos (filtro/ventana/reset) limpia todo y
   // recarga SOLO el channel activo; los demás se recargan al revisitarse.
@@ -4101,6 +4109,7 @@
     updateWindowLabels();
     updatePeriodLabels();
     hydrate(activeChannelEl(), { force: true });
+    hydrateFooter({ force: true });
   }
   // Cartel de ventana de las cards de 30d: refleja el filtro activo
   // (Desde/Hasta > Mes > 30d) — mismo orden que el backend (_periods.window_bounds).
@@ -4554,6 +4563,7 @@
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
+    hydrateFooter();
   }
 
   // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla) y
