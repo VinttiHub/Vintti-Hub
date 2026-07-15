@@ -4559,11 +4559,29 @@
     bindGlobalPeriodToggles();
     bindLeadTypeToggles();
     bindDtableFilters();
+    bindGlossary();
     bindStickyHead();
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
     hydrateFooter();
+  }
+
+  // Un <details> nativo solo alterna con su <summary>, así que el Glosario se queda
+  // abierto al clickear afuera. Lo cerramos como un popover: click fuera y Escape.
+  function bindGlossary() {
+    const el = document.querySelector('.glossary-pill');
+    if (!el) return;
+    document.addEventListener('click', (ev) => {
+      // Un click en el propio summary ya lo alterna el navegador: no lo pisamos.
+      if (el.open && !el.contains(ev.target)) el.open = false;
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape' || !el.open) return;
+      el.open = false;
+      const summary = el.querySelector('summary');
+      if (summary) summary.focus();
+    });
   }
 
   // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla) y
