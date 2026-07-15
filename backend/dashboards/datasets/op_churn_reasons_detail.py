@@ -35,7 +35,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
               ELSE ho.end_date::date
-            END AS end_d
+            END AS end_d,
+            CASE
+              WHEN NULLIF(TRIM(ho.buyout_daterange), '') IS NOT NULL
+                THEN TO_DATE(TRIM(ho.buyout_daterange) || '-01', 'YYYY-MM-DD')
+              ELSE NULL
+            END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           LEFT JOIN account a ON a.account_id = ho.account_id
@@ -50,6 +55,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.end_d BETWEEN v.win_ini AND v.win_fin
+            -- Solo bajas reales: excluir buyouts (igual que la card Candidate churn).
+            AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
           ORDER BY c.candidate_id, c.end_d DESC NULLS LAST, c.opportunity_id DESC
         )
         SELECT

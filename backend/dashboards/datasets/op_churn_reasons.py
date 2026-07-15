@@ -1,9 +1,10 @@
 """Operations · % de razón por la que se caen los candidatos.
 
-Población = la MISMA cohorte de bajas que la card "Candidate churn"
-(`candidate_churn_30d_summary`): candidatos de **Staffing** (cuenta no-interna)
-distintos cuyo `end_d = COALESCE(carga_inactive, end_date)` cae en la ventana. Así
-el total de la dona coincide 1:1 con las "bajas" de esa card.
+Población = la MISMA cohorte de bajas REALES que la card "Candidate churn"
+(`candidate_churn_30d_summary`, campo `bajas_real`): candidatos de **Staffing**
+(cuenta no-interna) distintos cuyo `end_d = COALESCE(carga_inactive, end_date)` cae
+en la ventana, EXCLUYENDO buyouts. Así el total de la dona coincide 1:1 con las
+"bajas reales" de esa card (no cuenta buyouts, igual que el churn).
 
 De cada candidato-baja se toma la razón (`inactive_reason`) del hire dado de baja
 más reciente; los que no tienen razón cargada se agrupan como 'Sin razón' — NO se
@@ -42,7 +43,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
               ELSE ho.end_date::date
-            END AS end_d
+            END AS end_d,
+            CASE
+              WHEN NULLIF(TRIM(ho.buyout_daterange), '') IS NOT NULL
+                THEN TO_DATE(TRIM(ho.buyout_daterange) || '-01', 'YYYY-MM-DD')
+              ELSE NULL
+            END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           LEFT JOIN account a ON a.account_id = ho.account_id
@@ -60,6 +66,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.end_d BETWEEN v.win_ini AND v.win_fin
+            -- Solo BAJAS REALES: excluir buyouts (igual que bajas_real de la card
+            -- Candidate churn). Buyout = buyout_daterange en/después del mes de baja.
+            AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
           ORDER BY c.candidate_id, c.end_d DESC NULLS LAST, c.opportunity_id DESC
         )
         SELECT
