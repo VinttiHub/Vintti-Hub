@@ -4256,7 +4256,10 @@
   // el channel/pestaña activa). Idempotente: lo ya cacheado se re-renderiza desde
   // cache (sin re-fetch) salvo force. Esto evita cargar las 4 pestañas + drawers de
   // una; cada pestaña/drawer carga on-demand → muchísimas menos queries por load.
-  let _hydrateGen = 0;  // R14 (#3): token de generación para descartar pasadas viejas (race)
+  // R14 (#3): token de generación para descartar pasadas viejas (race). Va POR scope:
+  // el footer y los drawers hidratan en paralelo con la pestaña, y un contador global
+  // hacía que la pasada de la pestaña se descartara entera (todo en "—").
+  const _hydrateGen = new Map();  // scopeKey -> generación en curso
   async function hydrate(scope, opts) {
     opts = opts || {};
     scope = scope || activeChannelEl();
@@ -4266,7 +4269,9 @@
       rerenderChartsInScope(scope); // ya cargado → solo re-pinta desde cache
       return;
     }
-    const myGen = ++_hydrateGen;  // R14: esta pasada; si arranca otra hydrate, esta se descarta
+    // R14: esta pasada; si arranca otra hydrate DEL MISMO scope, esta se descarta
+    const myGen = (_hydrateGen.get(scopeKey) || 0) + 1;
+    _hydrateGen.set(scopeKey, myGen);
     hydrateInflight++;
     document.body.classList.add('is-loading');
 
@@ -4293,7 +4298,7 @@
         const compKey = compKeyFor(chartKey, overrides);
         try {
           const r = await fetchChart(chartKey, overrides);
-          if (myGen !== _hydrateGen) return;  // R14 (#3): pasada superada por un filtro más nuevo → descartar
+          if (myGen !== _hydrateGen.get(scopeKey)) return;  // R14 (#3): pasada superada por un filtro más nuevo → descartar
           const rows = r.rows || [];
           lastFetchedRows.set(compKey, rows);
           els.forEach(el => {
@@ -4302,7 +4307,7 @@
             renderBinding(el, rows);
           });
         } catch (e) {
-          if (myGen !== _hydrateGen) return;  // R14 (#3): pasada superada → no pisar con un error viejo
+          if (myGen !== _hydrateGen.get(scopeKey)) return;  // R14 (#3): pasada superada → no pisar con un error viejo
           console.error(`fetch ${chartKey}`, e);
           if (!lastFetchedRows.has(compKey)) lastFetchedRows.set(compKey, []);
           // R14 (#7): marcar el error visualmente (distinto de "sin datos").
@@ -4314,7 +4319,7 @@
         }
       }));
 
-      if (myGen !== _hydrateGen) return;  // R14 (#3): llegó una hydrate más nueva → no pisar tablas/cohorts
+      if (myGen !== _hydrateGen.get(scopeKey)) return;  // R14 (#3): llegó una hydrate más nueva → no pisar tablas/cohorts
       // Re-render dtables con data-mf-all: ahora que la lista de opciones (ej. la de
       // recruiters) ya está en cache, reconstruye sus dropdowns con TODAS las opciones.
       scope.querySelectorAll('[data-mf-all][data-bind="dtable"]').forEach(el => {

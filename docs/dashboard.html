@@ -1054,8 +1054,10 @@
       </div>
     </div>
 
-    <!-- ============== SHARED SECTION · Cohort by contractor ============== -->
-    <header class="skpi-header skpi-header--cohort">
+    <!-- ============== SHARED SECTION · Cohort by contractor (Staffing only) ==============
+         cohort_by_contractor.py hardcodea `WHERE o.opp_model = 'Staffing'`: no hay dato de
+         Recruiting que mostrar, así que la sección se oculta en ese subtab. -->
+    <header class="skpi-header skpi-header--cohort" data-subtab="staffing">
       <div class="skpi-header__lead">
         <div class="skpi-header__avatar skpi-header__avatar--cohort">#</div>
         <h2 class="skpi-header__title">Cohort by contractor</h2>
@@ -1063,7 +1065,7 @@
       <div class="skpi-header__sub">Monthly client payment by contractor · Staffing</div>
     </header>
 
-    <div class="grid skpi-grid">
+    <div class="grid skpi-grid" data-subtab="staffing">
       <div class="cohort-card s-12">
         <header class="cohort-card__head">
           <div class="cohort-card__tabs" role="tablist" aria-label="Cohort metric">
@@ -1108,8 +1110,10 @@
       </div>
     </div>
 
-    <!-- ============== SHARED SECTION · Cohort by client ============== -->
-    <header class="skpi-header skpi-header--cohort">
+    <!-- ============== SHARED SECTION · Cohort by client (Staffing only) ==============
+         cohort_by_client.py hardcodea `WHERE o.opp_model = 'Staffing'` y es MRR-based:
+         no aplica a Recruiting, así que la sección se oculta en ese subtab. -->
+    <header class="skpi-header skpi-header--cohort" data-subtab="staffing">
       <div class="skpi-header__lead">
         <div class="skpi-header__avatar skpi-header__avatar--cohort">#</div>
         <h2 class="skpi-header__title">Cohort by client</h2>
@@ -1117,7 +1121,7 @@
       <div class="skpi-header__sub">Monthly client payment by client · Staffing</div>
     </header>
 
-    <div class="grid skpi-grid">
+    <div class="grid skpi-grid" data-subtab="staffing">
       <div class="cohort-card s-12" data-cohort-client-card>
         <div class="cohort-card__filters">
           <label class="cohort-filter">
@@ -9050,6 +9054,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=128" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=129" defer></script>
 </body>
 </html>
