@@ -55,16 +55,37 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         agg AS (
           SELECT industry, COUNT(*)::int AS c, COALESCE(SUM(rev), 0)::bigint AS rev
           FROM base GROUP BY industry
+        ),
+        shares AS (
+          SELECT
+            industry, c, rev,
+            SUM(c) OVER ()::int AS total_c,
+            SUM(rev) OVER ()::bigint AS total_rev,
+            FLOOR(100.0 * c / NULLIF(SUM(c) OVER (), 0))                         AS base_share,
+            (100.0 * c / NULLIF(SUM(c) OVER (), 0))
+              - FLOOR(100.0 * c / NULLIF(SUM(c) OVER (), 0))                     AS frac
+          FROM agg
+        ),
+        -- Largest-remainder (Hamilton): el frontend muestra el share como ENTERO
+        -- (Math.round), asi que 3 opps de 1/3 daban 33+33+33=99. Repartimos el
+        -- residuo (100 - suma de los pisos) de +1 en +1 a las filas de mayor
+        -- fraccion decimal para que los enteros cierren EXACTO en 100. Ver Hallazgo 34.
+        adj AS (
+          SELECT
+            shares.*,
+            (100 - SUM(base_share) OVER ())::int AS residual,
+            ROW_NUMBER() OVER (ORDER BY frac DESC, c DESC, industry) AS rn
+          FROM shares
         )
         SELECT
           industry,
           c AS count,
           rev AS expected_revenue,
-          ROUND(100.0 * c / NULLIF(SUM(c) OVER (), 0), 1)::float AS share_pct,
-          SUM(c) OVER ()::int AS total,
-          SUM(rev) OVER ()::bigint AS total_revenue,
+          (base_share + CASE WHEN rn <= residual THEN 1 ELSE 0 END)::float AS share_pct,
+          total_c AS total,
+          total_rev AS total_revenue,
           %(label)s::text AS period_label
-        FROM agg
+        FROM adj
         ORDER BY c DESC, industry;
     """
     return sql, {"ini": ini, "fin": fin, "label": label}
