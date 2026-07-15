@@ -76,7 +76,12 @@ COHORT_CTES = """
           WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
           WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
           ELSE h.end_date::date
-        END AS end_d
+        END AS end_d,
+        CASE
+          WHEN NULLIF(TRIM(h.buyout_daterange), '') IS NOT NULL
+            THEN TO_DATE(TRIM(h.buyout_daterange) || '-01', 'YYYY-MM-DD')
+          ELSE NULL
+        END AS buyout_d
       FROM hire_opportunity h
       JOIN opportunity o ON o.opportunity_id = h.opportunity_id
       LEFT JOIN account a ON a.account_id = h.account_id
@@ -90,24 +95,38 @@ COHORT_CTES = """
           WHEN ho.end_d IS NOT NULL AND ho.end_d <= v.corte_d THEN 'BAJA'
           WHEN COALESCE(ho.end_d, DATE '9999-12-31') > v.corte_d THEN 'ACTIVO'
           ELSE 'FUERA'
-        END AS estado
+        END AS estado,
+        -- Clasificación buyout vs real, igual que candidate_churn_window_summary.
+        CASE
+          WHEN ho.end_d IS NOT NULL AND ho.end_d <= v.corte_d
+            AND ho.buyout_d IS NOT NULL AND ho.buyout_d >= DATE_TRUNC('month', ho.end_d)
+            THEN 'BAJA_BUYOUT'
+          WHEN ho.end_d IS NOT NULL AND ho.end_d <= v.corte_d
+            THEN 'BAJA_REAL'
+          ELSE NULL
+        END AS baja_tipo
       FROM ho
       CROSS JOIN ventana v
       WHERE ho.start_d IS NOT NULL
         AND ho.start_d BETWEEN v.win_ini AND v.corte_d
     ),
     per_candidate AS (
-      SELECT candidate_id, BOOL_OR(estado = 'ACTIVO') AS is_active
+      SELECT
+        candidate_id,
+        BOOL_OR(estado = 'ACTIVO')          AS is_active,
+        BOOL_OR(baja_tipo = 'BAJA_REAL')    AS any_real
       FROM detalle GROUP BY candidate_id
     ),
     baja_hire AS (
-      -- Un candidato-baja: NINGÚN hire suyo en la ventana sigue activo. Se toma el
-      -- hire dado de baja más reciente como representante (su razón/account/opp).
+      -- Candidato baja REAL = bajas_real de la card churn M3: no activo Y con al menos
+      -- un hire dado de baja REAL (no buyout). Se toma el hire de baja real más reciente
+      -- como representante (su razón/account/opp). Los buyouts NO cuentan.
       SELECT DISTINCT ON (d.candidate_id)
         d.candidate_id, d.account_id, d.opportunity_id, d.reason, d.end_d
       FROM detalle d
-      JOIN per_candidate pc ON pc.candidate_id = d.candidate_id AND pc.is_active = FALSE
-      WHERE d.estado = 'BAJA'
+      JOIN per_candidate pc
+        ON pc.candidate_id = d.candidate_id AND pc.is_active = FALSE AND pc.any_real
+      WHERE d.baja_tipo = 'BAJA_REAL'
       ORDER BY d.candidate_id, d.end_d DESC NULLS LAST
     )
 """
