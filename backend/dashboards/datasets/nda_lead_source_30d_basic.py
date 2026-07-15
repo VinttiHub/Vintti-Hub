@@ -99,7 +99,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           w.lead_source,
           COUNT(*)::int AS total_closed_opps,
-          ROUND(COUNT(*)::numeric * 100.0 / NULLIF(t.total, 0), 1) AS pct_of_total,
+          -- Porcentaje CRUDO (sin pre-redondear): el frontend redondea una sola vez,
+          -- igual que la leyenda de la dona. Antes ROUND(,1) daba 45.5 y el formateador
+          -- lo subia a 46, mientras la leyenda mostraba 45 (5 sobre 11). Ver Hallazgo 33.
+          (COUNT(*)::numeric * 100.0 / NULLIF(t.total, 0))::float AS pct_of_total,
           COUNT(*) FILTER (WHERE w.opp_stage = 'Close Win')::int   AS close_win,
           COUNT(*) FILTER (WHERE w.opp_stage = 'Closed Lost')::int AS closed_lost
         FROM windowed w
