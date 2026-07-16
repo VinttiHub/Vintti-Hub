@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Candidate Success Journal • Vintti Hub</title>
+    <script src="./assets/js/auth-guard.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Onest:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./assets/css/candidate-success-overview.css?v=2" />
+    <link rel="stylesheet" href="./assets/css/mobile.css?v=4" />
+  </head>
+  <body>
+    <main class="shell">
+      <a class="topback" id="breadcrumbBack" href="#">
+        <span aria-hidden="true">←</span> Candidate details
+      </a>
+
+      <header class="masthead">
+        <p class="eyebrow"><span>Candidate success journal</span></p>
+        <h1 id="candidateName" class="masthead__name">Loading candidate…</h1>
+        <p class="masthead__lede">
+          A chronological read of every success note captured while this candidate settles in.
+        </p>
+        <dl class="masthead__meta">
+          <div>
+            <dt>Updates logged</dt>
+            <dd id="highlightCount">—</dd>
+          </div>
+          <div>
+            <dt>Latest milestone</dt>
+            <dd id="highlightLatest">—</dd>
+          </div>
+        </dl>
+      </header>
+
+      <section class="timeline-wrap">
+        <div class="timeline-head">
+          <h2>Success timeline</h2>
+          <p>Every entry is a note from the Candidate Success box, oldest at the top.</p>
+        </div>
+
+        <div id="timeline" class="spine" aria-live="polite"></div>
+
+        <div id="emptyState" class="empty" style="display:none;">
+          <span class="empty__emoji" aria-hidden="true">🌱</span>
+          <p class="empty__title">No success notes yet</p>
+          <p class="empty__text">
+            Once you log updates in the Candidate Success box, they'll grow into a timeline here.
+          </p>
+        </div>
+
+        <a id="footerBack" class="footback" href="#">
+          <span aria-hidden="true">←</span> Back to candidate details
+        </a>
+      </section>
+    </main>
+
+    <script src="./assets/js/candidate-success-overview.js?v=6" defer></script>
+  </body>
+</html>

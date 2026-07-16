@@ -417,9 +417,12 @@
 
           <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
           <div class="field textarea">
-            <label>
-              <img src="assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
-              Candidate success
+            <label style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <img src="assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+                Candidate success
+              </span>
+              <a id="candidate-success-overview-link" class="pill pill-link" href="candidate-success-overview.html" target="_blank" rel="noopener">🧭 Success overview →</a>
             </label>
             <div class="rich-toolbar" id="candidate-succes-toolbar">
               <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
@@ -1114,5 +1117,14 @@
       toast.classList.add('show');
       setTimeout(()=> toast.classList.remove('show'), 5000);
     });
+  })();
+</script>
+<script>
+  // Point the "Success overview" button at the standalone overview page for this candidate.
+  (function(){
+    const link = document.getElementById('candidate-success-overview-link');
+    if (!link) return;
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (id) link.href = `candidate-success-overview.html?id=${encodeURIComponent(id)}`;
   })();
 </script>

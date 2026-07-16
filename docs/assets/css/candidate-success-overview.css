@@ -1,0 +1,402 @@
+/* ==========================================================================
+   Candidate Success Journal
+   An editorial "growth journal" for a candidate's onboarding notes.
+   Display: Fraunces (serif, character) · Body/UI: Onest · Accent: Vintti lime.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+  --paper: #f3f6ec;
+  --paper-2: #eef3e2;
+  --panel: #ffffff;
+  --ink: #14231a;
+  --ink-2: #566259;
+  --ink-3: #8a958c;
+  --lime: #c1ff72;
+  --lime-tint: #e7fbc6;
+  --lime-ink: #3f6b0a;      /* dark lime — readable as text on light */
+  --violet: #6c38ff;        /* second accent, used only on stage numerals */
+  --line: rgba(20, 35, 26, 0.10);
+  --line-soft: rgba(20, 35, 26, 0.06);
+  --shadow: 0 1px 0 rgba(20, 35, 26, 0.04), 0 18px 40px -24px rgba(20, 35, 26, 0.30);
+  --page: 940px;
+  font-family: "Onest", "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.55;
+  background:
+    radial-gradient(120% 80% at 100% -10%, rgba(193, 255, 114, 0.35), transparent 60%),
+    radial-gradient(90% 70% at -10% 0%, rgba(108, 56, 255, 0.06), transparent 55%),
+    var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  width: min(100%, var(--page));
+  margin: 0 auto;
+  padding: 1.75rem clamp(1.1rem, 4vw, 2.5rem) 4rem;
+}
+
+/* ---- Back link ---------------------------------------------------------- */
+.topback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 0.35rem 0;
+  transition: color 0.18s ease, gap 0.18s ease;
+}
+
+.topback:hover {
+  color: var(--ink);
+  gap: 0.6rem;
+}
+
+/* ---- Masthead ----------------------------------------------------------- */
+.masthead {
+  padding: 2rem 0 2.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  margin: 0 0 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lime-ink);
+}
+
+/* Highlighter swipe — the journal signature */
+.eyebrow span {
+  display: inline;
+  background: linear-gradient(var(--lime), var(--lime));
+  background-size: 100% 42%;
+  background-position: 0 78%;
+  background-repeat: no-repeat;
+  padding: 0 0.15em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.masthead__name {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: clamp(2.5rem, 7vw, 4.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.masthead__lede {
+  margin: 1rem 0 0;
+  max-width: 46ch;
+  font-size: 1.06rem;
+  color: var(--ink-2);
+}
+
+.masthead__meta {
+  margin: 1.9rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.75rem;
+}
+
+.masthead__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.masthead__meta dt {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.masthead__meta dd {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+  font-size: 1.6rem;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* ---- Timeline section --------------------------------------------------- */
+.timeline-wrap {
+  margin-top: 2.75rem;
+  counter-reset: step;
+}
+
+.timeline-head h2 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.timeline-head p {
+  margin: 0.3rem 0 0;
+  color: var(--ink-2);
+}
+
+/* The spine: a continuous line the entries hang off of. */
+.spine {
+  position: relative;
+  margin-top: 2.25rem;
+  padding-left: 2.5rem;
+}
+
+.spine::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--lime-ink) 0%, rgba(63, 107, 10, 0.35) 45%, var(--line) 100%);
+  border-radius: 999px;
+}
+
+/* ---- Entry card --------------------------------------------------------- */
+.entry-card {
+  counter-increment: step;
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  padding: 1.35rem 1.6rem 1.5rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  animation: entry-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(63, 107, 10, 0.25);
+  box-shadow: 0 1px 0 rgba(20, 35, 26, 0.04), 0 26px 50px -26px rgba(20, 35, 26, 0.38);
+}
+
+/* Node on the spine */
+.entry-card::before {
+  content: "";
+  position: absolute;
+  top: 1.6rem;
+  left: -1.94rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--lime);
+  border: 2.5px solid var(--panel);
+  box-shadow: 0 0 0 2px var(--lime-ink);
+}
+
+/* Ghost stage numeral — legit because entries are a real ordered sequence */
+.entry-card::after {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  top: 0.85rem;
+  right: 1.25rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: rgba(108, 56, 255, 0.16);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+
+.entry-head {
+  margin-bottom: 0.8rem;
+}
+
+.entry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--lime-tint);
+  color: var(--lime-ink);
+  padding: 0.28rem 0.7rem 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.entry-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime-ink);
+}
+
+.entry-title {
+  margin: 0;
+  padding-right: 2.5rem;      /* clear the ghost numeral */
+  font-size: 1.18rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.entry-title + .entry-body {
+  margin-top: 0.85rem;
+}
+
+.entry-head + .entry-body {
+  margin-top: 0.2rem;
+}
+
+.entry-body {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.entry-body li {
+  position: relative;
+  padding-left: 1.4rem;
+  color: #2c3a30;
+  line-height: 1.55;
+}
+
+.entry-body li::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.62rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 0 1.5px rgba(63, 107, 10, 0.45);
+}
+
+/* ---- Empty state -------------------------------------------------------- */
+.empty {
+  margin-top: 1rem;
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  border-radius: 20px;
+  border: 1px dashed rgba(63, 107, 10, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.empty__emoji {
+  font-size: 2.4rem;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+
+.empty__title {
+  margin: 0 0 0.3rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+
+.empty__text {
+  margin: 0 auto;
+  max-width: 40ch;
+  color: var(--ink-2);
+}
+
+/* ---- Footer back -------------------------------------------------------- */
+.footback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 2rem;
+  font-weight: 600;
+  color: var(--lime-ink);
+  text-decoration: none;
+  transition: gap 0.18s ease;
+}
+
+.footback:hover {
+  gap: 0.6rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---- Motion / a11y ------------------------------------------------------ */
+@keyframes entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.entry-card:nth-child(1) { animation-delay: 0.02s; }
+.entry-card:nth-child(2) { animation-delay: 0.09s; }
+.entry-card:nth-child(3) { animation-delay: 0.16s; }
+.entry-card:nth-child(4) { animation-delay: 0.23s; }
+.entry-card:nth-child(5) { animation-delay: 0.30s; }
+.entry-card:nth-child(6) { animation-delay: 0.37s; }
+
+a:focus-visible,
+.entry-card:focus-visible {
+  outline: 2.5px solid var(--violet);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-card {
+    animation: none;
+  }
+  .topback,
+  .footback {
+    transition: none;
+  }
+}
+
+/* ---- Responsive --------------------------------------------------------- */
+@media (max-width: 560px) {
+  .spine {
+    padding-left: 1.9rem;
+  }
+  .entry-card {
+    padding: 1.2rem 1.2rem 1.3rem;
+  }
+  .entry-card::after {
+    font-size: 2rem;
+    top: 0.7rem;
+    right: 1rem;
+  }
+  .masthead__meta {
+    gap: 1.75rem;
+  }
+}
