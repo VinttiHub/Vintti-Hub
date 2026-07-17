@@ -264,18 +264,38 @@ body {
     background-color: #b6ea2a;
 }
 .stage-dropdown {
-    padding: 6px 10px;
-    border-radius: 12px;
-    border: 1px solid #ccc;
-    font-size: 13px;
-    width: 100px;
-    max-width: 100px;
-    background-color: #fefefe;
-    color: #333;
+    padding: 4px 26px 4px 12px;
+    border-radius: 999px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    width: 120px;
+    max-width: 120px;
+    background-color: #f1f5f9;
+    color: #334155;
     font-family: 'Onest', sans-serif;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: none;
     appearance: none;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    -webkit-appearance: none;
+    cursor: pointer;
+    /* Flechita custom (chevron) para controlar el look cross-browser */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    transition: box-shadow 0.2s ease, background-color 0.2s ease, filter 0.2s ease;
+}
+
+.stage-dropdown:hover {
+    filter: brightness(0.97);
+}
+
+/* Estados finales (Signed / Close Win / Closed Lost) van deshabilitados:
+   sin flechita ni cursor de click. */
+.stage-dropdown:disabled {
+    cursor: default;
+    background-image: none;
+    padding-right: 12px;
+    opacity: 1;
 }
 
 .filter-dropdown {
@@ -1126,40 +1146,42 @@ body {
     flex: 1 1 100%;
   }
 }
+/* Dos tonos por estado: se conserva el fondo original de cada stage y se le suma
+   el texto saturado de la misma familia de color. */
 .stage-color-signed {
-  background-color: #b7f3ef !important; /* aqua pastel para Signed */
+  background-color: #b7f3ef !important; color: #0E7490 !important; /* aqua */
 }
 
 .stage-color-close-win {
-  background-color: #8bfc9c !important; /* verde pastel suave (éxito) */
+  background-color: #8bfc9c !important; color: #166534 !important; /* verde (éxito) */
 }
 
 .stage-color-closed-lost {
-  background-color: #f9c2c2 !important; /* rojo pastel claro (error/pérdida) */
+  background-color: #f9c2c2 !important; color: #B91C1C !important; /* rojo (pérdida) */
 }
 
 .stage-color-negotiating {
-  background-color: #fff3cc !important; /* amarillo pastel (precaución/negociación) */
+  background-color: #fff3cc !important; color: #A16207 !important; /* amarillo (negociación) */
 }
 
 .stage-color-interviewing {
-  background-color: #e0f0ff !important; /* azul pastel (proceso activo) */
+  background-color: #e0f0ff !important; color: #1D4ED8 !important; /* celeste (proceso activo) */
 }
 
 .stage-color-stop {
-  background-color: #e2e8f0 !important; /* gris suave (pausa) */
+  background-color: #e2e8f0 !important; color: #475569 !important; /* gris (pausa) */
 }
 
 .stage-color-sourcing {
-  background-color: #e4fbe6 !important; /* verde menta pastel (búsqueda/fresco) */
+  background-color: #e4fbe6 !important; color: #15803D !important; /* menta (búsqueda) */
 }
 
 .stage-color-nda-sent {
-  background-color: #fcdb94 !important; /* durazno pastel (documentos enviados) */
+  background-color: #fcdb94 !important; color: #92400E !important; /* durazno (documentos enviados) */
 }
 
 .stage-color-deep-dive {
-  background-color: #f3e8fd !important; /* lila suave (investigación profunda) */
+  background-color: #f3e8fd !important; color: #7E22CE !important; /* lila (investigación) */
 }
 
 .filter-header i.rotate-up {
