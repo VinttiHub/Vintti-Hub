@@ -984,6 +984,25 @@ function fillEmployeesTables(candidates, buyouts = []) {
   let hasActiveStaffing = false;
   let hasActiveRecruiting = false;
 
+  // Orden de employees: activos primero, luego inactivos; dentro de cada grupo por
+  // antigüedad (start date más antiguo primero). Aplica a Staffing y Recruiting por igual.
+  const employeeStatusRank = (candidate = {}) => {
+    const status = (candidate.status ?? (candidate.end_date ? 'inactive' : 'active'))
+      .toString().trim().toLowerCase();
+    return status === 'inactive' ? 1 : 0;
+  };
+  const employeeStartKey = (candidate = {}) => dateInputValue(candidate.start_date) || '';
+  candidateList.sort((a, b) => {
+    const rankDiff = employeeStatusRank(a) - employeeStatusRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    const aStart = employeeStartKey(a);
+    const bStart = employeeStartKey(b);
+    if (aStart && bStart) return aStart.localeCompare(bStart); // más antiguo primero
+    if (aStart) return -1; // los que tienen fecha van antes que los que no
+    if (bStart) return 1;
+    return 0;
+  });
+
   candidateList.forEach(candidate => {
     // ---------- STAFFING ----------
     if (candidate.opp_model === 'Staffing') {
