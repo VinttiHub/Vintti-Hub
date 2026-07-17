@@ -682,6 +682,129 @@ body[data-talent-drop="true"] .resume-rating {
   list-style-type: disc;
 }
 
+/* ===== Multi-company: varios cargos en la misma empresa (estilo LinkedIn) =====
+   El encabezado de la empresa se muestra una sola vez y los cargos se anidan
+   debajo con su propia sub-línea y puntos pequeños. */
+.cv-entry.multi-company .cv-entry-company {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.multi-timeline {
+  position: relative;
+  margin-left: 6px;
+  padding-left: 20px;
+}
+
+/* Sub-línea vertical que conecta los cargos de la misma empresa */
+.multi-timeline::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: #e5e7eb;
+}
+
+.multi-role {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.multi-role:last-child {
+  padding-bottom: 0;
+}
+
+/* Punto pequeño por cada cargo */
+.multi-role::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #9ca3af;
+  border: 2px solid #fff;
+  z-index: 2;
+}
+
+.multi-role .cv-entry-role {
+  margin-bottom: 2px;
+}
+
+.multi-dates {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+/* La duración va en línea junto al rango de fechas: "… – … · 4 mos" */
+.multi-dates .cv-entry-duration {
+  display: inline;
+  margin-top: 0;
+}
+
+.multi-dates .cv-entry-duration::before {
+  content: " · ";
+}
+
+.multi-desc {
+  margin: 4px 0 0;
+}
+
+/* ===== Logo de empresa (solo Client Version; en Talent Drop no se renderiza) ===== */
+.cv-entry-headline {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cv-entry-headline-text {
+  min-width: 0;
+}
+
+/* En multi-company el logo se alinea con el encabezado de la empresa */
+.cv-entry.multi-company .cv-entry-headline {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cv-entry.multi-company .cv-entry-headline .cv-entry-company {
+  margin-bottom: 0;
+}
+
+.cv-company-logo {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: 1px solid #eceef2;
+}
+
+.cv-company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+}
+
+/* Fallback: monograma con la inicial de la empresa */
+.cv-company-logo--mono {
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  background: var(--logo-bg, #003BFF);
+  border-color: transparent;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .timeline::before {

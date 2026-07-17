@@ -479,8 +479,21 @@ function renderExperienceEntry(exp) {
     summaryDiv.className = "cv-entry-summary resume-description";
     summaryDiv.innerHTML = cleanHTML(exp.description || "");
 
-    right.appendChild(roleDiv);
-    right.appendChild(companyDiv);
+    const logo = renderCompanyLogo(exp.company, isTalentDrop);
+    if (logo) {
+      const headline = document.createElement("div");
+      headline.className = "cv-entry-headline";
+      const headlineText = document.createElement("div");
+      headlineText.className = "cv-entry-headline-text";
+      headlineText.appendChild(roleDiv);
+      headlineText.appendChild(companyDiv);
+      headline.appendChild(logo);
+      headline.appendChild(headlineText);
+      right.appendChild(headline);
+    } else {
+      right.appendChild(roleDiv);
+      right.appendChild(companyDiv);
+    }
     right.appendChild(summaryDiv);
 
     entry.appendChild(left);
@@ -489,6 +502,13 @@ function renderExperienceEntry(exp) {
   }
 
   // ---------- CASO MULTI-ROLES (misma empresa, varios cargos) ----------
+  return renderMultiRoleEntry(exp.company, exp.location || exp.country || "", roles);
+}
+
+/* Render de un bloque de empresa con varios cargos. Comparte el markup entre
+   el pack multi-roles embebido en UNA entrada y la agrupación automática de
+   VARIAS entradas separadas de la misma empresa (estilo LinkedIn). */
+function renderMultiRoleEntry(company, locationText, roles) {
   const hasCurrent = roles.some((r) => r.current);
   const overallStart = roles.reduce((min, r) => {
     const d = safeDate(r.start_date);
@@ -522,7 +542,6 @@ function renderExperienceEntry(exp) {
     left.appendChild(durationDiv);
   }
 
-  const locationText = exp.location || exp.country || "";
   if (locationText) {
     const locDiv = document.createElement("div");
     locDiv.className = "cv-entry-location";
@@ -535,8 +554,18 @@ function renderExperienceEntry(exp) {
 
   const companyDiv = document.createElement("div");
   companyDiv.className = "cv-entry-company";
-  renderCompanyName(companyDiv, exp.company, isTalentDrop);
-  right.appendChild(companyDiv);
+  renderCompanyName(companyDiv, company, isTalentDrop);
+
+  const logo = renderCompanyLogo(company, isTalentDrop);
+  if (logo) {
+    const headline = document.createElement("div");
+    headline.className = "cv-entry-headline";
+    headline.appendChild(logo);
+    headline.appendChild(companyDiv);
+    right.appendChild(headline);
+  } else {
+    right.appendChild(companyDiv);
+  }
 
   const rolesContainer = document.createElement("div");
   rolesContainer.className = "multi-timeline";
@@ -582,10 +611,64 @@ function renderExperienceEntry(exp) {
   return entry;
 }
 
+/* Convierte una entrada de experiencia en su lista de cargos (roles).
+   Si trae un pack multi-roles usa esos; si no, un único rol con sus datos. */
+function expToRoles(exp) {
+  const roles = extractMultiRoles(exp);
+  if (roles && roles.length) return roles;
+  return [{
+    title: exp.title || "",
+    start_date: exp.start_date || "",
+    end_date: exp.current ? "" : (exp.end_date || ""),
+    current: !!exp.current,
+    description_html: exp.description || "",
+  }];
+}
 
-/* Pintamos la experiencia (orden existente por fin de contrato) */
-sortByEndDateDescending(workExperience).forEach((exp) => {
-  workExperienceList.appendChild(renderExperienceEntry(exp));
+/* Agrupa varias entradas separadas de la misma empresa bajo un solo encabezado,
+   ordenando los cargos del más reciente al más antiguo. */
+function renderGroupedCompanyEntry(items) {
+  const company = items.map((e) => e.company).find((c) => String(c || "").trim()) || items[0].company;
+  const locationText = items.map((e) => e.location || e.country || "").find(Boolean) || "";
+  const roles = items
+    .flatMap(expToRoles)
+    .sort((a, b) => {
+      const aEnd = a.current || !a.end_date ? new Date(2100, 0, 1) : new Date(a.end_date);
+      const bEnd = b.current || !b.end_date ? new Date(2100, 0, 1) : new Date(b.end_date);
+      return bEnd - aEnd;
+    });
+  return renderMultiRoleEntry(company, locationText, roles);
+}
+
+/* Clave normalizada de empresa para agrupar. Vacío ("" / "—") = no agrupar. */
+function normalizeCompanyKey(company) {
+  const c = String(company || "").trim().toLowerCase();
+  if (!c || c === "—") return "";
+  return c;
+}
+
+
+/* Pintamos la experiencia (orden por fin de contrato). Antes de renderizar,
+   agrupamos entradas ADYACENTES de la misma empresa para mostrarlas juntas
+   bajo un único encabezado, como hace LinkedIn. */
+const sortedWorkExperience = sortByEndDateDescending(workExperience);
+const workExperienceGroups = [];
+sortedWorkExperience.forEach((exp) => {
+  const key = normalizeCompanyKey(exp.company);
+  const lastGroup = workExperienceGroups[workExperienceGroups.length - 1];
+  if (lastGroup && key && lastGroup.key === key) {
+    lastGroup.items.push(exp);
+  } else {
+    workExperienceGroups.push({ key, items: [exp] });
+  }
+});
+
+workExperienceGroups.forEach((group) => {
+  if (group.items.length === 1) {
+    workExperienceList.appendChild(renderExperienceEntry(group.items[0]));
+  } else {
+    workExperienceList.appendChild(renderGroupedCompanyEntry(group.items));
+  }
 });
 
 // 🎓 Education
@@ -829,6 +912,29 @@ function getCompanyNames(workExperience) {
       .map((experience) => String(experience?.company || "").trim())
       .filter((company) => company && company !== "—")
   )].sort((a, b) => b.length - a.length);
+}
+
+/* Color determinístico para el monograma según el nombre de la empresa. */
+function monogramColor(name) {
+  const palette = ["#003BFF", "#6c38ff", "#4ba9ff", "#ff1fdb", "#2563eb", "#7c3aed", "#0ea5e9"];
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return palette[hash % palette.length];
+}
+
+/* Monograma de la empresa: un cuadrito de color con la inicial. Sin llamadas
+   externas (nada de APIs de logos), así funciona igual en pantalla y en el PDF.
+   En Talent Drop no se muestra para no revelar la identidad censurada. */
+function renderCompanyLogo(company, isTalentDrop) {
+  if (isTalentDrop) return null;
+  const name = String(company || "").trim();
+  if (!name || name === "—") return null;
+
+  const wrap = document.createElement("div");
+  wrap.className = "cv-company-logo cv-company-logo--mono";
+  wrap.textContent = name.charAt(0).toUpperCase();
+  wrap.style.setProperty("--logo-bg", monogramColor(name));
+  return wrap;
 }
 
 function blurCanvasPixels(canvas, radius = 10, passes = 3) {
