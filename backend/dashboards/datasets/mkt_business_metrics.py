@@ -160,10 +160,59 @@ _PG_SQL = """
               / NULLIF(COUNT(*) FILTER (WHERE dec_prev), 0), 1)::float AS prev
       FROM dec
     ),
+    -- LTV (avg meses activos por cliente de Staffing) — mismo bloque canonico que
+    -- mkt_revenue_mix.py. El net revenue de Staffing se proyecta sobre la vida
+    -- promedio del cliente (fee * LTV); Recruiting queda one-shot. Asi el KPI
+    -- 'Net revenue' del strip reconcilia con la card Revenue mix y su detalle.
+    ltv_base AS (
+      SELECT c.candidate_id, c.account_id, c.start_d, c.end_d
+      FROM (
+        SELECT ho.candidate_id, ho.account_id,
+          CASE WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+               WHEN NULLIF(ho.start_date::text,'') IS NOT NULL THEN ho.start_date::date
+               ELSE NULL END AS start_d,
+          CASE WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+               WHEN NULLIF(ho.end_date::text,'') IS NULL THEN NULL
+               ELSE ho.end_date::date END AS end_d
+        FROM hire_opportunity ho
+        JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+        LEFT JOIN account a ON a.account_id = ho.account_id
+        WHERE ho.account_id IS NOT NULL
+          AND o.opp_model = 'Staffing'
+          AND COALESCE(a.vintti_internal, FALSE) = FALSE
+      ) c
+      WHERE c.start_d IS NOT NULL
+    ),
+    ltv_meses AS (
+      SELECT DATE_TRUNC('month', gs)::date AS mes
+      FROM generate_series(
+        (SELECT MIN(start_d) FROM ltv_base),
+        (SELECT MAX(COALESCE(end_d, CURRENT_DATE)) FROM ltv_base),
+        INTERVAL '1 month'
+      ) gs
+    ),
+    ltv_activos_mes AS (
+      SELECT m.mes, b.account_id, COUNT(DISTINCT b.candidate_id) AS activos
+      FROM ltv_meses m
+      JOIN ltv_base b
+        ON b.start_d < (m.mes + INTERVAL '1 month')
+       AND (b.end_d IS NULL OR b.end_d >= m.mes)
+      GROUP BY 1, 2
+    ),
+    ltv_duracion AS (
+      SELECT account_id, COUNT(*) AS active_months
+      FROM ltv_activos_mes
+      WHERE activos > 0
+      GROUP BY account_id
+    ),
+    ltv_months AS (
+      SELECT COALESCE(ROUND(AVG(active_months)), 0)::int AS ltv
+      FROM ltv_duracion
+    ),
     rev_opp AS (
       SELECT o.opportunity_id, NULLIF(o.opp_close_date::text, '')::date AS cdte,
         COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(ho.revenue, 0)
-                          ELSE COALESCE(ho.fee, 0) END), 0)::numeric AS rev
+                          ELSE COALESCE(ho.fee, 0) * (SELECT ltv FROM ltv_months) END), 0)::numeric AS rev
       FROM opportunity o
       JOIN account a ON a.account_id = o.account_id
       LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
