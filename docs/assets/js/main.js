@@ -2254,7 +2254,12 @@ function paintLeadDots(selectedList) {
   leadDotBar.innerHTML = '';
   if (!selectedList.length) return;
 
-  selectedList.forEach(label => {
+  // Mostramos como máximo N avatares y el resto se resume en un "+X"
+  const MAX_DOTS = 5;
+  const shown = selectedList.slice(0, MAX_DOTS);
+  const extra = selectedList.length - shown.length;
+
+  shown.forEach(label => {
     const span = document.createElement('span');
     span.className = 'lead-dot';
 
@@ -2294,6 +2299,15 @@ function paintLeadDots(selectedList) {
 
     leadDotBar.appendChild(span);
   });
+
+  if (extra > 0) {
+    const more = document.createElement('span');
+    more.className = 'lead-dot lead-dot--more';
+    more.textContent = `+${extra}`;
+    more.setAttribute('title', `+${extra} more`);
+    more.setAttribute('aria-label', `+${extra} more`);
+    leadDotBar.appendChild(more);
+  }
 }
 
   // Aplicar filtro + refrescar barras
@@ -3998,10 +4012,15 @@ function hrDisplayHTML(email) {
     : resolveAvatar(email);
   const nameTip  = displayNameForHR(email);
 
-  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+  // Mostramos SOLO el avatar cuando existe; las iniciales quedan como fallback
+  // (ocultas), y reaparecen si la imagen falla (onerror).
+  const img = avatar
+    ? `<img class="lead-avatar" src="${avatar}" alt="" loading="lazy" onerror="this.style.display='none';var b=this.parentNode.querySelector('.lead-bubble');if(b)b.style.display='inline-flex';">`
+    : '';
+  const bubble = `<span class="lead-bubble"${avatar ? ' style="display:none;"' : ''}>${initials}</span>`;
   return `
     <div class="hr-lead lead-tip" data-tip="${escapeHtml(nameTip)}">
-      <span class="lead-bubble">${initials}</span>
+      ${bubble}
       ${img}
     </div>
   `;
@@ -4016,10 +4035,15 @@ function salesDisplayHTML(emailOrName) {
     : resolveAvatar(key);
   const nameTip  = displayNameForSales(emailOrName);
 
-  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+  // Mostramos SOLO el avatar cuando existe; las iniciales quedan como fallback
+  // (ocultas), y reaparecen si la imagen falla (onerror).
+  const img = avatar
+    ? `<img class="lead-avatar" src="${avatar}" alt="" loading="lazy" onerror="this.style.display='none';var b=this.parentNode.querySelector('.lead-bubble');if(b)b.style.display='inline-flex';">`
+    : '';
+  const bubble = `<span class="lead-bubble ${bubbleCl}"${avatar ? ' style="display:none;"' : ''}>${initials}</span>`;
   return `
     <div class="sales-lead lead-tip" data-tip="${escapeHtml(nameTip)}">
-      <span class="lead-bubble ${bubbleCl}">${initials}</span>
+      ${bubble}
       ${img}
     </div>
   `;

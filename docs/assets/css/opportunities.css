@@ -911,12 +911,12 @@ body {
 
 .multi-filter {
   background: #fff;
-  border: 1px solid #ccc;
+  border: 1px solid #E5E7EB;
   border-radius: 14px;
   padding: 8px 10px;
   font-family: 'Onest', sans-serif;
   font-size: 13px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1098,14 +1098,14 @@ body {
 .text-filter select,
 .text-filter button {
   padding: 8px 10px;
-  border: 1px solid #e1d0ff;
+  border: 1px solid #E5E7EB;
   border-radius: 14px;
   font-family: 'Onest', sans-serif;
   font-size: 14px;
   background-color: white;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 .text-filter input:focus,
@@ -1219,8 +1219,8 @@ body {
   color: #205493;
 }
 .lead-avatar {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 0 0 1px rgba(0,0,0,.06);
@@ -1294,7 +1294,7 @@ body {
   display:inline-flex; align-items:center; justify-content:center;
   border-radius:999px; font-weight:600; font-size:12px;
 }
-.hr-lead .lead-avatar { width: 22px; height: 22px; border-radius: 999px; object-fit: cover; }
+.hr-lead .lead-avatar { width: 26px; height: 26px; border-radius: 999px; object-fit: cover; }
 /* Header como fila flexible para que quepan el label, los puntitos y el botón */
 .filter-header{
   display:flex;
@@ -1399,9 +1399,9 @@ body {
 .filter-header .lead-dot-bar{
   display:flex;
   align-items:center;
-  gap:6px;
+  gap:0;
   margin-left:8px;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;       /* una sola fila; los avatares se superponen */
 }
 
 /* Puntito-Avatar (más grande que el de stage) */
@@ -1415,11 +1415,22 @@ body {
   justify-content:center;
   background:#f1f1f1;
   box-shadow:
-    0 0 0 2px rgba(0,0,0,.04),
+    0 0 0 2px #fff,        /* anillo blanco para separar los avatares superpuestos */
     0 1px 2px rgba(0,0,0,.10);
   font-size:10px;         /* para iniciales cuando no hay avatar */
   font-weight:700;
   color:#666;
+}
+
+/* Superposición estilo "grupo de avatares" */
+.lead-dot + .lead-dot{ margin-left:-6px; }
+
+/* Resumen "+N" cuando hay más leads seleccionados que el máximo mostrado */
+.lead-dot--more{
+  background:#eef2f7;
+  color:#475569;
+  font-size:9px;
+  overflow:visible;
 }
 .lead-dot img{
   width:100%;
