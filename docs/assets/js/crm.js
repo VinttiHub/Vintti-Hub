@@ -534,6 +534,7 @@ function buildCrmExportRecord(item = {}) {
     position: csvTextValue(item.position),
     type: csvTextValue(item.type),
     sqlMeetingDate: csvDateValue(item.sql_meeting_date),
+    creationDate: csvDateValue(item.creation_date),
     contract,
     trr: csvMoneyValue(item.trr),
     tsf: csvMoneyValue(item.tsf),
@@ -571,6 +572,7 @@ function updateCrmExportCache(accountId, patch = {}) {
     position: '—',
     type: '—',
     sqlMeetingDate: '',
+    creationDate: '',
     contract: 'No Contract',
     trr: 0,
     tsf: 0,
@@ -625,7 +627,8 @@ async function hydrateCrmExportAccountRow(accountId, row = null) {
       painPoints: csvTextValue(account?.pain_points),
       position: csvTextValue(account?.position),
       type: csvTextValue(account?.type),
-      sqlMeetingDate: csvDateValue(account?.sql_meeting_date)
+      sqlMeetingDate: csvDateValue(account?.sql_meeting_date),
+      creationDate: csvDateValue(account?.creation_date)
     };
     updateCrmExportCache(id, patch);
     return { ...(currentRow || {}), ...patch };
@@ -802,6 +805,7 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
       accountRow.position,
       accountRow.type,
       accountRow.sqlMeetingDate,
+      accountRow.creationDate,
       accountRow.contract,
       accountRow.trr,
       accountRow.tsf,
@@ -829,6 +833,7 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
     accountRow.position,
     accountRow.type,
     accountRow.sqlMeetingDate,
+    accountRow.creationDate,
     accountRow.contract,
     accountRow.trr,
     accountRow.tsf,
@@ -890,6 +895,7 @@ async function downloadCrmCsv() {
     'position',
     'type',
     'sql_meeting_date',
+    'creation_date',
     'Contract',
     'TRR',
     'TSF',

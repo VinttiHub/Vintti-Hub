@@ -56,6 +56,7 @@ def data_light():
               a.position,
               a.type,
               a.sql_meeting_date,
+              a.creation_date,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) + COALESCE(h.fee, 0) END), 0) AS tsr
@@ -64,7 +65,7 @@ def data_light():
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
             GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.vintti_ai,
                      a.size, a.state, a.timezone, a.where_come_from, a.lead_source_detail, a.conversion_channel,
-                     a.referal_source, a.industry, a.outsource, a.pain_points, a.position, a.type, a.sql_meeting_date
+                     a.referal_source, a.industry, a.outsource, a.pain_points, a.position, a.type, a.sql_meeting_date, a.creation_date
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
