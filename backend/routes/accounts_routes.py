@@ -2563,6 +2563,48 @@ def get_interviewed_count(opportunity_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/opportunities/<opportunity_id>/alex/interviewed_count', methods=['GET'])
+def get_alex_interviewed_count(opportunity_id):
+    """Conteo de candidatos entrevistados en Alex AI para esta opportunity.
+
+    El enlace se hace por el `opportunity_id` incrustado en el `name` de la job
+    en Alex. Degrada suave: si falta ALEX_API_KEY o Alex falla, responde 200 con
+    matched=False para no romper la página de detalle."""
+    from utils.alex import AlexClient, AlexError
+
+    try:
+        client = AlexClient()
+    except AlexError:
+        # No hay API key configurada todavía.
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "interviewed_count": 0,
+            "position_id": None,
+            "matched": False,
+            "configured": False,
+        })
+
+    try:
+        count, position_id, matched = client.count_interviewed_for_opportunity(opportunity_id)
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "interviewed_count": int(count),
+            "position_id": position_id,
+            "matched": matched,
+            "configured": True,
+        })
+    except AlexError as e:
+        # Error hablando con Alex: no romper la UI, reportar matched=False.
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "interviewed_count": 0,
+            "position_id": None,
+            "matched": False,
+            "configured": True,
+            "error": str(e),
+        }), 502
+
+
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])
 def update_batch(batch_id):
     try:

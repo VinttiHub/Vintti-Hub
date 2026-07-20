@@ -2102,26 +2102,11 @@ document.getElementById('expected-revenue-input').addEventListener('blur', e => 
   const val = toNumOrNull(e.target.value);
   e.target.value = (val ?? '') === '' ? '' : String(val);
   updateOpportunityField('expected_revenue', val);
-  // 🔢 Number of interviewed candidates
-const interviewedInput  = document.getElementById('interviewed-count-input');
-const interviewedStatus = document.getElementById('interviewed-count-status');
-
-if (interviewedInput) {
-  interviewedInput.addEventListener('blur', e => {
-    const val = toNumOrNull(e.target.value);
-    e.target.value = (val ?? '') === '' ? '' : String(val);
-
-    // 👇 el nombre del campo debe coincidir con tu columna / backend
-    updateOpportunityField('interviewed_candidates', val);
-
-    if (interviewedStatus) {
-      interviewedStatus.textContent =
-        val == null ? '' : `Saved: ${val}`;
-    }
-  });
-}
-
 });
+// El contador "Number of interviewed candidates" se maneja íntegramente en
+// pipeline.js (prefill + guardado en la columna correcta `cantidad_entrevistados`
+// + integración Alex AI). Aquí se eliminó un handler duplicado que registraba un
+// listener por cada blur de expected-revenue y guardaba en la columna equivocada.
 
 document.getElementById('details-sales-lead').addEventListener('change', async (e) => {
   const emailValue = e.target.value; // el value es el email
@@ -3738,21 +3723,8 @@ function updateJobDescriptionSummary() {
  const d = window.currentOpportunityData || {};
  document.getElementById('expected-fee-input').value = d.expected_fee ?? '';
  document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
-       const interviewedInput  = document.getElementById('interviewed-count-input');
-      const interviewedStatus = document.getElementById('interviewed-count-status');
-
-      if (interviewedInput) {
-        // Intenta varios nombres por si el campo en la BD se llama distinto
-        const raw =
-          d.cantidad_entrevistados 
-          '';
-
-        interviewedInput.value = raw ?? '';
-
-        if (raw !== null && raw !== '' && interviewedStatus) {
-          interviewedStatus.textContent = `Saved: ${raw}`;
-        }
-      }
+ // El prefill del contador "interviewed candidates" vive en pipeline.js (único
+ // dueño del campo: prefill desde `cantidad_entrevistados` + integración Alex AI).
       }
 function formatDate(dateStr) {
   return toYMD(dateStr);

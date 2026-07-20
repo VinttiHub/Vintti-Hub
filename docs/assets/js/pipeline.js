@@ -1072,6 +1072,71 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
       // 💾 Guardar en DB (tabla opportunity.cantidad_entrevistados)
       await updateOpportunityField('cantidad_entrevistados', n);
     });
+
+    // 🤖 Integración Alex AI: traer el nº de candidatos entrevistados desde Alex.
+    // El enlace se hace por el opportunity_id incrustado en el nombre de la job
+    // en Alex; el backend resuelve el match y devuelve el conteo.
+    const alexBtn = document.getElementById('alex-fetch-interviewed-btn');
+    const alexStatusEl = document.getElementById('interviewed-count-status');
+
+    const getOppIdForAlex = () => {
+      const el = document.getElementById('opportunity-id-text');
+      return (el?.getAttribute('data-id') || el?.textContent || '').trim();
+    };
+
+    async function fetchAlexInterviewedCount() {
+      const oppId = getOppIdForAlex();
+      if (!oppId || oppId === '—') return null;
+      try {
+        const res = await fetch(
+          `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/interviewed_count`,
+          { cache: 'no-store' }
+        );
+        // 502 = Alex falló pero el body trae matched:false; lo aceptamos igual.
+        if (!res.ok && res.status !== 502) return null;
+        return await res.json();
+      } catch (err) {
+        console.warn('⚠️ Fallo consultando Alex interviewed count', err);
+        return null;
+      }
+    }
+
+    // force=true (botón): siempre pisa el valor. force=false (auto): solo si vacío.
+    async function applyAlexInterviewedCount({ force }) {
+      if (!force && (interviewedInput.value || '').trim() !== '') return;
+      if (alexStatusEl) alexStatusEl.textContent = 'Consultando Alex…';
+
+      const data = await fetchAlexInterviewedCount();
+      if (!data) { if (alexStatusEl) alexStatusEl.textContent = ''; return; }
+      if (data.configured === false) {
+        if (alexStatusEl) alexStatusEl.textContent = 'Alex no configurado';
+        return;
+      }
+      if (!data.matched) {
+        if (alexStatusEl) alexStatusEl.textContent = 'Sin match en Alex';
+        return;
+      }
+
+      const n = parseInt(data.interviewed_count, 10) || 0;
+      interviewedInput.value = String(n);
+      // Mantener sincronizado el cache que usan otros prefills de la página.
+      if (window.currentOpportunityData) {
+        window.currentOpportunityData.cantidad_entrevistados = n;
+      }
+      if (typeof updateOpportunityField === 'function') {
+        await updateOpportunityField('cantidad_entrevistados', n);
+      }
+      if (alexStatusEl) alexStatusEl.textContent = `Traído de Alex: ${n}`;
+    }
+
+    if (alexBtn) {
+      alexBtn.addEventListener('click', () => applyAlexInterviewedCount({ force: true }));
+    }
+    // Auto-llenado solo si el campo quedó vacío, tras un pequeño settle para
+    // dejar terminar los prefills desde la BD.
+    window.addEventListener('load', () => {
+      setTimeout(() => applyAlexInterviewedCount({ force: false }), 800);
+    });
   }
 
 }); //  cierre del DOMContentLoaded
