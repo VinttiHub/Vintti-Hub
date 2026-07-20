@@ -52,8 +52,9 @@ bp = Blueprint("sales_snapshot", __name__, url_prefix="/sales")
 # ---------------------------------------------------------------------------
 # Config (todo overrideable por env)
 # ---------------------------------------------------------------------------
-# Copia de prueba del sheet semanal de Sales (el original se deja intacto).
-DEFAULT_SPREADSHEET_ID = "1_XYGiiClNpn8exGBrhF_Lpp7sQ9IEhavDs0-oRF2xy4"
+# Sheet semanal de Sales · ORIGINAL (el botón escribe acá en producción).
+# Copia de prueba anterior: 1_XYGiiClNpn8exGBrhF_Lpp7sQ9IEhavDs0-oRF2xy4
+DEFAULT_SPREADSHEET_ID = "10uRvwNahlSbeL_qPz1gpQbpjeZLBOXx-ki-eP9ZbYdM"
 SPREADSHEET_ID = os.getenv("SALES_SNAPSHOT_SPREADSHEET_ID") or DEFAULT_SPREADSHEET_ID
 # Pestaña: si no se setea, se usa la primera hoja del spreadsheet (se reporta cuál).
 CONFIG_TAB = os.getenv("SALES_SNAPSHOT_TAB") or None
@@ -114,8 +115,10 @@ METRICS = [
      "dataset": "pipeline_outbound_ae", "field": "pipeline_worth", "reduce": "first", "fmt": "money", "filters": {}},
     {"key": "active_opps_nda", "match": "active opportunities",
      "dataset": "pipeline_outbound_ae", "field": "nda_signed_count", "reduce": "first", "fmt": "int", "filters": {}},
+    # Conversion Rate = el card "NDA → Close Win" de AE Performance (win rate =
+    # Close Win / (Win+Lost), solo Sales), al día (rolling 30d default, sin filtro).
     {"key": "conversion_rate", "match": "conversion rate",
-     "dataset": "nda_to_clientwin_30d", "field": "sales_pct", "reduce": "first", "fmt": "pct", "filters": {}},
+     "dataset": "lead_channel_winrate_30d", "field": "sales_win_rate", "reduce": "first", "fmt": "pct", "filters": {}},
 ]
 
 _MONTHS = {
