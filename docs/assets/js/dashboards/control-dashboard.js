@@ -4566,6 +4566,7 @@
     bindDtableFilters();
     bindGlossary();
     bindStickyHead();
+    bindSalesSheetUpdateBtn();
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
@@ -4587,6 +4588,121 @@
       const summary = el.querySelector('summary');
       if (summary) summary.focus();
     });
+  }
+
+  // Botón "Actualizar Sheet" (Outbound Performance): calcula las métricas actuales de
+  // Sales y las escribe en el Google Sheet semanal. Flujo preview → confirmar → commit.
+  // Visible solo para la allow-list (mismos emails que el botón de sync de CRM).
+  const SALES_SHEET_ALLOWED = [
+    'info@vintti.com', 'agustin@vintti.com', 'bahia@vintti.com',
+    'mariano@vintti.com', 'lara@vintti.com', 'pgonzales@vintti.com',
+    'agostina@vintti.com', 'mia@vintti.com',
+  ];
+
+  function bindSalesSheetUpdateBtn() {
+    const btn = document.getElementById('salesSheetUpdateBtn');
+    if (!btn) return;
+    const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+      .toLowerCase().trim();
+    if (!SALES_SHEET_ALLOWED.includes(email)) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+
+    const headers = () => {
+      const h = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+      if (email) h['X-User-Email'] = email;
+      return h;
+    };
+
+    const post = async (path) => {
+      const res = await fetch(API_BASE + path, { method: 'POST', headers: headers(), credentials: 'omit', body: '{}' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    };
+
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const orig = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Calculando…';
+      try {
+        const snap = await post('/sales/sheet-snapshot/preview');
+        btn.textContent = orig; btn.disabled = false;
+        openSalesSheetModal(snap, post);
+      } catch (err) {
+        btn.textContent = orig; btn.disabled = false;
+        alert('No pude calcular el snapshot:\n' + (err.message || err));
+      }
+    });
+  }
+
+  function openSalesSheetModal(snap, post) {
+    const ok = (snap.cells || []).filter(c => !c.error);
+    const bad = (snap.cells || []).filter(c => c.error);
+
+    const rows = ok.map(c => `
+      <tr>
+        <td style="padding:6px 10px;color:#111;">${escapeHtml(c.label || c.key)}</td>
+        <td style="padding:6px 10px;font-weight:700;color:#003bff;white-space:nowrap;">${escapeHtml(String(c.display))}</td>
+        <td style="padding:6px 10px;color:#888;font-family:monospace;">${escapeHtml(c.cell)}</td>
+        <td style="padding:6px 10px;color:#aaa;">${c.current != null ? escapeHtml(String(c.current)) : '—'}</td>
+      </tr>`).join('');
+
+    const badRows = bad.length ? `<p style="margin:10px 0 0;color:#c0392b;font-size:12px;">
+        ⚠ ${bad.length} métrica(s) sin resolver: ${bad.map(b => escapeHtml(b.key + (b.error ? ' (' + b.error + ')' : ''))).join(', ')}</p>` : '';
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,20,40,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">
+        <div style="padding:20px 22px 12px;">
+          <h3 style="margin:0 0 4px;font-size:18px;color:#111;">Actualizar Google Sheet · Sales</h3>
+          <p style="margin:0;color:#555;font-size:13px;">
+            Pestaña <b>${escapeHtml(snap.tab)}</b> · columna <b>${escapeHtml(snap.column)}</b>
+            (semana <b>${escapeHtml(String(snap.week_label || snap.week_date || '—'))}</b>) · hoy ${escapeHtml(snap.today || '')}
+          </p>
+        </div>
+        <div style="padding:0 22px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="text-align:left;border-bottom:1px solid #eee;color:#999;font-size:11px;text-transform:uppercase;">
+              <th style="padding:6px 10px;">Métrica</th><th style="padding:6px 10px;">Nuevo valor</th>
+              <th style="padding:6px 10px;">Celda</th><th style="padding:6px 10px;">Actual</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${badRows}
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px 20px;">
+          <button data-act="cancel" style="padding:10px 18px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#333;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button data-act="confirm" style="padding:10px 18px;border-radius:10px;border:1px solid #003bff;background:#003bff;color:#fff;font-weight:700;cursor:pointer;">
+            Escribir ${ok.length} celda(s)
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    const confirmBtn = overlay.querySelector('[data-act="confirm"]');
+    if (!ok.length) { confirmBtn.disabled = true; confirmBtn.style.opacity = '.5'; confirmBtn.style.cursor = 'default'; }
+    confirmBtn.addEventListener('click', async () => {
+      if (confirmBtn.disabled) return;
+      confirmBtn.disabled = true; confirmBtn.textContent = 'Escribiendo…';
+      try {
+        const res = await post('/sales/sheet-snapshot/commit');
+        close();
+        alert(`✅ Sheet actualizado: ${res.cells_written} celda(s) en columna ${res.column} (${res.tab}).`);
+      } catch (err) {
+        confirmBtn.disabled = false; confirmBtn.textContent = `Escribir ${ok.length} celda(s)`;
+        alert('Falló la escritura:\n' + (err.message || err));
+      }
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, m => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+    ));
   }
 
   // Marca .sticky-head como .is-stuck cuando queda pegada arriba (para resaltarla) y
