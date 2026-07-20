@@ -276,38 +276,53 @@ def _read_grids(svc, spreadsheet_id, tab):
     return fmt, unf
 
 
-def _resolve_tab(svc, spreadsheet_id):
-    if CONFIG_TAB:
-        return CONFIG_TAB
-    req = request.get_json(silent=True) or {}
-    if req.get("tab"):
-        return req["tab"]
+def _list_tabs(svc, spreadsheet_id):
     meta = svc.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-    sheets = meta.get("sheets", [])
-    if not sheets:
+    return [s["properties"]["title"] for s in meta.get("sheets", [])]
+
+
+def _find_layout(fmt, max_cols=8):
+    """Ubica (fila 'Date', columna de labels) escaneando las primeras columnas.
+    Tolera una columna espaciadora inicial (labels en A, B o donde estén)."""
+    for r, row in enumerate(fmt):
+        for c in range(min(max_cols, len(row))):
+            if _norm(row[c]) == "date":
+                return r, c
+    return None
+
+
+def _resolve_layout(svc, spreadsheet_id):
+    """Devuelve (tab, fmt, unf, date_row, label_col). Autodetecta la pestaña que
+    contiene la fila 'Date' (prueba todas si no se forzó una por env/request)."""
+    req = request.get_json(silent=True) or {}
+    forced = CONFIG_TAB or req.get("tab")
+    titles = [forced] if forced else _list_tabs(svc, spreadsheet_id)
+    if not titles:
         raise RuntimeError("El spreadsheet no tiene hojas")
-    return sheets[0]["properties"]["title"]
+
+    for tab in titles:
+        fmt, unf = _read_grids(svc, spreadsheet_id, tab)
+        layout = _find_layout(fmt)
+        if layout:
+            return tab, fmt, unf, layout[0], layout[1]
+
+    raise RuntimeError(
+        "No encontré una fila 'Date' en ninguna pestaña. Pestañas revisadas: "
+        + ", ".join(str(t) for t in titles)
+        + ". Verificá que la tabla tenga una fila cuyo primer valor sea 'Date'."
+    )
 
 
 def _build_snapshot():
     svc = sheets_service()
-    tab = _resolve_tab(svc, SPREADSHEET_ID)
-    fmt, unf = _read_grids(svc, SPREADSHEET_ID, tab)
+    tab, fmt, unf, date_row, label_col = _resolve_layout(svc, SPREADSHEET_ID)
     today = today_ar()
 
     # 1) fila "Date" → elegir columna = última fecha ≤ hoy
-    date_row = None
-    for r, row in enumerate(fmt):
-        if row and _norm(row[0]) == "date":
-            date_row = r
-            break
-    if date_row is None:
-        raise RuntimeError("No encontré la fila 'Date' en la columna A del sheet")
-
     best_col = None
     best_date = None
     week_label = None
-    for c in range(1, len(fmt[date_row])):
+    for c in range(label_col + 1, len(fmt[date_row])):
         d = _parse_week_date(fmt[date_row][c], today.year)
         if d is None or d > today:
             continue
@@ -315,7 +330,7 @@ def _build_snapshot():
             best_date, best_col = d, c
             week_label = str(fmt[date_row][c]).strip()
     if best_col is None:
-        raise RuntimeError("No hay ninguna columna de semana con fecha ≤ hoy en la fila 'Date'")
+        raise RuntimeError(f"No hay ninguna columna de semana con fecha ≤ hoy en la fila 'Date' (pestaña '{tab}')")
 
     col_letter = _col_letter(best_col)
 
@@ -335,21 +350,21 @@ def _build_snapshot():
             "key": metric["key"], "dataset": metric["dataset"], "field": metric["field"],
             "reduce": metric["reduce"], "fmt": metric["fmt"],
         }
-        # localizar la fila por prefijo de label en col A
+        # localizar la fila por prefijo de label en la columna de labels
         row_idx = None
         for r, row in enumerate(fmt):
-            if r in used_rows or not row:
+            if r in used_rows or len(row) <= label_col:
                 continue
-            label_norm = _norm(row[0])
+            label_norm = _norm(row[label_col])
             if label_norm and label_norm.startswith(metric["match"]):
                 row_idx = r
                 break
         if row_idx is None:
-            entry["error"] = f"no encontré la fila para '{metric['match']}' en col A"
+            entry["error"] = f"no encontré la fila para '{metric['match']}' en la columna de labels"
             cells.append(entry)
             continue
         used_rows.add(row_idx)
-        entry["label"] = str(fmt[row_idx][0]).strip()
+        entry["label"] = str(fmt[row_idx][label_col]).strip()
         entry["row"] = row_idx + 1
         entry["cell"] = f"{col_letter}{row_idx + 1}"
 
@@ -370,7 +385,7 @@ def _build_snapshot():
         ref_unf = _cell(unf, row_idx, best_col)
         ref_fmt = _cell(fmt, row_idx, best_col)
         if ref_unf in (None, ""):
-            for c in range(best_col - 1, 0, -1):
+            for c in range(best_col - 1, label_col, -1):
                 cand = _cell(unf, row_idx, c)
                 if cand not in (None, ""):
                     ref_unf = cand
@@ -413,6 +428,36 @@ def sheet_snapshot_preview():
         logging.exception("❌ sales sheet-snapshot preview failed")
         return jsonify({"error": str(exc)}), 500
     return jsonify({"ok": True, "mode": "preview", **snap}), 200
+
+
+@bp.route("/sheet-snapshot/debug", methods=["GET"])
+def sheet_snapshot_debug():
+    """Inspección: lista pestañas y un preview (primeras filas × primeras columnas) de
+    cada una, para ubicar dónde está la fila 'Date' y la columna de labels.
+    Abrible en el browser: /sales/sheet-snapshot/debug?user_email=info@vintti.com"""
+    gate = _require_editor()
+    if gate:
+        return gate
+    try:
+        svc = sheets_service()
+        titles = _list_tabs(svc, SPREADSHEET_ID)
+        out = []
+        for tab in titles:
+            quoted = a1_quote(tab)
+            grid = svc.spreadsheets().values().get(
+                spreadsheetId=SPREADSHEET_ID, range=f"{quoted}!A1:H40",
+                valueRenderOption="FORMATTED_VALUE").execute().get("values", [])
+            layout = _find_layout(grid)
+            out.append({
+                "tab": tab,
+                "layout": ({"date_row": layout[0] + 1, "label_col": _col_letter(layout[1])}
+                           if layout else None),
+                "preview": [[str(c) for c in (row[:8] if row else [])] for row in grid[:25]],
+            })
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("❌ sales sheet-snapshot debug failed")
+        return jsonify({"error": str(exc)}), 500
+    return jsonify({"spreadsheet_id": SPREADSHEET_ID, "tabs": titles, "sheets": out}), 200
 
 
 @bp.route("/sheet-snapshot/commit", methods=["POST"])
