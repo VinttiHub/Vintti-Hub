@@ -61,18 +61,14 @@ CONFIG_TAB = os.getenv("SALES_SNAPSHOT_TAB") or None
 # Rango a leer (las semanas se extienden a lo ancho → cubrir muchas columnas).
 READ_RANGE = "A1:CZ500"
 
-# Allow-list (mirror del botón de CRM). Override por env, coma-separado.
-_DEFAULT_EDITORS = {
-    "info@vintti.com", "agustin@vintti.com", "bahia@vintti.com",
-    "mariano@vintti.com", "lara@vintti.com", "pgonzales@vintti.com",
-    "agostina@vintti.com", "mia@vintti.com",
-}
+# Acceso: cualquier usuario del dashboard (email @vintti.com). Se puede ampliar a
+# emails externos puntuales con la env SALES_SNAPSHOT_EDITORS (coma-separado).
+_ALLOWED_DOMAIN = "@vintti.com"
 
 
-def _allowed_editors() -> set[str]:
+def _extra_editors() -> set[str]:
     raw = os.getenv("SALES_SNAPSHOT_EDITORS", "")
-    extra = {p.strip().lower() for p in raw.split(",") if p.strip()}
-    return _DEFAULT_EDITORS | extra
+    return {p.strip().lower() for p in raw.split(",") if p.strip()}
 
 
 def _user_email() -> str | None:
@@ -85,7 +81,8 @@ def _user_email() -> str | None:
 
 def _require_editor():
     email = _user_email()
-    if email not in _allowed_editors():
+    allowed = bool(email) and (email.endswith(_ALLOWED_DOMAIN) or email in _extra_editors())
+    if not allowed:
         return jsonify({"error": "forbidden", "email": email}), 403
     return None
 

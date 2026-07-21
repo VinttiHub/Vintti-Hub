@@ -4592,19 +4592,14 @@
 
   // Botón "Actualizar Sheet" (Outbound Performance): calcula las métricas actuales de
   // Sales y las escribe en el Google Sheet semanal. Flujo preview → confirmar → commit.
-  // Visible solo para la allow-list (mismos emails que el botón de sync de CRM).
-  const SALES_SHEET_ALLOWED = [
-    'info@vintti.com', 'agustin@vintti.com', 'bahia@vintti.com',
-    'mariano@vintti.com', 'lara@vintti.com', 'pgonzales@vintti.com',
-    'agostina@vintti.com', 'mia@vintti.com',
-  ];
-
+  // Visible para cualquier usuario logueado con acceso al dashboard (el backend valida
+  // que sea un email @vintti.com). El preview→confirmar es la red de seguridad.
   function bindSalesSheetUpdateBtn() {
     const btn = document.getElementById('salesSheetUpdateBtn');
     if (!btn) return;
     const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
       .toLowerCase().trim();
-    if (!SALES_SHEET_ALLOWED.includes(email)) { btn.style.display = 'none'; return; }
+    if (!email) { btn.style.display = 'none'; return; }  // solo si hay sesión
     btn.style.display = '';
 
     const headers = () => {
