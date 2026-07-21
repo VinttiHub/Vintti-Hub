@@ -4729,21 +4729,8 @@ input:checked + .slider::before {
   white-space: nowrap;
 }
 
-/* 🎥 Botón "Crear entrevista en Apriora" */
-.alex-create-job-btn {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid #6c38ff;
-  background: #6c38ff;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: filter .15s ease, opacity .15s ease;
-}
-.alex-create-job-btn:hover { filter: brightness(1.08); }
-.alex-create-job-btn:disabled { opacity: .6; cursor: default; }
+/* 🎥 Botón "Crear entrevista en Apriora": su color/forma se define junto a
+   #send-btn/#publish-career-btn (mismo gradiente violeta). Aquí solo el estado. */
 .alex-create-job-status {
   font-size: 12px;
   color: #64748b;
@@ -4984,7 +4971,8 @@ input:checked + .slider::before {
 }
 
 #job #send-btn,
-#job #publish-career-btn {
+#job #publish-career-btn,
+#job #alexCreateJobBtn {
   min-height: 40px;
   padding: 0.55rem 1rem !important;
   border-radius: 14px !important;
@@ -4997,9 +4985,20 @@ input:checked + .slider::before {
 }
 
 #job #send-btn:hover,
-#job #publish-career-btn:hover {
+#job #publish-career-btn:hover,
+#job #alexCreateJobBtn:hover {
   background: linear-gradient(180deg, #6538fb, #5329eb) !important;
   border-color: #5e34ea !important;
+}
+
+/* Deshabilitado (ya creada en Apriora): violeta claro para indicar bloqueado */
+#job #alexCreateJobBtn:disabled {
+  background: #cabfff !important;
+  border-color: #cabfff !important;
+  box-shadow: none !important;
+  cursor: default;
+  filter: none;
+  transform: none;
 }
 
 #job #pause-career-btn,
