@@ -1137,6 +1137,71 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
     }
   }
 
+  // 🎥 Botón "Crear entrevista en Apriora": crea la job en Apriora desde la JD.
+  const alexCreateBtn = document.getElementById('alexCreateJobBtn');
+  if (alexCreateBtn) {
+    const createStatusEl = document.getElementById('alexCreateJobStatus');
+    const getCreateOppId = () => {
+      const el = document.getElementById('opportunity-id-text');
+      return (el?.getAttribute('data-id') || el?.textContent || '').trim();
+    };
+    const markCreated = (text) => {
+      if (createStatusEl) createStatusEl.textContent = text;
+      alexCreateBtn.disabled = true;   // ya existe: no re-crear
+    };
+
+    // Al cargar: si ya existe la entrevista en Apriora, reflejarlo (para que tras
+    // un refresh se vea el estado en vez de quedar en blanco). Espera a que el
+    // opportunity_id esté disponible (se llena async al cargar la opp).
+    (function checkAlreadyCreated(tries) {
+      const oppId = getCreateOppId();
+      if (!oppId || oppId === '—') {
+        if (tries > 0) setTimeout(() => checkAlreadyCreated(tries - 1), 500);
+        return;
+      }
+      fetch(`${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/interviewed_count`, { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && d.matched) markCreated('✅ Ya creada en Apriora'); })
+        .catch(() => {});
+    })(20);
+
+    alexCreateBtn.addEventListener('click', async () => {
+      const oppId = getCreateOppId();
+      if (!oppId || oppId === '—') return;
+      const title = (document.getElementById('details-opportunity-name')?.value || '').trim();
+      const ok = confirm(
+        'Se creará la entrevista en Apriora con el título:\n\n' +
+        `   "${title || '(opportunity sin nombre)'}"\n\n` +
+        '⚠️ Apriora NO permite cambiar el título después, ni recrear la entrevista ' +
+        '(el ID no se libera). Verifica que el Opportunity Name esté correcto.\n\n' +
+        '¿Continuar?'
+      );
+      if (!ok) return;
+
+      alexCreateBtn.disabled = true;
+      if (createStatusEl) createStatusEl.textContent = 'Creando en Apriora… (puede tardar unos segundos)';
+      try {
+        const res = await fetch(
+          `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/create_position`,
+          { method: 'POST' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          markCreated('✅ Entrevista creada en Apriora');
+        } else if (res.status === 409) {
+          markCreated(data.error || `Ya existía: ${data.position_name || 'job en Apriora'}`);
+        } else {
+          if (createStatusEl) createStatusEl.textContent = `⚠️ ${data.error || 'No se pudo crear'}`;
+          alexCreateBtn.disabled = false;   // permitir reintento
+        }
+      } catch (err) {
+        console.warn('⚠️ Error creando job en Apriora', err);
+        if (createStatusEl) createStatusEl.textContent = '⚠️ Error de red';
+        alexCreateBtn.disabled = false;
+      }
+    });
+  }
+
 }); //  cierre del DOMContentLoaded
 
 // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline

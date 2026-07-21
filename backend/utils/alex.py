@@ -8,6 +8,7 @@ candidatos entrevistó Alex. El enlace opportunity <-> position se hace por el
 Docs: https://docs.alex.com/api-reference  (base https://api.alex.com/v1/api)
 """
 
+import html
 import os
 import re
 import time
@@ -27,6 +28,20 @@ _POSITIONS_TTL_SECONDS = 60.0
 
 class AlexError(RuntimeError):
     pass
+
+
+def html_to_text(value):
+    """Convierte la job description (HTML del Hub) a texto plano legible para
+    Apriora, conservando saltos de párrafo/lista."""
+    s = str(value or "")
+    s = re.sub(r"(?i)<\s*br\s*/?>", "\n", s)
+    s = re.sub(r"(?i)</\s*(p|div|li|h[1-6])\s*>", "\n", s)
+    s = re.sub(r"(?i)<\s*li[^>]*>", "• ", s)
+    s = re.sub(r"<[^>]+>", "", s)          # resto de tags
+    s = html.unescape(s)
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
 
 def _extract_list(payload):
@@ -105,6 +120,21 @@ class AlexClient:
         payload = self._request("GET", "/reports", params={"positionId": position_id})
         return _extract_list(payload)
 
+    def create_job(self, external_job_id, job_description, additional_questions=None, active=None):
+        """Crea una job (interviewer) en Apriora desde una job description.
+        `external_job_id` debe ser único por company (usamos el opportunity_id del
+        Hub, que además sirve para enlazar después por externalJobId).
+        Devuelve el dict de respuesta (payload = interviewerId)."""
+        body = {
+            "externalJobId": str(external_job_id),
+            "jobDescription": job_description,
+        }
+        if additional_questions:
+            body["additionalQuestions"] = additional_questions
+        if active is not None:
+            body["active"] = active
+        return self._request("POST", "/createJob", json=body)
+
     def get_interview_results_for_opportunity(self, opportunity_id):
         """Devuelve (position_id, results) para una opportunity, donde results es una
         lista de dicts con el score/feedback/video/pdf de Alex por cada reporte,
@@ -151,13 +181,17 @@ class AlexClient:
         # El id debe aparecer sin dígitos pegados a los lados: cubre formatos
         # como "Role [#1234]", "Role — 1234", "Role (1234)", etc.
         pattern = re.compile(r"(?<!\d)" + re.escape(oid) + r"(?!\d)")
-        # status=None => busca entre TODAS las positions (activas e inactivas),
-        # para seguir contando aunque la job quede inactiva en Alex.
+        # status=None => busca entre TODAS las positions (activas e inactivas).
+        # Preferimos el match EXACTO por externalJobId (jobs creadas desde el Hub);
+        # si no, caemos al match por el id en el nombre (jobs creadas a mano).
+        name_fallback = None
         for position in self.list_positions(status=None):
-            name = str(position.get("name") or "")
-            if pattern.search(name):
+            ext = str(position.get("externalJobId") or "").strip()
+            if ext and ext == oid:
                 return position
-        return None
+            if name_fallback is None and pattern.search(str(position.get("name") or "")):
+                name_fallback = position
+        return name_fallback
 
     def count_interviewed_for_opportunity(self, opportunity_id):
         """Devuelve (count, position_id, matched) para una opportunity.

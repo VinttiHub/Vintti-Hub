@@ -2667,6 +2667,77 @@ def get_alex_interviews(opportunity_id):
     })
 
 
+@bp.route('/opportunities/<int:opportunity_id>/alex/create_position', methods=['POST'])
+def create_alex_position(opportunity_id):
+    """Crea en Apriora la job (interviewer) de esta opportunity a partir de su job
+    description. Enlaza por externalJobId = opportunity_id. Evita duplicados: si ya
+    hay una position vinculada (por externalJobId o por el id en el nombre), no crea otra."""
+    from utils.alex import AlexClient, AlexError, html_to_text
+
+    try:
+        client = AlexClient()
+    except AlexError:
+        return jsonify({"error": "Apriora no está configurado (falta ALEX_API_KEY)."}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT hr_job_description, opp_position_name FROM opportunity WHERE opportunity_id = %s",
+        (opportunity_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Opportunity not found"}), 404
+
+    jd_text = html_to_text(row[0] or "")
+    if len(jd_text.strip()) < 20:
+        return jsonify({
+            "error": "La opportunity no tiene una job description suficiente para crear la entrevista en Apriora."
+        }), 400
+
+    # Forzar que el título en Apriora sea el OPPORTUNITY NAME (opp_position_name).
+    # createJob no tiene campo de título: Apriora lo deriva de la línea "Job Title:"
+    # de la job description, así que la anteponemos (quitando una "Job Title:" inicial
+    # preexistente para no duplicar).
+    opp_name = (row[1] or "").strip()
+    if opp_name:
+        jd_body = re.sub(r'^\s*job\s*title\s*:.*(?:\r?\n)+', '', jd_text, count=1, flags=re.IGNORECASE)
+        jd_text = f"Job Title: {opp_name}\n\n{jd_body.lstrip()}"
+
+    try:
+        # Evitar duplicados: si ya hay una position enlazada, no crear otra
+        # (externalJobId debe ser único por company en Apriora).
+        existing = client.find_position_for_opportunity(opportunity_id)
+        if existing:
+            return jsonify({
+                "error": "Ya existe una job en Apriora vinculada a esta opportunity.",
+                "already_exists": True,
+                "position_name": existing.get("name"),
+            }), 409
+
+        resp = client.create_job(external_job_id=opportunity_id, job_description=jd_text)
+        # Apriora puede responder 200 con success:false en el body → tratar como error.
+        if isinstance(resp, dict) and resp.get("success") is False:
+            msg = resp.get("message") or ""
+            if "already exists" in msg.lower():
+                # Apriora reserva el externalJobId de forma permanente: aunque se borre
+                # la job en su panel, el id no se libera y no hay API para recrear.
+                return jsonify({
+                    "error": "Apriora ya tiene registrada una entrevista para esta opportunity (no libera el ID aunque borres la job en su panel).",
+                    "already_exists": True,
+                }), 409
+            return jsonify({"error": msg or "Apriora rechazó la creación."}), 502
+        return jsonify({
+            "success": True,
+            "interviewer_id": resp.get("payload") if isinstance(resp, dict) else None,
+            "message": resp.get("message") if isinstance(resp, dict) else None,
+        })
+    except AlexError as e:
+        return jsonify({"error": str(e)}), 502
+
+
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])
 def update_batch(batch_id):
     try:
