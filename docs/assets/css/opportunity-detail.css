@@ -1378,6 +1378,63 @@ textarea,
   opacity: .9;
 }
 
+/* 🤖 Resultado de entrevista de Apriora en la tarjeta: badge de score clicable */
+.pipeline-card .alex-interview {
+  display: flex;                /* propia línea, debajo del salario */
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;             /* aire respecto al $ */
+  position: relative;          /* ancla del tooltip propio */
+}
+
+/* Tooltip propio: aparece al instante en hover (el title nativo tardaba ~1.5s).
+   Posición fija calculada por JS (positionAlexTooltip) para no cortarse ni taparse. */
+.alex-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 9999;               /* por encima del nav sticky */
+  width: 280px;
+  max-width: 88vw;
+  max-height: 300px;           /* acota el alto; el resto hace scroll interno */
+  overflow-y: auto;
+  background: #ffffff;
+  color: #1b1b1b;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+  padding: 10px 12px;
+  font-size: .72rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  cursor: default;
+}
+.alex-tip-feedback { white-space: pre-wrap; }
+.alex-tip-h { font-weight: 700; margin-top: 8px; margin-bottom: 2px; }
+.alex-tip-skills { margin: 0; padding-left: 16px; }
+.alex-tip-skills li { margin: 1px 0; }
+.alex-tip-match { margin-top: 8px; color: #64748b; font-style: italic; }
+.pipeline-card .alex-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: default;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.pipeline-card .alex-badge.alex-good { background: #c1ff72; color: #3a6b00; }   /* lime de marca */
+.pipeline-card .alex-badge.alex-mid  { background: #fff3c4; color: #7a5b00; }
+.pipeline-card .alex-badge.alex-low  { background: #ffd9d9; color: #a11212; }
+.pipeline-card .alex-badge.alex-na   { background: #eef2f7; color: #64748b; }
+/* Cuando el badge es link (a la página del candidato en Apriora) */
+.pipeline-card a.alex-badge { cursor: pointer; }
+.pipeline-card a.alex-badge:hover { filter: brightness(0.95); text-decoration: none; }
+
 .column h3 {
   font-size: 0.9rem;
   margin-bottom: 0.5rem;

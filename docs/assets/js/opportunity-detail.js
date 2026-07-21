@@ -874,7 +874,10 @@ function toggleActiveButton(command, button) {
   button.classList.toggle('active');
 }
 // --- SPEED UPS: caché + prewarm de candidatos para búsquedas instantáneas ---
-const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const API_BASE =
+  (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 const TRACK_PAGE = 'opp details';
 const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
   'pgonzales@vintti.com',

@@ -1096,7 +1096,7 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
         if (!res.ok && res.status !== 502) return null;
         return await res.json();
       } catch (err) {
-        console.warn('⚠️ Fallo consultando Alex interviewed count', err);
+        console.warn('⚠️ Fallo consultando Apriora interviewed count', err);
         return null;
       }
     }
@@ -1104,16 +1104,16 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
     // force=true (botón): siempre pisa el valor. force=false (auto): solo si vacío.
     async function applyAlexInterviewedCount({ force }) {
       if (!force && (interviewedInput.value || '').trim() !== '') return;
-      if (alexStatusEl) alexStatusEl.textContent = 'Consultando Alex…';
+      if (alexStatusEl) alexStatusEl.textContent = 'Consultando Apriora…';
 
       const data = await fetchAlexInterviewedCount();
       if (!data) { if (alexStatusEl) alexStatusEl.textContent = ''; return; }
       if (data.configured === false) {
-        if (alexStatusEl) alexStatusEl.textContent = 'Alex no configurado';
+        if (alexStatusEl) alexStatusEl.textContent = 'Apriora no configurado';
         return;
       }
       if (!data.matched) {
-        if (alexStatusEl) alexStatusEl.textContent = 'Sin match en Alex';
+        if (alexStatusEl) alexStatusEl.textContent = 'Sin match en Apriora';
         return;
       }
 
@@ -1126,7 +1126,7 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
       if (typeof updateOpportunityField === 'function') {
         await updateOpportunityField('cantidad_entrevistados', n);
       }
-      if (alexStatusEl) alexStatusEl.textContent = `Traído de Alex: ${n}`;
+      if (alexStatusEl) alexStatusEl.textContent = `Traído de Apriora: ${n}`;
     }
 
     // El prefill del valor guardado en la BD lo hace opportunity-detail.js tras
@@ -1383,12 +1383,192 @@ for (const column in counters) {
   }
 }
 
+// 🤖 Enriquecer las tarjetas con los resultados de entrevista de Alex (score,
+// video, PDF). Se hace después de pintar las tarjetas, cuando ya están en el DOM.
+hydrateAlexInterviews(opportunityId);
+
     })
     .catch(error => {
       console.error('Error loading candidates:', error);
     });
 }
 window.loadPipelineCandidates = loadPipelineCandidates;
+
+// 🤖 Trae de Alex los reportes de entrevista de esta opportunity (ya cruzados por
+// el backend con los candidatos del Hub, match por email→nombre) e inyecta un
+// badge de score + links a video/PDF en cada tarjeta correspondiente.
+function hydrateAlexInterviews(opportunityId) {
+  if (!opportunityId || opportunityId === '—') return;
+  fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/alex/interviews`, { cache: 'no-store' })
+    .then(res => (res.ok || res.status === 502) ? res.json() : null)
+    .then(data => {
+      if (!data || !data.interviews) return;
+      Object.entries(data.interviews).forEach(([candidateId, iv]) => {
+        const card = document.querySelector(
+          `.candidate-card[data-candidate-id="${window.CSS && CSS.escape ? CSS.escape(candidateId) : candidateId}"]`
+        );
+        if (!card) return;
+        const meta = card.querySelector('.candidate-meta');
+        if (!meta || meta.querySelector('.alex-interview')) return; // evita duplicar
+        meta.insertBefore(buildAlexInterviewEl(iv), meta.querySelector('.star-wrapper'));
+      });
+      // Ordena cada columna por score de Apriora (mayor a menor). Los candidatos
+      // sin entrevista en Apriora quedan debajo, en su orden normal.
+      sortPipelineColumnsByAlexScore(data.interviews);
+    })
+    .catch(err => console.warn('⚠️ No se pudieron cargar entrevistas de Apriora', err));
+}
+
+// Reordena las tarjetas de cada columna del pipeline por el score de Apriora (desc).
+// Las que no tienen entrevista en Apriora conservan su orden y quedan al final.
+// Solo cambia el orden visual: no toca datos ni el comportamiento de las tarjetas.
+function sortPipelineColumnsByAlexScore(interviews) {
+  const scoreOf = (card) => {
+    const id = card.getAttribute('data-candidate-id');
+    const iv = (id != null) ? interviews[id] : null;
+    const s = iv ? Number(iv.overall_score) : NaN;
+    return Number.isFinite(s) ? s : null;
+  };
+  document.querySelectorAll('#pipeline .card-container').forEach(col => {
+    const cards = Array.from(col.querySelectorAll(':scope > .candidate-card'));
+    cards.sort((a, b) => {
+      const sa = scoreOf(a);
+      const sb = scoreOf(b);
+      if (sa === null && sb === null) return 0;  // ambos sin score: orden original (sort estable)
+      if (sa === null) return 1;                 // sin score de Apriora va al final
+      if (sb === null) return -1;
+      return sb - sa;                            // mayor a menor
+    });
+    cards.forEach(c => col.appendChild(c));      // reordena en el DOM (mueve, no clona)
+  });
+}
+
+// Construye el elemento .alex-interview: un badge de score clicable que lleva a
+// la página del reporte del candidato en Apriora.
+function buildAlexInterviewEl(iv) {
+  const wrap = document.createElement('div');
+  wrap.className = 'alex-interview';
+  // No dejar que clicks aquí naveguen a candidate-details.
+  wrap.addEventListener('click', (e) => e.stopPropagation());
+
+  const score = iv.overall_score;
+  const label = (score === null || score === undefined) ? 'Apriora Score' : `Apriora Score ${score}`;
+  // Página del reporte del candidato en Apriora (fallback al video si no hay).
+  const url = iv.pdf_url || iv.video_url;
+
+  let badge;
+  if (url) {
+    badge = document.createElement('a');
+    badge.href = url;
+    badge.target = '_blank';
+    badge.rel = 'noopener noreferrer';
+  } else {
+    badge = document.createElement('span');
+  }
+  badge.className = 'alex-badge ' + alexScoreTierClass(score);
+  badge.textContent = label;
+  wrap.appendChild(badge);
+
+  // Tooltip compartido (montado en <body>): se llena y posiciona en hover.
+  wrap.addEventListener('mouseenter', () => showAlexTip(iv, badge));
+  wrap.addEventListener('mouseleave', hideAlexTip);
+
+  return wrap;
+}
+
+// --- Tooltip único de Apriora, montado en <body> ---
+let _alexTipEl = null;
+let _alexTipHideTimer = null;
+
+function getAlexTipEl() {
+  if (!_alexTipEl) {
+    _alexTipEl = document.createElement('div');
+    _alexTipEl.className = 'alex-tooltip';
+    // Mantener abierto mientras el mouse está sobre el propio tooltip (para scrollear).
+    _alexTipEl.addEventListener('mouseenter', () => clearTimeout(_alexTipHideTimer));
+    _alexTipEl.addEventListener('mouseleave', hideAlexTip);
+    document.body.appendChild(_alexTipEl);
+  }
+  return _alexTipEl;
+}
+
+function hideAlexTip() {
+  _alexTipHideTimer = setTimeout(() => {
+    if (_alexTipEl) _alexTipEl.style.display = 'none';
+  }, 140);
+}
+
+function showAlexTip(iv, anchor) {
+  clearTimeout(_alexTipHideTimer);
+  const tip = getAlexTipEl();
+  fillAlexTooltip(tip, iv);
+  tip.style.display = 'block';
+
+  const r = anchor.getBoundingClientRect();
+  const margin = 8;
+  const tw = tip.offsetWidth;
+  const th = tip.offsetHeight;
+  let left = r.left;
+  if (left + tw > window.innerWidth - margin) left = window.innerWidth - tw - margin;
+  if (left < margin) left = margin;
+  let top = r.bottom + margin;                   // preferir debajo del badge
+  if (top + th > window.innerHeight - margin) {  // si no cabe, arriba
+    const above = r.top - th - margin;
+    top = above >= margin ? above : Math.max(margin, window.innerHeight - th - margin);
+  }
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+}
+
+// Colorea el badge por tramo de score. Normaliza escalas 0-10 y 0-100.
+function alexScoreTierClass(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return 'alex-na';
+  const pct = n <= 10 ? n * 10 : n;
+  if (pct >= 80) return 'alex-good';
+  if (pct >= 60) return 'alex-mid';
+  return 'alex-low';
+}
+
+// Llena el tooltip con el feedback general + skills evaluadas del reporte.
+function fillAlexTooltip(tip, iv) {
+  tip.innerHTML = '';
+
+  if (iv.overall_feedback) {
+    const fb = document.createElement('div');
+    fb.className = 'alex-tip-feedback';
+    // Quita el markdown de negritas (**) y conserva los saltos de línea.
+    fb.textContent = String(iv.overall_feedback).replace(/\*\*/g, '').trim();
+    tip.appendChild(fb);
+  }
+
+  const skills = Array.isArray(iv.skills) ? iv.skills : [];
+  if (skills.length) {
+    const h = document.createElement('div');
+    h.className = 'alex-tip-h';
+    h.textContent = 'Skills';
+    tip.appendChild(h);
+    const ul = document.createElement('ul');
+    ul.className = 'alex-tip-skills';
+    skills.forEach(s => {
+      const li = document.createElement('li');
+      const name = (s && (s.name || s.skill)) ? (s.name || s.skill) : 'Skill';
+      const sc = s && (s.score ?? s.value);
+      li.textContent = (sc === undefined || sc === null) ? name : `${name}: ${sc}`;
+      ul.appendChild(li);
+    });
+    tip.appendChild(ul);
+  }
+
+  if (iv.matched_by) {
+    const m = document.createElement('div');
+    m.className = 'alex-tip-match';
+    m.textContent = `Match por ${iv.matched_by === 'email' ? 'email' : 'nombre'}`;
+    tip.appendChild(m);
+  }
+
+  if (!tip.childNodes.length) tip.textContent = 'Entrevista de Apriora';
+}
 
 function enableDrag(card) {
       card.draggable = true;

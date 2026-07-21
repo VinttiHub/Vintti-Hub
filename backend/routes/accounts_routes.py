@@ -2605,6 +2605,68 @@ def get_alex_interviewed_count(opportunity_id):
         }), 502
 
 
+@bp.route('/opportunities/<int:opportunity_id>/alex/interviews', methods=['GET'])
+def get_alex_interviews(opportunity_id):
+    """Resultados de entrevistas de Alex (score/feedback/video/pdf) cruzados con
+    los candidatos del Hub de esta opportunity. El match se hace por email y, si
+    no coincide, por nombre. Respuesta keyed por candidate_id del Hub:
+        { "interviews": { "<candidate_id>": { overall_score, overall_feedback,
+          skills, tags, video_url, pdf_url, matched_by } } }
+    Degrada suave si falta la key o Alex falla."""
+    from utils.alex import AlexClient, AlexError, match_alex_results_to_candidates
+
+    try:
+        client = AlexClient()
+    except AlexError:
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "configured": False, "matched": False, "interviews": {},
+        })
+
+    try:
+        position_id, alex_results = client.get_interview_results_for_opportunity(opportunity_id)
+    except AlexError as e:
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "configured": True, "matched": False, "interviews": {},
+            "error": str(e),
+        }), 502
+
+    if position_id is None:
+        return jsonify({
+            "opportunity_id": opportunity_id,
+            "configured": True, "matched": False, "interviews": {},
+        })
+
+    # Candidatos del Hub para esta opportunity (mismo join que /candidates).
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT c.candidate_id, c.name, c.email
+        FROM candidates c
+        INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+        WHERE oc.opportunity_id = %s
+        """,
+        (opportunity_id,),
+    )
+    hub_candidates = [
+        {"candidate_id": row[0], "name": row[1], "email": row[2]}
+        for row in cursor.fetchall()
+    ]
+    cursor.close()
+    conn.close()
+
+    interviews = match_alex_results_to_candidates(alex_results, hub_candidates)
+    return jsonify({
+        "opportunity_id": opportunity_id,
+        "configured": True,
+        "matched": True,
+        "position_id": position_id,
+        "interviews": interviews,
+    })
+
+
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])
 def update_batch(batch_id):
     try:
