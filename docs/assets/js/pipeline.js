@@ -1129,14 +1129,12 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
       if (alexStatusEl) alexStatusEl.textContent = `Traído de Alex: ${n}`;
     }
 
+    // El prefill del valor guardado en la BD lo hace opportunity-detail.js tras
+    // cargar los datos de la opp. Aquí solo el botón "🔄 Traer de Alex" fuerza la
+    // actualización desde Alex (pisa el valor con el conteo actual).
     if (alexBtn) {
       alexBtn.addEventListener('click', () => applyAlexInterviewedCount({ force: true }));
     }
-    // Auto-llenado solo si el campo quedó vacío, tras un pequeño settle para
-    // dejar terminar los prefills desde la BD.
-    window.addEventListener('load', () => {
-      setTimeout(() => applyAlexInterviewedCount({ force: false }), 800);
-    });
   }
 
 }); //  cierre del DOMContentLoaded

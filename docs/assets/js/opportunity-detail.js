@@ -3723,8 +3723,14 @@ function updateJobDescriptionSummary() {
  const d = window.currentOpportunityData || {};
  document.getElementById('expected-fee-input').value = d.expected_fee ?? '';
  document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
- // El prefill del contador "interviewed candidates" vive en pipeline.js (único
- // dueño del campo: prefill desde `cantidad_entrevistados` + integración Alex AI).
+ // Prefill del contador "Number of interviewed candidates" desde la BD (fuente de
+ // verdad). Corre aquí —tras cargar los datos de la opp— porque en DOMContentLoaded
+ // el opportunity_id aún no está listo. La actualización desde Alex AI vive en
+ // pipeline.js mediante el botón "🔄 Traer de Alex".
+ const interviewedCountInput = document.getElementById('interviewed-count-input');
+ if (interviewedCountInput) {
+   interviewedCountInput.value = d.cantidad_entrevistados ?? '';
+ }
       }
 function formatDate(dateStr) {
   return toYMD(dateStr);
