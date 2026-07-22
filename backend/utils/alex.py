@@ -44,6 +44,19 @@ def html_to_text(value):
     return s.strip()
 
 
+# Sufijos legales que no aportan a las iniciales (Elevate Clinics Inc -> EC).
+_INITIALS_SKIP = {"inc", "llc", "ltd", "corp", "co", "sa", "srl", "sas", "sl", "plc", "the"}
+
+
+def account_initials(name):
+    """Iniciales del nombre de la account: 'Elevate Clinics' -> 'EC'."""
+    words = re.findall(r"[A-Za-z0-9]+", str(name or ""))
+    letters = [w[0] for w in words if w.lower() not in _INITIALS_SKIP]
+    if not letters:  # si todo era sufijo/stopword, usa todas las palabras
+        letters = [w[0] for w in words]
+    return "".join(letters).upper()
+
+
 def _extract_list(payload):
     """Alex puede devolver una lista pelada o envuelta ({data|results|...}).
     Normaliza a lista en cualquiera de los casos."""

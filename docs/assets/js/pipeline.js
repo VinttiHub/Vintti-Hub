@@ -1168,7 +1168,9 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
     alexCreateBtn.addEventListener('click', async () => {
       const oppId = getCreateOppId();
       if (!oppId || oppId === '—') return;
-      const title = (document.getElementById('details-opportunity-name')?.value || '').trim();
+      const oppName = (document.getElementById('details-opportunity-name')?.value || '').trim();
+      const initials = accountInitials(document.getElementById('details-account-name')?.value || '');
+      const title = (oppName && initials) ? `${oppName} | ${initials}` : (oppName || initials);
       const ok = confirm(
         'Se creará la entrevista en Apriora con el título:\n\n' +
         `   "${title || '(opportunity sin nombre)'}"\n\n` +
@@ -1203,6 +1205,16 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
   }
 
 }); //  cierre del DOMContentLoaded
+
+// Iniciales del nombre de la account ('Elevate Clinics' -> 'EC'). Igual que el
+// backend (utils/alex.py::account_initials), para previsualizar el título en el confirm.
+function accountInitials(name) {
+  const skip = new Set(['inc', 'llc', 'ltd', 'corp', 'co', 'sa', 'srl', 'sas', 'sl', 'plc', 'the']);
+  const words = String(name || '').match(/[A-Za-z0-9]+/g) || [];
+  let letters = words.filter(w => !skip.has(w.toLowerCase())).map(w => w[0]);
+  if (!letters.length) letters = words.map(w => w[0]);
+  return letters.join('').toUpperCase();
+}
 
 // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
 function loadPipelineCandidates() {

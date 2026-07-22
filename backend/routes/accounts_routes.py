@@ -2672,7 +2672,7 @@ def create_alex_position(opportunity_id):
     """Crea en Apriora la job (interviewer) de esta opportunity a partir de su job
     description. Enlaza por externalJobId = opportunity_id. Evita duplicados: si ya
     hay una position vinculada (por externalJobId o por el id en el nombre), no crea otra."""
-    from utils.alex import AlexClient, AlexError, html_to_text
+    from utils.alex import AlexClient, AlexError, html_to_text, account_initials
 
     try:
         client = AlexClient()
@@ -2682,7 +2682,12 @@ def create_alex_position(opportunity_id):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT hr_job_description, opp_position_name FROM opportunity WHERE opportunity_id = %s",
+        """
+        SELECT o.hr_job_description, o.opp_position_name, a.client_name
+        FROM opportunity o
+        LEFT JOIN account a ON o.account_id = a.account_id
+        WHERE o.opportunity_id = %s
+        """,
         (opportunity_id,),
     )
     row = cursor.fetchone()
@@ -2697,14 +2702,16 @@ def create_alex_position(opportunity_id):
             "error": "La opportunity no tiene una job description suficiente para crear la entrevista en Apriora."
         }), 400
 
-    # Forzar que el título en Apriora sea el OPPORTUNITY NAME (opp_position_name).
-    # createJob no tiene campo de título: Apriora lo deriva de la línea "Job Title:"
-    # de la job description, así que la anteponemos (quitando una "Job Title:" inicial
-    # preexistente para no duplicar).
+    # Título en Apriora = OPPORTUNITY NAME + " | " + INICIALES DE LA ACCOUNT
+    # (ej. "Prueba Apriora 2 | EC"). createJob no tiene campo de título: Apriora lo
+    # deriva de la línea "Job Title:" de la job description, así que la anteponemos
+    # (quitando una "Job Title:" inicial preexistente para no duplicar).
     opp_name = (row[1] or "").strip()
-    if opp_name:
+    initials = account_initials(row[2])
+    title = f"{opp_name} | {initials}" if (opp_name and initials) else (opp_name or initials)
+    if title:
         jd_body = re.sub(r'^\s*job\s*title\s*:.*(?:\r?\n)+', '', jd_text, count=1, flags=re.IGNORECASE)
-        jd_text = f"Job Title: {opp_name}\n\n{jd_body.lstrip()}"
+        jd_text = f"Job Title: {title}\n\n{jd_body.lstrip()}"
 
     try:
         # Evitar duplicados: si ya hay una position enlazada, no crear otra
