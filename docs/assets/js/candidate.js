@@ -928,9 +928,12 @@ function clearInputErrors() {
     candidateModalRefs.nameInput,
     candidateModalRefs.emailInput,
     candidateModalRefs.countrySelect,
+    candidateModalRefs.countryDisplayButton,
     candidateModalRefs.usStateInput,
     candidateModalRefs.phoneInput,
-    candidateModalRefs.linkedinInput
+    candidateModalRefs.linkedinInput,
+    candidateModalRefs.sourceSelect,
+    candidateModalRefs.originSelect
   ].forEach(input => input?.classList.remove('input-error'));
 }
 
@@ -993,9 +996,26 @@ function gatherCandidateFormValues() {
 function validateCandidateForm(values) {
   let error = '';
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!values.name) {
+    error = error || 'Enter the full name.';
+    candidateModalRefs.nameInput?.classList.add('input-error');
+  }
+
   if (!values.email || !emailRegex.test(values.email)) {
-    error = 'Enter a valid email address.';
+    error = error || 'Enter a valid email address.';
     candidateModalRefs.emailInput?.classList.add('input-error');
+  }
+
+  if (!values.country) {
+    error = error || 'Select a country.';
+    candidateModalRefs.countrySelect?.classList.add('input-error');
+    candidateModalRefs.countryDisplayButton?.classList.add('input-error');
+  }
+
+  if (normalizeCountryKey(values.country) === 'United States' && !values.usStateCode) {
+    error = error || 'Select a state for United States candidates.';
+    candidateModalRefs.usStateInput?.classList.add('input-error');
   }
 
   if (!values.phoneDigits) {
@@ -1007,9 +1027,15 @@ function validateCandidateForm(values) {
     error = error || 'LinkedIn URL must point to linkedin.com.';
     candidateModalRefs.linkedinInput?.classList.add('input-error');
   }
-  if (normalizeCountryKey(values.country) === 'United States' && !values.usStateCode) {
-    error = error || 'Select a state for United States candidates.';
-    candidateModalRefs.usStateInput?.classList.add('input-error');
+
+  if (!values.candidateSource) {
+    error = error || 'Select a source.';
+    candidateModalRefs.sourceSelect?.classList.add('input-error');
+  }
+
+  if (!values.candidateOrigin) {
+    error = error || 'Select an origin.';
+    candidateModalRefs.originSelect?.classList.add('input-error');
   }
 
   return error;

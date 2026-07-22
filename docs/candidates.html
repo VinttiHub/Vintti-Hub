@@ -244,9 +244,9 @@
       </div>
 
       <form id="candidateCreateForm" class="candidate-form">
-        <label class="candidate-field">
-          <span>Full name</span>
-          <input type="text" id="candidateFullName" name="full_name" placeholder="Full name" autocomplete="name" />
+        <label class="candidate-field required">
+          <span>Full name <span class="required-marker">*</span></span>
+          <input type="text" id="candidateFullName" name="full_name" placeholder="Full name *" autocomplete="name" required />
         </label>
 
         <label class="candidate-field required">
@@ -254,8 +254,8 @@
           <input type="email" id="candidateEmail" name="email" placeholder="Email *" autocomplete="email" required />
         </label>
 
-        <label class="candidate-field">
-          <span>Country</span>
+        <label class="candidate-field required">
+          <span>Country <span class="required-marker">*</span></span>
           <div class="searchable-select" data-target="candidateCountry">
             <button type="button" class="searchable-select__display" id="candidateCountryDisplay">
               Select country…
@@ -298,9 +298,9 @@
           <input type="url" id="candidateLinkedin" name="linkedin" placeholder="https://linkedin.com/in/username *" autocomplete="url" required />
         </label>
 
-        <label class="candidate-field">
-          <span>Source</span>
-          <select id="candidateSource" name="candidate_source">
+        <label class="candidate-field required">
+          <span>Source <span class="required-marker">*</span></span>
+          <select id="candidateSource" name="candidate_source" required>
             <option value="">Select source…</option>
             <option value="Linkedin">Linkedin</option>
             <option value="Other Recruitment Tool">Other Recruitment Tool</option>
@@ -309,9 +309,9 @@
           </select>
         </label>
 
-        <label class="candidate-field">
-          <span>Origin</span>
-          <select id="candidateOrigin" name="candidate_origin">
+        <label class="candidate-field required">
+          <span>Origin <span class="required-marker">*</span></span>
+          <select id="candidateOrigin" name="candidate_origin" required>
             <option value="">Select origin…</option>
             <option value="Hunteo">Hunteo</option>
             <option value="Applicant">Applicant</option>
@@ -334,7 +334,7 @@
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/to-do-chat.js" defer></script>
   <script src="./assets/js/workspace.js?v=20260615-3" defer></script>
-  <script src="./assets/js/candidate.js?v=20260710-2" defer></script>
+  <script src="./assets/js/candidate.js?v=20260722-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260708-1" defer></script>
 
   <!-- SFX (kept id/src). Preload left as-is; controls hidden for UX -->
