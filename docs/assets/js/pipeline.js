@@ -1165,42 +1165,13 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
         .catch(() => {});
     })(20);
 
-    alexCreateBtn.addEventListener('click', async () => {
+    alexCreateBtn.addEventListener('click', () => {
       const oppId = getCreateOppId();
       if (!oppId || oppId === '—') return;
       const oppName = (document.getElementById('details-opportunity-name')?.value || '').trim();
       const initials = accountInitials(document.getElementById('details-account-name')?.value || '');
       const title = (oppName && initials) ? `${oppName} | ${initials}` : (oppName || initials);
-      const ok = confirm(
-        'Se creará la entrevista en Apriora con el título:\n\n' +
-        `   "${title || '(opportunity sin nombre)'}"\n\n` +
-        '⚠️ Apriora NO permite cambiar el título después, ni recrear la entrevista ' +
-        '(el ID no se libera). Verifica que el Opportunity Name esté correcto.\n\n' +
-        '¿Continuar?'
-      );
-      if (!ok) return;
-
-      alexCreateBtn.disabled = true;
-      if (createStatusEl) createStatusEl.textContent = 'Creando en Apriora… (puede tardar unos segundos)';
-      try {
-        const res = await fetch(
-          `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/create_position`,
-          { method: 'POST' }
-        );
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) {
-          markCreated('✅ Entrevista creada en Apriora');
-        } else if (res.status === 409) {
-          markCreated(data.error || `Ya existía: ${data.position_name || 'job en Apriora'}`);
-        } else {
-          if (createStatusEl) createStatusEl.textContent = `⚠️ ${data.error || 'No se pudo crear'}`;
-          alexCreateBtn.disabled = false;   // permitir reintento
-        }
-      } catch (err) {
-        console.warn('⚠️ Error creando job en Apriora', err);
-        if (createStatusEl) createStatusEl.textContent = '⚠️ Error de red';
-        alexCreateBtn.disabled = false;
-      }
+      openAprioraCreateModal({ oppId, title, button: alexCreateBtn, statusEl: createStatusEl, markCreated });
     });
   }
 
@@ -1214,6 +1185,94 @@ function accountInitials(name) {
   let letters = words.filter(w => !skip.has(w.toLowerCase())).map(w => w[0]);
   if (!letters.length) letters = words.map(w => w[0]);
   return letters.join('').toUpperCase();
+}
+
+// Modal para crear la entrevista en Apriora: confirma el título, dispara la
+// creación (fire-and-forget) y muestra que se está generando en segundo plano.
+function openAprioraCreateModal({ oppId, title, button, statusEl, markCreated }) {
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const overlay = document.createElement('div');
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483000;' +
+    'display:flex;align-items:center;justify-content:center;padding:16px;';
+  const box = document.createElement('div');
+  box.style.cssText =
+    'background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px 24px;' +
+    'box-shadow:0 24px 60px rgba(0,0,0,.28);' +
+    'font:400 14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1b1b1b;';
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  const btnBase = 'padding:9px 16px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;border:1px solid transparent;';
+  const btnGhost = btnBase + 'background:#f1f5f9;color:#334155;';
+  const btnViolet = btnBase + 'background:#6c38ff;color:#fff;';
+
+  box.innerHTML =
+    '<h3 style="margin:0 0 12px;font-size:18px;">Crear entrevista en Apriora</h3>' +
+    '<p style="margin:0 0 4px;color:#475569;">Se creará con el título:</p>' +
+    `<p style="margin:0 0 14px;font-weight:700;color:#6c38ff;">"${esc(title || '(opportunity sin nombre)')}"</p>` +
+    '<p style="margin:0 0 10px;color:#475569;">⏳ Apriora tarda <b>~1-2 min</b> en generarla. Se crea en <b>segundo plano</b>: puedes cerrar este aviso y seguir trabajando — te avisaremos cuando esté lista, estés en la página que estés del Hub.</p>' +
+    '<div style="margin:0 0 12px;padding:10px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;color:#5b21b6;font-size:12.5px;">' +
+    '📌 <b>Importante:</b> al darle Crear, <b>no cierres esta pestaña por unos segundos</b> (mientras se envía). Después puedes cerrarla, cambiar de página o hacer otras cosas — la creación sigue sola.' +
+    '</div>' +
+    '<p style="margin:0 0 18px;color:#b45309;font-size:12.5px;">⚠️ El título no se puede cambiar después ni recrear la entrevista. Verifica que esté correcto.</p>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+    `<button data-act="cancel" style="${btnGhost}">Cancelar</button>` +
+    `<button data-act="create" style="${btnViolet}">Crear entrevista</button>` +
+    '</div>';
+
+  box.querySelector('[data-act="cancel"]').addEventListener('click', close);
+
+  box.querySelector('[data-act="create"]').addEventListener('click', () => {
+    close();  // cerrar el popup de inmediato (feedback instantáneo)
+
+    const N = window.AprioraNotifier;
+    const AMBER = 'linear-gradient(180deg,#f59e0b,#d97706)';
+
+    // Pedir permiso de notificación (sin bloquear el flujo).
+    try {
+      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    } catch (e) {}
+
+    // Registrar pendiente + feedback inmediato + estado en la página.
+    if (N) {
+      N.addPending(oppId, title);
+      N.toast('⏳ Creándose en Apriora… te avisaremos cuando esté lista', {
+        icon: '⏳', accent: 'linear-gradient(180deg,#8b5cf6,#6c38ff)', sound: false, duration: 8000
+      });
+    }
+    if (button) button.disabled = true;
+    if (statusEl) statusEl.textContent = '⏳ Creándose en Apriora… te avisaremos cuando esté lista';
+
+    // Disparar la creación en segundo plano. keepalive:true => la petición sobrevive
+    // aunque el usuario cambie de página o cierre la pestaña justo después de dar clic.
+    fetch(`${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/create_position`, {
+      method: 'POST',
+      keepalive: true,
+    })
+      .then(async (res) => {
+        if (res.status === 202 || res.ok) return;  // en curso, todo bien
+        const d = await res.json().catch(() => ({}));
+        // Error real: revertir el estado "creándose".
+        if (N) N.removePending(oppId);
+        const is409 = res.status === 409;
+        if (button) button.disabled = is409;      // 409 = ya existe → dejar deshabilitado
+        if (statusEl) statusEl.textContent = is409 ? '✅ Ya creada en Apriora' : '';
+        if (N) N.toast(
+          (is409 ? '' : '⚠️ ') + (d.error || 'No se pudo iniciar la creación.'),
+          { icon: is409 ? '✓' : '⚠️', accent: is409 ? undefined : AMBER, sound: false }
+        );
+      })
+      .catch((err) => {
+        console.warn('⚠️ Error iniciando creación en Apriora', err);
+        if (N) N.removePending(oppId);
+        if (button) button.disabled = false;
+        if (statusEl) statusEl.textContent = '';
+        if (N) N.toast('⚠️ Error de red al iniciar la creación.', { icon: '⚠️', accent: AMBER, sound: false });
+      });
+  });
 }
 
 // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline

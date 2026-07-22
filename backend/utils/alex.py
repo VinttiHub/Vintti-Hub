@@ -133,10 +133,13 @@ class AlexClient:
         payload = self._request("GET", "/reports", params={"positionId": position_id})
         return _extract_list(payload)
 
-    def create_job(self, external_job_id, job_description, additional_questions=None, active=None):
+    def create_job(self, external_job_id, job_description, additional_questions=None,
+                   intelligently_order_questions=False, active=None):
         """Crea una job (interviewer) en Apriora desde una job description.
         `external_job_id` debe ser único por company (usamos el opportunity_id del
         Hub, que además sirve para enlazar después por externalJobId).
+        `intelligently_order_questions=False` => las preguntas extra se agregan al
+        final en el orden dado (no las intercala Apriora).
         Devuelve el dict de respuesta (payload = interviewerId)."""
         body = {
             "externalJobId": str(external_job_id),
@@ -144,6 +147,8 @@ class AlexClient:
         }
         if additional_questions:
             body["additionalQuestions"] = additional_questions
+            # Enviar explícito para que NO reordene/intercale las preguntas extra.
+            body["intelligentlyOrderQuestions"] = bool(intelligently_order_questions)
         if active is not None:
             body["active"] = active
         return self._request("POST", "/createJob", json=body)

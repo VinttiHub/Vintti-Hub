@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import threading
 import traceback
 import uuid
 from datetime import date, datetime
@@ -2667,6 +2668,33 @@ def get_alex_interviews(opportunity_id):
     })
 
 
+def _create_alex_job_bg(opportunity_id, jd_text):
+    """Corre en un hilo: hace el createJob (que en Apriora tarda ~1-2 min) sin
+    bloquear la respuesta HTTP. El front detecta que quedó lista cuando la position
+    aparece en Apriora (polling), así que aquí solo disparamos y logueamos."""
+    try:
+        from utils.alex import AlexClient
+        AlexClient().create_job(
+            external_job_id=opportunity_id,
+            job_description=jd_text,
+            additional_questions=DEFAULT_APRIORA_QUESTIONS,
+        )
+        logging.info("Apriora createJob OK (bg) opp %s", opportunity_id)
+    except Exception as e:
+        logging.warning("Apriora createJob (bg) falló opp %s: %s", opportunity_id, e)
+
+
+# Preguntas fijas que se agregan a TODA entrevista creada en Apriora desde el Hub
+# (campo additionalQuestions de createJob). Abiertas, sin orden inteligente.
+DEFAULT_APRIORA_QUESTIONS = [
+    "Having in mind that this position has a Independent contractor, could you please tell me your Net Monthly Salary expectations in USD?",
+    "Do you have any vacations planned or some days you know that you are going to be out of office?",
+    "Just so you know, if you continue moving forward in the process, we'll be asking for references and, at the final stage, a resignation letter. Are you comfortable with both of these?",
+    "Are you participating in other processes?",
+    "Do you have your own computer to work? this is very important since you will be working with your own computer",
+]
+
+
 @bp.route('/opportunities/<int:opportunity_id>/alex/create_position', methods=['POST'])
 def create_alex_position(opportunity_id):
     """Crea en Apriora la job (interviewer) de esta opportunity a partir de su job
@@ -2713,36 +2741,17 @@ def create_alex_position(opportunity_id):
         jd_body = re.sub(r'^\s*job\s*title\s*:.*(?:\r?\n)+', '', jd_text, count=1, flags=re.IGNORECASE)
         jd_text = f"Job Title: {title}\n\n{jd_body.lstrip()}"
 
-    try:
-        # Evitar duplicados: si ya hay una position enlazada, no crear otra
-        # (externalJobId debe ser único por company en Apriora).
-        existing = client.find_position_for_opportunity(opportunity_id)
-        if existing:
-            return jsonify({
-                "error": "Ya existe una job en Apriora vinculada a esta opportunity.",
-                "already_exists": True,
-                "position_name": existing.get("name"),
-            }), 409
-
-        resp = client.create_job(external_job_id=opportunity_id, job_description=jd_text)
-        # Apriora puede responder 200 con success:false en el body → tratar como error.
-        if isinstance(resp, dict) and resp.get("success") is False:
-            msg = resp.get("message") or ""
-            if "already exists" in msg.lower():
-                # Apriora reserva el externalJobId de forma permanente: aunque se borre
-                # la job en su panel, el id no se libera y no hay API para recrear.
-                return jsonify({
-                    "error": "Apriora ya tiene registrada una entrevista para esta opportunity (no libera el ID aunque borres la job en su panel).",
-                    "already_exists": True,
-                }), 409
-            return jsonify({"error": msg or "Apriora rechazó la creación."}), 502
-        return jsonify({
-            "success": True,
-            "interviewer_id": resp.get("payload") if isinstance(resp, dict) else None,
-            "message": resp.get("message") if isinstance(resp, dict) else None,
-        })
-    except AlexError as e:
-        return jsonify({"error": str(e)}), 502
+    # Fire-and-forget: la generación en Apriora tarda ~1-2 min. En vez de bloquear
+    # la respuesta, disparamos el createJob en un hilo y devolvemos 202 al instante.
+    # El front detecta que quedó lista cuando la position aparece en Apriora (polling).
+    # (No hace falta pre-chequear duplicados: el externalJobId es único y Apriora los
+    # rechaza; además el botón se deshabilita en la UI si ya existe.)
+    threading.Thread(
+        target=_create_alex_job_bg,
+        args=(opportunity_id, jd_text),
+        daemon=True,
+    ).start()
+    return jsonify({"started": True, "opportunity_id": opportunity_id}), 202
 
 
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])
