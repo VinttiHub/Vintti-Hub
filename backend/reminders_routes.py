@@ -1599,9 +1599,11 @@ def send_due_reminders():
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
-          SELECT *
-            FROM hire_reminders
-           WHERE (NOT jaz OR NOT lar)
+          SELECT hr.*
+            FROM hire_reminders hr
+            JOIN opportunity o ON o.opportunity_id = hr.opportunity_id
+           WHERE (NOT hr.jaz OR NOT hr.lar)
+             AND hr.candidate_id = o.candidato_contratado
         """)
         rows = cur.fetchall() or []
 
@@ -1612,6 +1614,7 @@ def send_due_reminders():
             rid = r["reminder_id"]
             press = r["press_date"].astimezone(BOGOTA_TZ) if r["press_date"] else now
             opportunity_id = r.get("opportunity_id")
+
             ctx = _fetch_email_context(cid, opportunity_id, cur) if opportunity_id else {}
             candidate_name    = ctx.get("candidate_name") or ""
             client_name       = ctx.get("client_name") or ""
