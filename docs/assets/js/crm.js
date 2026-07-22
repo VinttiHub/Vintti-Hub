@@ -484,6 +484,12 @@ function csvMoneyValue(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function csvBoolValue(value) {
+  if (value === true) return 'TRUE';
+  if (value === false) return 'FALSE';
+  return '';
+}
+
 function csvTextValue(value, fallback = '—') {
   const text = value === null || value === undefined ? '' : String(value).trim();
   return text || fallback;
@@ -539,7 +545,22 @@ function buildCrmExportRecord(item = {}) {
     trr: csvMoneyValue(item.trr),
     tsf: csvMoneyValue(item.tsf),
     tsr: csvMoneyValue(item.tsr),
-    priority
+    priority,
+    mail: csvTextValue(item.mail, ''),
+    website: csvTextValue(item.website, ''),
+    linkedin: csvTextValue(item.linkedin, ''),
+    foundus: csvTextValue(item.foundus, ''),
+    contactName: csvTextValue(item.name, ''),
+    contactSurname: csvTextValue(item.surname, ''),
+    comments: csvTextValue(item.comments, ''),
+    creditLoop: csvTextValue(item.credit_loop, ''),
+    vinttiAi: csvBoolValue(item.vintti_ai),
+    vinttiInternal: csvBoolValue(item.vintti_internal),
+    billingDay: item.billing_day ?? '',
+    billingContact: csvTextValue(item.billing_contact, ''),
+    billingCurrency: csvTextValue(item.billing_currency, ''),
+    billingType: csvTextValue(item.billing_type, ''),
+    billingNotes: csvTextValue(item.billing_notes, '')
   };
 }
 
@@ -577,30 +598,24 @@ function updateCrmExportCache(accountId, patch = {}) {
     trr: 0,
     tsf: 0,
     tsr: 0,
-    priority: ''
+    priority: '',
+    mail: '',
+    website: '',
+    linkedin: '',
+    foundus: '',
+    contactName: '',
+    contactSurname: '',
+    comments: '',
+    creditLoop: '',
+    vinttiAi: '',
+    vinttiInternal: '',
+    billingDay: '',
+    billingContact: '',
+    billingCurrency: '',
+    billingType: '',
+    billingNotes: ''
   };
   CRM_EXPORT_CACHE.set(id, { ...current, ...patch });
-}
-
-function hasCrmExportAccountData(row = {}) {
-  const requiredTextFields = [
-    'size',
-    'state',
-    'timezone',
-    'leadSource',
-    'leadSourceDetail',
-    'conversionChannel',
-    'referralSource',
-    'industry',
-    'outsource',
-    'painPoints',
-    'position',
-    'type'
-  ];
-  return requiredTextFields.every((field) => {
-    const value = (row?.[field] || '').toString().trim();
-    return value && value !== '—';
-  });
 }
 
 async function hydrateCrmExportAccountRow(accountId, row = null) {
@@ -608,7 +623,7 @@ async function hydrateCrmExportAccountRow(accountId, row = null) {
   if (!id) return row;
 
   const currentRow = row || CRM_EXPORT_CACHE.get(id);
-  if (currentRow && hasCrmExportAccountData(currentRow)) return currentRow;
+  if (currentRow && currentRow._hydrated) return currentRow;
 
   try {
     const res = await fetch(`${API_BASE}/accounts/${encodeURIComponent(id)}`);
@@ -628,7 +643,23 @@ async function hydrateCrmExportAccountRow(accountId, row = null) {
       position: csvTextValue(account?.position),
       type: csvTextValue(account?.type),
       sqlMeetingDate: csvDateValue(account?.sql_meeting_date),
-      creationDate: csvDateValue(account?.creation_date)
+      creationDate: csvDateValue(account?.creation_date),
+      mail: csvTextValue(account?.mail, ''),
+      website: csvTextValue(account?.website, ''),
+      linkedin: csvTextValue(account?.linkedin, ''),
+      foundus: csvTextValue(account?.foundus, ''),
+      contactName: csvTextValue(account?.name, ''),
+      contactSurname: csvTextValue(account?.surname, ''),
+      comments: csvTextValue(account?.comments, ''),
+      creditLoop: csvTextValue(account?.credit_loop, ''),
+      vinttiAi: csvBoolValue(account?.vintti_ai),
+      vinttiInternal: csvBoolValue(account?.vintti_internal),
+      billingDay: account?.billing_day ?? '',
+      billingContact: csvTextValue(account?.billing_contact, ''),
+      billingCurrency: csvTextValue(account?.billing_currency, ''),
+      billingType: csvTextValue(account?.billing_type, ''),
+      billingNotes: csvTextValue(account?.billing_notes, ''),
+      _hydrated: true
     };
     updateCrmExportCache(id, patch);
     return { ...(currentRow || {}), ...patch };
@@ -783,39 +814,82 @@ async function fetchCrmExportCandidateSheets(accountId) {
   }
 }
 
-function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmptyAccountRow = false } = {}) {
-  const candidateList = Array.isArray(candidates) ? candidates : [];
-  if (!candidateList.length) {
-    if (!includeEmptyAccountRow) return [];
-    return [[
-      accountRow.accountId,
-      accountRow.clientName,
-      accountRow.status,
-      accountRow.salesLead,
-      accountRow.size,
-      accountRow.state,
-      accountRow.timezone,
-      accountRow.leadSource,
-      accountRow.leadSourceDetail,
-      accountRow.conversionChannel,
-      accountRow.referralSource,
-      accountRow.industry,
-      accountRow.outsource,
-      accountRow.painPoints,
-      accountRow.position,
-      accountRow.type,
-      accountRow.sqlMeetingDate,
-      accountRow.creationDate,
-      accountRow.contract,
-      accountRow.trr,
-      accountRow.tsf,
-      accountRow.tsr,
-      accountRow.priority,
-      ...Array(12).fill('')
-    ]];
-  }
+// Column headers, split so the account block and the candidate/hire block stay
+// in sync with their value builders below (crmAccountRowValues / crmCandidateValues).
+const CRM_ACCOUNT_HEADERS = [
+  'Account ID',
+  'Client Name',
+  'Status',
+  'Sales Lead',
+  'size',
+  'state',
+  'timezone',
+  'lead_source',
+  'lead_source_detail',
+  'conversion_channel',
+  'referal_source',
+  'industry',
+  'outsource',
+  'painpoints',
+  'position',
+  'type',
+  'sql_meeting_date',
+  'creation_date',
+  'Contract',
+  'TRR',
+  'TSF',
+  'TSR',
+  'Priority',
+  'mail',
+  'website',
+  'account_linkedin',
+  'foundus',
+  'contact_name',
+  'contact_surname',
+  'comments',
+  'credit_loop',
+  'vintti_ai',
+  'vintti_internal',
+  'billing_day',
+  'billing_contact',
+  'billing_currency',
+  'billing_type',
+  'billing_notes'
+];
 
-  return candidateList.map((candidate = {}) => [
+const CRM_CANDIDATE_HEADERS = [
+  'Candidate ID',
+  'Candidate Name',
+  'Candidate Status',
+  'Opportunity Model',
+  'Position',
+  'Opp Stage',
+  'Replacement Of',
+  'Start Date',
+  'End Date',
+  'Employee Fee',
+  'Employee Salary',
+  'Employee Revenue',
+  'Setup Fee',
+  'Price Type',
+  'Working Schedule',
+  'PTO',
+  'Computer',
+  'Extra Perks',
+  'Probation Days',
+  'Discount ($)',
+  'Discount Date Range',
+  'Referral ($)',
+  'Referral Date Range',
+  'Buyout ($)',
+  'Buyout Date Range',
+  'Inactive Reason',
+  'Inactive Comments',
+  'Inactive Vintti Error'
+];
+
+function crmAccountRowValues(accountRow) {
+  return [
     accountRow.accountId,
     accountRow.clientName,
     accountRow.status,
@@ -839,18 +913,70 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
     accountRow.tsf,
     accountRow.tsr,
     accountRow.priority,
+    accountRow.mail,
+    accountRow.website,
+    accountRow.linkedin,
+    accountRow.foundus,
+    accountRow.contactName,
+    accountRow.contactSurname,
+    accountRow.comments,
+    accountRow.creditLoop,
+    accountRow.vinttiAi,
+    accountRow.vinttiInternal,
+    accountRow.billingDay,
+    accountRow.billingContact,
+    accountRow.billingCurrency,
+    accountRow.billingType,
+    accountRow.billingNotes
+  ];
+}
+
+function crmCandidateValues(candidate = {}) {
+  return [
     candidate.candidate_id ?? '',
     csvTextValue(candidate.name),
     csvTextValue(candidate.status ?? (candidate.end_date ? 'inactive' : 'active')),
     csvTextValue(candidate.opp_model),
     csvTextValue(candidate.opp_position_name),
+    csvTextValue(candidate.opp_stage, ''),
+    candidate.replacement_of ?? '',
     csvNullableTextValue(candidate.start_date),
     csvNullableTextValue(candidate.end_date),
     candidate.employee_fee ?? '',
     candidate.employee_salary ?? '',
     candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '',
+    candidate.setup_fee ?? '',
+    csvTextValue(candidate.price_type, ''),
+    csvTextValue(candidate.working_schedule, ''),
+    csvTextValue(candidate.pto, ''),
+    csvTextValue(candidate.computer, ''),
+    csvTextValue(candidate.extra_perks, ''),
+    candidate.probation_days ?? '',
+    candidate.discount_dolar ?? '',
+    csvTextValue(candidate.discount_daterange, ''),
+    candidate.referral_dolar ?? '',
+    csvTextValue(candidate.referral_daterange, ''),
+    candidate.buyout_dolar ?? '',
+    csvTextValue(candidate.buyout_daterange, ''),
     csvNullableTextValue(candidate.inactive_reason),
-    csvNullableTextValue(candidate.inactive_comments)
+    csvNullableTextValue(candidate.inactive_comments),
+    csvBoolValue(candidate.inactive_vinttierror)
+  ];
+}
+
+function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmptyAccountRow = false } = {}) {
+  const candidateList = Array.isArray(candidates) ? candidates : [];
+  if (!candidateList.length) {
+    if (!includeEmptyAccountRow) return [];
+    return [[
+      ...crmAccountRowValues(accountRow),
+      ...Array(CRM_CANDIDATE_HEADERS.length).fill('')
+    ]];
+  }
+
+  return candidateList.map((candidate = {}) => [
+    ...crmAccountRowValues(accountRow),
+    ...crmCandidateValues(candidate)
   ]);
 }
 
@@ -877,43 +1003,7 @@ async function downloadCrmCsv() {
   }
   const contractFilterCode = getCrmExportContractFilterCode();
 
-  const headers = [
-    'Account ID',
-    'Client Name',
-    'Status',
-    'Sales Lead',
-    'size',
-    'state',
-    'timezone',
-    'lead_source',
-    'lead_source_detail',
-    'conversion_channel',
-    'referal_source',
-    'industry',
-    'outsource',
-    'painpoints',
-    'position',
-    'type',
-    'sql_meeting_date',
-    'creation_date',
-    'Contract',
-    'TRR',
-    'TSF',
-    'TSR',
-    'Priority',
-    'Candidate ID',
-    'Candidate Name',
-    'Candidate Status',
-    'Opportunity Model',
-    'Position',
-    'Start Date',
-    'End Date',
-    'Employee Fee',
-    'Employee Salary',
-    'Employee Revenue',
-    'Inactive Reason',
-    'Inactive Comments'
-  ];
+  const headers = [...CRM_ACCOUNT_HEADERS, ...CRM_CANDIDATE_HEADERS];
   const activeRows = [];
   const inactiveRows = [];
 

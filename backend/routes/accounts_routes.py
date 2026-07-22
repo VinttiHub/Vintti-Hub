@@ -1695,7 +1695,14 @@ def get_candidates_by_account_opportunities(account_id):
             h.referral_dolar,
             h.referral_daterange,
             h.buyout_dolar,
-            h.buyout_daterange
+            h.buyout_daterange,
+            h.setup_fee,
+            h.price_type,
+            h.working_schedule,
+            h.pto,
+            h.computer,
+            COALESCE(h.extra_perks, h.extraperks) AS extra_perks,
+            h.probation_days
             FROM opportunity o
             LEFT JOIN candidates c
                 ON o.candidato_contratado = c.candidate_id
