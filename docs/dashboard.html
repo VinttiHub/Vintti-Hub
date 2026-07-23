@@ -225,6 +225,17 @@
       <label class="subtabs__btn" for="gsub-recruiting">Recruiting</label>
     </nav>
 
+    <!-- Botón "Actualizar OKRs": escribe las métricas actuales en el Google Sheet de
+         OKRs 2026 (pestañas "OKR 2 - 2026" + "Sales NEW"). Flujo preview → confirmar. -->
+    <div class="okr-toolbar" style="display:flex; justify-content:flex-end; margin:-4px 0 6px;">
+      <button type="button" id="okrSheetUpdateBtn" class="okr-sheet-btn"
+              style="display:none; border:1px solid var(--c-violet,#6c38ff);
+                     background:var(--c-violet,#6c38ff); color:#fff; font:600 13px/1 inherit; padding:9px 16px;
+                     border-radius:10px; cursor:pointer; white-space:nowrap;">
+        ⟳ Actualizar OKRs
+      </button>
+    </div>
+
     <!-- Window pill (controls the snapshot KPI cards below) -->
     <div class="view-mode" data-view-key="window">
       <span class="view-mode__lab">Window</span>
@@ -9066,7 +9077,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=131" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=134" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260722-4" defer></script>
 </body>
 </html>

@@ -42,6 +42,7 @@ from routes.hubspot_routes import bp as hubspot_bp
 from routes.turvo_routes import bp as turvo_bp
 from routes.dashboards_routes import bp as dashboards_bp
 from routes.sales_snapshot_routes import bp as sales_snapshot_bp
+from routes.okr_snapshot_routes import bp as okr_snapshot_bp
 
 
 
@@ -98,6 +99,7 @@ def create_app() -> Flask:
     app.register_blueprint(resume_tracking_bp)
     app.register_blueprint(dashboards_bp)
     app.register_blueprint(sales_snapshot_bp)
+    app.register_blueprint(okr_snapshot_bp)
 
     @app.after_request
     def apply_cors_headers(response):

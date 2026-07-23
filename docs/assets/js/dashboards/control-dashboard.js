@@ -4567,6 +4567,7 @@
     bindGlossary();
     bindStickyHead();
     bindSalesSheetUpdateBtn();
+    bindOkrSheetUpdateBtn();
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
@@ -4689,6 +4690,125 @@
         alert(`✅ Sheet actualizado: ${res.cells_written} celda(s) en columna ${res.column} (${res.tab}).`);
       } catch (err) {
         confirmBtn.disabled = false; confirmBtn.textContent = `Escribir ${ok.length} celda(s)`;
+        alert('Falló la escritura:\n' + (err.message || err));
+      }
+    });
+  }
+
+  // Botón "Actualizar OKRs" (tab Growth & Revenue): calcula las métricas actuales de
+  // TODOS los dashboards y las escribe en el Google Sheet de OKRs 2026 (dos pestañas:
+  // "OKR 2 - 2026" + "Sales NEW"). Flujo preview → confirmar → commit. Visible para
+  // cualquier sesión @vintti.com (el backend valida el email; el preview es la red).
+  function bindOkrSheetUpdateBtn() {
+    const btn = document.getElementById('okrSheetUpdateBtn');
+    if (!btn) return;
+    const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+      .toLowerCase().trim();
+    if (!email) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+
+    const headers = () => {
+      const h = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+      if (email) h['X-User-Email'] = email;
+      return h;
+    };
+    const post = async (path) => {
+      const res = await fetch(API_BASE + path, { method: 'POST', headers: headers(), credentials: 'omit', body: '{}' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    };
+
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const orig = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Calculando…';
+      try {
+        const snap = await post('/okr/sheet-snapshot/preview');
+        btn.textContent = orig; btn.disabled = false;
+        openOkrSheetModal(snap, post);
+      } catch (err) {
+        btn.textContent = orig; btn.disabled = false;
+        alert('No pude calcular el snapshot de OKRs:\n' + (err.message || err));
+      }
+    });
+  }
+
+  function openOkrSheetModal(snap, post) {
+    const tabs = snap.tabs || [];
+    let okCount = 0, badCount = 0;
+    const sections = tabs.map(t => {
+      if (t.error) { badCount++; return `<p style="margin:10px 0 0;color:#c0392b;font-size:12px;">⚠ ${escapeHtml(t.key)}: ${escapeHtml(t.error)}</p>`; }
+      const cells = t.cells || [];
+      const ok = cells.filter(c => !c.error);
+      const bad = cells.filter(c => c.error);
+      okCount += ok.length; badCount += bad.length;
+      let lastObj = null;
+      const rows = ok.map(c => {
+        let head = '';
+        if (c.obj && c.obj !== lastObj) {
+          lastObj = c.obj;
+          head = `<tr><td colspan="4" style="padding:13px 10px 4px;font-weight:700;color:#6c38ff;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid #ece7ff;">🎯 ${escapeHtml(c.obj)}</td></tr>`;
+        }
+        return head + `
+        <tr>
+          <td style="padding:5px 10px;color:#111;">${escapeHtml(c.label || c.key)}</td>
+          <td style="padding:5px 10px;font-weight:700;color:#6c38ff;white-space:nowrap;">${escapeHtml(String(c.display))}</td>
+          <td style="padding:5px 10px;color:#888;font-family:monospace;">${escapeHtml(c.cell)}</td>
+          <td style="padding:5px 10px;color:#aaa;">${c.current != null ? escapeHtml(String(c.current)) : '—'}</td>
+        </tr>`;
+      }).join('');
+      const badRows = bad.length ? `<p style="margin:6px 0 0;color:#c0392b;font-size:12px;">
+          ⚠ ${bad.length} sin resolver: ${bad.map(b => escapeHtml(b.key + (b.error ? ' (' + b.error + ')' : ''))).join(', ')}</p>` : '';
+      return `
+        <div style="margin-top:14px;">
+          <p style="margin:0 0 6px;color:#555;font-size:13px;">
+            Pestaña <b>${escapeHtml(t.tab)}</b> · columna <b>${escapeHtml(t.column)}</b>
+            (semana <b>${escapeHtml(String(t.week_label || t.week_date || '—'))}</b>)
+          </p>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="text-align:left;border-bottom:1px solid #eee;color:#999;font-size:11px;text-transform:uppercase;">
+              <th style="padding:5px 10px;">Métrica</th><th style="padding:5px 10px;">Nuevo valor</th>
+              <th style="padding:5px 10px;">Celda</th><th style="padding:5px 10px;">Actual</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${badRows}
+        </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,20,40,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">
+        <div style="padding:20px 22px 4px;">
+          <h3 style="margin:0 0 4px;font-size:18px;color:#111;">Actualizar Google Sheet · OKRs 2026</h3>
+          <p style="margin:0;color:#555;font-size:13px;">${snap.as_of ? `<b style="color:#6c38ff;">as-of ${escapeHtml(snap.as_of)}</b> · ` : ''}hoy ${escapeHtml(snap.today || '')} · ${okCount} celda(s) a escribir${badCount ? ` · ${badCount} sin resolver` : ''}</p>
+        </div>
+        <div style="padding:0 22px;">${sections}</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px 20px;">
+          <button data-act="cancel" style="padding:10px 18px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#333;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button data-act="confirm" style="padding:10px 18px;border-radius:10px;border:1px solid #6c38ff;background:#6c38ff;color:#fff;font-weight:700;cursor:pointer;">
+            Escribir ${okCount} celda(s)
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    const confirmBtn = overlay.querySelector('[data-act="confirm"]');
+    if (!okCount) { confirmBtn.disabled = true; confirmBtn.style.opacity = '.5'; confirmBtn.style.cursor = 'default'; }
+    confirmBtn.addEventListener('click', async () => {
+      if (confirmBtn.disabled) return;
+      confirmBtn.disabled = true; confirmBtn.textContent = 'Escribiendo…';
+      try {
+        const res = await post('/okr/sheet-snapshot/commit');
+        close();
+        alert(`✅ OKRs actualizados: ${res.cells_written} celda(s) escritas.`);
+      } catch (err) {
+        confirmBtn.disabled = false; confirmBtn.textContent = `Escribir ${okCount} celda(s)`;
         alert('Falló la escritura:\n' + (err.message || err));
       }
     });
