@@ -2749,14 +2749,21 @@ def create_alex_position(opportunity_id):
         }), 400
 
     # Título en Apriora = OPPORTUNITY NAME + " | " + INICIALES DE LA ACCOUNT
-    # (ej. "Prueba Apriora 2 | EC"). createJob no tiene campo de título: Apriora lo
-    # deriva de la línea "Job Title:" de la job description, así que la anteponemos
-    # (quitando una "Job Title:" inicial preexistente para no duplicar).
+    # (ej. "Tax Manager | SA"). createJob no tiene campo de título: Apriora lo deriva
+    # de la PRIMERA línea con etiqueta de puesto de la job description.
+    #
+    # OJO: la JD casi siempre trae su propia cabecera de rol ("💼 Position: Tax Manager",
+    # "Job Title:", "Role:", "Puesto:"…). Si la dejamos, Apriora prefiere ESA (rol limpio)
+    # sobre la que anteponemos con el sufijo → se perdía el "| SA". Por eso quitamos esa
+    # cabecera nativa (cualquiera sea su forma/emoji) y dejamos UNA sola línea de título:
+    # la nuestra, con el tag de la account.
     opp_name = (row[1] or "").strip()
     initials = account_initials(row[2])
     title = f"{opp_name} | {initials}" if (opp_name and initials) else (opp_name or initials)
     if title:
-        jd_body = re.sub(r'^\s*job\s*title\s*:.*(?:\r?\n)+', '', jd_text, count=1, flags=re.IGNORECASE)
+        jd_body = re.sub(
+            r'^\s*[^\w\n]*\s*(?:job\s*title|position|puesto|role|rol)\s*:.*(?:\r?\n)+',
+            '', jd_text, count=1, flags=re.IGNORECASE)
         jd_text = f"Job Title: {title}\n\n{jd_body.lstrip()}"
 
     # Fire-and-forget: la generación en Apriora tarda ~1-2 min. En vez de bloquear
