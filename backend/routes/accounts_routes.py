@@ -35,6 +35,7 @@ bp = Blueprint('accounts', __name__)
 def _ensure_opportunity_stage_date_columns(cursor):
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS stage_before_closed_lost TEXT")
 
 
 def _is_deep_dive_stage(stage):
@@ -47,6 +48,10 @@ def _is_nda_sent_stage(stage):
 
 def _is_signed_stage(stage):
     return str(stage or "").strip().lower() == "signed"
+
+
+def _is_closed_lost_stage(stage):
+    return str(stage or "").strip().lower() == "closed lost"
 
 
 def _mark_signed_hire_active(cursor, opportunity_id):
@@ -1096,6 +1101,10 @@ def update_opportunity_stage(opportunity_id):
                         nda_sent_date = CASE
                             WHEN %s THEN COALESCE(nda_sent_date, CURRENT_DATE)
                             ELSE nda_sent_date
+                        END,
+                        stage_before_closed_lost = CASE
+                            WHEN %s THEN %s
+                            ELSE stage_before_closed_lost
                         END
                     WHERE opportunity_id = %s
                     """,
@@ -1103,6 +1112,8 @@ def update_opportunity_stage(opportunity_id):
                         new_stage,
                         stage_changed and _is_deep_dive_stage(new_stage),
                         stage_changed and _is_nda_sent_stage(new_stage),
+                        stage_changed and _is_closed_lost_stage(new_stage),
+                        previous_stage,
                         opportunity_id,
                     ),
                 )
