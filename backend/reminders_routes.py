@@ -418,7 +418,7 @@ def press_and_send(candidate_id):
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]  # hire reminders activos
+        to_list = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL, AGUS_EMAIL]  # hire reminders activos
         # Lucia desactivada para hire reminders.
         # to_list = [JAZ_EMAIL, LAR_EMAIL, LUCIA_EMAIL, PGONZALES_EMAIL]
 
