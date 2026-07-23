@@ -1150,6 +1150,16 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
       alexCreateBtn.disabled = true;   // ya existe: no re-crear
     };
 
+    // Cuando el notifier global detecta que la entrevista quedó lista en Apriora
+    // (polling en apriora-notifier.js), avisa con este evento. Si es la opp de esta
+    // página, reflejamos "✅ Ya creada" en vivo, sin que haga falta refrescar.
+    window.addEventListener('apriora:ready', (e) => {
+      const readyId = String(e.detail?.oppId || '');
+      if (readyId && readyId === String(getCreateOppId())) {
+        markCreated('✅ Ya creada en Apriora');
+      }
+    });
+
     // Al cargar: si ya existe la entrevista en Apriora, reflejarlo (para que tras
     // un refresh se vea el estado en vez de quedar en blanco). Espera a que el
     // opportunity_id esté disponible (se llena async al cargar la opp).

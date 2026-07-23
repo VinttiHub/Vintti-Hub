@@ -189,10 +189,12 @@ class AlexClient:
             })
         return position_id, results
 
-    def find_position_for_opportunity(self, opportunity_id):
+    def find_position_for_opportunity(self, opportunity_id, use_cache=True):
         """Encuentra la position de Alex cuyo `name` contiene el opportunity_id
         como token delimitado (evita que "12" haga match con "123").
-        Devuelve el dict de la position o None."""
+        Devuelve el dict de la position o None.
+        `use_cache=False` fuerza releer las positions de Apriora sin el cache de
+        60s (lo usa el polling de "¿ya está lista?" para detectarla al toque)."""
         oid = str(opportunity_id or "").strip()
         if not oid:
             return None
@@ -203,7 +205,7 @@ class AlexClient:
         # Preferimos el match EXACTO por externalJobId (jobs creadas desde el Hub);
         # si no, caemos al match por el id en el nombre (jobs creadas a mano).
         name_fallback = None
-        for position in self.list_positions(status=None):
+        for position in self.list_positions(status=None, use_cache=use_cache):
             ext = str(position.get("externalJobId") or "").strip()
             if ext and ext == oid:
                 return position
@@ -211,10 +213,11 @@ class AlexClient:
                 name_fallback = position
         return name_fallback
 
-    def count_interviewed_for_opportunity(self, opportunity_id):
+    def count_interviewed_for_opportunity(self, opportunity_id, use_cache=True):
         """Devuelve (count, position_id, matched) para una opportunity.
-        Si no hay position que haga match, matched=False y count=0."""
-        position = self.find_position_for_opportunity(opportunity_id)
+        Si no hay position que haga match, matched=False y count=0.
+        `use_cache=False` saltea el cache de positions (polling de readiness)."""
+        position = self.find_position_for_opportunity(opportunity_id, use_cache=use_cache)
         if not position:
             return 0, None, False
         position_id = position.get("positionId") or position.get("id")

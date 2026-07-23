@@ -2604,7 +2604,12 @@ def get_alex_interviewed_count(opportunity_id):
         })
 
     try:
-        count, position_id, matched = client.count_interviewed_for_opportunity(opportunity_id)
+        # ?fresh=1 => saltea el cache de 60s de list_positions. Lo usa el polling de
+        # "¿ya está lista?" para detectar la position apenas Apriora la crea, sin
+        # esperar a que expire el cache.
+        fresh = request.args.get('fresh') in ('1', 'true', 'yes')
+        count, position_id, matched = client.count_interviewed_for_opportunity(
+            opportunity_id, use_cache=not fresh)
         return jsonify({
             "opportunity_id": opportunity_id,
             "interviewed_count": int(count),

@@ -126,7 +126,9 @@
     el.appendChild(close);
     host.appendChild(el);
     if (opts.sound !== false) playChime();
-    setTimeout(dismiss, opts.duration || 12000);
+    // duration:0 => toast persistente (solo se cierra con la ✕). Se usa para el
+    // aviso "ya está lista", para que no se pierda si no estás mirando.
+    if (opts.duration !== 0) setTimeout(dismiss, opts.duration || 12000);
   }
 
   // --- Notificación del navegador (si hay permiso) ---
@@ -140,14 +142,24 @@
 
   function announceReady(item) {
     const name = item.name || 'La entrevista';
-    toast(`"${name}" ya está lista en Apriora`);
+    // Toast persistente (duration:0): se queda hasta que lo cierres, así no te lo
+    // perdés si estabas en otra pestaña o mirando otra cosa.
+    toast(`"${name}" ya está lista en Apriora`, { duration: 0 });
     browserNotify(`"${name}" ya está lista en Apriora`);
+    // Avisar a la página (si es la de esta opp) para que actualice el botón
+    // "Create Job in Apriora" a "✅ Ya creada" en vivo, sin necesidad de refrescar.
+    try {
+      window.dispatchEvent(new CustomEvent('apriora:ready', {
+        detail: { oppId: String(item.oppId || '') }
+      }));
+    } catch (e) {}
   }
 
   async function isReady(oppId) {
     // Está lista cuando la position ya existe en Apriora (matched=true).
+    // ?fresh=1 => el backend saltea su cache de 60s y la detecta al instante.
     const res = await fetch(
-      `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/interviewed_count`,
+      `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/interviewed_count?fresh=1`,
       { cache: 'no-store' }
     );
     if (!res.ok) return false;
