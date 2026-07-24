@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hirex · Job</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-6" />
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="hirex-app" id="hirexApp">
+
+      <!-- ============ Detail topbar ============ -->
+      <header class="hx-detail-top">
+        <a class="hx-back" href="hirex.html"><i class="fa-solid fa-arrow-left"></i> Jobs</a>
+
+        <div class="hx-detail-head" id="hxHead">
+          <div class="hx-detail-title">
+            <span class="hx-eyebrow" id="hxRef">—</span>
+            <h1 id="hxTitle">Loading…</h1>
+          </div>
+          <div class="hx-detail-meta" id="hxMeta"></div>
+        </div>
+
+        <div class="hx-detail-actions">
+          <a class="hx-btn hx-btn-ghost" id="hxEditBtn" href="#"><i class="fa-solid fa-pen"></i> Edit</a>
+          <button class="hx-btn hx-btn-primary" id="hxAddCand"><i class="fa-solid fa-user-plus"></i> Add candidate</button>
+        </div>
+      </header>
+
+      <!-- ============ Tabs ============ -->
+      <nav class="hx-modnav" aria-label="Job sections">
+        <button class="hx-mod is-active" data-tab="pipeline">Pipeline <span class="hx-tab-count" id="hxPipeCount"></span></button>
+        <button class="hx-mod" data-tab="activity">Activity</button>
+        <button class="hx-mod" data-tab="about">About</button>
+      </nav>
+
+      <!-- ============ Pipeline tab ============ -->
+      <section class="hx-tabview" id="tab-pipeline">
+        <div class="hx-board-scroll">
+          <div class="hx-board" id="hxBoard"></div>
+        </div>
+        <div class="hx-state" id="hxPipeLoading">
+          <div class="hx-spinner"></div><p>Loading pipeline…</p>
+        </div>
+      </section>
+
+      <!-- ============ Activity tab ============ -->
+      <section class="hx-tabview" id="tab-activity" hidden>
+        <div class="hx-activity" id="hxActivity"></div>
+      </section>
+
+      <!-- ============ About tab ============ -->
+      <section class="hx-tabview" id="tab-about" hidden>
+        <div class="hx-about" id="hxAbout"></div>
+      </section>
+
+      <!-- ============ Add-candidate drawer ============ -->
+      <div class="hx-scrim" id="hxAddScrim" hidden></div>
+      <aside class="hx-drawer" id="hxAddDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div><span class="hx-eyebrow">New</span><h2>Add candidate</h2></div>
+          <button class="hx-icon-btn" id="hxAddClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <form class="hx-drawer-body" id="hxAddForm">
+          <div class="hx-grid" style="padding-top:12px">
+            <label class="hx-field hx-col-2">
+              <span>Full name <b class="hx-req">*</b></span>
+              <input name="full_name" type="text" placeholder="Jane Doe" required />
+              <em class="hx-err" data-err="full_name"></em>
+            </label>
+            <label class="hx-field"><span>Email</span><input name="email" type="email" placeholder="jane@email.com" /></label>
+            <label class="hx-field"><span>Phone</span><input name="phone" type="text" placeholder="+54 …" /></label>
+            <label class="hx-field hx-col-2"><span>Headline</span><input name="headline" type="text" placeholder="Senior Backend Engineer @ Acme" /></label>
+            <label class="hx-field"><span>Location</span><input name="location" type="text" placeholder="Buenos Aires" /></label>
+            <label class="hx-field"><span>LinkedIn</span><input name="linkedin_url" type="text" placeholder="linkedin.com/in/…" /></label>
+            <label class="hx-field">
+              <span>Source</span>
+              <select name="source">
+                <option value="">—</option>
+                <option value="referral">Referral</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="job_board">Job board</option>
+                <option value="inbound">Inbound</option>
+                <option value="sourced">Sourced</option>
+              </select>
+            </label>
+            <label class="hx-field">
+              <span>Start stage</span>
+              <select name="stage" id="hxAddStage"></select>
+            </label>
+          </div>
+        </form>
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost" id="hxAddCancel" type="button">Cancel</button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-primary" id="hxAddSave" type="button">Add to pipeline</button>
+          </div>
+        </footer>
+      </aside>
+
+      <!-- ============ Candidate drawer ============ -->
+      <div class="hx-scrim" id="hxCandScrim" hidden></div>
+      <aside class="hx-drawer" id="hxCandDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div class="hx-cand-head">
+            <span class="hx-avatar" id="hxCandAvatar">—</span>
+            <div>
+              <h2 id="hxCandName">—</h2>
+              <span class="hx-cand-sub" id="hxCandSub"></span>
+            </div>
+          </div>
+          <button class="hx-icon-btn" id="hxCandClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="hx-drawer-body">
+          <div class="hx-cand-row">
+            <span class="hx-cand-label">Stage</span>
+            <select id="hxCandStage" class="hx-inline-select"></select>
+          </div>
+          <div class="hx-cand-row">
+            <span class="hx-cand-label">Rating</span>
+            <div class="hx-stars" id="hxCandStars"></div>
+          </div>
+          <div class="hx-cand-contact" id="hxCandContact"></div>
+
+          <div class="hx-cand-cv" id="hxCandCv"></div>
+          <input type="file" id="hxCvInput" accept=".pdf,.doc,.docx" hidden />
+
+          <div class="hx-ai-panel" id="hxCandAi"></div>
+
+          <div class="hx-scorecards" id="hxScorecards"></div>
+
+          <label class="hx-field" style="margin-top:16px">
+            <span>Notes</span>
+            <textarea id="hxCandNotes" rows="5" placeholder="Interview impressions, next steps…"></textarea>
+          </label>
+        </div>
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost hx-btn-danger-ghost" id="hxCandRemove" type="button">
+            <i class="fa-solid fa-user-minus"></i> Remove
+          </button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-primary" id="hxCandSave" type="button">Save</button>
+          </div>
+        </footer>
+      </aside>
+
+      <!-- ============ Scorecard editor drawer ============ -->
+      <div class="hx-scrim" id="hxScScrim" hidden></div>
+      <aside class="hx-drawer" id="hxScDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div><span class="hx-eyebrow">Scorecard</span><h2 id="hxScTitle">Evaluate candidate</h2></div>
+          <button class="hx-icon-btn" id="hxScClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="hx-drawer-body" id="hxScBody"></div>
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost hx-btn-danger-ghost" id="hxScDelete" type="button" hidden>
+            <i class="fa-solid fa-trash-can"></i> Delete
+          </button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-ghost" id="hxScCancel" type="button">Cancel</button>
+            <button class="hx-btn hx-btn-primary" id="hxScSave" type="button">Save evaluation</button>
+          </div>
+        </footer>
+      </aside>
+
+      <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
+  <script src="./assets/js/hirex-detail.js?v=20260724-6" defer></script>
+</body>
+</html>

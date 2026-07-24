@@ -2023,15 +2023,18 @@ Return STRICT JSON:
             return jsonify({"error": str(e)}), 500
 
 
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3, response_format=None):
         for attempt in range(retries):
             try:
-                response = openai.chat.completions.create(
+                kwargs = dict(
                     model=model,
                     messages=messages,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
+                if response_format is not None:
+                    kwargs["response_format"] = response_format
+                response = openai.chat.completions.create(**kwargs)
                 return response
             except openai.RateLimitError as e:
                 logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")

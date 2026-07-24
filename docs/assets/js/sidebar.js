@@ -102,6 +102,10 @@
       if (el) el.style.display = ok ? 'flex' : 'none';
     };
 
+    setDisplay('hirexLink', new Set([
+      'pgonzales@vintti.com'
+    ]).has(email));
+
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pgonzales@vintti.com','agostina@vintti.com',

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- ---------- Meta ---------- -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hirex</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <!-- ---------- Icons & Favicons ---------- -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <!-- ---------- Fonts ---------- -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- ---------- Vendor CSS ---------- -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- ---------- App CSS ---------- -->
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-6" />
+</head>
+
+<body class="light-mode">
+  <!-- Vintti sidebar mounts here -->
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="hirex-app" id="hirexApp">
+
+      <!-- ============ Topbar ============ -->
+      <header class="hx-topbar">
+        <div class="hx-brand">
+          <span class="hx-logo">Hirex</span>
+          <span class="hx-eyebrow">Applicant Tracking</span>
+        </div>
+
+        <div class="hx-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="hxSearch" type="search" placeholder="Search jobs by title, team, or location" autocomplete="off" />
+        </div>
+
+        <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-primary" id="hxNewJob">
+            <i class="fa-solid fa-plus"></i> New job
+          </button>
+        </div>
+      </header>
+
+      <!-- ============ Module nav ============ -->
+      <nav class="hx-modnav" aria-label="Hirex modules">
+        <button class="hx-mod is-active" data-mod="jobs">Jobs</button>
+        <button class="hx-mod" disabled>Candidates <span class="hx-soon">Soon</span></button>
+        <button class="hx-mod" disabled>Pipeline <span class="hx-soon">Soon</span></button>
+        <button class="hx-mod" disabled>Reports <span class="hx-soon">Soon</span></button>
+        <button class="hx-mod" disabled>Settings <span class="hx-soon">Soon</span></button>
+      </nav>
+
+      <!-- ============ Jobs view ============ -->
+      <section class="hx-view" id="hxJobsView">
+        <div class="hx-toolbar">
+          <div class="hx-filters">
+            <label class="hx-filter">
+              <span>Status</span>
+              <select id="fStatus">
+                <option value="">All</option>
+                <option value="draft">Draft</option>
+                <option value="open">Open</option>
+                <option value="on_hold">On hold</option>
+                <option value="closed">Closed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+            <label class="hx-filter">
+              <span>Priority</span>
+              <select id="fPriority">
+                <option value="">All</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <button class="hx-btn hx-btn-ghost" id="hxClearFilters" hidden>Clear</button>
+          </div>
+          <div class="hx-count" id="hxCount">—</div>
+        </div>
+
+        <div class="hx-table-wrap">
+          <table class="hx-table">
+            <thead>
+              <tr>
+                <th class="hx-col-ref">Ref</th>
+                <th class="hx-col-title">Role</th>
+                <th>Team</th>
+                <th>Location</th>
+                <th>Recruiter</th>
+                <th class="hx-col-openings">Openings</th>
+                <th>Status</th>
+                <th class="hx-col-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="hxJobsBody"></tbody>
+          </table>
+        </div>
+
+        <!-- States -->
+        <div class="hx-state" id="hxLoading">
+          <div class="hx-spinner"></div>
+          <p>Loading jobs…</p>
+        </div>
+
+        <div class="hx-state hx-empty" id="hxEmpty" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-briefcase"></i></div>
+          <h3 id="hxEmptyTitle">No jobs yet</h3>
+          <p id="hxEmptyText">Open your first vacancy to start building the pipeline.</p>
+          <button class="hx-btn hx-btn-primary" id="hxEmptyNew"><i class="fa-solid fa-plus"></i> New job</button>
+        </div>
+
+        <div class="hx-state hx-error" id="hxError" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <h3>Couldn't load jobs</h3>
+          <p id="hxErrorText">Something went wrong. Check your connection and try again.</p>
+          <button class="hx-btn hx-btn-ghost" id="hxRetry">Try again</button>
+        </div>
+      </section>
+
+      <!-- ============ Row action menu (popover) ============ -->
+      <div class="hx-menu" id="hxRowMenu" hidden></div>
+
+      <!-- ============ Create / edit drawer ============ -->
+      <div class="hx-scrim" id="hxScrim" hidden></div>
+      <aside class="hx-drawer" id="hxDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div>
+            <span class="hx-eyebrow" id="hxDrawerRef">New</span>
+            <h2 id="hxDrawerTitle">New job</h2>
+          </div>
+          <button class="hx-icon-btn" id="hxDrawerClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+
+        <form class="hx-drawer-body" id="hxForm">
+          <details class="hx-section" open>
+            <summary>Basics</summary>
+            <div class="hx-grid">
+              <label class="hx-field hx-col-2">
+                <span>Role title <b class="hx-req">*</b></span>
+                <input name="title" type="text" placeholder="e.g. Senior Backend Engineer" required />
+                <em class="hx-err" data-err="title"></em>
+              </label>
+              <label class="hx-field">
+                <span>Team / Department</span>
+                <input name="department" type="text" placeholder="Engineering" />
+              </label>
+              <label class="hx-field">
+                <span>Location</span>
+                <input name="location" type="text" placeholder="Buenos Aires · Remote" />
+              </label>
+              <label class="hx-field">
+                <span>Work mode</span>
+                <select name="work_mode">
+                  <option value="">—</option>
+                  <option value="remote">Remote</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="onsite">On-site</option>
+                </select>
+              </label>
+              <label class="hx-field">
+                <span>Employment type</span>
+                <select name="employment_type">
+                  <option value="">—</option>
+                  <option value="full_time">Full-time</option>
+                  <option value="part_time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                  <option value="temporary">Temporary</option>
+                </select>
+              </label>
+              <label class="hx-field">
+                <span>Seniority</span>
+                <select name="seniority">
+                  <option value="">—</option>
+                  <option value="intern">Intern</option>
+                  <option value="junior">Junior</option>
+                  <option value="mid">Mid</option>
+                  <option value="senior">Senior</option>
+                  <option value="lead">Lead</option>
+                  <option value="principal">Principal</option>
+                </select>
+              </label>
+              <label class="hx-field">
+                <span>Language</span>
+                <input name="language" type="text" placeholder="English · Spanish" />
+              </label>
+            </div>
+          </details>
+
+          <details class="hx-section" open>
+            <summary>Job Description</summary>
+            <div class="hx-grid">
+              <label class="hx-field hx-col-2">
+                <span>Job Description <em class="hx-hint">paste the full posting — the AI reads this to screen candidates</em></span>
+                <textarea name="description" rows="12" placeholder="Paste the entire job posting here (role summary, responsibilities, requirements, nice-to-haves…). No need to split it up."></textarea>
+              </label>
+            </div>
+          </details>
+
+          <details class="hx-section">
+            <summary>Compensation</summary>
+            <div class="hx-grid">
+              <label class="hx-field">
+                <span>Salary min</span>
+                <input name="salary_min" type="number" min="0" step="any" placeholder="0" />
+              </label>
+              <label class="hx-field">
+                <span>Salary max</span>
+                <input name="salary_max" type="number" min="0" step="any" placeholder="0" />
+                <em class="hx-err" data-err="salary"></em>
+              </label>
+              <label class="hx-field">
+                <span>Currency</span>
+                <select name="salary_currency">
+                  <option value="">—</option>
+                  <option value="USD">USD</option>
+                  <option value="ARS">ARS</option>
+                  <option value="EUR">EUR</option>
+                  <option value="BRL">BRL</option>
+                  <option value="MXN">MXN</option>
+                </select>
+              </label>
+              <label class="hx-field">
+                <span>Per</span>
+                <select name="salary_period">
+                  <option value="">—</option>
+                  <option value="year">Year</option>
+                  <option value="month">Month</option>
+                  <option value="hour">Hour</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <details class="hx-section">
+            <summary>People &amp; priority</summary>
+            <div class="hx-grid">
+              <label class="hx-field">
+                <span>Recruiter (email)</span>
+                <input name="recruiter_email" type="email" placeholder="name@vintti.com" />
+              </label>
+              <label class="hx-field">
+                <span>Hiring manager (email)</span>
+                <input name="hiring_manager_email" type="email" placeholder="name@company.com" />
+              </label>
+              <label class="hx-field">
+                <span>Priority</span>
+                <select name="priority">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </label>
+              <label class="hx-field">
+                <span>Openings</span>
+                <input name="openings" type="number" min="1" step="1" value="1" />
+                <em class="hx-err" data-err="openings"></em>
+              </label>
+            </div>
+          </details>
+
+          <details class="hx-section">
+            <summary>More detail <em class="hx-hint">optional</em></summary>
+            <div class="hx-grid">
+              <label class="hx-field hx-col-2">
+                <span>Requirements <em class="hx-hint">optional — only if not already in the JD above</em></span>
+                <textarea name="requirements" rows="4" placeholder="Leave empty if the JD above already lists them."></textarea>
+              </label>
+              <label class="hx-field hx-col-2">
+                <span>Benefits <em class="hx-hint">optional</em></span>
+                <textarea name="benefits" rows="3" placeholder="Perks, equity, PTO…"></textarea>
+              </label>
+              <label class="hx-field hx-col-2">
+                <span>Skills <em class="hx-hint">optional · comma-separated · sharpens skill matching</em></span>
+                <input name="skills" type="text" placeholder="Next.js, Vue.js, React, Figma" />
+              </label>
+              <label class="hx-field hx-col-2">
+                <span>Tags <em class="hx-hint">optional · comma-separated</em></span>
+                <input name="tags" type="text" placeholder="urgent-fill, client-facing" />
+              </label>
+            </div>
+          </details>
+        </form>
+
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost" id="hxCancel" type="button">Cancel</button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-soft" id="hxSaveDraft" type="button">Save draft</button>
+            <button class="hx-btn hx-btn-primary" id="hxSavePrimary" type="button">Save &amp; open</button>
+          </div>
+        </footer>
+      </aside>
+
+      <!-- ============ Delete confirmation modal ============ -->
+      <div class="hx-modal-scrim" id="hxDelScrim" hidden>
+        <div class="hx-modal" role="dialog" aria-modal="true" aria-labelledby="hxDelHeading">
+          <div class="hx-modal-mark"><i class="fa-solid fa-trash-can"></i></div>
+          <h3 id="hxDelHeading">Delete this job?</h3>
+          <p class="hx-modal-text">
+            You're about to permanently delete <strong id="hxDelName">this job</strong>
+            (<span id="hxDelRef" class="hx-ref"></span>) and its activity history.
+            This can't be undone.
+          </p>
+          <label class="hx-field">
+            <span>Type <b class="hx-del-word">DELETE</b> to confirm</span>
+            <input id="hxDelInput" type="text" autocomplete="off" placeholder="DELETE" />
+          </label>
+          <div class="hx-modal-actions">
+            <button class="hx-btn hx-btn-ghost" id="hxDelCancel" type="button">Cancel</button>
+            <button class="hx-btn hx-btn-danger" id="hxDelConfirm" type="button" disabled>Delete job</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toasts -->
+      <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <!-- ---------- Scripts ---------- -->
+  <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
+  <script src="./assets/js/hirex.js?v=20260724-4" defer></script>
+</body>
+</html>
