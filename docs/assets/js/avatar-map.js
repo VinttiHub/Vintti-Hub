@@ -135,7 +135,7 @@
     const currentEmail = typeof localStorage !== 'undefined'
       ? String(localStorage.getItem('user_email') || '').trim().toLowerCase()
       : '';
-    return cached && (!normalizedEmail || normalizedEmail === currentEmail) ? cached : '';
+    return cached && normalizedEmail && normalizedEmail === currentEmail ? cached : '';
   }
 
   root.AVATAR_BASE = AVATAR_BASE;
