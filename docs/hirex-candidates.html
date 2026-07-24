@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hirex · Candidates</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-9" />
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="hirex-app" id="hirexApp">
+
+      <!-- ============ Topbar ============ -->
+      <header class="hx-topbar">
+        <div class="hx-brand">
+          <span class="hx-logo">Hirex</span>
+          <span class="hx-eyebrow">Applicant Tracking</span>
+        </div>
+        <div class="hx-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="hxSearch" type="search" placeholder="Search candidates by name, email, or headline" autocomplete="off" />
+        </div>
+      </header>
+
+      <!-- ============ Module nav ============ -->
+      <nav class="hx-modnav" aria-label="Hirex modules">
+        <a class="hx-mod" href="hirex.html">Jobs</a>
+        <a class="hx-mod is-active" href="hirex-candidates.html">Candidates</a>
+        <button class="hx-mod" disabled>Reports <span class="hx-soon">Soon</span></button>
+        <button class="hx-mod" disabled>Settings <span class="hx-soon">Soon</span></button>
+      </nav>
+
+      <!-- ============ Candidates view ============ -->
+      <section class="hx-view" id="hxCandView">
+        <div class="hx-toolbar">
+          <div class="hx-filters">
+            <label class="hx-filter hx-check">
+              <input type="checkbox" id="fHasCv" />
+              <span>Has CV</span>
+            </label>
+            <button class="hx-btn hx-btn-ghost" id="hxClearFilters" hidden>Clear</button>
+          </div>
+          <div class="hx-count" id="hxCount">—</div>
+        </div>
+
+        <div class="hx-table-wrap">
+          <table class="hx-table">
+            <thead>
+              <tr>
+                <th class="hx-col-title">Candidate</th>
+                <th>Email</th>
+                <th class="hx-col-apps">Applications</th>
+                <th>Applied</th>
+                <th>Jobs</th>
+                <th>Source</th>
+                <th class="hx-col-openings">CV</th>
+              </tr>
+            </thead>
+            <tbody id="hxCandBody"></tbody>
+          </table>
+        </div>
+
+        <div class="hx-state" id="hxLoading">
+          <div class="hx-spinner"></div><p>Loading candidates…</p>
+        </div>
+        <div class="hx-state hx-empty" id="hxEmpty" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-user-group"></i></div>
+          <h3 id="hxEmptyTitle">No candidates yet</h3>
+          <p id="hxEmptyText">Add candidates to a job's pipeline and they'll show up here.</p>
+          <a class="hx-btn hx-btn-primary" href="hirex.html"><i class="fa-solid fa-briefcase"></i> Go to jobs</a>
+        </div>
+        <div class="hx-state hx-error" id="hxError" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <h3>Couldn't load candidates</h3>
+          <p id="hxErrorText">Something went wrong. Try again.</p>
+          <button class="hx-btn hx-btn-ghost" id="hxRetry">Try again</button>
+        </div>
+      </section>
+
+      <!-- ============ Candidate profile drawer ============ -->
+      <div class="hx-scrim" id="hxProfScrim" hidden></div>
+      <aside class="hx-drawer" id="hxProfDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div class="hx-cand-head">
+            <span class="hx-avatar hx-avatar-lg" id="hxProfAvatar">—</span>
+            <div>
+              <h2 id="hxProfName">—</h2>
+              <span class="hx-cand-sub" id="hxProfSub"></span>
+            </div>
+          </div>
+          <button class="hx-icon-btn" id="hxProfClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="hx-drawer-body">
+          <div class="hx-cand-contact" id="hxProfContact"></div>
+          <div class="hx-cand-cv" id="hxProfCv"></div>
+          <input type="file" id="hxCvInput" accept=".pdf,.doc,.docx" hidden />
+          <div class="hx-prof-apps" id="hxProfApps"></div>
+        </div>
+      </aside>
+
+      <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
+  <script src="./assets/js/hirex-candidates.js?v=20260724-3" defer></script>
+</body>
+</html>

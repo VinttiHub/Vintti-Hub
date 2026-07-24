@@ -370,6 +370,53 @@ def delete_application(app_id):
             conn.close()
 
 
+# --- Candidate directory -----------------------------------------------------
+@bp.route("/candidates", methods=["GET"])
+def list_candidates():
+    """Global candidate directory with per-person aggregates (all jobs)."""
+    q = (request.args.get("q") or "").strip().lower()
+    where, params = [], []
+    if q:
+        where.append("(LOWER(c.full_name) LIKE %s OR LOWER(COALESCE(c.email,'')) LIKE %s "
+                     "OR LOWER(COALESCE(c.headline,'')) LIKE %s)")
+        like = f"%{q}%"
+        params += [like, like, like]
+    if request.args.get("has_cv") == "1":
+        where.append("c.cv_s3_key IS NOT NULL")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            f"""SELECT c.candidate_id, c.full_name, c.email, c.phone, c.headline, c.location,
+                       c.linkedin_url, c.source, c.cv_file_name,
+                       (c.cv_s3_key IS NOT NULL) AS has_cv,
+                       COUNT(a.application_id) AS applications,
+                       MAX(a.applied_at) AS last_applied,
+                       COALESCE(
+                         json_agg(json_build_object('job_id', j.job_id, 'title', j.title,
+                                                    'stage', a.stage, 'ai_score', a.ai_score,
+                                                    'applied_at', a.applied_at)
+                                  ORDER BY a.applied_at DESC)
+                         FILTER (WHERE a.application_id IS NOT NULL), '[]'
+                       ) AS jobs
+                FROM hirex_candidates c
+                LEFT JOIN hirex_applications a ON a.candidate_id = c.candidate_id
+                LEFT JOIN hirex_jobs j        ON j.job_id = a.job_id
+                {clause}
+                GROUP BY c.candidate_id
+                ORDER BY c.updated_at DESC, c.candidate_id DESC;""",
+            tuple(params),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # --- Candidate record --------------------------------------------------------
 @bp.route("/candidates/<int:candidate_id>", methods=["GET"])
 def get_candidate(candidate_id):
