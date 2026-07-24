@@ -94,6 +94,77 @@ def get_pipeline(job_id):
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/jobs/<int:job_id>/overview", methods=["GET"])
+def job_overview(job_id):
+    """Aggregated stats for the job's Overview tab — one connection, real data only."""
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute("SELECT status, created_at, openings FROM hirex_jobs WHERE job_id = %s;", (job_id,))
+        job = cur.fetchone()
+        if not job:
+            cur.close(); conn.close()
+            return jsonify({"error": "job not found"}), 404
+
+        cur.execute(
+            """SELECT COUNT(*) AS total,
+                      COUNT(*) FILTER (WHERE applied_at::date = CURRENT_DATE) AS today,
+                      COUNT(*) FILTER (WHERE applied_at >= NOW() - INTERVAL '7 days') AS week
+               FROM hirex_applications WHERE job_id = %s;""",
+            (job_id,),
+        )
+        totals = cur.fetchone()
+
+        cur.execute("SELECT stage, COUNT(*) AS n FROM hirex_applications WHERE job_id = %s GROUP BY stage;", (job_id,))
+        by_stage = {r["stage"]: r["n"] for r in cur.fetchall()}
+
+        cur.execute(
+            """SELECT COALESCE(NULLIF(TRIM(c.source), ''), 'unknown') AS source, COUNT(*) AS n
+               FROM hirex_applications a JOIN hirex_candidates c ON c.candidate_id = a.candidate_id
+               WHERE a.job_id = %s GROUP BY 1 ORDER BY n DESC;""",
+            (job_id,),
+        )
+        by_source = [{"source": r["source"], "count": r["n"]} for r in cur.fetchall()]
+
+        cur.execute(
+            "SELECT COUNT(ai_score) AS analyzed, ROUND(AVG(ai_score))::int AS avg_score "
+            "FROM hirex_applications WHERE job_id = %s;",
+            (job_id,),
+        )
+        ai = cur.fetchone()
+
+        cur.execute(
+            "SELECT COUNT(*) AS n, COUNT(DISTINCT reviewer_email) AS reviewers "
+            "FROM hirex_scorecards WHERE job_id = %s;",
+            (job_id,),
+        )
+        sc = cur.fetchone()
+
+        cur.execute(
+            """SELECT applied_at::date AS d, COUNT(*) AS n
+               FROM hirex_applications
+               WHERE job_id = %s AND applied_at >= (CURRENT_DATE - INTERVAL '6 days')
+               GROUP BY 1 ORDER BY 1;""",
+            (job_id,),
+        )
+        daily = [{"date": str(r["d"]), "count": r["n"]} for r in cur.fetchall()]
+
+        cur.close()
+        conn.close()
+        return jsonify({
+            "job": {"status": job["status"], "created_at": job["created_at"], "openings": job["openings"]},
+            "totals": {"total": totals["total"], "today": totals["today"], "week": totals["week"]},
+            "by_stage": by_stage,
+            "by_source": by_source,
+            "ai": {"analyzed": ai["analyzed"], "avg_score": ai["avg_score"]},
+            "scorecards": {"count": sc["n"], "reviewers": sc["reviewers"]},
+            "daily": daily,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/applications/<int:app_id>", methods=["GET"])
 def get_application(app_id):
     """Full application incl. stored AI analysis (used by the candidate drawer)."""

@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-6" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-7" />
 </head>
 
 <body class="light-mode">
@@ -46,13 +46,19 @@
 
       <!-- ============ Tabs ============ -->
       <nav class="hx-modnav" aria-label="Job sections">
-        <button class="hx-mod is-active" data-tab="pipeline">Pipeline <span class="hx-tab-count" id="hxPipeCount"></span></button>
+        <button class="hx-mod is-active" data-tab="overview">Overview</button>
+        <button class="hx-mod" data-tab="pipeline">Pipeline <span class="hx-tab-count" id="hxPipeCount"></span></button>
         <button class="hx-mod" data-tab="activity">Activity</button>
         <button class="hx-mod" data-tab="about">About</button>
       </nav>
 
+      <!-- ============ Overview tab ============ -->
+      <section class="hx-tabview" id="tab-overview">
+        <div class="hx-overview" id="hxOverview"></div>
+      </section>
+
       <!-- ============ Pipeline tab ============ -->
-      <section class="hx-tabview" id="tab-pipeline">
+      <section class="hx-tabview" id="tab-pipeline" hidden>
         <div class="hx-board-scroll">
           <div class="hx-board" id="hxBoard"></div>
         </div>
@@ -186,6 +192,6 @@
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-detail.js?v=20260724-6" defer></script>
+  <script src="./assets/js/hirex-detail.js?v=20260724-8" defer></script>
 </body>
 </html>

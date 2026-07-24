@@ -56,7 +56,7 @@
       ref: $("hxRef"), title: $("hxTitle"), meta: $("hxMeta"), editBtn: $("hxEditBtn"),
       addCand: $("hxAddCand"),
       board: $("hxBoard"), pipeLoading: $("hxPipeLoading"), pipeCount: $("hxPipeCount"),
-      activity: $("hxActivity"), about: $("hxAbout"),
+      overview: $("hxOverview"), activity: $("hxActivity"), about: $("hxAbout"),
       addScrim: $("hxAddScrim"), addDrawer: $("hxAddDrawer"), addForm: $("hxAddForm"),
       addStage: $("hxAddStage"), addClose: $("hxAddClose"), addCancel: $("hxAddCancel"), addSave: $("hxAddSave"),
       candScrim: $("hxCandScrim"), candDrawer: $("hxCandDrawer"), candClose: $("hxCandClose"),
@@ -114,6 +114,7 @@
 
     loadJob();
     loadPipeline();
+    loadOverview();
   }
 
   // --- Load ----------------------------------------------------------------
@@ -129,6 +130,7 @@
   }
 
   async function loadPipeline() {
+    overviewLoaded = false;   // data changed → refresh overview on next visit
     els.pipeLoading.hidden = false;
     try {
       const res = await fetch(`${API_BASE}/hirex/jobs/${jobId}/pipeline`, { credentials: "include" });
@@ -289,8 +291,99 @@
   // --- Tabs ----------------------------------------------------------------
   function switchTab(tab) {
     els.tabs.forEach((t) => t.classList.toggle("is-active", t.dataset.tab === tab));
-    ["pipeline", "activity", "about"].forEach((t) => { $(`tab-${t}`).hidden = t !== tab; });
+    ["overview", "pipeline", "activity", "about"].forEach((t) => { $(`tab-${t}`).hidden = t !== tab; });
     if (tab === "activity" && !activityLoaded) loadActivity();
+    if (tab === "overview" && !overviewLoaded) loadOverview();
+  }
+
+  // --- Overview ------------------------------------------------------------
+  let overviewLoaded = false;
+
+  async function loadOverview() {
+    els.overview.innerHTML = `<div class="hx-state"><div class="hx-spinner"></div><p>Loading overview…</p></div>`;
+    try {
+      const res = await fetch(`${API_BASE}/hirex/jobs/${jobId}/overview`, { credentials: "include" });
+      if (!res.ok) throw new Error();
+      renderOverview(await res.json());
+      overviewLoaded = true;
+    } catch {
+      els.overview.innerHTML = `<div class="hx-state"><p class="hx-cell-muted">Couldn't load the overview.</p></div>`;
+    }
+  }
+
+  function renderOverview(o) {
+    const kpi = (big, label, sub) =>
+      `<div class="hx-ov-card hx-ov-kpi"><div class="hx-ov-big">${big}</div><div class="hx-ov-label">${label}</div>${sub ? `<div class="hx-ov-sub">${sub}</div>` : ""}</div>`;
+
+    // Listing duration
+    let durBig = "—", durSub = "";
+    const created = o.job && o.job.created_at ? new Date(o.job.created_at) : null;
+    if (created && !isNaN(created)) {
+      const days = Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000));
+      durBig = `${days}<span style="font-size:15px;font-weight:600"> day${days === 1 ? "" : "s"}</span>`;
+      durSub = `Open since ${created.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`;
+    }
+    const t = o.totals || {}, ai = o.ai || {}, sc = o.scorecards || {};
+
+    const kpis = kpi(t.total ?? 0, "Candidates", `<b>${t.today ?? 0}</b> today · ${t.week ?? 0} this week`)
+      + kpi(durBig, "Listing duration", durSub)
+      + kpi(ai.avg_score != null ? ai.avg_score : "—", "Avg AI score", `${ai.analyzed ?? 0} analyzed`)
+      + kpi(sc.count ?? 0, "Evaluations", `${sc.reviewers ?? 0} reviewer${(sc.reviewers ?? 0) === 1 ? "" : "s"}`);
+
+    // Daily chart — fill a 14-day window
+    const map = {}; (o.daily || []).forEach((d) => { map[d.date] = d.count; });
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date(); dt.setHours(0, 0, 0, 0); dt.setDate(dt.getDate() - i);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      days.push({ key, count: map[key] || 0, label: dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }) });
+    }
+    const maxD = Math.max(1, ...days.map((d) => d.count));
+    const chart = days.map((d) => `<span class="hx-ov-daybar" title="${d.label}: ${d.count}"><span style="height:${(d.count / maxD * 100).toFixed(1)}%"></span></span>`).join("");
+
+    // Stage bars
+    const stageCounts = o.by_stage || {};
+    const maxStage = Math.max(1, ...STAGES.map((s) => stageCounts[s.key] || 0));
+    const stageBars = STAGES.map((s) => {
+      const n = stageCounts[s.key] || 0;
+      return `<div class="hx-ov-bar-row">
+        <span class="hx-ov-bar-label"><span class="hx-col-dot" style="background:${s.color}"></span>${s.label}</span>
+        <span class="hx-ov-bar"><span style="width:${(n / maxStage * 100).toFixed(1)}%;background:${s.color}"></span></span>
+        <span class="hx-ov-bar-n">${n}</span>
+      </div>`;
+    }).join("");
+
+    // Source bars
+    const srcs = o.by_source || [];
+    const maxSrc = Math.max(1, ...srcs.map((s) => s.count));
+    const srcBars = srcs.length
+      ? srcs.map((s) => {
+          const label = s.source === "unknown" ? "Unknown" : (SOURCE_LABEL[s.source] || s.source);
+          return `<div class="hx-ov-bar-row">
+            <span class="hx-ov-bar-label">${esc(label)}</span>
+            <span class="hx-ov-bar"><span style="width:${(s.count / maxSrc * 100).toFixed(1)}%"></span></span>
+            <span class="hx-ov-bar-n">${s.count}</span>
+          </div>`;
+        }).join("")
+      : `<p class="hx-ov-none">No source data yet.</p>`;
+
+    els.overview.innerHTML = `
+      <div class="hx-ov-section">
+        <h3>Job performance</h3>
+        <div class="hx-ov-kpis">${kpis}</div>
+        <div class="hx-ov-card">
+          <h4>Applications · last 7 days</h4>
+          <div class="hx-ov-chart">${chart}</div>
+          <div class="hx-ov-chart-foot"><span>${days[0].label}</span><span>Today</span></div>
+        </div>
+      </div>
+      <div class="hx-ov-section">
+        <h3>Candidate pipeline</h3>
+        <div class="hx-ov-grid2">
+          <div class="hx-ov-card"><h4>By stage</h4><div class="hx-ov-bars">${stageBars}</div></div>
+          <div class="hx-ov-card"><h4>Sources</h4><div class="hx-ov-bars">${srcBars}</div></div>
+        </div>
+      </div>`;
   }
 
   // --- Activity ------------------------------------------------------------

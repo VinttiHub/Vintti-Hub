@@ -688,6 +688,38 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .hx-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--hx-surface-2); border: 1px solid var(--hx-line); color: var(--hx-ink-2); }
 
+/* ---------- Overview tab ---------- */
+.hx-overview { padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 28px; }
+.hx-ov-section > h3 { margin: 0 0 14px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.hx-ov-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.hx-ov-card {
+  background: var(--hx-surface); border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-lg); box-shadow: var(--hx-shadow); padding: 18px 18px 16px;
+}
+.hx-ov-card > h4 { margin: 0 0 14px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--hx-muted); }
+.hx-ov-kpi { display: flex; flex-direction: column; gap: 3px; }
+.hx-ov-kpi .hx-ov-big { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; }
+.hx-ov-kpi .hx-ov-label { font-size: 12.5px; font-weight: 600; color: var(--hx-ink-2); }
+.hx-ov-kpi .hx-ov-sub { font-size: 11.5px; color: var(--hx-muted); margin-top: 2px; }
+.hx-ov-kpi .hx-ov-sub b { color: var(--hx-accent); font-weight: 700; }
+.hx-ov-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* bars (stages + sources) */
+.hx-ov-bars { display: flex; flex-direction: column; gap: 11px; }
+.hx-ov-bar-row { display: grid; grid-template-columns: 128px 1fr 30px; align-items: center; gap: 10px; }
+.hx-ov-bar-label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--hx-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-ov-bar { height: 8px; border-radius: 999px; background: var(--hx-line-2); overflow: hidden; }
+.hx-ov-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--hx-accent); transition: width .4s ease; }
+.hx-ov-bar-n { font-family: var(--hx-mono); font-size: 12px; font-weight: 700; color: var(--hx-ink); text-align: right; }
+.hx-ov-none { font-size: 12.5px; color: var(--hx-faint); padding: 8px 0; }
+
+/* daily chart */
+.hx-ov-chart { display: flex; align-items: flex-end; gap: 4px; height: 96px; padding-top: 6px; }
+.hx-ov-daybar { flex: 1; display: flex; align-items: flex-end; height: 100%; min-width: 0; }
+.hx-ov-daybar > span { width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--hx-accent) 55%, #fff); transition: height .4s ease; }
+.hx-ov-daybar:hover > span { background: var(--hx-accent); }
+.hx-ov-chart-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--hx-mono); font-size: 10px; color: var(--hx-faint); }
+
 /* ---------- Candidate drawer bits ---------- */
 .hx-cand-head { display: flex; align-items: center; gap: 12px; }
 .hx-cand-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
