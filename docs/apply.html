@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apply · Vintti</title>
+  <meta name="theme-color" content="#0028ff">
+  <meta name="robots" content="noindex">
+  <!-- NOTE: no auth-guard.js here. This page is for candidates, not hub users. -->
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./assets/css/apply.css?v=20260727-4" />
+</head>
+
+<body>
+  <div class="vap" id="vap">
+
+    <header class="vap-bar">
+      <a class="vap-brand" href="https://vintti.com" target="_blank" rel="noopener">
+        <img src="./assets/img/vintti_logo.png" alt="Vintti" />
+      </a>
+      <span class="vap-bar-note">Job application</span>
+    </header>
+
+    <!-- Loading -->
+    <div class="vap-state" id="vapLoading">
+      <div class="vap-spinner" aria-hidden="true"></div>
+      <p>Loading the role…</p>
+    </div>
+
+    <!-- Not found / closed -->
+    <div class="vap-state" id="vapGone" hidden>
+      <h1 class="vap-gone-title" id="vapGoneTitle">This link isn't active</h1>
+      <p class="vap-gone-text" id="vapGoneText">
+        The role may have been filled or the link may be incomplete. If someone sent you
+        this link, ask them for the current one.
+      </p>
+      <a class="vap-btn vap-btn-ghost" href="https://vintti.com" target="_blank" rel="noopener">
+        See Vintti's open roles
+      </a>
+    </div>
+
+    <!-- Job + form -->
+    <main class="vap-main" id="vapMain" hidden>
+
+      <section class="vap-hero">
+        <h1 class="vap-title" id="vapTitle"></h1>
+        <p class="vap-dept" id="vapDept" hidden></p>
+
+        <!-- Signature: the role as a spec sheet. Precision is the pitch. -->
+        <dl class="vap-spec" id="vapSpec"></dl>
+      </section>
+
+      <div class="vap-cols">
+        <article class="vap-jd" id="vapJd"></article>
+
+        <aside class="vap-formwrap">
+          <form class="vap-card" id="vapForm" novalidate>
+            <h2 class="vap-card-title">Apply</h2>
+            <p class="vap-card-sub">Takes about two minutes.</p>
+
+            <div class="vap-fields" id="vapFields"></div>
+
+            <div class="vap-questions" id="vapQuestions"></div>
+
+            <!-- Honeypot: hidden from people, irresistible to bots. -->
+            <div class="vap-hp" aria-hidden="true">
+              <label>Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+            </div>
+
+            <p class="vap-consent">
+              By applying you agree that Vintti stores the information above to evaluate
+              you for this role and other openings that fit your profile.
+            </p>
+
+            <p class="vap-formerr" id="vapFormErr" hidden></p>
+
+            <button class="vap-btn vap-btn-primary vap-submit" type="submit" id="vapSubmit">
+              Send application
+            </button>
+          </form>
+
+          <!-- Success -->
+          <div class="vap-done" id="vapDone" hidden>
+            <span class="vap-done-mark" aria-hidden="true"></span>
+            <h2>Application sent</h2>
+            <p id="vapDoneRole"></p>
+            <p class="vap-done-next">
+              We read every application. If your profile fits the role, someone from Vintti
+              will email you. If you don't hear back, the role wasn't the right match — you're
+              welcome to apply to others.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="vap-foot">
+      <span>Vintti</span>
+      <span class="vap-foot-dot"></span>
+      <span>Hiring, handled.</span>
+    </footer>
+  </div>
+
+  <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
+  <script src="./assets/js/apply.js?v=20260727-3" defer></script>
+</body>
+</html>

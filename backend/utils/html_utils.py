@@ -4,6 +4,50 @@ import re
 _ALLOWED_TAGS = ('p', 'ul', 'ol', 'li', 'br', 'b', 'strong', 'i', 'em', 'a')
 
 
+# A block-level tag is the giveaway that a field holds rich text rather than a
+# stray "<" someone typed (e.g. "budget < 5000").
+_LOOKS_LIKE_HTML = re.compile(
+    r'<\s*/?\s*(p|div|ul|ol|li|br|h[1-6]|strong|em|b|i|span|table|tr|td)\b[^>]*>', re.I)
+
+
+def looks_like_html(value: str) -> bool:
+    return bool(_LOOKS_LIKE_HTML.search(str(value or '')))
+
+
+def html_to_plain_text(value: str) -> str:
+    """Rich-text HTML -> readable plain text, keeping paragraphs and bullets.
+
+    Job descriptions arrive as HTML from the CRM / careers site, but Hirex stores
+    them as plain text: they go into a <textarea>, into the AI prompt, and onto
+    the public apply page, which escapes its input — so raw tags would be shown
+    to candidates verbatim.
+    """
+    if not value:
+        return ""
+
+    # Inline the links BEFORE sanitizing: clean_html_for_webflow's tag whitelist
+    # rebuilds <a> without its attributes, so the href is gone by then.
+    s = re.sub(r'<a[^>]*href=["\']([^"\']*)["\'][^>]*>(.*?)</a>',
+               r'\2 (\1)', str(value), flags=re.I | re.S)
+
+    # Then reuse the sanitizer: it kills scripts, styles and Webflow noise.
+    s = clean_html_for_webflow(s, output='html')
+    if not s:
+        return ""
+
+    s = re.sub(r'<\s*li[^>]*>', '\n• ', s, flags=re.I)
+    s = re.sub(r'<\s*/\s*li\s*>', '', s, flags=re.I)
+    s = re.sub(r'<\s*br\s*/?>', '\n', s, flags=re.I)
+    s = re.sub(r'<\s*/\s*(p|ul|ol|h[1-6])\s*>', '\n\n', s, flags=re.I)
+    s = re.sub(r'<[^>]+>', '', s)
+    s = _html.unescape(s).replace(' ', ' ')
+
+    s = re.sub(r'[ \t]+', ' ', s)
+    s = '\n'.join(line.strip() for line in s.splitlines())
+    s = re.sub(r'\n{3,}', '\n\n', s)
+    return s.strip()
+
+
 def _strip_attrs_keep_href(tag_html: str) -> str:
     """
     Return sanitized tag with attributes removed except for <a href="...">.

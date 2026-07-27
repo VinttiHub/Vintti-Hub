@@ -24,7 +24,7 @@
 
   <!-- ---------- App CSS ---------- -->
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-9" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260727-5" />
 </head>
 
 <body class="light-mode">
@@ -47,6 +47,9 @@
         </div>
 
         <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-ghost" id="hxFromOpp">
+            <i class="fa-solid fa-briefcase"></i> From an opportunity
+          </button>
           <button class="hx-btn hx-btn-primary" id="hxNewJob">
             <i class="fa-solid fa-plus"></i> New job
           </button>
@@ -249,12 +252,16 @@
             <summary>People &amp; priority</summary>
             <div class="hx-grid">
               <label class="hx-field">
-                <span>Recruiter (email)</span>
-                <input name="recruiter_email" type="email" placeholder="name@vintti.com" />
+                <span>Recruiter <em class="hx-hint">HR lead</em></span>
+                <select name="recruiter_email" id="hxRecruiterSel">
+                  <option value="">Loading…</option>
+                </select>
               </label>
               <label class="hx-field">
-                <span>Hiring manager (email)</span>
-                <input name="hiring_manager_email" type="email" placeholder="name@company.com" />
+                <span>Hiring manager <em class="hx-hint">sales lead</em></span>
+                <select name="hiring_manager_email" id="hxHiringSel">
+                  <option value="">Loading…</option>
+                </select>
               </label>
               <label class="hx-field">
                 <span>Priority</span>
@@ -326,6 +333,30 @@
         </div>
       </div>
 
+      <!-- ============ Opportunity picker ============ -->
+      <div class="hx-modal-scrim" id="hxOppScrim" hidden>
+        <div class="hx-modal hx-modal-wide" role="dialog" aria-modal="true" aria-labelledby="hxOppHeading">
+          <h3 id="hxOppHeading">Start from an opportunity</h3>
+          <p class="hx-modal-text">
+            Pick a deal from Opportunities. Hirex copies the position, the JD, the
+            leads and the salary range, and keeps the two linked.
+          </p>
+          <div class="hx-opp-tools">
+            <div class="hx-search hx-search-sm">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="search" id="hxOppSearch" placeholder="Search by position or client…" />
+            </div>
+            <label class="hx-opp-toggle">
+              <input type="checkbox" id="hxOppAll" /> Include closed deals
+            </label>
+          </div>
+          <div class="hx-opp-list" id="hxOppList"></div>
+          <div class="hx-modal-actions">
+            <button class="hx-btn hx-btn-ghost" id="hxOppCancel" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Toasts -->
       <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
     </div>
@@ -334,6 +365,6 @@
   <!-- ---------- Scripts ---------- -->
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex.js?v=20260724-4" defer></script>
+  <script src="./assets/js/hirex.js?v=20260727-4" defer></script>
 </body>
 </html>

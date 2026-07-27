@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260724-9" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260727-5" />
 </head>
 
 <body class="light-mode">
@@ -48,6 +48,7 @@
       <nav class="hx-modnav" aria-label="Job sections">
         <button class="hx-mod is-active" data-tab="overview">Overview</button>
         <button class="hx-mod" data-tab="pipeline">Pipeline <span class="hx-tab-count" id="hxPipeCount"></span></button>
+        <button class="hx-mod" data-tab="apply">Application form</button>
         <button class="hx-mod" data-tab="activity">Activity</button>
         <button class="hx-mod" data-tab="about">About</button>
       </nav>
@@ -66,6 +67,27 @@
           <div class="hx-spinner"></div><p>Loading pipeline…</p>
         </div>
       </section>
+
+      <!-- ============ Application form tab ============ -->
+      <section class="hx-tabview" id="tab-apply" hidden>
+        <div class="hx-af" id="hxApply"></div>
+      </section>
+
+      <!-- ============ Screening-question editor drawer ============ -->
+      <div class="hx-scrim" id="hxQScrim" hidden></div>
+      <aside class="hx-drawer" id="hxQDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div><span class="hx-eyebrow">Screening</span><h2 id="hxQTitle">Add question</h2></div>
+          <button class="hx-icon-btn" id="hxQClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="hx-drawer-body" id="hxQBody"></div>
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost" id="hxQCancel" type="button">Cancel</button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-primary" id="hxQSave" type="button">Save question</button>
+          </div>
+        </footer>
+      </aside>
 
       <!-- ============ Activity tab ============ -->
       <section class="hx-tabview" id="tab-activity" hidden>
@@ -86,10 +108,14 @@
         </header>
         <form class="hx-drawer-body" id="hxAddForm">
           <div class="hx-grid" style="padding-top:12px">
-            <label class="hx-field hx-col-2">
-              <span>Full name <b class="hx-req">*</b></span>
-              <input name="full_name" type="text" placeholder="Jane Doe" required />
-              <em class="hx-err" data-err="full_name"></em>
+            <label class="hx-field">
+              <span>First name <b class="hx-req">*</b></span>
+              <input name="first_name" type="text" placeholder="Jane" required />
+              <em class="hx-err" data-err="first_name"></em>
+            </label>
+            <label class="hx-field">
+              <span>Last name</span>
+              <input name="last_name" type="text" placeholder="Doe" />
             </label>
             <label class="hx-field"><span>Email</span><input name="email" type="email" placeholder="jane@email.com" /></label>
             <label class="hx-field"><span>Phone</span><input name="phone" type="text" placeholder="+54 …" /></label>
@@ -148,6 +174,8 @@
           <div class="hx-cand-cv" id="hxCandCv"></div>
           <input type="file" id="hxCvInput" accept=".pdf,.doc,.docx" hidden />
 
+          <div class="hx-answers" id="hxCandAnswers"></div>
+
           <div class="hx-ai-panel" id="hxCandAi"></div>
 
           <div class="hx-scorecards" id="hxScorecards"></div>
@@ -192,6 +220,6 @@
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-detail.js?v=20260724-8" defer></script>
+  <script src="./assets/js/hirex-detail.js?v=20260727-4" defer></script>
 </body>
 </html>

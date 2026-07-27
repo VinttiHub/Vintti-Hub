@@ -3,10 +3,13 @@
 Fresh, decoupled hirex_* schema. Depends on the migration
 backend/sql/20260724_add_hirex_jobs.sql being applied to RDS.
 """
+import uuid
+
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, Json
 
 from db import get_connection
+from utils.html_utils import html_to_plain_text, looks_like_html
 
 bp = Blueprint("hirex", __name__, url_prefix="/hirex")
 
@@ -22,7 +25,8 @@ TEXT_FIELDS = {
     "language", "seniority",
 }
 NUMERIC_FIELDS = {"salary_min", "salary_max"}
-INT_FIELDS = {"openings"}
+INT_FIELDS = {"openings", "opportunity_id"}
+RICH_TEXT_FIELDS = {"description", "requirements", "benefits"}
 JSON_FIELDS = {
     "tags", "skills", "workflow", "scorecard_config",
     "custom_form", "knockout_questions",
@@ -36,8 +40,16 @@ SELECT_COLS = """
     recruiter_email, hiring_manager_email, priority, status, openings,
     tags, description, benefits, requirements, skills, language, seniority,
     workflow, scorecard_config, custom_form, knockout_questions,
+    public_token, published_at, opportunity_id,
     created_by, created_at, updated_at
 """
+
+# Public apply page (docs/apply.html). Built here so the UI never hardcodes it.
+PUBLIC_APPLY_BASE = "https://vinttihub.vintti.com/apply.html"
+
+
+def public_apply_url(token):
+    return f"{PUBLIC_APPLY_BASE}?t={token}" if token else None
 
 
 def _actor_email():
@@ -63,7 +75,23 @@ def _coerce_value(field, value):
         except (TypeError, ValueError):
             return False, f"{field} must be an integer"
     if field in JSON_FIELDS:
+        # The apply-form schema is public-facing, so it gets validated on the way
+        # in rather than trusted as free-form JSON.
+        if field == "custom_form":
+            from routes.hirex_public_routes import normalize_form
+            return True, Json(normalize_form(value))
+        if field == "knockout_questions":
+            from routes.hirex_public_routes import normalize_questions
+            return True, Json(normalize_questions(value))
         return True, Json(value)
+    if field in RICH_TEXT_FIELDS:
+        # Pasted from a CRM or a careers site, these arrive as HTML. Hirex stores
+        # plain text: the public apply page escapes what it renders, so tags would
+        # be shown to candidates verbatim.
+        text = str(value)
+        if looks_like_html(text):
+            return True, (html_to_plain_text(text) or None)
+        return True, text
     # text
     return True, str(value)
 
@@ -166,9 +194,90 @@ def get_job(job_id):
         conn.close()
         if not row:
             return jsonify({"error": "job not found"}), 404
+        row["public_url"] = public_apply_url(row.get("public_token"))
         return jsonify(row)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/jobs/<int:job_id>/publish", methods=["POST"])
+def publish_job(job_id):
+    """Mint (or reuse) the public token so the job can accept applications.
+
+    Publishing a draft also opens it — the public page only serves jobs whose
+    status is 'open', so publishing a draft that stays closed would 410 for
+    every candidate who clicked the LinkedIn link.
+    """
+    actor = _actor_email()
+    conn = None
+    try:
+        conn = get_connection()
+        conn.autocommit = False
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SET LOCAL lock_timeout = '5s';")
+            cur.execute("SET LOCAL statement_timeout = '10s';")
+            cur.execute("SELECT status, public_token FROM hirex_jobs WHERE job_id = %s FOR UPDATE;", (job_id,))
+            existing = cur.fetchone()
+            if not existing:
+                conn.rollback()
+                return jsonify({"error": "job not found"}), 404
+
+            new_status = "open" if existing["status"] == "draft" else existing["status"]
+            # Token minted in Python so this doesn't depend on pgcrypto being installed.
+            token = str(existing["public_token"] or uuid.uuid4())
+            cur.execute(
+                f"UPDATE hirex_jobs SET public_token = %s, published_at = NOW(), "
+                f"status = %s, updated_at = NOW() "
+                f"WHERE job_id = %s RETURNING {SELECT_COLS};",
+                (token, new_status, job_id),
+            )
+            row = cur.fetchone()
+            _log_activity(cur, job_id, actor, "published",
+                          {"reopened": new_status != existing["status"]})
+            conn.commit()
+        row["public_url"] = public_apply_url(row.get("public_token"))
+        return jsonify(row)
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/jobs/<int:job_id>/unpublish", methods=["POST"])
+def unpublish_job(job_id):
+    """Take the apply page offline. The token is kept, so re-publishing later
+    revives the SAME URL — any link already pasted into LinkedIn keeps working."""
+    actor = _actor_email()
+    conn = None
+    try:
+        conn = get_connection()
+        conn.autocommit = False
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SET LOCAL lock_timeout = '5s';")
+            cur.execute("SET LOCAL statement_timeout = '10s';")
+            cur.execute(
+                f"UPDATE hirex_jobs SET published_at = NULL, updated_at = NOW() "
+                f"WHERE job_id = %s RETURNING {SELECT_COLS};",
+                (job_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                return jsonify({"error": "job not found"}), 404
+            _log_activity(cur, job_id, actor, "unpublished", {})
+            conn.commit()
+        row["public_url"] = public_apply_url(row.get("public_token"))
+        return jsonify(row)
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @bp.route("/jobs", methods=["POST"])
@@ -254,6 +363,7 @@ def update_job(job_id):
                 return jsonify({"error": "job not found"}), 404
             _log_activity(cur, job_id, actor, "updated", {"fields": cols})
             conn.commit()
+        row["public_url"] = public_apply_url(row.get("public_token"))
         return jsonify(row)
     except Exception as e:
         if conn:
@@ -322,7 +432,8 @@ def duplicate_job(job_id):
                     salary_min, salary_max, salary_currency, salary_period,
                     recruiter_email, hiring_manager_email, priority, status, openings,
                     tags, description, benefits, requirements, skills, language, seniority,
-                    workflow, scorecard_config, custom_form, knockout_questions, created_by
+                    workflow, scorecard_config, custom_form, knockout_questions,
+                    opportunity_id, created_by
                 )
                 SELECT
                     title || ' (Copy)', department, location, work_mode, employment_type,
@@ -330,7 +441,7 @@ def duplicate_job(job_id):
                     recruiter_email, hiring_manager_email, priority, 'draft', openings,
                     tags, description, benefits, requirements, skills, language, seniority,
                     workflow, scorecard_config, custom_form, knockout_questions,
-                    COALESCE(%s, created_by)
+                    opportunity_id, COALESCE(%s, created_by)
                 FROM hirex_jobs WHERE job_id = %s
                 RETURNING {SELECT_COLS};
                 """,

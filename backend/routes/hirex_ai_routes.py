@@ -222,7 +222,8 @@ def analyze_application(app_id):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
             """SELECT a.application_id, a.job_id, a.candidate_id,
-                      c.full_name, c.cv_text,
+                      NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), '') AS full_name,
+                      c.cv_text,
                       j.title, j.seniority, j.department, j.location, j.work_mode,
                       j.employment_type, j.language, j.skills, j.description, j.requirements
                FROM hirex_applications a

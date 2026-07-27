@@ -47,6 +47,8 @@ from routes.hirex_routes import bp as hirex_bp
 from routes.hirex_pipeline_routes import bp as hirex_pipeline_bp
 from routes.hirex_ai_routes import bp as hirex_ai_bp
 from routes.hirex_scorecards_routes import bp as hirex_scorecards_bp
+from routes.hirex_public_routes import bp as hirex_public_bp
+from routes.hirex_opportunity_routes import bp as hirex_opp_bp
 
 
 
@@ -108,6 +110,8 @@ def create_app() -> Flask:
     app.register_blueprint(hirex_pipeline_bp)
     app.register_blueprint(hirex_ai_bp)
     app.register_blueprint(hirex_scorecards_bp)
+    app.register_blueprint(hirex_public_bp)
+    app.register_blueprint(hirex_opp_bp)
 
     @app.after_request
     def apply_cors_headers(response):

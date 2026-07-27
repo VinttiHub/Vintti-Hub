@@ -1,0 +1,417 @@
+/* =====================================================================
+   Vintti — public job application page (Hirex Slice 5)
+   Candidate-facing. Shares the Hirex palette so the two never look like
+   different companies, but stands on its own (no sidebar, no app chrome).
+
+   Design note: the applicant arrives from LinkedIn on a domain they've
+   never seen, and is asked to hand over their CV. Everything here serves
+   legibility and legitimacy — the role stated as a precise spec sheet,
+   no marketing gloss. Brand lime appears exactly once: the confirmation.
+   ===================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* The page swaps between loading / not-found / job / success with the `hidden`
+   attribute. Several of those blocks set `display`, and an author rule always
+   beats the user agent's `[hidden] { display: none }` — so without this they all
+   render at once and the real content ends up pushed below the fold. */
+.vap [hidden] { display: none !important; }
+
+.vap {
+  --ink:      #0e1116;
+  --ink-2:    #3d4653;
+  --muted:    #6b7480;
+  --faint:    #9aa2ad;
+  --canvas:   #f6f7f9;
+  --surface:  #ffffff;
+  --line:     #e6e8ec;
+  --line-2:   #eef0f3;
+  --accent:   #0028ff;
+  --accent-wash: #eef1ff;
+  --lime:     #c1ff72;
+  --lime-ink: #3a6b00;
+  --danger:   #d21f4a;
+
+  --r-sm: 7px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { margin: 0; }
+
+/* --- Top bar -------------------------------------------------------- */
+.vap-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.vap-brand img { display: block; height: 26px; width: auto; }
+.vap-bar-note {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* --- States --------------------------------------------------------- */
+.vap-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 80px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.vap-gone-title { margin: 0; font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+.vap-gone-text  { margin: 0; max-width: 46ch; }
+.vap-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: vap-spin .7s linear infinite;
+}
+@keyframes vap-spin { to { transform: rotate(360deg); } }
+
+/* --- Main ------------------------------------------------------------ */
+.vap-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 28px 72px;
+  animation: vap-in .35s ease both;
+}
+@keyframes vap-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.vap-hero { margin-bottom: 36px; }
+.vap-title {
+  margin: 0;
+  font-size: clamp(30px, 4.4vw, 44px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -.03em;
+  max-width: 20ch;
+}
+.vap-dept {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* Signature element — the role as a datasheet. */
+.vap-spec {
+  margin: 26px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--ink);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.vap-spec > div {
+  padding: 12px 16px 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.vap-spec dt {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.vap-spec dd {
+  margin: 3px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* --- Two columns ----------------------------------------------------- */
+.vap-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 56px;
+  align-items: start;
+}
+
+/* --- Job description -------------------------------------------------- */
+.vap-jd { min-width: 0; }
+.vap-jd h2 {
+  margin: 34px 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.vap-jd h2:first-child { margin-top: 0; }
+.vap-jd p {
+  margin: 0;
+  white-space: pre-wrap;   /* the JD is pasted plain text; keep its shape */
+  color: var(--ink-2);
+  font-size: 15.5px;
+  line-height: 1.68;
+}
+.vap-skills { display: flex; flex-wrap: wrap; gap: 7px; }
+.vap-skill {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+/* --- Form card -------------------------------------------------------- */
+.vap-formwrap { position: sticky; top: 24px; }
+.vap-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 26px 24px;
+  box-shadow: 0 1px 2px rgba(14, 17, 22, .04), 0 12px 32px -18px rgba(14, 17, 22, .18);
+}
+.vap-card-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.vap-card-sub   { margin: 4px 0 22px; font-size: 13.5px; color: var(--muted); }
+
+.vap-fields, .vap-questions { display: flex; flex-direction: column; gap: 16px; }
+.vap-questions:not(:empty) {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line-2);
+}
+
+.vap-field { display: flex; flex-direction: column; gap: 6px; }
+.vap-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.vap-opt { font-weight: 400; color: var(--faint); }
+.vap-help { font-size: 12.5px; color: var(--muted); }
+
+.vap-field input[type="text"],
+.vap-field input[type="email"],
+.vap-field input[type="tel"],
+.vap-field input[type="number"],
+.vap-field select,
+.vap-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  transition: border-color .14s, box-shadow .14s;
+}
+.vap-field textarea { resize: vertical; min-height: 84px; }
+
+/* Without appearance:none the OS paints its own control — a grey gradient pill
+   with a double arrow — which looks nothing like the text inputs beside it. */
+.vap-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7480' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  text-overflow: ellipsis;   /* long country names shouldn't collide with the chevron */
+}
+.vap-field select:hover { border-color: var(--faint); }
+/* Read as a placeholder until something is actually picked. */
+.vap-field select:has(option[value=""]:checked) { color: var(--muted); }
+.vap-field select option { color: var(--ink); }
+.vap-field input:focus-visible,
+.vap-field select:focus-visible,
+.vap-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.vap-field.is-bad input,
+.vap-field.is-bad select,
+.vap-field.is-bad textarea,
+.vap-field.is-bad .vap-drop { border-color: var(--danger); }
+.vap-err { font-size: 12.5px; color: var(--danger); }
+
+/* Choice groups */
+.vap-choices { display: flex; flex-direction: column; gap: 8px; }
+.vap-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink-2);
+  transition: border-color .14s, background .14s;
+}
+.vap-choice:hover { border-color: var(--faint); }
+.vap-choice input { margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.vap-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+/* CV dropzone */
+.vap-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-md);
+  background: #fcfcfd;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .14s, background .14s;
+}
+.vap-drop:hover, .vap-drop.is-over { border-color: var(--accent); background: var(--accent-wash); }
+.vap-drop-main { font-size: 14px; font-weight: 600; color: var(--accent); }
+.vap-drop-sub  { font-size: 12.5px; color: var(--muted); }
+.vap-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: 14px;
+}
+.vap-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.vap-file-size { font-size: 12px; color: var(--faint); flex: none; }
+.vap-file-x {
+  flex: none; border: 0; background: none; cursor: pointer;
+  color: var(--muted); font-size: 17px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+}
+.vap-file-x:hover { color: var(--danger); background: #fdeef2; }
+
+.vap-consent { margin: 20px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.vap-formerr {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #f6cdd8;
+  border-radius: var(--r-sm);
+  background: #fdeef2;
+  color: #9c1836;
+  font-size: 13.5px;
+}
+
+/* Honeypot — off-screen, never focusable. */
+.vap-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* --- Buttons ---------------------------------------------------------- */
+.vap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .14s, border-color .14s, transform .1s;
+}
+.vap-btn:active { transform: translateY(1px); }
+.vap-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vap-btn-primary { background: var(--accent); color: #fff; }
+.vap-btn-primary:hover { background: #001fd6; }
+.vap-btn-primary[disabled] { background: var(--faint); cursor: not-allowed; }
+.vap-btn-ghost { background: var(--surface); border-color: var(--line); color: var(--ink-2); }
+.vap-btn-ghost:hover { border-color: var(--faint); }
+.vap-submit { width: 100%; margin-top: 18px; padding: 13px 18px; font-size: 15px; }
+
+/* --- Success ---------------------------------------------------------- */
+.vap-done {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 34px 26px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(14, 17, 22, .04), 0 12px 32px -18px rgba(14, 17, 22, .18);
+  animation: vap-in .3s ease both;
+}
+/* The one place brand lime appears. */
+.vap-done-mark {
+  display: block;
+  width: 46px; height: 46px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--lime);
+  position: relative;
+}
+.vap-done-mark::after {
+  content: "";
+  position: absolute;
+  left: 16px; top: 12px;
+  width: 12px; height: 21px;
+  border: solid var(--lime-ink);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.vap-done h2 { margin: 0 0 8px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.vap-done p  { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+.vap-done-next { margin-top: 14px !important; color: var(--muted) !important; font-size: 13.5px !important; }
+
+/* --- Footer ----------------------------------------------------------- */
+.vap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.vap-foot-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line); }
+
+/* --- Responsive -------------------------------------------------------- */
+@media (max-width: 940px) {
+  .vap-cols { grid-template-columns: 1fr; gap: 40px; }
+  .vap-formwrap { position: static; }
+  .vap-main { padding: 30px 20px 56px; }
+  .vap-bar { padding: 12px 20px; }
+}
+@media (max-width: 520px) {
+  .vap-card { padding: 22px 18px; border-radius: var(--r-md); }
+  .vap-spec { grid-template-columns: repeat(2, 1fr); }
+  .vap-title { letter-spacing: -.02em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vap-main, .vap-done { animation: none; }
+  .vap-spinner { animation-duration: 1.6s; }
+  .vap-btn:active { transform: none; }
+}

@@ -14,8 +14,22 @@ bp = Blueprint("hirex_pipeline", __name__, url_prefix="/hirex")
 VALID_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"]
 STAGE_SET = set(VALID_STAGES)
 
-CAND_FIELDS = ["full_name", "email", "phone", "headline", "location",
-               "linkedin_url", "source", "notes"]
+# Editable candidate columns. There is no stored full_name — the display name is
+# composed from first_name + last_name wherever it's needed.
+CAND_FIELDS = ["first_name", "last_name", "email", "phone", "country", "headline",
+               "area", "english_level", "current_company", "linkedin_url",
+               "desired_salary", "location", "source", "notes"]
+REQUIRED_CAND_FIELDS = {"first_name"}
+
+# Composed display name, for SELECTs that join the candidate as `c`.
+DISPLAY_NAME = "NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), '')"
+
+# The candidate record as the UI reads it (table aliased `c`).
+CAND_SELECT = f"""
+    candidate_id, first_name, last_name, {DISPLAY_NAME} AS full_name,
+    email, phone, country, headline, area, english_level, current_company,
+    linkedin_url, desired_salary, location, source, notes, created_at, updated_at
+"""
 
 
 def _actor_email():
@@ -45,13 +59,23 @@ def _nest(row, with_analysis=False):
         "updated_at": row["updated_at"],
         "ai_score": row.get("ai_score"),
         "ai_analyzed_at": row.get("ai_analyzed_at"),
+        "source": row.get("app_source"),
+        "knockout_flags": row.get("knockout_flags") or [],
         "candidate": {
             "candidate_id": row["candidate_id"],
+            "first_name": row["first_name"],
+            "last_name": row["last_name"],
+            # Composed by the query, never stored.
             "full_name": row["full_name"],
             "email": row["email"],
             "phone": row["phone"],
             "headline": row["headline"],
             "location": row["location"],
+            "country": row.get("country"),
+            "area": row.get("area"),
+            "english_level": row.get("english_level"),
+            "current_company": row.get("current_company"),
+            "desired_salary": row.get("desired_salary"),
             "linkedin_url": row["linkedin_url"],
             "source": row["cand_source"],
             "notes": row["notes"],
@@ -61,13 +85,17 @@ def _nest(row, with_analysis=False):
     }
     if with_analysis:
         out["ai_analysis"] = row.get("ai_analysis")
+        out["answers"] = row.get("answers") or []
     return out
 
 
-APP_JOIN_SELECT = """
+APP_JOIN_SELECT = f"""
     SELECT a.application_id, a.job_id, a.candidate_id, a.stage, a.rating,
            a.applied_at, a.updated_at, a.ai_score, a.ai_analyzed_at,
-           c.full_name, c.email, c.phone, c.headline, c.location,
+           a.source AS app_source, a.knockout_flags,
+           c.first_name, c.last_name, {DISPLAY_NAME} AS full_name,
+           c.email, c.phone, c.headline, c.location, c.country, c.area,
+           c.english_level, c.current_company, c.desired_salary,
            c.linkedin_url, c.source AS cand_source, c.notes,
            c.cv_file_name, c.cv_s3_key
     FROM hirex_applications a
@@ -172,7 +200,7 @@ def get_application(app_id):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
-            APP_JOIN_SELECT.replace("c.cv_s3_key", "c.cv_s3_key, a.ai_analysis")
+            APP_JOIN_SELECT.replace("c.cv_s3_key", "c.cv_s3_key, a.ai_analysis, a.answers")
             + " WHERE a.application_id = %s;",
             (app_id,),
         )
@@ -189,9 +217,11 @@ def get_application(app_id):
 @bp.route("/jobs/<int:job_id>/candidates", methods=["POST"])
 def add_candidate(job_id):
     data = request.get_json(silent=True) or {}
-    name = (data.get("full_name") or "").strip()
-    if not name:
-        return jsonify({"error": "full_name is required"}), 400
+    first = (data.get("first_name") or "").strip()
+    last = (data.get("last_name") or "").strip()
+    if not first:
+        return jsonify({"error": "first_name is required"}), 400
+    name = " ".join(p for p in (first, last) if p)
 
     stage = (data.get("stage") or "applied").strip()
     if stage not in STAGE_SET:
@@ -229,9 +259,10 @@ def add_candidate(job_id):
             if candidate_id is None:
                 cur.execute(
                     """INSERT INTO hirex_candidates
-                       (full_name, email, phone, headline, location, linkedin_url, source, notes, created_by)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING candidate_id;""",
-                    (name, email, data.get("phone"), data.get("headline"),
+                       (first_name, last_name, email, phone, headline, location,
+                        linkedin_url, source, notes, created_by)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING candidate_id;""",
+                    (first, last or None, email, data.get("phone"), data.get("headline"),
                      data.get("location"), data.get("linkedin_url"),
                      data.get("source"), data.get("notes"), actor),
                 )
@@ -303,7 +334,7 @@ def update_application(app_id):
             cur.execute("SET LOCAL lock_timeout = '5s';")
             cur.execute("SET LOCAL statement_timeout = '10s';")
             cur.execute(
-                "SELECT a.job_id, a.stage, c.full_name "
+                f"SELECT a.job_id, a.stage, {DISPLAY_NAME} AS full_name "
                 "FROM hirex_applications a JOIN hirex_candidates c "
                 "ON c.candidate_id = a.candidate_id WHERE a.application_id = %s FOR UPDATE OF a;",
                 (app_id,),
@@ -347,7 +378,7 @@ def delete_application(app_id):
             cur.execute("SET LOCAL lock_timeout = '5s';")
             cur.execute("SET LOCAL statement_timeout = '10s';")
             cur.execute(
-                "SELECT a.job_id, c.full_name FROM hirex_applications a "
+                f"SELECT a.job_id, {DISPLAY_NAME} AS full_name FROM hirex_applications a "
                 "JOIN hirex_candidates c ON c.candidate_id = a.candidate_id "
                 "WHERE a.application_id = %s;",
                 (app_id,),
@@ -377,7 +408,8 @@ def list_candidates():
     q = (request.args.get("q") or "").strip().lower()
     where, params = [], []
     if q:
-        where.append("(LOWER(c.full_name) LIKE %s OR LOWER(COALESCE(c.email,'')) LIKE %s "
+        where.append("(LOWER(CONCAT_WS(' ', c.first_name, c.last_name)) LIKE %s "
+                     "OR LOWER(COALESCE(c.email,'')) LIKE %s "
                      "OR LOWER(COALESCE(c.headline,'')) LIKE %s)")
         like = f"%{q}%"
         params += [like, like, like]
@@ -389,7 +421,10 @@ def list_candidates():
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
-            f"""SELECT c.candidate_id, c.full_name, c.email, c.phone, c.headline, c.location,
+            f"""SELECT c.candidate_id, c.first_name, c.last_name,
+                       {DISPLAY_NAME} AS full_name,
+                       c.email, c.phone, c.headline, c.location, c.country, c.area,
+                       c.english_level, c.current_company, c.desired_salary,
                        c.linkedin_url, c.source, c.cv_file_name,
                        (c.cv_s3_key IS NOT NULL) AS has_cv,
                        COUNT(a.application_id) AS applications,
@@ -424,9 +459,7 @@ def get_candidate(candidate_id):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
-            "SELECT candidate_id, full_name, email, phone, headline, location, "
-            "linkedin_url, source, notes, created_at, updated_at "
-            "FROM hirex_candidates WHERE candidate_id = %s;",
+            f"SELECT {CAND_SELECT} FROM hirex_candidates c WHERE candidate_id = %s;",
             (candidate_id,),
         )
         row = cur.fetchone()
@@ -442,14 +475,17 @@ def get_candidate(candidate_id):
 @bp.route("/candidates/<int:candidate_id>", methods=["PATCH"])
 def update_candidate(candidate_id):
     data = request.get_json(silent=True) or {}
-    if "full_name" in data and not (data.get("full_name") or "").strip():
-        return jsonify({"error": "full_name cannot be empty"}), 400
+    for f in REQUIRED_CAND_FIELDS:
+        if f in data and not (data.get(f) or "").strip():
+            return jsonify({"error": f"{f} cannot be empty"}), 400
 
     sets, vals = [], []
     for f in CAND_FIELDS:
         if f in data:
+            value = data.get(f)
+            value = value.strip() if isinstance(value, str) else value
             sets.append(f"{f} = %s")
-            vals.append((data.get(f) or None) if f != "full_name" else data.get(f).strip())
+            vals.append(value or None)
     if not sets:
         return jsonify({"error": "no editable fields provided"}), 400
 
@@ -460,17 +496,19 @@ def update_candidate(candidate_id):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SET LOCAL lock_timeout = '5s';")
             cur.execute("SET LOCAL statement_timeout = '10s';")
+            # RETURNING can't see the table alias the composed name needs, so the
+            # row is re-read through the same SELECT the GET route uses.
             cur.execute(
                 f"UPDATE hirex_candidates SET {', '.join(sets)}, updated_at = NOW() "
-                f"WHERE candidate_id = %s "
-                f"RETURNING candidate_id, full_name, email, phone, headline, location, "
-                f"linkedin_url, source, notes, created_at, updated_at;",
+                f"WHERE candidate_id = %s RETURNING candidate_id;",
                 tuple(vals) + (candidate_id,),
             )
-            row = cur.fetchone()
-            if not row:
+            if not cur.fetchone():
                 conn.rollback()
                 return jsonify({"error": "candidate not found"}), 404
+            cur.execute(f"SELECT {CAND_SELECT} FROM hirex_candidates c WHERE candidate_id = %s;",
+                        (candidate_id,))
+            row = cur.fetchone()
             conn.commit()
         return jsonify(row)
     except Exception as e:

@@ -63,11 +63,15 @@
       candAvatar: $("hxCandAvatar"), candName: $("hxCandName"), candSub: $("hxCandSub"),
       candStage: $("hxCandStage"), candStars: $("hxCandStars"), candContact: $("hxCandContact"),
       candCv: $("hxCandCv"), cvInput: $("hxCvInput"), candAi: $("hxCandAi"),
+      candAnswers: $("hxCandAnswers"),
       scorecards: $("hxScorecards"),
       scScrim: $("hxScScrim"), scDrawer: $("hxScDrawer"), scTitle: $("hxScTitle"),
       scBody: $("hxScBody"), scClose: $("hxScClose"), scCancel: $("hxScCancel"),
       scSave: $("hxScSave"), scDelete: $("hxScDelete"),
       candNotes: $("hxCandNotes"), candRemove: $("hxCandRemove"), candSave: $("hxCandSave"),
+      apply: $("hxApply"),
+      qScrim: $("hxQScrim"), qDrawer: $("hxQDrawer"), qTitle: $("hxQTitle"), qBody: $("hxQBody"),
+      qClose: $("hxQClose"), qCancel: $("hxQCancel"), qSave: $("hxQSave"),
       toasts: $("hxToasts"),
       tabs: Array.from(document.querySelectorAll(".hx-mod[data-tab]")),
     };
@@ -105,9 +109,16 @@
     els.scSave.addEventListener("click", saveScorecard);
     els.scDelete.addEventListener("click", deleteMyScorecard);
 
+    // Screening-question editor
+    els.qClose.addEventListener("click", closeQuestionEditor);
+    els.qCancel.addEventListener("click", closeQuestionEditor);
+    els.qScrim.addEventListener("click", closeQuestionEditor);
+    els.qSave.addEventListener("click", saveQuestion);
+
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       // Close the top-most open layer first.
+      if (els.qDrawer.getAttribute("aria-hidden") === "false") return closeQuestionEditor();
       if (els.scDrawer.getAttribute("aria-hidden") === "false") return closeScorecardEditor();
       closeAddDrawer(); closeCandDrawer();
     });
@@ -126,6 +137,7 @@
       job = await res.json();
       renderHead();
       renderAbout();
+      if (!$("tab-apply").hidden) renderApplyTab();   // tab opened before the job landed
     } catch { toast("err", "Couldn't load the job"); }
   }
 
@@ -165,6 +177,12 @@
     if (job.location) bits.push(`<span><i class="fa-solid fa-location-dot"></i>${esc(job.location)}</span>`);
     if (job.recruiter_email) bits.push(`<span><i class="fa-solid fa-user-tie"></i>${esc(job.recruiter_email)}</span>`);
     bits.push(`<span><i class="fa-solid fa-users"></i>${Number(job.openings) || 1} opening${(Number(job.openings) || 1) > 1 ? "s" : ""}</span>`);
+    if (job.opportunity_id) {
+      bits.push(`<a class="hx-opp-link" href="opportunity-detail.html?id=${job.opportunity_id}"
+                    title="This job came from an opportunity">
+                   <i class="fa-solid fa-briefcase"></i>Opportunity #${job.opportunity_id}
+                 </a>`);
+    }
     els.meta.innerHTML = bits.join('<span class="hx-dot"></span>');
     document.title = `Hirex · ${job.title}`;
   }
@@ -236,6 +254,7 @@
         <div class="hx-card-foot">
           ${c.source ? `<span class="hx-src-chip">${esc(SOURCE_LABEL[c.source] || c.source)}</span>` : ""}
           ${c.has_cv ? `<span class="hx-cv-flag" title="CV on file"><i class="fa-solid fa-paperclip"></i></span>` : ""}
+          ${(a.knockout_flags || []).length ? `<span class="hx-ko-flag" title="Doesn't meet: ${esc((a.knockout_flags || []).join(" · "))}"><i class="fa-solid fa-flag"></i></span>` : ""}
           ${a.ai_score != null ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">AI ${a.ai_score}</span>` : ""}
           ${starsHtml(a.rating)}
         </div>
@@ -291,9 +310,10 @@
   // --- Tabs ----------------------------------------------------------------
   function switchTab(tab) {
     els.tabs.forEach((t) => t.classList.toggle("is-active", t.dataset.tab === tab));
-    ["overview", "pipeline", "activity", "about"].forEach((t) => { $(`tab-${t}`).hidden = t !== tab; });
+    ["overview", "pipeline", "apply", "activity", "about"].forEach((t) => { $(`tab-${t}`).hidden = t !== tab; });
     if (tab === "activity" && !activityLoaded) loadActivity();
     if (tab === "overview" && !overviewLoaded) loadOverview();
+    if (tab === "apply") renderApplyTab();
   }
 
   // --- Overview ------------------------------------------------------------
@@ -426,7 +446,7 @@
     els.addForm.reset();
     els.addStage.value = "applied";
     clearErr(els.addForm);
-    openDrawer(els.addScrim, els.addDrawer, () => els.addForm.querySelector('[name="full_name"]').focus());
+    openDrawer(els.addScrim, els.addDrawer, () => els.addForm.querySelector('[name="first_name"]').focus());
   }
   function closeAddDrawer() { closeDrawer(els.addScrim, els.addDrawer); }
 
@@ -434,9 +454,10 @@
     const f = els.addForm;
     const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : "");
     clearErr(f);
-    if (!v("full_name")) { showErr(f, "full_name", "A name is required"); return; }
+    if (!v("first_name")) { showErr(f, "first_name", "A first name is required"); return; }
     const payload = {
-      full_name: v("full_name"), email: v("email") || null, phone: v("phone") || null,
+      first_name: v("first_name"), last_name: v("last_name") || null,
+      email: v("email") || null, phone: v("phone") || null,
       headline: v("headline") || null, location: v("location") || null,
       linkedin_url: v("linkedin_url") || null, source: v("source") || null, stage: v("stage") || "applied",
     };
@@ -445,7 +466,7 @@
       const res = await apiWrite(`/hirex/jobs/${jobId}/candidates`, "POST", payload);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "");
-      toast("ok", `Added ${payload.full_name}`);
+      toast("ok", `Added ${[payload.first_name, payload.last_name].filter(Boolean).join(" ")}`);
       closeAddDrawer();
       activityLoaded = false;
       loadPipeline();
@@ -480,6 +501,7 @@
     els.candContact.innerHTML = contact.join("") || `<span class="hx-cell-muted">No contact details</span>`;
 
     els.candCv.innerHTML = "";
+    els.candAnswers.innerHTML = "";
     els.candAi.innerHTML = "";
     els.scorecards.innerHTML = "";
     openDrawer(els.candScrim, els.candDrawer);
@@ -501,11 +523,41 @@
       if (!currentCand || currentCand.application_id !== appId) return; // drawer moved on
       currentDetail = detail;
       renderCv(detail.candidate);
+      renderAnswers(detail);
       renderAi(detail);
     } catch {
       els.candAi.innerHTML = "";
       renderCv((currentCand && currentCand.candidate) || {});
     }
+  }
+
+  /** Screening answers from the public apply page, plus any knockout flags.
+   *  Flags are informational: nothing here was auto-rejected. */
+  function renderAnswers(detail) {
+    const answers = detail.answers || [];
+    const flags = (currentCand && currentCand.knockout_flags) || [];
+    if (!answers.length && !flags.length) { els.candAnswers.innerHTML = ""; return; }
+
+    const flagBox = flags.length ? `
+      <div class="hx-ko-banner">
+        <i class="fa-solid fa-flag"></i>
+        <div>
+          <b>Doesn't meet ${flags.length === 1 ? "a requirement" : `${flags.length} requirements`}</b>
+          <span>${flags.map(esc).join(" · ")}</span>
+        </div>
+      </div>` : "";
+
+    const rows = answers.map((a) => {
+      const val = Array.isArray(a.answer) ? a.answer.join(", ") : a.answer;
+      return `
+        <div class="hx-answer">
+          <span class="hx-answer-q">${esc(a.label)}</span>
+          <span class="hx-answer-a">${val ? esc(val) : `<em class="hx-cell-muted">No answer</em>`}</span>
+        </div>`;
+    }).join("");
+
+    els.candAnswers.innerHTML = flagBox + (answers.length
+      ? `<div class="hx-answers-box"><h4>Application answers</h4>${rows}</div>` : "");
   }
 
   function renderCv(c) {
@@ -883,6 +935,493 @@
   }
 
   // --- Drawer helpers ------------------------------------------------------
+  /* =======================================================================
+     Application form builder (Slice 5)
+     Configures what the public apply page asks. The recruiter edits a draft
+     here and saves it onto the job as custom_form + knockout_questions.
+     ======================================================================= */
+
+  // Mirrors STANDARD_FIELDS in backend/routes/hirex_public_routes.py — that
+  // file is the source of truth; keep the keys in sync.
+  const APPLY_FIELDS = [
+    { key: "first_name",      label: "First name",      locked: true },
+    { key: "last_name",       label: "Last name",       locked: true },
+    { key: "email",           label: "Email address",   locked: true },
+    { key: "phone",           label: "Phone number" },
+    { key: "country",         label: "Location",        note: "Country dropdown" },
+    { key: "cv",              label: "CV / Resume" },
+    { key: "role_position",   label: "Role / position" },
+    { key: "area",            label: "Area" },
+    { key: "english_level",   label: "English level",   note: "Beginner → Native" },
+    { key: "found_via",       label: "How did you find out about this position?",
+                              note: "LinkedIn · Referral · Website · Social Media · Other" },
+    { key: "linkedin",        label: "LinkedIn profile" },
+    { key: "current_company", label: "Current company" },
+    { key: "desired_salary",  label: "Desired salary" },
+  ];
+  const MODES = ["required", "optional", "off"];
+  const MODE_LABEL = { required: "Required", optional: "Optional", off: "Off" };
+
+  const Q_TYPES = [
+    { key: "short_answer",  label: "Short answer" },
+    { key: "paragraph",     label: "Paragraph" },
+    { key: "dropdown",      label: "Dropdown" },
+    { key: "single_select", label: "Single selection" },
+    { key: "multi_select",  label: "Multiple selection" },
+    { key: "yes_no",        label: "Yes / No" },
+    { key: "number",        label: "Number" },
+  ];
+  const Q_TYPE_LABEL = Object.fromEntries(Q_TYPES.map((t) => [t.key, t.label]));
+  const CHOICE_TYPES = ["dropdown", "single_select", "multi_select"];
+
+  let draft = null;         // { form: {key:mode}, questions: [...] }
+  let draftDirty = false;
+  let qEditing = null;      // question being edited in the drawer (null = new)
+
+  // Mirrors DEFAULT_FORM in hirex_public_routes.py — Vintti's usual application.
+  function defaultForm() {
+    return {
+      first_name: "required", last_name: "required", email: "required",
+      phone: "required", country: "required", cv: "required",
+      role_position: "optional", area: "optional", english_level: "required",
+      found_via: "optional", linkedin: "optional",
+      current_company: "off", desired_salary: "off",
+    };
+  }
+
+  function initDraft() {
+    const stored = (job && job.custom_form) || {};
+    const form = defaultForm();
+    Object.keys(form).forEach((k) => {
+      if (MODES.includes(stored[k])) form[k] = stored[k];
+    });
+    APPLY_FIELDS.filter((f) => f.locked).forEach((f) => { form[f.key] = "required"; });
+    draft = {
+      form,
+      questions: Array.isArray(job && job.knockout_questions) ? deepCopy(job.knockout_questions) : [],
+    };
+    draftDirty = false;
+  }
+
+  function renderApplyTab() {
+    if (!job) {
+      els.apply.innerHTML = `<div class="hx-state"><div class="hx-spinner"></div><p>Loading…</p></div>`;
+      return;
+    }
+    if (!draft) initDraft();
+
+    els.apply.innerHTML = publishHtml() + fieldsHtml() + questionsHtml() + saveBarHtml();
+    wireApplyTab();
+  }
+
+  function publishHtml() {
+    const live = !!(job.published_at && job.public_token);
+    const url = job.public_url || "";
+    const previewUrl = job.public_token ? `apply.html?t=${job.public_token}` : "";
+
+    if (!live) {
+      return `
+        <div class="hx-af-pub">
+          <div class="hx-af-pub-head">
+            <span class="hx-af-dot"></span>
+            <div>
+              <h3>Not published</h3>
+              <p>Publish the job to get a link candidates can apply through.</p>
+            </div>
+            <button class="hx-btn hx-btn-primary" id="hxPubBtn">
+              <i class="fa-solid fa-globe"></i> Publish
+            </button>
+          </div>
+          ${job.status === "draft" ? `<p class="hx-af-note">
+            <i class="fa-solid fa-circle-info"></i>
+            This job is a draft. Publishing also moves it to Open, so the link works right away.
+          </p>` : ""}
+        </div>`;
+    }
+
+    return `
+      <div class="hx-af-pub is-live">
+        <div class="hx-af-pub-head">
+          <span class="hx-af-dot is-live"></span>
+          <div>
+            <h3>Live since ${esc(fmtDate(job.published_at))}</h3>
+            <p>Anyone with this link can apply.</p>
+          </div>
+          <button class="hx-btn hx-btn-ghost" id="hxUnpubBtn">Unpublish</button>
+        </div>
+        <div class="hx-af-link">
+          <input type="text" id="hxPubUrl" readonly value="${esc(url)}" />
+          <button class="hx-btn hx-btn-ghost" id="hxCopyBtn"><i class="fa-regular fa-copy"></i> Copy</button>
+          <a class="hx-btn hx-btn-ghost" id="hxPreviewBtn" href="${esc(previewUrl)}" target="_blank" rel="noopener">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview
+          </a>
+        </div>
+        <p class="hx-af-note">
+          <i class="fa-brands fa-linkedin"></i>
+          Paste this into your LinkedIn post under <b>Apply on company website</b>. Add
+          <code>&amp;src=linkedin</code> to the end to track where applicants came from.
+        </p>
+      </div>`;
+  }
+
+  function fieldsHtml() {
+    const rows = APPLY_FIELDS.map((f) => {
+      const mode = draft.form[f.key] || "off";
+      const segs = MODES.map((m) => `
+        <button type="button" class="hx-af-seg${mode === m ? " is-on" : ""}${f.locked ? " is-locked" : ""}"
+                data-field="${f.key}" data-mode="${m}"${f.locked ? " disabled" : ""}>${MODE_LABEL[m]}</button>`).join("");
+      return `
+        <div class="hx-af-row">
+          <div class="hx-af-row-label">
+            <span class="hx-af-row-name">
+              ${esc(f.label)}
+              ${f.locked ? `<span class="hx-af-lock" title="Always required — we can't build a candidate record without it"><i class="fa-solid fa-lock"></i></span>` : ""}
+            </span>
+            ${f.note ? `<span class="hx-af-row-note">${esc(f.note)}</span>` : ""}
+          </div>
+          <div class="hx-af-segs">${segs}</div>
+        </div>`;
+    }).join("");
+
+    return `
+      <section class="hx-af-block">
+        <div class="hx-af-block-head">
+          <h3>Candidate details</h3>
+          <p>What the apply page asks everyone.</p>
+        </div>
+        <div class="hx-af-rows">${rows}</div>
+      </section>`;
+  }
+
+  function questionsHtml() {
+    const list = draft.questions.length
+      ? draft.questions.map(questionRowHtml).join("")
+      : `<div class="hx-af-empty">
+           No screening questions yet. Add one to ask about work authorization,
+           availability, salary expectations — anything the CV won't tell you.
+         </div>`;
+
+    return `
+      <section class="hx-af-block">
+        <div class="hx-af-block-head">
+          <h3>Screening questions</h3>
+          <p>Asked after the standard fields. Answers show up on the candidate.</p>
+          <button class="hx-btn hx-btn-ghost" id="hxAddQ"><i class="fa-solid fa-plus"></i> Add question</button>
+        </div>
+        <div class="hx-af-qs">${list}</div>
+      </section>`;
+  }
+
+  function questionRowHtml(q, i) {
+    const ko = q.knockout
+      ? `<span class="hx-af-ko" title="Applications that fail this get flagged, never auto-rejected">
+           <i class="fa-solid fa-flag"></i> Knockout
+         </span>`
+      : "";
+    return `
+      <div class="hx-af-q" data-i="${i}">
+        <div class="hx-af-q-main">
+          <div class="hx-af-q-label">${esc(q.label)}</div>
+          <div class="hx-af-q-meta">
+            <span class="hx-af-type">${esc(Q_TYPE_LABEL[q.type] || q.type)}</span>
+            ${q.required ? `<span class="hx-af-req-chip">Required</span>` : ""}
+            ${ko}
+            ${(q.options || []).length ? `<span class="hx-af-optcount">${q.options.length} options</span>` : ""}
+          </div>
+        </div>
+        <div class="hx-af-q-actions">
+          <button class="hx-icon-btn" data-act="up"   ${i === 0 ? "disabled" : ""} aria-label="Move up"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="hx-icon-btn" data-act="down" ${i === draft.questions.length - 1 ? "disabled" : ""} aria-label="Move down"><i class="fa-solid fa-chevron-down"></i></button>
+          <button class="hx-icon-btn" data-act="edit" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button class="hx-icon-btn" data-act="del"  aria-label="Delete"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+      </div>`;
+  }
+
+  function saveBarHtml() {
+    return `
+      <div class="hx-af-savebar${draftDirty ? " is-dirty" : ""}">
+        <span class="hx-af-save-note">${draftDirty ? "Unsaved changes" : "All changes saved"}</span>
+        <button class="hx-btn hx-btn-primary" id="hxAfSave"${draftDirty ? "" : " disabled"}>Save form</button>
+      </div>`;
+  }
+
+  function wireApplyTab() {
+    const pub = $("hxPubBtn"), unpub = $("hxUnpubBtn"), copy = $("hxCopyBtn");
+    if (pub) pub.addEventListener("click", () => setPublished(true));
+    if (unpub) unpub.addEventListener("click", () => setPublished(false));
+    if (copy) copy.addEventListener("click", copyPublicUrl);
+
+    els.apply.querySelectorAll(".hx-af-seg:not(.is-locked)").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        draft.form[btn.dataset.field] = btn.dataset.mode;
+        markDirty();
+      });
+    });
+
+    const addQ = $("hxAddQ");
+    if (addQ) addQ.addEventListener("click", () => openQuestionEditor(null));
+
+    els.apply.querySelectorAll(".hx-af-q").forEach((row) => {
+      const i = Number(row.dataset.i);
+      row.querySelectorAll("[data-act]").forEach((btn) => {
+        btn.addEventListener("click", () => questionAction(btn.dataset.act, i));
+      });
+    });
+
+    const save = $("hxAfSave");
+    if (save) save.addEventListener("click", saveApplyForm);
+  }
+
+  function markDirty() { draftDirty = true; renderApplyTab(); }
+
+  function questionAction(act, i) {
+    const qs = draft.questions;
+    if (act === "edit") return openQuestionEditor(i);
+    if (act === "del") {
+      qs.splice(i, 1);
+      return markDirty();
+    }
+    const j = act === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= qs.length) return;
+    [qs[i], qs[j]] = [qs[j], qs[i]];
+    markDirty();
+  }
+
+  async function copyPublicUrl() {
+    const input = $("hxPubUrl");
+    if (!input) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      input.select();
+      document.execCommand("copy");
+    }
+    toast("ok", "Link copied");
+  }
+
+  async function setPublished(on) {
+    const btn = $(on ? "hxPubBtn" : "hxUnpubBtn");
+    if (btn) { btn.disabled = true; btn.textContent = on ? "Publishing…" : "Unpublishing…"; }
+    try {
+      const res = await apiWrite(`/hirex/jobs/${jobId}/${on ? "publish" : "unpublish"}`, "POST", {});
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      job = body;
+      activityLoaded = false;
+      renderHead();
+      renderApplyTab();
+      toast("ok", on ? "The apply page is live" : "The apply page is offline");
+    } catch (err) {
+      toast("err", err.message || `Couldn't ${on ? "publish" : "unpublish"} the job`);
+      renderApplyTab();
+    }
+  }
+
+  async function saveApplyForm() {
+    const btn = $("hxAfSave");
+    if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+    try {
+      const res = await apiWrite(`/hirex/jobs/${jobId}`, "PATCH", {
+        custom_form: draft.form,
+        knockout_questions: draft.questions,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      job = body;
+      activityLoaded = false;
+      initDraft();                 // re-sync with what the server actually stored
+      renderApplyTab();
+      toast("ok", "Form saved");
+    } catch (err) {
+      toast("err", err.message || "Couldn't save the form");
+      renderApplyTab();
+    }
+  }
+
+  // --- Question editor ------------------------------------------------------
+  function openQuestionEditor(index) {
+    qEditing = index == null ? null : index;
+    const q = index == null ? null : draft.questions[index];
+    els.qTitle.textContent = index == null ? "Add question" : "Edit question";
+    els.qBody.innerHTML = questionFormHtml(q);
+    wireQuestionForm();
+    openDrawer(els.qScrim, els.qDrawer, () => {
+      const first = els.qBody.querySelector("#hxQLabel");
+      if (first) first.focus();
+    });
+  }
+
+  function closeQuestionEditor() { closeDrawer(els.qScrim, els.qDrawer); qEditing = null; }
+
+  function questionFormHtml(q) {
+    const type = (q && q.type) || "short_answer";
+    const opts = (q && q.options) || [];
+    return `
+      <div class="hx-grid" style="padding-top:12px">
+        <label class="hx-field hx-col-2">
+          <span>Question <b class="hx-req">*</b></span>
+          <input type="text" id="hxQLabel" placeholder="Do you have a valid work permit for the US?"
+                 value="${esc((q && q.label) || "")}" />
+          <em class="hx-err" data-err="label"></em>
+        </label>
+
+        <label class="hx-field">
+          <span>Format</span>
+          <select id="hxQType">
+            ${Q_TYPES.map((t) => `<option value="${t.key}"${t.key === type ? " selected" : ""}>${t.label}</option>`).join("")}
+          </select>
+        </label>
+
+        <label class="hx-field">
+          <span>Required</span>
+          <select id="hxQReq">
+            <option value="">Optional</option>
+            <option value="1"${q && q.required ? " selected" : ""}>Required</option>
+          </select>
+        </label>
+
+        <label class="hx-field hx-col-2">
+          <span>Help text</span>
+          <input type="text" id="hxQHelp" placeholder="Shown in small print under the question"
+                 value="${esc((q && q.help) || "")}" />
+        </label>
+
+        <label class="hx-field hx-col-2" id="hxQOptsWrap" ${CHOICE_TYPES.includes(type) ? "" : "hidden"}>
+          <span>Options <b class="hx-req">*</b></span>
+          <textarea id="hxQOpts" rows="4" placeholder="One per line&#10;Yes, immediately&#10;Within 30 days&#10;Not available">${esc(opts.join("\n"))}</textarea>
+          <em class="hx-err" data-err="options"></em>
+        </label>
+
+        <div class="hx-field hx-col-2" id="hxQKoWrap">
+          <span>Knockout rule</span>
+          <div class="hx-af-ko-box">
+            <label class="hx-af-ko-toggle">
+              <input type="checkbox" id="hxQKoOn" ${q && q.knockout ? "checked" : ""} />
+              <span>Flag applicants who don't answer this the way you need</span>
+            </label>
+            <div id="hxQKoDetail" ${q && q.knockout ? "" : "hidden"}></div>
+            <p class="hx-af-ko-help">
+              Flagged applications still land in <b>Applied</b> with a red marker — Hirex never
+              rejects anyone on its own.
+            </p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wireQuestionForm() {
+    const typeSel = $("hxQType");
+    typeSel.addEventListener("change", () => {
+      $("hxQOptsWrap").hidden = !CHOICE_TYPES.includes(typeSel.value);
+      renderKoDetail();
+    });
+    $("hxQOpts").addEventListener("input", renderKoDetail);
+    $("hxQKoOn").addEventListener("change", () => {
+      $("hxQKoDetail").hidden = !$("hxQKoOn").checked;
+      renderKoDetail();
+    });
+    renderKoDetail();
+  }
+
+  /** The knockout control depends on the question format — a Yes/No needs a
+   *  Yes-or-No expectation, a number needs a minimum, and free text can't be
+   *  matched reliably, so it gets no rule at all. */
+  function renderKoDetail() {
+    const box = $("hxQKoDetail"), on = $("hxQKoOn");
+    if (!box) return;
+    const type = $("hxQType").value;
+    const existing = qEditing != null ? (draft.questions[qEditing] || {}).knockout : null;
+
+    if (!CHOICE_TYPES.includes(type) && type !== "yes_no" && type !== "number") {
+      on.checked = false;
+      on.disabled = true;
+      box.hidden = true;
+      box.innerHTML = "";
+      box.closest(".hx-af-ko-box").querySelector(".hx-af-ko-toggle span").textContent =
+        "Free-text answers can't be matched automatically";
+      return;
+    }
+    on.disabled = false;
+    box.closest(".hx-af-ko-box").querySelector(".hx-af-ko-toggle span").textContent =
+      "Flag applicants who don't answer this the way you need";
+    if (!on.checked) { box.hidden = true; return; }
+    box.hidden = false;
+
+    if (type === "number") {
+      box.innerHTML = `
+        <div class="hx-af-ko-rule">
+          <span>Flag unless the answer is at least</span>
+          <input type="number" id="hxQKoVal" step="any"
+                 value="${esc(existing && existing.op === "min" ? existing.value : "")}" />
+        </div>`;
+      return;
+    }
+
+    const options = type === "yes_no"
+      ? ["Yes", "No"]
+      : ($("hxQOpts").value || "").split("\n").map((s) => s.trim()).filter(Boolean);
+
+    if (!options.length) {
+      box.innerHTML = `<p class="hx-af-ko-warn">Add the options above first.</p>`;
+      return;
+    }
+    const multi = type === "multi_select";
+    const current = existing ? existing.value : null;
+    const currentList = Array.isArray(current) ? current : (current != null ? [current] : []);
+    box.innerHTML = `
+      <div class="hx-af-ko-rule">
+        <span>${multi ? "Flag unless they select at least one of" : "Flag unless the answer is"}</span>
+        ${multi
+          ? `<div class="hx-af-ko-multi" id="hxQKoMulti">${options.map((o) => `
+              <label><input type="checkbox" value="${esc(o)}"${currentList.includes(o) ? " checked" : ""} /> ${esc(o)}</label>`).join("")}</div>`
+          : `<select id="hxQKoVal">${options.map((o) =>
+              `<option value="${esc(o)}"${currentList[0] === o ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`}
+      </div>`;
+  }
+
+  function saveQuestion() {
+    clearErr(els.qBody);
+    const label = $("hxQLabel").value.trim();
+    const type = $("hxQType").value;
+    if (!label) return showErr(els.qBody, "label", "Write the question first.");
+
+    const q = {
+      id: (qEditing != null && draft.questions[qEditing] && draft.questions[qEditing].id) || null,
+      type,
+      label,
+      help: $("hxQHelp").value.trim() || null,
+      required: $("hxQReq").value === "1",
+    };
+
+    if (CHOICE_TYPES.includes(type)) {
+      q.options = ($("hxQOpts").value || "").split("\n").map((s) => s.trim()).filter(Boolean);
+      if (q.options.length < 2) return showErr(els.qBody, "options", "Give it at least two options.");
+    }
+
+    const koOn = $("hxQKoOn");
+    if (koOn && koOn.checked && !koOn.disabled) {
+      if (type === "number") {
+        const v = ($("hxQKoVal") || {}).value;
+        if (v !== "" && v != null) q.knockout = { op: "min", value: Number(v) };
+      } else if (type === "multi_select") {
+        const picked = Array.from(document.querySelectorAll("#hxQKoMulti input:checked")).map((i) => i.value);
+        if (picked.length) q.knockout = { op: "includes", value: picked };
+      } else {
+        const v = ($("hxQKoVal") || {}).value;
+        if (v) q.knockout = { op: "equals", value: v };
+      }
+    }
+
+    if (qEditing == null) draft.questions.push(q);
+    else draft.questions[qEditing] = q;
+
+    closeQuestionEditor();
+    markDirty();
+  }
+
+  function deepCopy(v) { return JSON.parse(JSON.stringify(v)); }
+
   function openDrawer(scrim, drawer, afterOpen) {
     scrim.hidden = false;
     drawer.setAttribute("aria-hidden", "false");
