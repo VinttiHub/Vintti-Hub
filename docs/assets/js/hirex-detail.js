@@ -256,9 +256,25 @@
           ${c.has_cv ? `<span class="hx-cv-flag" title="CV on file"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           ${(a.knockout_flags || []).length ? `<span class="hx-ko-flag" title="Doesn't meet: ${esc((a.knockout_flags || []).join(" · "))}"><i class="fa-solid fa-flag"></i></span>` : ""}
           ${a.ai_score != null ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">AI ${a.ai_score}</span>` : ""}
+          ${consensusChip(a.scorecards)}
           ${starsHtml(a.rating)}
         </div>
       </div>`;
+  }
+
+  /** What the interviewers concluded, as a chip on the board card.
+   *  Shows the consensus rather than a number: "Yes" is what a human said,
+   *  3.0 is an implementation detail. The reviewer count comes along so a
+   *  single opinion doesn't read like a verdict. */
+  function consensusChip(sc) {
+    // A scorecard saved without a recommendation has no verdict yet — show
+    // nothing rather than an empty chip.
+    if (!sc || !sc.count || !sc.consensus) return "";
+    const label = REC_LABEL[sc.consensus] || cap(sc.consensus);
+    const title = `${sc.count} evaluation${sc.count > 1 ? "s" : ""} · consensus ${label}`;
+    return `<span class="hx-sc-chip hx-sc-${esc(sc.consensus)}" title="${esc(title)}">
+              ${esc(label)}${sc.count > 1 ? ` <b>${sc.count}</b>` : ""}
+            </span>`;
   }
 
   function wireBoard() {
@@ -974,6 +990,14 @@
   const Q_TYPE_LABEL = Object.fromEntries(Q_TYPES.map((t) => [t.key, t.label]));
   const CHOICE_TYPES = ["dropdown", "single_select", "multi_select"];
 
+  // Each button copies the public link with ?src= already appended, so the
+  // recruiter never has to hand-edit a URL. The value lands on the application.
+  const SOURCE_TAGS = [
+    { key: "linkedin", label: "LinkedIn", icon: "fa-briefcase" },
+    { key: "referral", label: "a referral", icon: "fa-user-group" },
+    { key: "job_board", label: "a job board", icon: "fa-list" },
+  ];
+
   let draft = null;         // { form: {key:mode}, questions: [...] }
   let draftDirty = false;
   let qEditing = null;      // question being edited in the drawer (null = new)
@@ -1034,7 +1058,7 @@
           </div>
           ${job.status === "draft" ? `<p class="hx-af-note">
             <i class="fa-solid fa-circle-info"></i>
-            This job is a draft. Publishing also moves it to Open, so the link works right away.
+            <span>This job is a draft. Publishing also moves it to Open, so the link works right away.</span>
           </p>` : ""}
         </div>`;
     }
@@ -1058,9 +1082,17 @@
         </div>
         <p class="hx-af-note">
           <i class="fa-brands fa-linkedin"></i>
-          Paste this into your LinkedIn post under <b>Apply on company website</b>. Add
-          <code>&amp;src=linkedin</code> to the end to track where applicants came from.
+          <span>In your LinkedIn post, choose <b>Apply on company website</b> and paste the link there.</span>
         </p>
+        <div class="hx-af-sources">
+          <span class="hx-af-sources-label">Tag the link so you know where each applicant came from</span>
+          <div class="hx-af-source-btns">
+            ${SOURCE_TAGS.map((s) => `
+              <button type="button" class="hx-af-source" data-src="${s.key}">
+                <i class="fa-solid ${s.icon}"></i> Copy for ${s.label}
+              </button>`).join("")}
+          </div>
+        </div>
       </div>`;
   }
 
@@ -1150,7 +1182,10 @@
     const pub = $("hxPubBtn"), unpub = $("hxUnpubBtn"), copy = $("hxCopyBtn");
     if (pub) pub.addEventListener("click", () => setPublished(true));
     if (unpub) unpub.addEventListener("click", () => setPublished(false));
-    if (copy) copy.addEventListener("click", copyPublicUrl);
+    if (copy) copy.addEventListener("click", () => copyPublicUrl());
+    els.apply.querySelectorAll(".hx-af-source").forEach((btn) => {
+      btn.addEventListener("click", () => copyPublicUrl(btn.dataset.src, btn));
+    });
 
     els.apply.querySelectorAll(".hx-af-seg:not(.is-locked)").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1188,16 +1223,28 @@
     markDirty();
   }
 
-  async function copyPublicUrl() {
+  /** Copy the public link, optionally tagged with a source. */
+  async function copyPublicUrl(src, btn) {
     const input = $("hxPubUrl");
     if (!input) return;
+    const url = src ? `${input.value}&src=${encodeURIComponent(src)}` : input.value;
     try {
-      await navigator.clipboard.writeText(input.value);
+      await navigator.clipboard.writeText(url);
     } catch {
+      // Clipboard API needs a secure context; fall back to selecting the field.
+      input.value = url;
       input.select();
       document.execCommand("copy");
+      input.value = url.split("&src=")[0];
     }
-    toast("ok", "Link copied");
+    if (btn) {
+      const original = btn.innerHTML;
+      btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied`;
+      btn.classList.add("is-copied");
+      setTimeout(() => { btn.innerHTML = original; btn.classList.remove("is-copied"); }, 1600);
+    }
+    const label = (SOURCE_TAGS.find((s) => s.key === src) || {}).label;
+    toast("ok", label ? `Link copied, tagged for ${label}` : "Link copied");
   }
 
   async function setPublished(on) {

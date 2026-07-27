@@ -17,6 +17,20 @@ RECOMMENDATIONS = ["strong_no", "no", "yes", "strong_yes"]
 REC_VALUE = {"strong_no": 1, "no": 2, "yes": 3, "strong_yes": 4}
 
 
+def consensus_from_avg(avg):
+    """Average recommendation (1-4) -> the label shown to humans.
+
+    Single source of truth: used by the scorecard summary and by the pipeline
+    board chip, so a candidate can't read "Yes" in one place and "No" in another.
+    """
+    if avg is None:
+        return None
+    avg = float(avg)
+    return ("strong_no" if avg < 1.75 else
+            "no" if avg < 2.5 else
+            "yes" if avg < 3.25 else "strong_yes")
+
+
 def _actor_email():
     data = request.get_json(silent=True) or {}
     return (data.get("actor_email")
@@ -70,11 +84,7 @@ def _summary(cards):
             acc[1] += 1
 
     avg_rec = round(sum(rec_vals) / len(rec_vals), 2) if rec_vals else None
-    consensus = None
-    if avg_rec is not None:
-        consensus = ("strong_no" if avg_rec < 1.75 else
-                     "no" if avg_rec < 2.5 else
-                     "yes" if avg_rec < 3.25 else "strong_yes")
+    consensus = consensus_from_avg(avg_rec)
 
     competencies = [
         {"competency": comp, "avg": round(acc[0] / acc[1], 2), "count": acc[1]}

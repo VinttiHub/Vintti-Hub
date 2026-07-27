@@ -636,7 +636,7 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   background: var(--hx-surface);
   border: 1px solid var(--hx-line);
   border-radius: var(--hx-r);
-  padding: 11px 12px;
+  padding: 12px 13px 13px;
   box-shadow: var(--hx-shadow);
   cursor: grab;
   transition: box-shadow .15s, border-color .15s, transform .05s;
@@ -655,25 +655,53 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-card-name { font-size: 13.5px; font-weight: 600; color: var(--hx-ink); line-height: 1.2; }
 .hx-card-headline { font-size: 12px; color: var(--hx-muted); margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hx-card-foot { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+/* Up to five signals share this row (source, CV, AI, consensus, rating). They
+   wrap onto a second line instead of squeezing — a chip compressed until its
+   own label breaks in half ("AI / 15") is worse than a taller card. */
+.hx-card-foot {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 6px; margin-top: 10px;
+}
+.hx-card-foot > * { flex: none; }
 .hx-src-chip {
   font-family: var(--hx-mono); font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase;
   padding: 2px 7px; border-radius: 999px; background: var(--hx-surface-2);
   border: 1px solid var(--hx-line); color: var(--hx-muted);
+  white-space: nowrap;
 }
 .hx-stars { display: inline-flex; gap: 2px; }
 .hx-stars i { font-size: 11px; color: #dcdfe4; }
 .hx-stars i.on { color: #ffb020; }
-.hx-card .hx-stars { margin-left: auto; }
+/* No auto margin: with a wrapping row it would fling the rating alone to the far
+   right of whatever line it lands on. The signals read as one left-aligned run. */
+.hx-card .hx-stars { margin-left: 0; }
 .hx-cv-flag { color: var(--hx-faint); font-size: 11px; }
 .hx-ai-chip {
   font-family: var(--hx-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
-  padding: 2px 7px; border-radius: 999px;
+  padding: 2px 7px; border-radius: 999px; white-space: nowrap;
   color: var(--c, var(--hx-accent));
   background: color-mix(in srgb, var(--c, var(--hx-accent)) 12%, #fff);
   border: 1px solid color-mix(in srgb, var(--c, var(--hx-accent)) 30%, #fff);
 }
-.hx-card-foot .hx-ai-chip + .hx-stars { margin-left: 0; }
+
+/* Scorecard consensus. Deliberately reads as a word, not a number: the AI chip
+   next to it is already numeric, and these two must not be confused. */
+/* Sentence case, not uppercase: "Strong No" is a third narrower than
+   "STRONG NO" and reads as a judgement rather than a shout. */
+.hx-sc-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 650; letter-spacing: -.005em;
+  padding: 2.5px 8px; border-radius: 999px;
+  white-space: nowrap;
+}
+.hx-sc-chip b {
+  font-size: 9.5px; font-weight: 700; opacity: .6;
+  padding-left: 5px; border-left: 1px solid currentColor;
+}
+.hx-sc-strong_yes { background: var(--hx-lime);  color: var(--hx-lime-ink);  border: 1px solid color-mix(in srgb, var(--hx-lime-ink) 22%, var(--hx-lime)); }
+.hx-sc-yes        { background: #eaf9ef;         color: #0a7c3e;             border: 1px solid #c8ecd6; }
+.hx-sc-no         { background: var(--hx-amber); color: var(--hx-amber-ink); border: 1px solid color-mix(in srgb, var(--hx-amber-ink) 20%, var(--hx-amber)); }
+.hx-sc-strong_no  { background: #fdeef2;         color: #9c1836;             border: 1px solid #f6cdd8; }
 
 /* ---------- Activity ---------- */
 .hx-activity { padding: 20px 28px 32px; max-width: 720px; }
@@ -1038,6 +1066,9 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   font-size: 12.5px;
   color: var(--hx-ink-2);
 }
+/* The text lives in its own <span>: in a flex container every bare text run and
+   inline tag becomes a separate anonymous flex item, which shreds the sentence
+   into pieces that wrap independently. */
 .hx-af-note {
   display: flex; align-items: flex-start; gap: 8px;
   margin: 13px 0 0;
@@ -1045,7 +1076,35 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   line-height: 1.5;
   color: var(--hx-muted);
 }
-.hx-af-note i { margin-top: 2px; color: var(--hx-accent); }
+.hx-af-note i { margin-top: 2px; flex: none; color: var(--hx-accent); }
+.hx-af-note span { flex: 1; min-width: 0; }
+
+/* --- Tagged copy buttons --- */
+.hx-af-sources {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--hx-line-2);
+}
+.hx-af-sources-label { display: block; font-size: 12.5px; color: var(--hx-muted); }
+.hx-af-source-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.hx-af-source {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  background: var(--hx-surface);
+  font: inherit; font-size: 12.5px; font-weight: 550;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  transition: border-color .14s, background .14s, color .14s;
+}
+.hx-af-source i { font-size: 11px; color: var(--hx-faint); }
+.hx-af-source:hover { border-color: var(--hx-accent); color: var(--hx-accent); }
+.hx-af-source:hover i { color: var(--hx-accent); }
+.hx-af-source.is-copied {
+  border-color: var(--hx-lime); background: var(--hx-lime); color: var(--hx-lime-ink);
+}
+.hx-af-source.is-copied i { color: var(--hx-lime-ink); }
 .hx-af-note code {
   padding: 1px 5px;
   border-radius: 4px;

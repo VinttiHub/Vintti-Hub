@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, Json
 
 from db import get_connection
+from routes.hirex_scorecards_routes import consensus_from_avg
 
 bp = Blueprint("hirex_pipeline", __name__, url_prefix="/hirex")
 
@@ -61,6 +62,11 @@ def _nest(row, with_analysis=False):
         "ai_analyzed_at": row.get("ai_analyzed_at"),
         "source": row.get("app_source"),
         "knockout_flags": row.get("knockout_flags") or [],
+        "scorecards": {
+            "count": int(row.get("sc_count") or 0),
+            "avg": round(float(row["sc_avg"]), 2) if row.get("sc_avg") is not None else None,
+            "consensus": consensus_from_avg(row.get("sc_avg")),
+        },
         "candidate": {
             "candidate_id": row["candidate_id"],
             "first_name": row["first_name"],
@@ -97,9 +103,20 @@ APP_JOIN_SELECT = f"""
            c.email, c.phone, c.headline, c.location, c.country, c.area,
            c.english_level, c.current_company, c.desired_salary,
            c.linkedin_url, c.source AS cand_source, c.notes,
-           c.cv_file_name, c.cv_s3_key
+           c.cv_file_name, c.cv_s3_key,
+           sc.n AS sc_count, sc.avg_rec AS sc_avg
     FROM hirex_applications a
     JOIN hirex_candidates c ON c.candidate_id = a.candidate_id
+    -- Human evaluation, rolled up so the board can show the consensus without
+    -- a second round-trip per card.
+    LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS n,
+               AVG(CASE s.recommendation
+                     WHEN 'strong_no'  THEN 1 WHEN 'no'  THEN 2
+                     WHEN 'yes'        THEN 3 WHEN 'strong_yes' THEN 4 END) AS avg_rec
+        FROM hirex_scorecards s
+        WHERE s.application_id = a.application_id
+    ) sc ON TRUE
 """
 
 
