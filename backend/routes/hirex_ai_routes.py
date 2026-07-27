@@ -7,7 +7,7 @@
 
 Reuses existing helpers: ai_routes._extract_pdf_text_with_openai (CV parsing,
 local-first then OpenAI fallback) and ai_routes.call_openai_with_retry (LLM).
-Depends on 20260724_add_hirex_cv_ai.sql (auto-applied on startup).
+Depends on backend/sql/20260724_add_hirex_cv_ai.sql being applied to RDS.
 """
 import json
 import logging

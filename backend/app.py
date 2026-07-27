@@ -109,14 +109,6 @@ def create_app() -> Flask:
     app.register_blueprint(hirex_ai_bp)
     app.register_blueprint(hirex_scorecards_bp)
 
-    # Auto-create Hirex tables on startup so it runs locally & in prod with no
-    # manual migration step. Guarded so a transient DB issue won't block boot.
-    try:
-        from utils.hirex_schema import ensure_hirex_tables
-        ensure_hirex_tables()
-    except Exception:
-        logging.exception("Hirex schema bootstrap skipped")
-
     @app.after_request
     def apply_cors_headers(response):
         origin = request.headers.get('Origin')

@@ -4,7 +4,7 @@ One scorecard per (application, reviewer); per-competency ratings (1-4) in JSONB
 The human counterpart to the AI analysis: interviewers score competencies and give
 an overall recommendation; the backend computes a consensus across all reviewers.
 
-Depends on 20260724_add_hirex_scorecards.sql (auto-applied on startup).
+Depends on backend/sql/20260724_add_hirex_scorecards.sql being applied to RDS.
 """
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, Json
