@@ -757,6 +757,42 @@ const LANGUAGE_LEVEL_MAP = {
   Native: 4,
 };
 
+/* Levels reach this page from the AI, from imports and from old records, and
+   they don't always use our three words. An unrecognised label used to render
+   verbatim next to three empty dots — "Expert ○○○" — which is what the client
+   sees. Map anything unknown onto the closest label we can actually draw. */
+const TOOL_LEVEL_ALIASES = [
+  [/^(adv|expert|expert?o|master|senior|pro|proficient|native|fluent|high|4|5)/i, "Advanced"],
+  [/^(inter|medium|mid|regular|moderate|working|3)/i, "Intermediate"],
+  [/^(basic|begin|junior|element|low|limited|1|2)/i, "Basic"],
+];
+
+const LANGUAGE_LEVEL_ALIASES = [
+  [/^(native|bilingual|mother)/i, "Native"],
+  [/^(fluent|advanced|full|profession|c1|c2)/i, "Fluent"],
+  [/^(regular|inter|working|conversational|b1|b2)/i, "Regular"],
+  [/^(basic|begin|element|limited|a1|a2)/i, "Basic"],
+];
+
+function normalizeLevel(level, mapping, aliases) {
+  const raw = String(level || "").trim();
+  if (!raw) return "";
+  // Match our own labels first, case-insensitively.
+  const known = Object.keys(mapping).find((k) => k.toLowerCase() === raw.toLowerCase());
+  if (known) return known;
+  const alias = aliases.find(([re]) => re.test(raw));
+  return alias ? alias[1] : "";
+}
+
+function createLevelCell(level, mapping, aliases, maxDots) {
+  const label = normalizeLevel(level, mapping, aliases);
+  return `
+      <div class="skill-level">${label}</div>
+      <div class="skill-dots">
+        ${createDots(label, mapping, maxDots)}
+      </div>`;
+}
+
 
 // 🛠️ Tools
 const toolsList = document.getElementById("toolsList");
@@ -780,10 +816,7 @@ if (tools.length === 0) {
 
     row.innerHTML = `
       <div class="skill-name">${name}</div>
-      <div class="skill-level">${level}</div>
-      <div class="skill-dots">
-        ${createDots(level, TOOL_LEVEL_MAP, 3)}
-      </div>
+      ${createLevelCell(level, TOOL_LEVEL_MAP, TOOL_LEVEL_ALIASES, 3)}
     `;
 
     toolsList.appendChild(row);
@@ -812,10 +845,7 @@ if (languages.length === 0) {
 
     row.innerHTML = `
       <div class="skill-name">${name}</div>
-      <div class="skill-level">${level}</div>
-      <div class="skill-dots">
-        ${createDots(level, LANGUAGE_LEVEL_MAP, 4)}
-      </div>
+      ${createLevelCell(level, LANGUAGE_LEVEL_MAP, LANGUAGE_LEVEL_ALIASES, 4)}
     `;
 
     languagesList.appendChild(row);

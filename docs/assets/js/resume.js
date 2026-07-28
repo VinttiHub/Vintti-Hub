@@ -639,12 +639,16 @@ if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
   function addToolEntry(entry={ tool:'', level:'Basic' }){
     const row = document.createElement('div');
     row.className='cv-card-entry';
+    // The AI and old imports write levels we don't offer ("Expert", "Senior"…).
+    // Without this the <select> matches no option, the browser falls back to
+    // showing the first one — "Basic" — and saving silently downgrades the tool.
+    const level = mapToolLevel(entry.level || 'Basic');
     row.innerHTML = `
       <input type="text" class="tool-name" placeholder="Tool Name" value="${entry.tool||''}">
       <select class="tool-level">
-        <option value="Basic" ${entry.level==='Basic'?'selected':''}>Basic</option>
-        <option value="Intermediate" ${entry.level==='Intermediate'?'selected':''}>Intermediate</option>
-        <option value="Advanced" ${entry.level==='Advanced'?'selected':''}>Advanced</option>
+        <option value="Basic" ${level==='Basic'?'selected':''}>Basic</option>
+        <option value="Intermediate" ${level==='Intermediate'?'selected':''}>Intermediate</option>
+        <option value="Advanced" ${level==='Advanced'?'selected':''}>Advanced</option>
       </select>
       <button class="remove-entry" title="Remove">🗑️</button>
     `;
@@ -1034,6 +1038,37 @@ const end    = normalizeISO15(endRaw);
   }
 
   // ---------- DIFF & SAVE ----------
+/* Autosave feedback. Until now a failed save was only a console.error, so
+   people kept typing into a page that had silently stopped saving. Builds its
+   own element so it works regardless of the page markup. */
+let _saveStateTimer = null;
+function setSaveState(state){
+  let el = document.getElementById('cvSaveState');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'cvSaveState';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
+  }
+  clearTimeout(_saveStateTimer);
+  el.className = `cv-save-state is-${state}`;
+
+  if (state === 'saving'){
+    el.textContent = 'Saving…';
+  } else if (state === 'saved'){
+    el.textContent = 'Saved';
+    _saveStateTimer = setTimeout(() => { el.className = 'cv-save-state'; }, 2000);
+  } else {
+    el.innerHTML = `<span>Couldn't save your changes.</span>
+                    <button type="button" id="cvSaveRetry">Retry</button>`;
+    const retry = el.querySelector('#cvSaveRetry');
+    // The snapshot was left untouched on failure, so the pending changes are
+    // still in the diff — a plain re-save picks them up.
+    if (retry) retry.addEventListener('click', () => saveNow());
+  }
+}
+
 async function saveNow(options = {}){
   const { skipValidation = false, onlyFields = null } = options || {};
   if (!hydrated) return;
@@ -1123,15 +1158,29 @@ async function saveNow(options = {}){
 
   try {
     saving = true;
+    setSaveState('saving');
 
     let triedCreate = false;
+    let retriedNetwork = false;
     let lastRes = null;
     while (true) {
-      lastRes = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(patch)
-      });
+      try {
+        lastRes = await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify(patch)
+        });
+      } catch (netErr) {
+        // Safari drops a kept-alive connection the server already closed —
+        // common right after a long request. The request never left the
+        // machine, so retrying once costs nothing and fixes most of these.
+        if (!retriedNetwork) {
+          retriedNetwork = true;
+          await new Promise(r => setTimeout(r, 800));
+          continue;
+        }
+        throw netErr;
+      }
       if (lastRes.ok) break;
       if (lastRes.status === 404 && !triedCreate) {
         triedCreate = true;
@@ -1150,6 +1199,14 @@ async function saveNow(options = {}){
       }
     }
 
+    // Only mark these fields as saved when the server actually accepted them.
+    // Updating the snapshot after a failed PATCH made the next diff come back
+    // empty, so the change was never resent — silent, permanent data loss.
+    if (!lastRes?.ok) {
+      setSaveState('error');
+      return;
+    }
+
     // merge al snapshot: parsea arrays que enviamos como strings
     const merged = { ...snapshot };
     for (const [k, v] of Object.entries(patch)){
@@ -1160,13 +1217,15 @@ async function saveNow(options = {}){
       }
     }
     snapshot = merged;
+    setSaveState('saved');
 
-    if (lastRes?.ok && trackEvents.length) {
+    if (trackEvents.length) {
       await Promise.all(trackEvents.map((eventId) => logCandidateTrack(eventId)));
     }
 
   } catch(e){
     console.error('❌ PATCH /resumes failed', e);
+    setSaveState('error');
   } finally{
     saving = false;
     if (savePending){ savePending=false; saveNow(); }

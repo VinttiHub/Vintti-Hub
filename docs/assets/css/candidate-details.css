@@ -5421,3 +5421,53 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
     align-items: flex-start;
   }
 }
+
+/* =====================================================================
+   Autosave feedback (resume.js)
+   A failed save used to be a console.error only — people kept typing into
+   a page that had quietly stopped saving. Built by JS, styled here.
+   ===================================================================== */
+.cv-save-state {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-family: "Onest", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px -6px rgba(16, 17, 22, .28);
+}
+.cv-save-state.is-saving,
+.cv-save-state.is-saved,
+.cv-save-state.is-error { display: inline-flex; }
+
+.cv-save-state.is-saving { background: #eef1ff; color: #0028ff; border: 1px solid #d4dbff; }
+.cv-save-state.is-saved  { background: #eaf9ef; color: #0a7c3e; border: 1px solid #c8ecd6; }
+
+/* Errors don't fade away on their own: losing work must be impossible to miss. */
+.cv-save-state.is-error {
+  background: #fdeef2;
+  color: #9c1836;
+  border: 1px solid #f6cdd8;
+  font-weight: 600;
+}
+.cv-save-state.is-error button {
+  border: 1px solid #9c1836;
+  background: #9c1836;
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cv-save-state.is-error button:hover { background: #7d1029; }
+
+@media (max-width: 620px) {
+  .cv-save-state { right: 12px; bottom: 12px; left: 12px; justify-content: center; }
+}
