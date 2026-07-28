@@ -963,6 +963,9 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-sc-recs button.on[data-rec="yes"] { background: #12924e; }
 .hx-sc-recs button.on[data-rec="strong_yes"] { background: #0a7c3e; }
 
+/* LinkedIn sourcing modal */
+.hx-modal-mark-li { background: #eaf3fe; color: #0a66c2; }
+
 /* =====================================================================
    Opportunity picker — "New job from an opportunity"
    ===================================================================== */

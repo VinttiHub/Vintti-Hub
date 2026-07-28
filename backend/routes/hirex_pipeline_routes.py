@@ -87,6 +87,8 @@ def _nest(row, with_analysis=False):
             "notes": row["notes"],
             "cv_file_name": row.get("cv_file_name"),
             "has_cv": bool(row.get("cv_s3_key")),
+            "has_text": bool(row.get("has_text")),
+            "sourced_at": row.get("sourced_at"),
         },
     }
     if with_analysis:
@@ -103,7 +105,10 @@ APP_JOIN_SELECT = f"""
            c.email, c.phone, c.headline, c.location, c.country, c.area,
            c.english_level, c.current_company, c.desired_salary,
            c.linkedin_url, c.source AS cand_source, c.notes,
-           c.cv_file_name, c.cv_s3_key,
+           c.cv_file_name, c.cv_s3_key, c.sourced_at,
+           -- Sourced candidates have no file but do have profile text, which is
+           -- all the AI rubric needs.
+           (c.cv_text IS NOT NULL AND c.cv_text <> '') AS has_text,
            sc.n AS sc_count, sc.avg_rec AS sc_avg
     FROM hirex_applications a
     JOIN hirex_candidates c ON c.candidate_id = a.candidate_id

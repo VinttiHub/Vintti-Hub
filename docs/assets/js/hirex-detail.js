@@ -70,6 +70,8 @@
       scSave: $("hxScSave"), scDelete: $("hxScDelete"),
       candNotes: $("hxCandNotes"), candRemove: $("hxCandRemove"), candSave: $("hxCandSave"),
       apply: $("hxApply"),
+      sourceBtn: $("hxSourceBtn"), srcScrim: $("hxSrcScrim"), srcUrl: $("hxSrcUrl"),
+      srcStage: $("hxSrcStage"), srcCancel: $("hxSrcCancel"), srcGo: $("hxSrcGo"),
       qScrim: $("hxQScrim"), qDrawer: $("hxQDrawer"), qTitle: $("hxQTitle"), qBody: $("hxQBody"),
       qClose: $("hxQClose"), qCancel: $("hxQCancel"), qSave: $("hxQSave"),
       toasts: $("hxToasts"),
@@ -109,6 +111,14 @@
     els.scSave.addEventListener("click", saveScorecard);
     els.scDelete.addEventListener("click", deleteMyScorecard);
 
+    // Source from LinkedIn
+    els.srcStage.innerHTML = STAGES.map((s) => `<option value="${s.key}">${s.label}</option>`).join("");
+    els.sourceBtn.addEventListener("click", openSourceModal);
+    els.srcCancel.addEventListener("click", closeSourceModal);
+    els.srcScrim.addEventListener("click", (e) => { if (e.target === els.srcScrim) closeSourceModal(); });
+    els.srcGo.addEventListener("click", sourceFromLinkedIn);
+    els.srcUrl.addEventListener("keydown", (e) => { if (e.key === "Enter") sourceFromLinkedIn(); });
+
     // Screening-question editor
     els.qClose.addEventListener("click", closeQuestionEditor);
     els.qCancel.addEventListener("click", closeQuestionEditor);
@@ -118,6 +128,7 @@
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       // Close the top-most open layer first.
+      if (!els.srcScrim.hidden) return closeSourceModal();
       if (els.qDrawer.getAttribute("aria-hidden") === "false") return closeQuestionEditor();
       if (els.scDrawer.getAttribute("aria-hidden") === "false") return closeScorecardEditor();
       closeAddDrawer(); closeCandDrawer();
@@ -493,6 +504,50 @@
     }
   }
 
+  /* =======================================================================
+     Source from LinkedIn
+     The URL only yields the public slug; the profile itself comes from
+     Coresignal, which also gives us the text the AI rubric can score.
+     ======================================================================= */
+  function openSourceModal() {
+    els.srcScrim.hidden = false;
+    els.srcUrl.value = "";
+    els.srcStage.value = "applied";
+    clearErr(els.srcScrim);
+    setTimeout(() => els.srcUrl.focus(), 30);
+  }
+  function closeSourceModal() { els.srcScrim.hidden = true; }
+
+  async function sourceFromLinkedIn() {
+    const url = els.srcUrl.value.trim();
+    clearErr(els.srcScrim);
+    if (!/linkedin\.com\/(in|pub)\//i.test(url)) {
+      showErr(els.srcScrim, "url", "Paste a profile link, like linkedin.com/in/janedoe");
+      return;
+    }
+
+    els.srcGo.disabled = true;
+    els.srcGo.textContent = "Looking them up…";
+    try {
+      const res = await apiWrite(`/hirex/jobs/${jobId}/candidates/from-linkedin`, "POST",
+                                 { linkedin_url: url, stage: els.srcStage.value });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Couldn't add that profile");
+      closeSourceModal();
+      activityLoaded = false;
+      await loadPipeline();
+      toast("ok", body.has_profile_text
+        ? `${body.full_name} added — profile ready to score`
+        : `${body.full_name} added`);
+      if (body.application_id) openCandDrawer(body.application_id);
+    } catch (err) {
+      showErr(els.srcScrim, "url", err.message || "Couldn't add that profile");
+    } finally {
+      els.srcGo.disabled = false;
+      els.srcGo.textContent = "Add to pipeline";
+    }
+  }
+
   // --- Candidate drawer ----------------------------------------------------
   function openCandDrawer(appId) {
     const a = apps.find((x) => x.application_id === appId);
@@ -593,7 +648,12 @@
       $("hxCvView").addEventListener("click", () => viewCv(c.candidate_id));
       $("hxCvReplace").addEventListener("click", () => triggerCvUpload(c.candidate_id));
     } else {
-      els.candCv.innerHTML = `
+      els.candCv.innerHTML = c.has_text ? `
+        <div class="hx-cv-empty">
+          <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-brands fa-linkedin"></i></span>
+          <p>Sourced from LinkedIn. Their profile stands in for a CV, so AI screening works — upload one if you get it.</p>
+          <button class="hx-btn hx-btn-soft" id="hxCvUpload" type="button"><i class="fa-solid fa-upload"></i> Upload CV</button>
+        </div>` : `
         <div class="hx-cv-empty">
           <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-solid fa-file-arrow-up"></i></span>
           <p>No CV yet. Upload a PDF to enable AI screening.</p>
@@ -639,13 +699,18 @@
   function renderAi(detail) {
     const a = detail.ai_analysis;
     if (!a) {
-      const canAnalyze = detail.candidate && detail.candidate.has_cv;
+      // A sourced candidate has no CV file but does have their LinkedIn profile
+      // as text, which is what the rubric actually reads.
+      const c = detail.candidate || {};
+      const canAnalyze = !!(c.has_cv || c.has_text);
       els.candAi.innerHTML = `
         <div class="hx-ai-cta">
           <span class="hx-ai-spark"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
           <div class="hx-ai-cta-txt">
             <h4>AI screening</h4>
-            <p>${canAnalyze ? "Score this candidate against the job description." : "Upload a CV to enable AI screening."}</p>
+            <p>${canAnalyze
+                  ? `Score this candidate against the job description${!c.has_cv ? ", using their LinkedIn profile" : ""}.`
+                  : "Upload a CV to enable AI screening."}</p>
           </div>
           <button class="hx-btn hx-btn-primary" id="hxAnalyze" type="button" ${canAnalyze ? "" : "disabled"}>Analyze</button>
         </div>`;

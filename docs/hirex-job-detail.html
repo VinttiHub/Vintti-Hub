@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260727-8" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260728-1" />
 </head>
 
 <body class="light-mode">
@@ -40,6 +40,7 @@
 
         <div class="hx-detail-actions">
           <a class="hx-btn hx-btn-ghost" id="hxEditBtn" href="#"><i class="fa-solid fa-pen"></i> Edit</a>
+          <button class="hx-btn hx-btn-ghost" id="hxSourceBtn"><i class="fa-brands fa-linkedin"></i> From LinkedIn</button>
           <button class="hx-btn hx-btn-primary" id="hxAddCand"><i class="fa-solid fa-user-plus"></i> Add candidate</button>
         </div>
       </header>
@@ -214,12 +215,39 @@
         </footer>
       </aside>
 
+      <!-- ============ Source from LinkedIn ============ -->
+      <div class="hx-modal-scrim" id="hxSrcScrim" hidden>
+        <div class="hx-modal" role="dialog" aria-modal="true" aria-labelledby="hxSrcHeading">
+          <div class="hx-modal-mark hx-modal-mark-li"><i class="fa-brands fa-linkedin"></i></div>
+          <h3 id="hxSrcHeading">Add someone you found on LinkedIn</h3>
+          <p class="hx-modal-text">
+            Paste their profile URL. Hirex pulls the profile through Coresignal and
+            builds the candidate — including the text the AI rubric scores, so you
+            can rate them without a CV.
+          </p>
+          <label class="hx-field">
+            <span>LinkedIn profile URL</span>
+            <input id="hxSrcUrl" type="text" autocomplete="off"
+                   placeholder="https://www.linkedin.com/in/janedoe" />
+            <em class="hx-err" data-err="url"></em>
+          </label>
+          <label class="hx-field">
+            <span>Start stage</span>
+            <select id="hxSrcStage"></select>
+          </label>
+          <div class="hx-modal-actions">
+            <button class="hx-btn hx-btn-ghost" id="hxSrcCancel" type="button">Cancel</button>
+            <button class="hx-btn hx-btn-primary" id="hxSrcGo" type="button">Add to pipeline</button>
+          </div>
+        </div>
+      </div>
+
       <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
     </div>
   </main>
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-detail.js?v=20260727-7" defer></script>
+  <script src="./assets/js/hirex-detail.js?v=20260728-1" defer></script>
 </body>
 </html>

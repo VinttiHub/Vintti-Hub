@@ -2037,6 +2037,20 @@ def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, re
                 response = openai.chat.completions.create(**kwargs)
                 return response
             except openai.RateLimitError as e:
+                # A 429 means two very different things. "rate_limit_exceeded" is
+                # temporary and worth waiting out; "insufficient_quota" means the
+                # billing limit is spent and no amount of waiting will fix it —
+                # retrying just makes the user stare at a spinner for 30s before
+                # getting a misleading "rate limit" message.
+                body = getattr(e, "body", None)
+                code = getattr(e, "code", None) or (
+                    body.get("code") if isinstance(body, dict) else None)
+                if code == "insufficient_quota":
+                    logging.error("❌ OpenAI budget exhausted — raise the limit or add credits.")
+                    raise RuntimeError(
+                        "OpenAI budget exhausted. Raise the monthly limit or add credits at "
+                        "platform.openai.com/settings/organization/limits, then try again."
+                    ) from e
                 logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
                 if hasattr(e, 'response') and e.response is not None:
                     logging.warning("🔎 Response headers: %s", e.response.headers)
