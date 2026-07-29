@@ -662,23 +662,36 @@ row.querySelectorAll('input,select').forEach(el=>{
     const name = row.querySelector('.tool-name'); if (name && !entry.tool) name.focus();
   }
 
+  const LANGUAGE_OPTIONS = ['English','Spanish','Portuguese','French','German'];
+  const LANGUAGE_LEVELS  = ['Basic','Regular','Fluent','Native'];
+
   function addLanguageEntry(entry={ language:'', level:'Basic' }){
     const row = document.createElement('div');
     row.className='cv-card-entry';
+
+    // Same trap as addToolEntry: the AI and old imports write languages and
+    // levels we don't offer ("Italian", "C1"). With no matching <option> the
+    // name falls back to the empty placeholder, the row fails validation, and
+    // getSectionValidity() then blocks the whole languages section from ever
+    // being saved — silently. Normalize the level, and keep an unknown language
+    // as its own option so it round-trips instead of disappearing.
+    const escAttr = (s) => String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const rawLang = (entry.language || '').toString().trim();
+    const lang    = LANGUAGE_OPTIONS.find(l => l.toLowerCase() === rawLang.toLowerCase()) || rawLang;
+    const level   = mapLangLevel(entry.level || 'Basic');
+    const extra   = (lang && !LANGUAGE_OPTIONS.includes(lang))
+      ? `<option value="${escAttr(lang)}" selected>${escAttr(lang)}</option>` : '';
+
     row.innerHTML = `
       <select class="language-name">
         <option value="">Select Language</option>
-        <option value="English" ${entry.language==='English'?'selected':''}>English</option>
-        <option value="Spanish" ${entry.language==='Spanish'?'selected':''}>Spanish</option>
-        <option value="Portuguese" ${entry.language==='Portuguese'?'selected':''}>Portuguese</option>
-        <option value="French" ${entry.language==='French'?'selected':''}>French</option>
-        <option value="German" ${entry.language==='German'?'selected':''}>German</option>
+        ${extra}
+        ${LANGUAGE_OPTIONS.map(l => `<option value="${l}" ${lang===l?'selected':''}>${l}</option>`).join('')}
       </select>
       <select class="language-level">
-        <option value="Basic" ${entry.level==='Basic'?'selected':''}>Basic</option>
-        <option value="Regular" ${entry.level==='Regular'?'selected':''}>Regular</option>
-        <option value="Fluent" ${entry.level==='Fluent'?'selected':''}>Fluent</option>
-        <option value="Native" ${entry.level==='Native'?'selected':''}>Native</option>
+        ${LANGUAGE_LEVELS.map(v => `<option value="${v}" ${level===v?'selected':''}>${v}</option>`).join('')}
       </select>
       <button class="remove-entry" title="Remove">🗑️</button>
     `;
@@ -1435,6 +1448,22 @@ qsa('#resume [contenteditable="true"]:not(#videoLinkInput)').forEach(el => {
       if (!r.ok){ const t=await r.text().catch(()=> ''); throw new Error(t||`Upload failed (${r.status})`); }
       const data = await r.json();
       render(data.items || []);
+
+      // Subir el PDF NO extraía el texto: eso sólo pasaba al recargar la
+      // página. Si la recruiter subía el CV y generaba en la misma sesión, la
+      // IA nunca veía el CV y armaba el resume sólo con la transcripción.
+      if (isPdf){
+        const pdf = (data.items || []).find(it => /\.pdf$/i.test(it.name||''));
+        if (pdf?.url){
+          try{
+            await fetch(`${API_BASE}/ai/extract_cv_from_pdf`, {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ candidate_id: candidateId, pdf_url: pdf.url, force: true })
+            });
+          }catch(err){ console.warn('CV extraction after upload failed', err); }
+        }
+      }
+
       cvIndicator.success(isPdf ? 'CV extracted' : 'Uploaded');
       setTimeout(()=>cvIndicator.hide(), 900);
     }catch(e){ console.error('Upload failed', e); alert('Upload failed'); cvIndicator.hide(); }
@@ -1512,9 +1541,14 @@ applyGenerated(result = {}) {
   const has = (k) => Object.prototype.hasOwnProperty.call(result, k);
 
   // About
-  if (has('about') && result.about != null) {
-    if (aboutEl) aboutEl.innerHTML = result.about;
-    touched.about = true;
+  // Un about vacío del modelo NO debe borrar el que escribió la recruiter:
+  // marcarlo touched con '' dispara allow_clear=true en saveNow() y lo pierde.
+  if (has('about')) {
+    const about = (result.about ?? '').toString().trim();
+    if (about) {
+      if (aboutEl) aboutEl.innerHTML = sanitizeHTML(about);
+      touched.about = true;
+    }
   }
 
   // Education
@@ -1550,9 +1584,11 @@ applyGenerated(result = {}) {
   }
 
   // Languages
+  // coerceLanguages() normaliza strings sueltos, "English (C1)" y objetos con
+  // claves alternativas. Una lista vacía no debe borrar las que ya había.
   if (has('languages')) {
-    const langs = safeParseArray(result.languages, null);
-    if (Array.isArray(langs)) {
+    const langs = coerceLanguages(result.languages);
+    if (langs.length) {
       if (langsList) langsList.innerHTML = '';
       langs.forEach(addLanguageEntry);
       touched.languages = true;

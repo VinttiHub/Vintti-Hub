@@ -32,11 +32,33 @@ from utils.applicant_matching import score_candidate_against_job
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-RESUME_LINKEDIN_SOURCE_LIMIT = 30000
-RESUME_CV_SOURCE_LIMIT = 50000
+RESUME_LINKEDIN_SOURCE_LIMIT = 60000
+RESUME_CV_SOURCE_LIMIT = 80000
 RESUME_NOTES_LIMIT = 8000
 RESUME_SOURCE_CHUNK_SIZE = 12000
 RESUME_SOURCE_MAX_CHUNKS = 8
+
+# Cuánta job description se inyecta en el prompt del CV, y topes de salida.
+RESUME_JD_LIMIT = 6000
+RESUME_ABOUT_LIMIT = 1500
+RESUME_MAX_TOOLS = 15
+RESUME_MAX_LANGUAGES = 6
+
+# El <select> de idiomas en docs/assets/js/resume.js sólo ofrece estos cinco.
+# Cualquier otro nombre no matchea ninguna opción, la fila no valida y la
+# sección languages nunca se guarda — así que filtramos acá.
+RESUME_LANGUAGE_ALIASES = {
+    "english": "English", "ingles": "English", "inglés": "English",
+    "spanish": "Spanish", "espanol": "Spanish", "español": "Spanish",
+    "castellano": "Spanish",
+    "portuguese": "Portuguese", "portugues": "Portuguese",
+    "português": "Portuguese", "brazilian portuguese": "Portuguese",
+    "portuguese (brazil)": "Portuguese", "portuguese (brazilian)": "Portuguese",
+    "french": "French", "frances": "French", "francés": "French",
+    "français": "French",
+    "german": "German", "aleman": "German", "alemán": "German",
+    "deutsch": "German",
+}
 
 _COUNTRY_ALIASES = {
     "Afghanistan": ["afghanistan"],
@@ -266,6 +288,46 @@ def _parse_filters_without_ai(message: str, current_filters: Optional[Dict[str, 
 
     return updated, "", True
 
+def _local_pdf_text_is_usable(local_text: str) -> bool:
+    """¿El texto que sacó PyPDF sirve, o hay que pedirle el PDF al modelo?
+
+    El umbral anterior era `len >= 300`, y ese era el problema: en un CV
+    diseñado (multi-columna, títulos con letra espaciada, cajas de texto)
+    PyPDF devuelve 800-3000 caracteres fragmentados y desordenados. Cruzaba
+    los 300, el fallback nunca corría, y el generador recibía basura que
+    después tenía que esquivar con lenguaje defensivo.
+    """
+    text = (local_text or "").strip()
+    if len(text) < 1200:
+        return False
+
+    words = re.findall(r"[A-Za-zÀ-ÿ]+", text)
+    if len(words) < 150:
+        return False
+
+    # Un CV real trae fechas o encabezados de sección reconocibles.
+    has_dates = len(re.findall(r"\b(?:19|20)\d{2}\b", text)) >= 2
+    has_sections = len(re.findall(
+        r"\b(experience|education|skills|work|university|degree|profile|summary|"
+        r"experiencia|educacion|educación|habilidades|formacion|formación)\b",
+        text, re.IGNORECASE)) >= 2
+    if not (has_dates or has_sections):
+        return False
+
+    alpha = sum(1 for ch in text if ch.isalpha())
+    if alpha / max(len(text), 1) < 0.6:
+        return False
+
+    # "E x p e r i e n c e": si demasiados tokens son de un solo carácter,
+    # el PDF salió con letter-spacing y el texto es inservible.
+    tokens = text.split()
+    if tokens:
+        singles = sum(1 for t in tokens if len(t) == 1)
+        if singles / len(tokens) > 0.25:
+            return False
+
+    return True
+
 def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> str:
     """
     Intenta extraer texto localmente primero para evitar costo.
@@ -289,7 +351,10 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
     except Exception as e:
         logging.error(f"❌ Local PDF read failed: {e}")
 
-    if len(local_text) >= 300:
+    if _local_pdf_text_is_usable(local_text):
+        logging.info(
+            "pdf_extract: local=%s model=skipped used=local", len(local_text)
+        )
         return local_text
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -346,8 +411,21 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
     if not extracted or "can't view or extract" in extracted.lower():
         logging.warning("⚠️ Model did not read the PDF properly. Returning best local extraction.")
         extracted = local_text
+    elif local_text and len(extracted) < len(local_text) * 0.6:
+        # El modelo resumió o perdió contenido: nos quedamos con el texto local,
+        # que aunque esté desordenado conserva todas las fechas y nombres.
+        logging.warning(
+            "pdf_extract: model output much shorter than local text (%s vs %s); keeping local",
+            len(extracted), len(local_text),
+        )
+        extracted = local_text
 
-    return extracted.strip()
+    extracted = extracted.strip()
+    logging.info(
+        "pdf_extract: local=%s model_used=%s final=%s",
+        len(local_text), bool(up is not None), len(extracted),
+    )
+    return extracted
 
 def _truncate_preserving_edges(text: str, limit: int) -> str:
     text = str(text or "").strip()
@@ -366,6 +444,12 @@ def _summarize_long_resume_source(source_name: str, text: str, limit: int) -> st
     if len(text) <= limit:
         return text
 
+    # Antes se cortaba a RESUME_SOURCE_MAX_CHUNKS y se TIRABA el resto sin
+    # dejar rastro. Pre-encogemos con el helper que sí deja marcador, para que
+    # sobrevivan cabeza y cola y quede visible que hubo recorte.
+    text = _truncate_preserving_edges(
+        text, RESUME_SOURCE_CHUNK_SIZE * RESUME_SOURCE_MAX_CHUNKS
+    )
     chunks = [
         text[i:i + RESUME_SOURCE_CHUNK_SIZE]
         for i in range(0, len(text), RESUME_SOURCE_CHUNK_SIZE)
@@ -377,6 +461,7 @@ def _summarize_long_resume_source(source_name: str, text: str, limit: int) -> st
         Keep every factual resume signal from this {source_name} chunk: candidate name, roles, companies,
         dates, responsibilities, achievements, tools, skills, education, certifications, and languages.
         Do not invent or generalize. Preserve page/chunk order and date ranges.
+        Preserve every date range and every tool name verbatim.
 
         SOURCE: {source_name}
         CHUNK {idx} OF {len(chunks)}
@@ -393,7 +478,7 @@ def _summarize_long_resume_source(source_name: str, text: str, limit: int) -> st
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                max_tokens=1800,
+                max_tokens=2500,
             )
             summaries.append(response.choices[0].message.content.strip())
         except Exception:
@@ -501,8 +586,14 @@ def _clean_generated_education_dates(entry: Dict[str, Any]) -> Dict[str, Any]:
 
     entry["start_date"] = _normalize_resume_date(start, allow_year_only=True)
     entry["end_date"] = _normalize_resume_date(end, allow_year_only=True)
+    # Fecha única de graduación ("December 2018", sin inicio): el modelo a veces
+    # la repite en ambos campos y la UI muestra un rango de largo cero.
+    if entry["start_date"] and entry["start_date"] == entry["end_date"]:
+        entry["start_date"] = ""
     if not entry["end_date"] and not entry["start_date"]:
-        entry["current"] = False
+        # Una carrera en curso sin fechas ("8vo semestre, en curso") sigue siendo
+        # current: sólo la apagamos si el modelo no la marcó.
+        entry["current"] = bool(entry.get("current"))
     return entry
 
 def _clean_generated_work_dates(entry: Dict[str, Any], today: datetime.date) -> Dict[str, Any]:
@@ -522,6 +613,152 @@ def _clean_generated_work_dates(entry: Dict[str, Any], today: datetime.date) -> 
     entry["end_date"] = "" if current else end
     entry["current"] = current
     return entry
+
+def _format_description_to_html(description: Any, *, bullets_only: bool = False) -> str:
+    """Convierte la descripción del modelo ("- bullet" por línea) a HTML.
+
+    La versión anterior vivía inline y duplicada dentro de la ruta, y guardaba
+    SÓLO la primera línea que no era bullet, descartando el resto en silencio.
+    Con la educación en dos oraciones eso perdía la segunda.
+
+    `bullets_only=True` (experiencia laboral) fuerza que TODO salga como bullet:
+    una línea suelta arriba de la lista se ve como texto huérfano en la caja de
+    edición y en el CV del cliente.
+    """
+    if not description:
+        return ""
+    paragraphs, bullets = [], []
+    for line in str(description).strip().split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped[0] in "-•–*":
+            bullets.append(stripped.lstrip("-•–* ").strip())
+        elif bullets or bullets_only:
+            # Párrafo suelto (antes o después de los bullets): lo tratamos como
+            # bullet para no perderlo ni dejarlo colgado fuera de la lista.
+            bullets.append(stripped)
+        else:
+            paragraphs.append(stripped)
+    if bullets_only and paragraphs:
+        bullets = paragraphs + bullets
+        paragraphs = []
+    html = "".join(f"<p>{p}</p>" for p in paragraphs)
+    if bullets:
+        html += "<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>"
+    return html
+
+_ABOUT_FILLER_PATTERNS = [
+    # (patrón, reemplazo). Conservan la sustancia que viene después del relleno.
+    (r",?\s*with a proven track record (?:in|of)\s+", ", "),
+    (r",?\s*with a proven ability to\s+", ", "),
+    (r"\bProven ability to\s+", ""),
+    (r"\bProven track record (?:in|of)\s+", ""),
+    (r",?\s*with a strong background (?:in|working with)\s+", ", experienced in "),
+    (r"\bPassionate about\s+", "Focused on "),
+    (r",?\s*and is passionate about\s+", ", focused on "),
+    (r"\bresults-driven\s+", ""),
+    (r"\bdynamic professional\b", "professional"),
+    (r"\bdetail-oriented\s+", ""),
+    (r"\bteam player\b", "collaborative contributor"),
+]
+
+def _scrub_about_filler(about: str) -> str:
+    """Saca el relleno de CV del About.
+
+    El prompt lo prohíbe, pero el modelo lo copia igual desde el summary del CV
+    original ("Proven ability to build financial models..."), así que hace falta
+    una red determinista.
+    """
+    text = str(about or "")
+    if not text.strip():
+        return ""
+    original = text
+    for pattern, replacement in _ABOUT_FILLER_PATTERNS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r"\s+([,.;])", r"\1", text)
+    text = re.sub(r",\s*,", ",", text)
+    text = re.sub(r"(^|\.\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), text)
+    text = text.strip()
+    if text != original:
+        logging.info("resume generation: scrubbed filler phrasing from About")
+    return text
+
+def _parse_model_json(content: str) -> Dict[str, Any]:
+    """Parser tolerante: JSON directo, sin code fences, o el substring {...}."""
+    raw = (content or "").strip()
+    attempts = [raw, re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', raw)]
+    if "{" in raw and "}" in raw:
+        attempts.append(raw[raw.find("{"): raw.rfind("}") + 1])
+    for candidate in attempts:
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            continue
+    raise Exception(f"❌ Could not parse model JSON. First 300 chars: {raw[:300]}")
+
+def _normalize_tool_level(value: Any) -> str:
+    v = str(value or "").strip().lower()
+    if re.search(r"adv|expert|senior|master|fluent|native|\b4\b|\b5\b", v):
+        return "Advanced"
+    if re.search(r"basic|begin|junior|elementary|low|\b1\b", v):
+        return "Basic"
+    return "Intermediate"
+
+def _normalize_generated_tools(raw: Any) -> list:
+    out, seen = [], set()
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, str):
+            item = {"tool": item, "level": ""}
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("tool") or item.get("name") or "").strip()
+        if not name or name.casefold() in seen:
+            continue
+        seen.add(name.casefold())
+        out.append({"tool": name, "level": _normalize_tool_level(item.get("level"))})
+        if len(out) >= RESUME_MAX_TOOLS:
+            break
+    return out
+
+def _normalize_language_level(value: Any) -> str:
+    v = str(value or "").strip().lower()
+    if re.search(r"native|bilingual|mother", v):
+        return "Native"
+    if re.search(r"fluent|advanced|full professional|professional working|c1|c2", v):
+        return "Fluent"
+    if re.search(r"basic|beginner|elementary|a1|a2", v):
+        return "Basic"
+    return "Regular"
+
+def _normalize_generated_languages(raw: Any) -> list:
+    out, seen = [], set()
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, str):
+            item = {"language": item, "level": ""}
+        if not isinstance(item, dict):
+            continue
+        key = re.sub(r"\s+", " ", str(item.get("language") or "")).strip().casefold()
+        name = RESUME_LANGUAGE_ALIASES.get(key)
+        if not name:
+            if key:
+                logging.info("resume generation: dropping unsupported language %r", key)
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append({
+            "language": name,
+            "level": _normalize_language_level(item.get("level")),
+        })
+        if len(out) >= RESUME_MAX_LANGUAGES:
+            break
+    return out
 
 def _strip_html_text(raw: str) -> str:
     text = re.sub(r"<[^>]+>", " ", raw or "")
@@ -679,6 +916,529 @@ def _build_opportunity_context(cursor, opportunity_id: Optional[int]):
         "years_experience": years_experience or "",
     }
     return jd_plain, context
+
+def _load_resume_generation_context(candidate_id, opportunity_id):
+    """Lee de la DB todo lo que necesita el prompt del CV, en una conexión corta
+    y ANTES de la llamada (lenta) a OpenAI.
+
+    Nunca lanza excepción: si la oportunidad no existe, no tiene JD o la query
+    falla, devolvemos contexto vacío y el CV sale genérico.
+    """
+    candidate = {"name": "", "country": ""}
+    target = None
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        if candidate_id:
+            cur.execute(
+                "SELECT COALESCE(name, ''), COALESCE(country, '') "
+                "FROM candidates WHERE candidate_id = %s",
+                (candidate_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                candidate = {"name": row[0], "country": row[1]}
+        if opportunity_id:
+            jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
+            cur.execute(
+                """
+                SELECT COALESCE(a.client_name, '')
+                FROM opportunity o
+                LEFT JOIN account a ON o.account_id = a.account_id
+                WHERE o.opportunity_id = %s
+                """,
+                (opportunity_id,),
+            )
+            row = cur.fetchone()
+            client_name = row[0] if row else ""
+            if opp_ctx or jd_plain:
+                target = {
+                    "client_name": client_name,
+                    "position": opp_ctx.get("position", ""),
+                    "career_country": opp_ctx.get("career_country", ""),
+                    "years_experience": str(opp_ctx.get("years_experience") or ""),
+                    "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
+                }
+        cur.close()
+    except Exception:
+        logging.exception(
+            "generate_resume_fields: could not load DB context; continuing generically"
+        )
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+    return candidate, target
+
+def _ensure_cv_pdf_text(candidate_id) -> str:
+    """Extrae el texto del CV subido si `candidates.cv_pdf_scrapper` está vacío.
+
+    La extracción automática del front sólo corre al CARGAR la página
+    (autoExtractFromPdfOnLoad en resume.js). Si la recruiter sube el CV y
+    genera en la misma sesión, el texto todavía no existe y el CV se arma sólo
+    con la transcripción — que es exactamente cómo salen los CVs flacos, con
+    instituciones sin nombre y sin métricas. Acá lo resolvemos del lado del
+    servidor para que no dependa de recargar.
+    """
+    if not candidate_id:
+        return ""
+    from utils import services
+    from utils.storage_utils import get_cv_keys
+
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COALESCE(cv_pdf_scrapper, '') FROM candidates WHERE candidate_id = %s",
+            (candidate_id,),
+        )
+        row = cur.fetchone()
+        if row and (row[0] or "").strip():
+            cur.close()
+            return row[0]
+
+        keys = [k for k in (get_cv_keys(cur, candidate_id) or []) if k.lower().endswith(".pdf")]
+        if not keys:
+            cur.close()
+            return ""
+
+        obj = services.s3_client.get_object(Bucket=services.S3_BUCKET, Key=keys[-1])
+        pdf_bytes = obj["Body"].read()
+        text = (_extract_pdf_text_with_openai(pdf_bytes) or "").strip()
+        if not text:
+            cur.close()
+            return ""
+
+        cur.execute(
+            "UPDATE candidates SET cv_pdf_scrapper = %s, "
+            "affinda_scrapper = COALESCE(NULLIF(affinda_scrapper, ''), %s) "
+            "WHERE candidate_id = %s",
+            (text, text, candidate_id),
+        )
+        conn.commit()
+        cur.close()
+        logging.info(
+            "generate_resume_fields: extracted CV PDF on demand for candidate %s (%s chars)",
+            candidate_id, len(text),
+        )
+        return text
+    except Exception:
+        logging.exception(
+            "generate_resume_fields: on-demand CV extraction failed for candidate %s",
+            candidate_id,
+        )
+        return ""
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+def _build_resume_target_role_block(target: Optional[Dict[str, Any]]) -> str:
+    """Bloque 'TARGET ROLE' del prompt. Sin oportunidad -> CV genérico."""
+    if not target:
+        return (
+            "TARGET ROLE\n"
+            "None provided. Write a strong general-purpose CV. Order and weight the content\n"
+            "by the candidate's own seniority and most substantial experience.\n"
+        )
+    lines = [
+        "TARGET ROLE",
+        "This CV will be sent to a client for this specific opening.",
+    ]
+    if target.get("client_name"):
+        lines.append(f"Client: {target['client_name']}")
+    if target.get("position"):
+        lines.append(f"Position: {target['position']}")
+    if target.get("career_country"):
+        lines.append(f"Country / market: {target['career_country']}")
+    if target.get("years_experience"):
+        lines.append(f"Experience the client asked for: {target['years_experience']}")
+    jd = (target.get("jd") or "").strip()
+    if jd:
+        lines.append("Job description (verbatim from the client):\n---\n" + jd + "\n---")
+    else:
+        lines.append("No job description text is available; use the position title only.")
+    return "\n".join(lines) + "\n"
+
+def _build_resume_generation_prompt(
+    *,
+    target_role_block: str,
+    candidate_name: str,
+    candidate_country: str,
+    linkedin_scrapper: str,
+    cv_pdf_scrapper: str,
+    intro_call_transcript: str,
+    deep_dive_transcript: str,
+    first_interview_transcript: str,
+    notes: str,
+    today: str,
+) -> str:
+    return f"""You are a senior recruiter at Vintti writing a client-facing CV in English.
+Vintti presents LatAm talent to US clients, so the CV must read like a professional,
+confident, factual English CV — never like a machine describing a document.
+
+Return ONE valid JSON object and nothing else. No markdown, no code fences, no commentary.
+
+TODAY'S DATE: {today}
+CANDIDATE NAME (context only, never write it inside the sections): {candidate_name}
+CANDIDATE COUNTRY (context only): {candidate_country}
+
+{target_role_block}
+
+SOURCE MATERIAL — this is the ONLY thing you may draw facts from.
+
+WARNING ABOUT THE LINKEDIN SCRAPE: it is a raw dump that also contains OTHER PEOPLE's
+content — feed posts, comments, recommendations written by third parties, "people also
+viewed" profiles. Only use facts that belong to THIS candidate's own profile sections
+(their experience, education, skills, languages). If a degree, employer or achievement
+appears only inside a post or a third-party name block, it is somebody else's — ignore it.
+
+LINKEDIN SCRAPER:
+{linkedin_scrapper}
+
+CV PDF SCRAPER:
+{cv_pdf_scrapper}
+
+INTRO CALL TRANSCRIPT:
+{intro_call_transcript}
+
+DEEP DIVE TRANSCRIPT:
+{deep_dive_transcript}
+
+FIRST INTERVIEW TRANSCRIPT:
+{first_interview_transcript}
+
+RECRUITER NOTES / COMMENTS:
+{notes}
+
+=========================
+ABSOLUTE RULES (violating any of these ruins the deliverable)
+=========================
+1. NO FABRICATION. Every statement must be traceable to a specific fact in the source
+   material above. Do not invent responsibilities, clients, deliverables, metrics, team
+   sizes, industries, tools, certifications, coursework or achievements.
+2. NO EXAGGERATION. Do not upgrade scope ("supported" is not "led"), do not turn a task
+   into an achievement, do not add numbers that are not in the source.
+3. WHEN A ROLE IS SPARSE, WRITE FEWER BULLETS. One accurate bullet beats four padded ones.
+   Never pad, never restate the job title as a bullet, never write filler.
+4. NEVER WRITE META-COMMENTARY ABOUT THE SOURCES. Forbidden phrasings include:
+   "the CV presents...", "the CV lists this role as...", "CV-wide context includes...",
+   "listed software includes...", "according to the source", "the candidate's profile states".
+   Write the fact directly in professional CV language, or omit it entirely.
+5. INCLUDE EVERY DISTINCT WORK EXPERIENCE ENTRY found in any source. Do not drop older,
+   shorter, freelance, internship, consulting, RPO, part-time or overlapping roles to save
+   space. Completeness of roles outranks length of descriptions.
+6. OUTPUT ENGLISH. Translate job titles, degrees and descriptions into English. Keep company
+   and institution proper names as they appear in the source.
+7. Do not use first person ("I", "my"). Do not use "Responsible for". Do not use markdown,
+   bold, emojis or HTML tags anywhere in your output.
+8. NEVER INVENT PLACEHOLDER NAMES. If the source does not name the company, institution or
+   school, leave that field as an empty string. Writing "Unnamed University", "Unknown
+   Company", "A university in the US" or similar is a fabrication and is forbidden.
+9. USE THE MOST COMPLETE VERSION OF EVERY NAME the sources contain. If the CV says
+   "CSLR Investments Corp" and the interview says "CSLR", write "CSLR Investments Corp".
+   Never shorten or abbreviate a company or institution name.
+10. CARRY OVER EVERY NUMBER the source states for a role: portfolio and deal sizes, budgets,
+   percentages, headcounts, account volumes, AUM growth, savings. These are the strongest
+   part of a CV and dropping them is the most common way this output comes out weak.
+
+=========================
+TAILORING TO THE TARGET ROLE
+=========================
+- If a target role is given, make the relevant experience obvious at a glance:
+  * Within each role, order bullets so the most relevant-to-the-target ones come FIRST.
+  * Give more bullets (4-6) to roles whose work overlaps the target role; give fewer (1-3)
+    to roles that do not.
+  * Prefer source facts that match the job description's responsibilities, tools, industry
+    and seniority. Use the client's vocabulary ONLY when the candidate's own source contains
+    an equivalent fact. Renaming a candidate's experience to match the JD is fabrication.
+  * Never claim a JD requirement the candidate did not actually demonstrate. Gaps stay gaps.
+- Do NOT reorder the roles themselves. Work experience is always reverse-chronological
+  (most recent first), and education is reverse-chronological too.
+
+=========================
+OUTPUT SHAPE
+=========================
+Return exactly this JSON object, always with all five keys, using [] or "" when a section
+genuinely has no grounded content:
+
+{{
+  "about": "string",
+  "work_experience": [
+    {{
+      "title": "...",
+      "company": "...",
+      "start_date": "YYYY-MM-DD",
+      "end_date": "YYYY-MM-DD or empty string if current",
+      "current": true/false,
+      "description": "One-line role context.\\n- Bullet 1\\n- Bullet 2\\n- Bullet 3"
+    }}
+  ],
+  "education": [
+    {{
+      "institution": "...",
+      "title": "...",
+      "country": "Country name or empty string",
+      "start_date": "YYYY-MM-DD or empty string",
+      "end_date": "YYYY-MM-DD or empty string",
+      "current": true/false,
+      "description": "Two sentences on one single line, no bullets."
+    }}
+  ],
+  "tools": [{{"tool": "Excel", "level": "Advanced"}}],
+  "languages": [{{"language": "English", "level": "Fluent"}}]
+}}
+
+=========================
+ABOUT
+=========================
+- 3 to 5 sentences, ONE plain-text paragraph, third person, no name, no line breaks,
+  no bullets, no HTML.
+- START WITH THE PROFESSION, NOT WITH A PRONOUN OR A LABEL. Never begin with "This
+  candidate", "The candidate", "A professional with", "They have" or "With over X years".
+  Write it like a headline: "Economist and finance professional (MBA & MSc in Finance,
+  University of Miami) with close to 4 years of experience across strategic finance, FP&A
+  and real estate investment analysis." Avoid "they/them" as a subject throughout — lead
+  each sentence with the work, e.g. "Leads capital planning across...", "Comfortable acting
+  as the client-facing point of contact with...".
+- Name the real companies, degrees and institutions when the source gives them.
+- Then the two or three strengths most relevant to the target role, then the core
+  tools/industries. Close with education or a differentiator only if it adds something.
+- Grounded and specific. These phrases are BANNED outright, even if the source CV uses them
+  in its own summary: "passionate", "results-driven", "dynamic professional", "proven track
+  record", "proven ability", "team player", "detail-oriented", "strong background",
+  "excellent communication skills", "drive strategic decisions". They say nothing. Replace
+  each one with the concrete fact underneath it — instead of "proven track record of
+  optimizing capital deployment", write what was actually deployed and how much.
+- Do not close the About with a languages sentence; languages have their own section.
+- If there is not enough material for 3 sentences, write 2. Never invent to reach a length.
+
+=========================
+WORK EXPERIENCE
+=========================
+- One entry per distinct title/company. Keep a promotion as its own entry; do not merge it
+  into the previous title, and do not split one role into several.
+
+*** STACKED TITLES AT ONE COMPANY — READ THIS TWICE ***
+CVs very often print the company name ONCE and then stack two or more titles under it,
+each with its own date range, followed by a SINGLE shared bullet list. Example layout:
+
+    CSLR Investments Corp                          Miami, FL
+    Director of Strategic Finance & Investments    December 2025-Present
+    Finance Strategy & Investment Lead (Part-Time) September 2023-December 2025
+    - Lead financial strategy, capital planning...
+    - Build and manage underwriting models...
+    - Support financing structures for $4M+...
+
+That is TWO work_experience entries, not one. Rules:
+  * Every title that has its own date range becomes its OWN entry, repeating the same
+    company name. Two titles -> two entries. Three titles -> three entries.
+  * NEVER collapse them into the most recent title. Doing so silently deletes years of
+    tenure from the timeline — it is the single worst error you can make here.
+  * NEVER drop the older/junior title just because the bullets are shared.
+  * DISTRIBUTE the shared bullets — do not copy them all to the senior title. Leadership,
+    strategy, ownership and client-facing bullets go to the SENIOR/most recent title;
+    hands-on execution, modelling, building and analysis bullets go to the EARLIER title.
+    If a bullet plainly describes the whole tenure, put it on the entry where that work
+    started.
+  * THE SHARED BULLETS ARE THE ONLY CONTENT YOU HAVE FOR BOTH ENTRIES. Never invent new
+    bullets to fill the earlier title, and never restate a bullet you already used on the
+    other entry in weaker words. Writing "Managed demand planning for multiple business
+    units" or "Focused on improving accuracy and optimization" because the earlier entry
+    looked empty is fabrication — those sentences exist nowhere in the source.
+  * If after distributing, one entry would end up with zero bullets, MOVE one real bullet
+    to it rather than inventing. An entry with a single real bullet is correct and normal.
+    An entry with invented bullets is a defect.
+  * Use present tense for the current title and past tense for the earlier one, even though
+    the source wrote them all in the same tense.
+  * Scan every company block for this pattern before you write your answer.
+- "description" format: BULLETS ONLY. Every line starts with "- ". Never write an
+  introductory sentence or a paragraph above the bullets — a loose line floating above the
+  list looks broken in the editor and in the client-facing CV. If you want to give role
+  context (scope, team, what the company does), make it the FIRST BULLET, not a paragraph.
+  And if the source already states that context as one of its own bullets, keep it as a
+  bullet — never promote a real bullet into an intro line.
+- 4-6 bullets for the roles most relevant to the target; 1-3 for less relevant or sparse
+  roles. Never more than 6.
+
+*** SPARSE ROLES — WHEN THE SOURCE ONLY GIVES TITLE, COMPANY AND DATES ***
+Designed/visual CVs often list roles with no bullets at all, and put the software in a
+single global "Software"/"Skills" list. In that situation:
+  * Write 1-2 bullets maximum. A short honest entry is correct; a padded one is a lie.
+  * NEVER attribute the global software list to a specific role. If the CV lists
+    "Cinema 4D, After Effects, Photoshop" once at the bottom, you may NOT write "Used
+    Cinema 4D and RedShift at this company" — the source never says where each tool was
+    used. Put those tools in the tools section only.
+  * NEVER invent a skill name the source does not contain (e.g. writing "Adobe Creative
+    Suite" when the CV lists "Photoshop, Illustrator").
+  * BANNED generic bullets that say nothing and could apply to anyone. Do not write:
+    "Collaborated with cross-functional teams", "Supported senior colleagues",
+    "Gained proficiency in X", "Contributed to project success", "Developed engaging
+    content", "Enhanced project outcomes", "Delivered high-quality work", "Assisted in
+    daily tasks". If the only thing you can write is one of these, write nothing.
+  * Also banned as padding: "various projects", "diverse projects", "various media
+    platforms", "a wide range of clients", "multiple industries", "enhancing visual
+    storytelling", "contributing to the agency's creative output". Vague scope invented to
+    fill a line. Name the real thing or leave it out.
+  * What you MAY write for a sparse role: a plain statement of what that job title does,
+    phrased as work, with no invented scope, clients, metrics or tools. Example for a
+    "Motion Designer" with no detail: "- Produced motion graphics and animated content."
+    One line. Stop there.
+- Each bullet: one line, max ~25 words, starts with a strong verb. Past tense for finished
+  roles, present tense for the current role. Include the concrete object of the work
+  (system, process, market, deliverable, stakeholder) whenever the source names it.
+- Include metrics, volumes, budgets, team sizes and tool names ONLY when they appear in the
+  source for THAT role — but when they DO appear, they are mandatory. If the source bullet
+  says "projects totaling $10M+", "$4M+ in construction loans targeting 25%-35% IRRs",
+  "reduced discrepancies by 5%" or "AUM from $48M to $102M", your bullet must carry those
+  exact figures. Rewriting "$4M+ in construction loans" as "construction loans" strips the
+  CV of its strongest evidence. Before finishing, re-read every source bullet and confirm
+  no number was left behind.
+- INTERVIEW TRANSCRIPTS ADD CONTENT — they are not just for cross-checking. A written CV is
+  always shorter than what the candidate actually did. When the candidate describes clients,
+  brands, platforms, channels, team sizes, tools, deliverables or responsibilities that are
+  NOT in the written CV, ADD them as extra bullets on the matching role. Example: if the CV
+  says "Lead integrated digital strategies" and in the call the candidate says she runs
+  social media for Flormar and Súper Salón, manages influencer campaigns on Instagram and
+  TikTok, and sources and briefs creators — all of that belongs in that role's bullets.
+  Failing to carry over what the candidate said in the interview wastes the best source you
+  have.
+- The ONLY thing you exclude from a transcript is recruiting logistics, never the work
+  itself. Forbidden anywhere in the output: reason for leaving, notice period, salary
+  expectations, availability, visa or relocation status, layoffs or restructuring at the
+  current employer, motivations for changing jobs, and any assessment of the candidate.
+  Also ignore speculation and future plans. Everything the candidate says about work they
+  actually did is fair game and should be used.
+- Merge overlapping facts from several sources into one bullet; never state the same fact
+  twice. Prefer the most specific version of a fact.
+- Expand acronyms the first time they appear when the source makes their meaning clear.
+- Do NOT add a "Tools:" line inside any role description.
+
+DATES (work experience)
+- Always "YYYY-MM-DD". If the source gives only month/year, use the first day of that month.
+  If the source gives only a year, use YYYY-01-01. Never guess a day.
+- Ongoing role: "current": true and "end_date": "".
+- If the dates for a role cannot be determined at all, leave them as empty strings but still
+  include the role.
+
+=========================
+EDUCATION
+=========================
+- One entry per degree/program. Include certifications only if they are substantial programs.
+- NEVER UPGRADE THE LEVEL OF A DEGREE. Copy the qualification exactly as the source names it.
+  A "Técnico Superior" / "Advanced Technical Degree" is NOT a Bachelor's. A "Diplomado" or
+  a certificate is not a Master's. Keep the source's own wording for the qualification; if
+  the CV and LinkedIn disagree, use the more conservative (lower) one.
+- "description": EXACTLY two sentences on a SINGLE line (no line breaks, no "- " bullets,
+  ~30-45 words total) briefly describing the subjects the program covers, plus any explicit
+  detail from the source (thesis, honors, specialization, exchange, notable coursework).
+- The two sentences must stay within what the degree title plainly implies plus what the
+  source explicitly states. Example, for "Bachelor's Degree in Business Administration":
+  "Covered accounting, finance, operations and organizational management, with a focus on
+  business analysis and decision-making. Included coursework in economics, marketing and
+  corporate strategy." Do not claim specific courses, grades, projects or honors that are
+  not in the source and not plainly implied by the degree name.
+- When a target role is given, emphasize the parts of the program that connect to it —
+  without inventing anything.
+
+DATES (education)
+- "YYYY-MM-DD". Full range if the source gives a range. Month/year if given.
+- If the source gives only ONE year for the program, set "start_date": "YYYY-01-01" and
+  "end_date": "YYYY-12-31" and "current": false.
+- If the source gives only a GRADUATION date (e.g. "December 2018", "May 2023") and no start,
+  put it in "end_date" and leave "start_date" as an empty string. Never set start and end to
+  the same date — that renders as a zero-length range — and never invent a start year.
+- If the source gives NO dates at all for a program, leave both as empty strings. That is
+  correct and expected; do not guess.
+- Ongoing studies: "current": true and "end_date": "".
+
+COUNTRY (education)
+- Fill "country" whenever the source explicitly gives a country, or a city/region that
+  unambiguously identifies one ("Barcelona, Spain" -> "Spain", "Loja, Ecuador" -> "Ecuador",
+  "Sydney" -> "Australia"). If ambiguous, leave it as an empty string.
+
+=========================
+TOOLS
+=========================
+- Only real software, platforms, systems and technical frameworks the candidate has actually
+  used. No soft skills, no spoken languages, no methodologies-as-buzzwords, no company names.
+- SPELL EACH TOOL EXACTLY AS THE SOURCE SPELLS IT. "NetX360" is not "Net360", "Power BI" is
+  not "PowerBI". Copy the string, do not normalize or abbreviate it from memory.
+- EVERY tool must have an explicit level: exactly "Basic", "Intermediate" or "Advanced".
+  Assign the real level using the evidence:
+  * Advanced — 4+ years of hands-on use, or the tool is central to their main roles across
+    multiple jobs, or the source/interview says expert/advanced/daily/administrator/trained
+    others/holds a certification in it.
+  * Intermediate — roughly 1-3 years of regular use, or used substantively in a specific
+    project or role, or named as a core skill without depth evidence.
+  * Basic — mentioned once, exposure only, "familiar with", "learning", "basic".
+- Use the dates of the roles where the tool appears to estimate years of use, relative to
+  TODAY'S DATE above. Never leave a level blank.
+- If the source explicitly states a level (e.g. "Technical Skills: Advanced in X, Y, Z"),
+  USE IT even if that means several tools share the same level.
+- If the source states NO levels — just a flat software list — do NOT mark everything
+  "Advanced". You have no evidence for that, and an all-Advanced list reads as inflated to
+  a client. Infer conservatively from how central each tool is to the roles and how long
+  it has been in use: "Intermediate" is the honest default, "Advanced" only for the two or
+  three tools that are clearly core to the candidate's main job, "Basic" for the peripheral
+  ones. The result must be a mix.
+- Maximum 15 tools. When a target role is given, list the tools relevant to it first.
+
+=========================
+LANGUAGES
+=========================
+- Spoken languages only. Allowed names, spelled exactly like this and nothing else:
+  "English", "Spanish", "Portuguese", "French", "German". Omit any other language.
+- Allowed levels, exactly: "Basic", "Regular", "Fluent", "Native".
+  Map source wording: native/bilingual/mother tongue -> "Native";
+  C1/C2/advanced/fluent/full professional/professional working -> "Fluent";
+  B1/B2/intermediate/conversational/limited working -> "Regular";
+  A1/A2/beginner/elementary/basic -> "Basic".
+- If a language is listed with NO level at all, do not upgrade it. Use "Regular" — never
+  assume "Fluent" or "Native" from a bare mention. The only exception is the candidate's
+  own native language (see below).
+- Include a language only when there is evidence. Two inferences ARE allowed:
+  (a) the candidate's native language may be inferred from their country and from the
+      language the source documents are written in;
+  (b) the English level may be inferred from an interview transcript conducted in English —
+      if the candidate held a full professional conversation in English, that is "Fluent".
+  Beyond these two, do not guess.
+
+=========================
+FINAL CHECK BEFORE ANSWERING
+=========================
+Go back over your draft and verify each of these. Fix anything that fails.
+- Every role from the sources is present.
+- STACKED TITLES: for every company, count the titles that have their own date range in the
+  source, and count your entries for that company. The two numbers must match. If the source
+  shows two titles at one company and you produced one entry, you deleted a role — go back
+  and split it.
+- No gaps you created: the date ranges of your entries must cover the same span the source
+  covers for each company.
+- Every number in the source bullets you used appears in your bullets.
+- Every company and institution name is the full version the source uses; no "Unnamed" or
+  invented placeholders anywhere.
+- Every bullet can be pointed back to a specific line in the source material.
+- No meta-commentary about the CV or the sources anywhere.
+- The About does not contain any banned filler phrase and does not start with "This
+  candidate" or "A professional".
+- Every tool has a level; the levels are not all identical; tool names are spelled as in
+  the source.
+- Education descriptions are single-line two-sentence paragraphs, not bullets.
+- LANGUAGES: for each one, did the source actually state a level? If it just listed the
+  language with no level, it must be "Regular" — not "Fluent", not "Native". Only the
+  candidate's own native language and a language they demonstrably conducted the interview
+  in may be rated higher.
+- SPARSE ROLES: no role invented tools, scope, clients or metrics that the source did not
+  attach to that specific role, and no padding phrases.
+- Output is one raw JSON object, parseable as-is.
+"""
 
 def _score_applicant_with_openai(
     extracted_pdf: str,
@@ -1189,11 +1949,15 @@ Return STRICT JSON:
 
             # Obtener tools actuales
             cursor.execute("SELECT tools FROM resume WHERE candidate_id = %s", (candidate_id,))
-            tools = cursor.fetchone()[0] or "[]"
+            row = cursor.fetchone()
+            tools = (row[0] if row else None) or "[]"
 
             # Obtener scraps
             cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+            row = cursor.fetchone()
+            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
+            linkedin_scrapper = (linkedin_scrapper or "")
+            cv_pdf_scrapper = (cv_pdf_scrapper or "")
 
             prompt = f"""
     You are a resume tools editor.
@@ -1251,10 +2015,14 @@ Return STRICT JSON:
             cursor = conn.cursor()
 
             cursor.execute("SELECT work_experience FROM resume WHERE candidate_id = %s", (candidate_id,))
-            work_experience = cursor.fetchone()[0] or "[]"
+            row = cursor.fetchone()
+            work_experience = (row[0] if row else None) or "[]"
 
             cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+            row = cursor.fetchone()
+            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
+            linkedin_scrapper = (linkedin_scrapper or "")
+            cv_pdf_scrapper = (cv_pdf_scrapper or "")
 
             prompt = f"""
     You are a resume work experience editor.
@@ -1338,11 +2106,24 @@ Return STRICT JSON:
 
             # Obtener education actual
             cursor.execute("SELECT education FROM resume WHERE candidate_id = %s", (candidate_id,))
-            education = cursor.fetchone()[0] or "[]"
+            row = cursor.fetchone()
+            education = (row[0] if row else None) or "[]"
 
             # Obtener scraps
             cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+            row = cursor.fetchone()
+            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
+            linkedin_scrapper = (linkedin_scrapper or "")
+            cv_pdf_scrapper = (cv_pdf_scrapper or "")
+
+            # Guardamos los title/country previos: el modelo a veces los omite y
+            # el UPDATE de más abajo pisa el array entero, borrándolos.
+            try:
+                previous_education = json.loads(education)
+                if not isinstance(previous_education, list):
+                    previous_education = []
+            except Exception:
+                previous_education = []
 
             prompt = f"""
     You are a resume education editor.
@@ -1360,8 +2141,12 @@ Return STRICT JSON:
     {user_prompt}
 
     Improve the education section using this info. Output must be a JSON array with objects of this format:
-    [{{"institution":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}}]
+    [{{"institution":"...", "title":"...", "country":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}}]
 
+    - ALWAYS return "title" (the degree/program name) and "country" for every entry.
+      Keep the values already present in the current education section unless the
+      sources clearly correct them. Never drop them and never return them empty
+      when the current section already has a value.
     - If month or day is missing, complete with 01
     - If end_date is missing or says "present", set current = true
     - Else set current = false
@@ -1399,6 +2184,31 @@ Return STRICT JSON:
                         entry["current"] = end > today
                     except:
                         entry["current"] = False
+
+            # Restaurar title/country desde la entrada previa equivalente cuando
+            # el modelo los devolvió vacíos o directamente los omitió.
+            def _match_previous(entry):
+                institution = _fold_location_text(entry.get("institution"))
+                if not institution:
+                    return None
+                for prev in previous_education:
+                    if not isinstance(prev, dict):
+                        continue
+                    if _fold_location_text(prev.get("institution")) == institution:
+                        return prev
+                return None
+
+            for entry in education_json:
+                if not isinstance(entry, dict):
+                    continue
+                prev = _match_previous(entry)
+                if not prev:
+                    entry.setdefault("title", "")
+                    entry.setdefault("country", "")
+                    continue
+                for field in ("title", "country"):
+                    if not str(entry.get(field) or "").strip():
+                        entry[field] = prev.get(field, "") or ""
 
             cursor.execute("UPDATE resume SET education = %s WHERE candidate_id = %s", (json.dumps(education_json), candidate_id))
             conn.commit()
@@ -1625,6 +2435,17 @@ Return STRICT JSON:
         try:
             data = request.json
             candidate_id = data.get('candidate_id')
+            try:
+                opportunity_id = int(str(data.get('opportunity_id') or "").strip() or 0) or None
+            except (TypeError, ValueError):
+                opportunity_id = None
+            # Si el front no mandó el texto del CV (típico: subieron el PDF y
+            # generaron sin recargar la página), lo extraemos acá. Sin esto el
+            # CV se arma sólo con la transcripción y sale flaco.
+            raw_cv_source = str(data.get('cv_pdf_scrapper', '') or '')
+            if not raw_cv_source.strip():
+                raw_cv_source = _ensure_cv_pdf_text(candidate_id)
+
             linkedin_scrapper = _summarize_long_resume_source(
                 "LINKEDIN SCRAPER",
                 data.get('linkedin_scrapper', ''),
@@ -1632,7 +2453,7 @@ Return STRICT JSON:
             )
             cv_pdf_scrapper = _summarize_long_resume_source(
                 "CV PDF SCRAPER",
-                data.get('cv_pdf_scrapper', ''),
+                raw_cv_source,
                 RESUME_CV_SOURCE_LIMIT,
             )
             intro_call_link = data.get('intro_call_link', '')
@@ -1643,15 +2464,28 @@ Return STRICT JSON:
             first_interview_transcript = data.get('first_interview_transcript', '')
             notes = str(data.get('notes', '') or '')[:RESUME_NOTES_LIMIT]
 
-            if intro_call_link:
-                logging.info("generate_resume_fields: fetching Intro Call transcript from Grain link")
-                intro_call_transcript = _fetch_grain_transcript_from_link(intro_call_link)
-            if deep_dive_link:
-                logging.info("generate_resume_fields: fetching Deep Dive transcript from Grain link")
-                deep_dive_transcript = _fetch_grain_transcript_from_link(deep_dive_link)
-            if first_interview_link:
-                logging.info("generate_resume_fields: fetching First Interview transcript from Grain link")
-                first_interview_transcript = _fetch_grain_transcript_from_link(first_interview_link)
+            # Grain degrada suave: un link vencido, un token faltante o una
+            # grabación sin transcript no puede tumbar toda la generación del CV.
+            grain_warnings = []
+
+            def _try_grain(label, link, fallback):
+                if not link:
+                    return fallback
+                logging.info("generate_resume_fields: fetching %s transcript from Grain link", label)
+                try:
+                    return _fetch_grain_transcript_from_link(link)
+                except Exception as grain_error:
+                    logging.warning(
+                        "generate_resume_fields: Grain fetch failed for %s: %s", label, grain_error
+                    )
+                    grain_warnings.append(f"{label}: {grain_error}")
+                    return fallback
+
+            intro_call_transcript = _try_grain("Intro Call", intro_call_link, intro_call_transcript)
+            deep_dive_transcript = _try_grain("Deep Dive", deep_dive_link, deep_dive_transcript)
+            first_interview_transcript = _try_grain(
+                "First Interview", first_interview_link, first_interview_transcript
+            )
 
             intro_call_transcript = intro_call_transcript[:12000]
             deep_dive_transcript = deep_dive_transcript[:12000]
@@ -1675,172 +2509,61 @@ Return STRICT JSON:
                 len(cv_pdf_scrapper or ""),
             )
 
-            prompt = f"""
-            You are a resume generation assistant. Based only on the following data, generate a resume in valid JSON format. Do NOT invent or assume any information.
+            candidate_ctx, target_role = _load_resume_generation_context(
+                candidate_id, opportunity_id
+            )
+            target_role_block = _build_resume_target_role_block(target_role)
+            logging.info(
+                "generate_resume_fields tailoring: opportunity_id=%s position=%s client=%s jd_chars=%s",
+                opportunity_id,
+                (target_role or {}).get("position"),
+                (target_role or {}).get("client_name"),
+                len((target_role or {}).get("jd") or ""),
+            )
 
-            LINKEDIN SCRAPER:
-            {linkedin_scrapper}
-
-            CV PDF SCRAPER:
-            {cv_pdf_scrapper}
-
-            INTRO CALL TRANSCRIPT:
-            {intro_call_transcript}
-
-            DEEP DIVE TRANSCRIPT:
-            {deep_dive_transcript}
-
-            FIRST INTERVIEW TRANSCRIPT:
-            {first_interview_transcript}
-
-            RECRUITER NOTES / COMMENTS:
-            {notes}
-
-            You must always return all 3 fields, even if any of them are empty. Return a complete valid JSON.
-
-            - education: [
-                {{
-                    "institution": "...", \\translate everything to english
-                    "title": "...", \\translate everything to english
-                    "country": "Country name or empty string",
-                    "start_date": "YYYY-MM-DD or empty string",
-                    "end_date": "YYYY-MM-DD or empty string",
-                    "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3"  // Write useful education bullets grounded in the degree title and explicit CV details. Use cautious wording for broad academic context.
-                }}
-            ]
-            - work_experience: [
-                {{
-                    "title": "...", \\translate everything to english
-                    "company": "...", \\translate everything to english
-                    "start_date": "YYYY-MM-DD",
-                    "end_date": "YYYY-MM-DD",
-                    "current": true/false,
-                    "description": "In this role I did (short summary). \\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Use the responsibilities, achievements, industries, tools, and metrics explicitly present for this exact role. No extra info.
-                }}
-            ]
-            - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
-
-            Rules:
-            - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
-            - Include EVERY distinct work experience entry from the CV/PDF/LinkedIn source. Do not omit older, shorter, internship, consulting, RPO, or overlapping roles just to save space.
-            - Work experience completeness is more important than long descriptions. If needed, use fewer bullets per role, but keep all roles.
-            - If a role has only title, company, and dates because the CV is visual/designed and sparse, do not invent company-specific responsibilities, clients, deliverables, metrics, or tools.
-            - For sparse roles, write 2-3 concise bullets using only CV-wide explicit context such as the headline/summary, key skills, and software list. Phrase that context carefully as "the CV presents..." or "CV-wide context includes...", not as a proven responsibility at that exact company unless the source links it to that role.
-            - For sparse roles, choose title-aligned CV-wide context: 3D roles can mention 3D generalist/design and listed software such as Cinema 4D, RedShift, and X Particles; motion/video roles can mention motion graphics, compositing, dynamic visual content, and listed software such as Adobe After Effects and Adobe Premiere; photography roles can mention photography/video and listed software such as Adobe Lightroom/Photoshop.
-            - Never say "expertise in", "proficient in", "advanced in", or "used at this company" for software unless the source explicitly says that. Prefer "listed software includes..." or "CV-wide tools listed include...".
-            - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
-            - For education dates: if the source gives a year range, keep the full range. If the source gives only one year, store it as that full year for UI display. If the source gives month/year, keep that month/year.
-            - For education country: fill "country" when the source explicitly includes a country or a clear city/country location for that education entry (for example "Barcelona, Spain" -> "Spain", "Loja, Ecuador" -> "Ecuador", "Sydney, Australia" -> "Australia").
-            - If the source only includes a well-known, unambiguous city/province/state for that education entry, infer the country when confidence is high, regardless of which country it is. If the location is ambiguous or could reasonably be multiple countries, leave country empty.
-            - For education descriptions, include explicit education details first: honors, thesis, coursework, student organizations, language level, projects, certifications, and academic achievements if they appear in the source.
-            - If an education entry has only a degree/title and institution, write 2-3 concise field-aligned bullets based on the title. Use cautious language such as "Academic background in...", "Foundation related to...", "Supports understanding of...", or "Relevant to...".
-            - Do not invent specific courses, projects, grades, honors, memberships, tools, or achievements. For example, do not say "completed advanced financial management courses" unless coursework is stated; prefer "Academic background related to financial administration and management."
-            - Education bullets may be general, but they must be directly related to the degree/title or explicit CV details.
-            - If a day is not present in the source, use the first day of the known month only as a storage placeholder. Do not imply the day is exact.
-            - For tools: do not infer expertise from a simple software list. If no proficiency level is stated, use "Intermediate" as a neutral UI placeholder and do not describe it as proven advanced/basic proficiency.
-            - Use the available sources when present: LinkedIn, CV PDF, Intro Call transcript, Deep Dive transcript, and First Interview transcript.
-            - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, domain experience, and interview examples. Use that information when it clearly refers to the candidate's real background.
-            - Use all possible details found in the source to make work descriptions specific.
-            - Work descriptions should use `- ` for each bullet.
-            - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
-            - If sources overlap, merge them carefully without duplicating the same point.
-            - Prefer the most specific version of a fact when multiple sources mention it.
-            - Ignore speculative statements, future plans, or recruiter opinions unless they describe factual past experience already stated in the source material.
-            - Expand acronyms and explain concepts if mentioned.
-            - translate everything to english
-            Return only the full JSON object. Do not return only partial content or text outside of the JSON.
-            DO NOT merge bullet points into paragraphs. Keep each bullet on a separate line starting with "- ".
-
-            """
+            prompt = _build_resume_generation_prompt(
+                target_role_block=target_role_block,
+                candidate_name=candidate_ctx.get("name", ""),
+                candidate_country=candidate_ctx.get("country", ""),
+                linkedin_scrapper=linkedin_scrapper,
+                cv_pdf_scrapper=cv_pdf_scrapper,
+                intro_call_transcript=intro_call_transcript,
+                deep_dive_transcript=deep_dive_transcript,
+                first_interview_transcript=first_interview_transcript,
+                notes=notes,
+                today=datetime.date.today().isoformat(),
+            )
 
             completion = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are a resume generation assistant."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a senior recruiter writing client-facing CVs. You never "
+                            "invent facts, and you always reply with a single valid JSON object."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                max_tokens=12000
+                max_tokens=12000,
+                response_format={"type": "json_object"},
             )
 
-            if not completion.choices or not hasattr(completion.choices[0], "message"):
+            choice = completion.choices[0] if completion.choices else None
+            if not choice or not getattr(choice, "message", None):
                 raise Exception("❌ OpenAI response missing 'choices[0].message'")
+            if getattr(choice, "finish_reason", "") == "length":
+                # En JSON mode una respuesta truncada es irrecuperable; sin este
+                # guard sale como un "Expecting ',' delimiter" incomprensible.
+                raise Exception(
+                    "The model hit the output limit before finishing the CV. "
+                    "Trim the source material (very long LinkedIn/CV text) and try again."
+                )
 
-            content = completion.choices[0].message.content
-            print("📥 Resume raw response content:", content)
-
-
-            try:
-                print("🔍 Raw OpenAI response content:", repr(content[:500]))
-                json_data = json.loads(content)
-                def format_description_to_html(description):
-                    if not description:
-                        return ""
-
-                    # Separar por líneas
-                    lines = description.strip().split("\n")
-                    first_sentence = ""
-                    bullet_lines = []
-
-                    for line in lines:
-                        stripped = line.strip()
-                        if not stripped:
-                            continue
-                        if stripped.startswith("-") or stripped.startswith("•") or stripped.startswith("–"):
-                            bullet_lines.append(stripped.lstrip("-•–").strip())
-                        elif not first_sentence:
-                            first_sentence = stripped
-
-                    html = ""
-                    if first_sentence:
-                        html += f"<p>{first_sentence}</p>"
-
-                    if bullet_lines:
-                        html += "<ul>" + "".join(f"<li>{b}</li>" for b in bullet_lines) + "</ul>"
-
-                    return html
-
-                for entry in json_data.get("education", []):
-                    entry["description"] = format_description_to_html(entry.get("description", ""))
-
-                for entry in json_data.get("work_experience", []):
-                    entry["description"] = format_description_to_html(entry.get("description", ""))
-
-            except Exception as e1:
-                try:
-                    cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip())
-                    json_data = json.loads(cleaned)
-                    # 🔄 Convertir bullets a HTML incluso en el segundo intento
-                    def format_description_to_html(description):
-                        if not description:
-                            return ""
-                        lines = description.strip().split("\n")
-                        first_sentence = ""
-                        bullet_lines = []
-                        for line in lines:
-                            stripped = line.strip()
-                            if not stripped:
-                                continue
-                            if stripped.startswith("-") or stripped.startswith("•") or stripped.startswith("–"):
-                                bullet_lines.append(stripped.lstrip("-•–").strip())
-                            elif not first_sentence:
-                                first_sentence = stripped
-                        html = ""
-                        if first_sentence:
-                            html += f"<p>{first_sentence}</p>"
-                        if bullet_lines:
-                            html += "<ul>" + "".join(f"<li>{b}</li>" for b in bullet_lines) + "</ul>"
-                        return html
-
-                    for entry in json_data.get("education", []):
-                        entry["description"] = format_description_to_html(entry.get("description", ""))
-
-                    for entry in json_data.get("work_experience", []):
-                        entry["description"] = format_description_to_html(entry.get("description", ""))
-
-                except Exception as e2:
-                    raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
+            content = choice.message.content
+            json_data = _parse_model_json(content)
 
             today = datetime.date.today()
             education_country_source = "\n".join([
@@ -1851,40 +2574,95 @@ Return STRICT JSON:
                 first_interview_transcript or "",
                 notes or "",
             ])
-            for entry in json_data.get("work_experience", []):
-                _clean_generated_work_dates(entry, today)
-            for entry in json_data.get("education", []):
-                _clean_generated_education_dates(entry)
-                entry["country"] = _infer_education_country(entry, education_country_source)
 
-            education = json.dumps(json_data.get('education', []))
-            work_experience = json.dumps(json_data.get('work_experience', []))
-            tools = json.dumps(json_data.get('tools', []))
+            work_entries = [
+                e for e in json_data.get("work_experience", []) if isinstance(e, dict)
+            ]
+            for entry in work_entries:
+                _clean_generated_work_dates(entry, today)
+                entry["description"] = _format_description_to_html(
+                    entry.get("description", ""), bullets_only=True
+                )
+
+            edu_entries = [e for e in json_data.get("education", []) if isinstance(e, dict)]
+            for entry in edu_entries:
+                _clean_generated_education_dates(entry)
+                # _infer_education_country lee entry["description"], así que corre
+                # ANTES de convertirla a HTML.
+                entry["country"] = _infer_education_country(entry, education_country_source)
+                entry["description"] = _format_description_to_html(entry.get("description", ""))
+
+            # About se guarda como texto plano: resume.js lo lee con
+            # stripHtmlToText() SIN separadores, así que "<p>a</p><p>b</p>"
+            # volvería como "ab".
+            about_raw = json_data.get("about")
+            if isinstance(about_raw, list):
+                about_raw = " ".join(str(x) for x in about_raw)
+            about_text = _scrub_about_filler(
+                _strip_html_text(str(about_raw or ""))
+            )[:RESUME_ABOUT_LIMIT].strip()
+
+            tools_list = _normalize_generated_tools(json_data.get("tools"))
+            languages_list = _normalize_generated_languages(json_data.get("languages"))
+
+            education = json.dumps(edu_entries)
+            work_experience = json.dumps(work_entries)
+            tools = json.dumps(tools_list)
+            languages = json.dumps(languages_list)
 
             conn = get_connection()
             cursor = conn.cursor()
 
             cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
-            result = cursor.fetchone()
-            exists = result is not None
+            exists = cursor.fetchone() is not None
 
+            # Sólo escribimos las columnas que el modelo realmente llenó: un
+            # about vacío no debe pisar el que escribió la recruiter a mano.
+            columns = {
+                "education": education,
+                "work_experience": work_experience,
+                "tools": tools,
+            }
+            if about_text:
+                columns["about"] = about_text
+            if languages_list:
+                columns["languages"] = languages
 
             if exists:
-                cursor.execute("""
-                    UPDATE resume SET education=%s, work_experience=%s, tools=%s
-                    WHERE candidate_id=%s
-                """, (education, work_experience, tools, candidate_id))
+                sets = ", ".join(f"{c}=%s" for c in columns)
+                cursor.execute(
+                    f"UPDATE resume SET {sets} WHERE candidate_id=%s",
+                    (*columns.values(), candidate_id),
+                )
             else:
-                cursor.execute("""
-                    INSERT INTO resume (candidate_id, education, work_experience, tools)
-                    VALUES (%s, %s, %s, %s)
-                """, (candidate_id, education, work_experience, tools))
+                cols = ", ".join(["candidate_id", *columns])
+                placeholders = ", ".join(["%s"] * (len(columns) + 1))
+                cursor.execute(
+                    f"INSERT INTO resume ({cols}) VALUES ({placeholders})",
+                    (candidate_id, *columns.values()),
+                )
 
             conn.commit()
             cursor.close()
             conn.close()
 
-            return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
+            # Las claves vacías se OMITEN a propósito: applyGenerated() en
+            # resume.js gatea con hasOwnProperty, no por truthiness, así que
+            # mandar about:"" o languages:"[]" borraría lo que ya había.
+            payload = {
+                "success": True,
+                "education": education,
+                "work_experience": work_experience,
+                "tools": tools,
+                "tailored_to_opportunity_id": opportunity_id,
+            }
+            if about_text:
+                payload["about"] = about_text
+            if languages_list:
+                payload["languages"] = languages
+            if grain_warnings:
+                payload["warnings"] = grain_warnings
+            return jsonify(payload)
 
         except Exception as e:
             logging.error("❌ Error en /generate_resume_fields:")
@@ -1953,13 +2731,16 @@ Return STRICT JSON:
     def extract_cv_from_pdf():
         """
         Extrae texto del último CV (PDF) y lo guarda en candidates.affinda_scrapper y candidates.cv_pdf_scrapper
-        Solo corre si affinda_scrapper está vacío.
-        Body: { "candidate_id": "<id>", "pdf_url": "<https://.../cv.pdf>" }
+        Solo corre si affinda_scrapper está vacío, salvo que se mande force=true.
+        Body: { "candidate_id": "<id>", "pdf_url": "<https://.../cv.pdf>", "force": false }
         """
         try:
             data = request.get_json(force=True) or {}
             candidate_id = str(data.get('candidate_id', '')).strip()
             pdf_url = (data.get('pdf_url') or '').strip()
+            # Sin force, una extracción mala queda congelada para siempre y sólo
+            # se arregla editando la DB a mano.
+            force_reextract = str(data.get('force', '')).strip().lower() in ("1", "true", "yes", "on")
 
             if not candidate_id:
                 return jsonify({"error": "candidate_id is required"}), 400
@@ -1978,7 +2759,7 @@ Return STRICT JSON:
                 return jsonify({"error": "Candidate not found"}), 404
 
             affinda_now, cv_pdf_now = row
-            if (cv_pdf_now or "").strip():
+            if (cv_pdf_now or "").strip() and not force_reextract:
                 cur.close(); conn.close()
                 return jsonify({"skipped": True, "reason": "cv_pdf_scrapper already has content"}), 200
 

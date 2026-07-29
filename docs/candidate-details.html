@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260728-1" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260729-2" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -50,6 +50,30 @@
         </div>
 
         <div class="ai-popup-content">
+          <!-- ===== Target vacancy: drives the JD-tailored generation ===== -->
+          <section class="ai-popup-section">
+            <div class="ai-section-heading">
+              <div>
+                <span class="ai-section-eyebrow">Target Role</span>
+                <h3>Which vacancy is this CV for?</h3>
+              </div>
+              <span class="ai-section-chip ai-section-chip-soft">Tailors the CV</span>
+            </div>
+
+            <div class="ai-input-card ai-input-card-full">
+              <div class="ai-input-head">
+                <label for="ai-opportunity">Opportunity</label>
+                <span class="ai-input-tag">Recommended</span>
+              </div>
+              <select id="ai-opportunity">
+                <option value="">Loading opportunities…</option>
+              </select>
+              <div id="ai-opportunity-note" class="ai-note-box">
+                Pick the vacancy and I'll pull its job description to tailor the resume.
+              </div>
+            </div>
+          </section>
+
           <section class="ai-popup-section">
             <div class="ai-section-heading">
               <div>
@@ -1099,9 +1123,9 @@
   <!-- ===================== Scripts ===================== -->
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="./assets/js/rich-comment-box.js"></script>
-  <script defer src="./assets/js/resume.js?v=20260728-1"></script>
+  <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=6"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260729-2"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

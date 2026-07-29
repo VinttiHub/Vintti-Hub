@@ -569,6 +569,7 @@ a {
 
 #ai-popup input[type="text"]:focus,
 #ai-popup input[type="url"]:focus,
+#ai-popup select:focus,
 #ai-popup textarea:focus {
   border-color: rgba(168, 85, 247, 0.46);
   outline: none;
@@ -580,6 +581,7 @@ a {
 #ai-popup input[type="text"],
 #ai-popup input[type="url"],
 #ai-popup input[type="file"],
+#ai-popup select,
 #ai-popup textarea {
   width: 100%;
   padding: 16px 18px;
@@ -591,6 +593,19 @@ a {
   box-sizing: border-box;
   color: #111827;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* El <select> del selector de vacante: mismo chrome que los inputs, más el
+   chevron propio (el nativo no respeta el border-radius del popup). */
+#ai-popup select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' stroke='%2364748b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
 }
 
 #ai-popup textarea {

@@ -165,6 +165,46 @@ async function ensureCurrentOppId(candidateId, apiBase='https://7m6mw95m8y.us-ea
   return oppId;
 }
 
+// --- Opportunities del candidato: fetch compartido + dedupe + cache ---------
+// Lo usan la tabla de la pestaña Opportunities y el selector del AI popup.
+// Cacheamos la PROMESA (no el resultado) para que dos llamadas simultáneas
+// compartan un solo request; si falla, se descarta para permitir reintento.
+window.__candidateOppsCache = window.__candidateOppsCache || Object.create(null);
+
+function candidatesApiBase(){
+  return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+}
+
+// Nada en esta página cambia la relación candidato↔oportunidad, así que cachear
+// es seguro. Si algún día se agrega "asociar candidato a oportunidad" acá,
+// llamar con { force: true }.
+function fetchCandidateOpportunities(candidateId, { force = false } = {}){
+  const key = String(candidateId || '');
+  if (!key) return Promise.resolve([]);
+  if (!force && window.__candidateOppsCache[key]) return window.__candidateOppsCache[key];
+
+  const p = fetch(`${candidatesApiBase()}/candidates/${key}/opportunities`)
+    .then(r => { if (!r.ok) throw new Error(`GET opportunities failed ${r.status}`); return r.json(); })
+    .then(data => {
+      const seen = new Set();
+      const out  = [];                 // conserva el orden que devuelve el backend
+      (Array.isArray(data) ? data : []).forEach(opp => {
+        const id = opp?.opportunity_id;
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        out.push(opp);
+      });
+      return out;
+    })
+    .catch(err => { delete window.__candidateOppsCache[key]; throw err; });
+
+  window.__candidateOppsCache[key] = p;
+  return p;
+}
+window.fetchCandidateOpportunities = fetchCandidateOpportunities;
+
 function todayYmd(){
   const d = new Date();
   const mm = String(d.getMonth()+1).padStart(2,'0');
@@ -583,6 +623,111 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   // --- Abrir/cerrar popup AI ---
   aiButton?.addEventListener('click', () => aiPopup?.classList.remove('hidden'));
   aiClose?.addEventListener('click', () => aiPopup?.classList.add('hidden'));
+
+  // --- AI popup: selector de vacante (target role) ---
+  // El backend usa el opportunity_id para traer la job description real y
+  // enfocar el CV a ese puesto. Sin selección, genera genérico.
+  (function wireAiOpportunityPicker(){
+    const sel     = document.getElementById('ai-opportunity');
+    const note    = document.getElementById('ai-opportunity-note');
+    const popupEl = document.getElementById('ai-popup');
+    if (!sel) return;
+
+    const GENERIC_NOTE = 'No vacancy selected — the resume will be generated generically.';
+    let loaded  = false;
+    let loading = null;
+
+    const stageLabel = (opp) => {
+      const raw = opp?.candidate_stage || opp?.opp_stage || '';
+      const fmt = window.formatCandidatePipelineStage;
+      return (typeof fmt === 'function') ? fmt(raw) : String(raw || '');
+    };
+
+    // El "#id" desambigua cuando el candidato está en dos batches del mismo
+    // rol y cliente — pasa, y si no se ve, se elige la vacante equivocada.
+    const optionLabel = (opp) => {
+      const parts = [
+        (opp.opp_position_name || 'Untitled position').trim(),
+        (opp.client_name || '').trim(),
+        stageLabel(opp)
+      ].filter(Boolean);
+      return `${parts.join(' · ')} (#${opp.opportunity_id})`;
+    };
+
+    // textContent, nunca innerHTML: estos datos vienen del backend.
+    function paintNote(){
+      if (!note) return;
+      const opt = sel.options[sel.selectedIndex];
+      if (!sel.value || !opt) { note.textContent = GENERIC_NOTE; return; }
+      const client = opt.dataset.client ? ` at ${opt.dataset.client}` : '';
+      note.textContent =
+        `Tailoring this resume to “${opt.dataset.position || 'this vacancy'}”${client} ` +
+        `(opportunity #${sel.value}). Its job description will be used.`;
+    }
+
+    function populate(){
+      if (loaded)  return Promise.resolve();
+      if (loading) return loading;
+
+      sel.innerHTML = '<option value="">Loading opportunities…</option>';
+
+      loading = fetchCandidateOpportunities(candidateId)
+        .catch(err => { console.warn('⚠️ AI popup: could not load opportunities', err); return null; })
+        .then(opps => {
+          const failed = (opps === null);
+          const list   = Array.isArray(opps) ? opps : [];
+
+          sel.innerHTML = '';
+          const generic = document.createElement('option');
+          generic.value = '';
+          generic.textContent = list.length
+            ? 'None / generic CV'
+            : (failed ? 'Could not load opportunities — generic CV'
+                      : 'No opportunities yet — generic CV');
+          sel.appendChild(generic);
+
+          list.forEach(opp => {
+            const o = document.createElement('option');
+            o.value            = String(opp.opportunity_id);
+            o.textContent      = optionLabel(opp);
+            o.dataset.position = opp.opp_position_name || '';
+            o.dataset.client   = opp.client_name || '';
+            sel.appendChild(o);
+          });
+
+          // Preselección conservadora: sólo cuando no hay ambigüedad. Con 2+
+          // vacantes y sin señal de hire queda en genérico — quien no elige
+          // obtiene el resultado seguro, nunca un CV apuntado al cliente
+          // equivocado en silencio.
+          let preselect = '';
+          if (list.length === 1) {
+            preselect = String(list[0].opportunity_id);
+          } else if (list.length > 1 && window.__currentOppId &&
+                     list.some(o => String(o.opportunity_id) === String(window.__currentOppId))) {
+            preselect = String(window.__currentOppId);
+          }
+          sel.value = preselect;
+
+          loaded = !failed;   // si falló, reintenta la próxima vez que se abra
+          paintNote();
+        })
+        .finally(() => { loading = null; });
+
+      return loading;
+    }
+
+    sel.addEventListener('change', paintNote);
+    aiButton?.addEventListener('click', () => { populate(); });
+    if (popupEl && !popupEl.classList.contains('hidden')) populate();
+
+    window.__aiOpportunity = {
+      ensure: populate,
+      id: () => { const v = (sel.value || '').trim(); return v ? Number(v) : null; },
+      label: () => sel.options[sel.selectedIndex]?.textContent || '',
+      reload: () => { loaded = false; return populate(); }
+    };
+  })();
+
   // --- LET'S GO (AI Assistant) ---
 // --- Sustituye COMPLETO el bloque (function wireAiLetsGo(){...}) por:
 (function wireAiGenerate(){
@@ -642,7 +787,10 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
 
   // Enter en el popup = click
   aiPopup?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); letsGoBtn.click(); }
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    // Elegir una vacante con el teclado no debe disparar la generación.
+    if ((e.target?.tagName || '').toUpperCase() === 'SELECT') return;
+    e.preventDefault(); letsGoBtn.click();
   });
 
   const introLinkEl = document.getElementById('ai-intro-call-link');
@@ -679,6 +827,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
       const first_interview_link = (firstInterviewLinkEl?.value || '').trim();
       const first_interview_transcript = (firstInterviewEl?.value || '').trim();
       const notes = (commentsEl?.value || '').trim();
+
+      // El selector se puebla al abrir el popup; esto sólo espera si se abrió
+      // por otra vía o el fetch sigue en vuelo.
+      try { await window.__aiOpportunity?.ensure?.(); } catch {}
+      const opportunity_id = window.__aiOpportunity?.id?.() ?? null;
+
       let hasLinkedinUrl = false, hasAnyCvFile = false;
 
       try {
@@ -714,6 +868,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           candidate_id: candidateId,
+          opportunity_id,          // null = CV genérico, sin JD
           linkedin_scrapper,
           cv_pdf_scrapper,
           intro_call_link,
@@ -3233,22 +3388,16 @@ if (hireRevenue){
     const normalizedStage = String(stage || '').trim();
     return PIPELINE_STAGE_LABELS[normalizedStage] || normalizedStage;
   }
+  // El selector del AI popup vive en otro IIFE y no alcanza esta función.
+  window.formatCandidatePipelineStage = formatCandidatePipelineStage;
 
   window.loadOpportunitiesForCandidate = function () {
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
-      .then(res => res.json())
-      .then(data => {
+    // Fetch + dedupe compartidos con el selector del AI popup.
+    fetchCandidateOpportunities(candidateId)
+      .then(uniqueOpps => {
         const tbody = document.querySelector("#opportunitiesTable tbody");
         if (!tbody) return;
         tbody.innerHTML = "";
-        const uniqueOpps = []; // keep display order while filtering duplicates
-        const seenIds = new Set();
-        (data || []).forEach(opp => {
-          const oppId = opp?.opportunity_id;
-          if (!oppId || seenIds.has(oppId)) return;
-          seenIds.add(oppId);
-          uniqueOpps.push(opp);
-        });
         uniqueOpps.forEach(opp => {
           const row = document.createElement("tr");
           row.innerHTML = `
@@ -3266,7 +3415,8 @@ if (hireRevenue){
           });
           tbody.appendChild(row);
         });
-      });
+      })
+      .catch(err => console.warn('⚠️ Could not load opportunities table', err));
   };
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
     loadOpportunitiesForCandidate();
