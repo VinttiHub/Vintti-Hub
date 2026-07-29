@@ -29,6 +29,24 @@
     referral: "Referral", linkedin: "LinkedIn", job_board: "Job board",
     inbound: "Inbound", sourced: "Sourced",
   };
+  // Values arrive with mixed casing ("LinkedIn" from the apply form, "Linkedin"
+  // from Vintti), so match on lowercase and fall back to what's stored.
+  const sourceLabel = (s) =>
+    SOURCE_LABEL[String(s || "").toLowerCase()] || String(s || "");
+
+  /* Two different questions share the word "source":
+       candidate.source   — where we originally found this person
+       application.source — how they got into THIS pipeline
+     Showing only the first is what made an imported candidate read "LinkedIn". */
+  const APP_SOURCE_LABEL = {
+    careers:   "Applied through the apply page",
+    linkedin:  "Applied via the LinkedIn link",
+    referral:  "Applied via a referral link",
+    job_board: "Applied via a job-board link",
+    sourced:   "Sourced from LinkedIn",
+    vintti:    "Added from Vintti",
+    hirex:     "Added from another pipeline",
+  };
 
   // Scorecards
   const COMPETENCIES = ["Technical skills", "Problem solving", "Communication",
@@ -63,13 +81,14 @@
       candAvatar: $("hxCandAvatar"), candName: $("hxCandName"), candSub: $("hxCandSub"),
       candStage: $("hxCandStage"), candStars: $("hxCandStars"), candContact: $("hxCandContact"),
       candCv: $("hxCandCv"), cvInput: $("hxCvInput"), candAi: $("hxCandAi"),
-      candAnswers: $("hxCandAnswers"),
+      candAnswers: $("hxCandAnswers"), candEdit: $("hxCandEdit"),
       scorecards: $("hxScorecards"),
       scScrim: $("hxScScrim"), scDrawer: $("hxScDrawer"), scTitle: $("hxScTitle"),
       scBody: $("hxScBody"), scClose: $("hxScClose"), scCancel: $("hxScCancel"),
       scSave: $("hxScSave"), scDelete: $("hxScDelete"),
       candNotes: $("hxCandNotes"), candRemove: $("hxCandRemove"), candSave: $("hxCandSave"),
       apply: $("hxApply"),
+      peopleSearch: $("hxPeopleSearch"), peopleResults: $("hxPeopleResults"),
       sourceBtn: $("hxSourceBtn"), srcScrim: $("hxSrcScrim"), srcUrl: $("hxSrcUrl"),
       srcStage: $("hxSrcStage"), srcCancel: $("hxSrcCancel"), srcGo: $("hxSrcGo"),
       qScrim: $("hxQScrim"), qDrawer: $("hxQDrawer"), qTitle: $("hxQTitle"), qBody: $("hxQBody"),
@@ -110,6 +129,12 @@
     els.scScrim.addEventListener("click", closeScorecardEditor);
     els.scSave.addEventListener("click", saveScorecard);
     els.scDelete.addEventListener("click", deleteMyScorecard);
+
+    // Reuse someone we already have
+    els.peopleSearch.addEventListener("input", () => {
+      clearTimeout(peopleTimer);
+      peopleTimer = setTimeout(searchPeople, 260);
+    });
 
     // Source from LinkedIn
     els.srcStage.innerHTML = STAGES.map((s) => `<option value="${s.key}">${s.label}</option>`).join("");
@@ -263,7 +288,7 @@
           </div>
         </div>
         <div class="hx-card-foot">
-          ${c.source ? `<span class="hx-src-chip">${esc(SOURCE_LABEL[c.source] || c.source)}</span>` : ""}
+          ${c.source ? `<span class="hx-src-chip">${esc(sourceLabel(c.source))}</span>` : ""}
           ${c.has_cv ? `<span class="hx-cv-flag" title="CV on file"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           ${(a.knockout_flags || []).length ? `<span class="hx-ko-flag" title="Doesn't meet: ${esc((a.knockout_flags || []).join(" · "))}"><i class="fa-solid fa-flag"></i></span>` : ""}
           ${a.ai_score != null ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">AI ${a.ai_score}</span>` : ""}
@@ -405,7 +430,7 @@
     const maxSrc = Math.max(1, ...srcs.map((s) => s.count));
     const srcBars = srcs.length
       ? srcs.map((s) => {
-          const label = s.source === "unknown" ? "Unknown" : (SOURCE_LABEL[s.source] || s.source);
+          const label = s.source === "unknown" ? "Unknown" : sourceLabel(s.source);
           return `<div class="hx-ov-bar-row">
             <span class="hx-ov-bar-label">${esc(label)}</span>
             <span class="hx-ov-bar"><span style="width:${(s.count / maxSrc * 100).toFixed(1)}%"></span></span>
@@ -472,6 +497,8 @@
   function openAddDrawer() {
     els.addForm.reset();
     els.addStage.value = "applied";
+    els.peopleSearch.value = "";
+    els.peopleResults.innerHTML = "";
     clearErr(els.addForm);
     openDrawer(els.addScrim, els.addDrawer, () => els.addForm.querySelector('[name="first_name"]').focus());
   }
@@ -501,6 +528,84 @@
       toast("err", err.message || "Couldn't add the candidate");
     } finally {
       els.addSave.disabled = false; els.addSave.textContent = "Add to pipeline";
+    }
+  }
+
+  /* =======================================================================
+     Reuse a person we already have — from Hirex or from Vintti.
+     Same question either way ("do we already have them?"), so one search.
+     ======================================================================= */
+  let peopleTimer = null;
+
+  async function searchPeople() {
+    const q = els.peopleSearch.value.trim();
+    if (q.length < 2) { els.peopleResults.innerHTML = ""; return; }
+    els.peopleResults.innerHTML = `<div class="hx-people-note">Searching…</div>`;
+    try {
+      const res = await fetch(
+        `${API_BASE}/hirex/people?q=${encodeURIComponent(q)}&job_id=${jobId}`,
+        { credentials: "include" });
+      if (!res.ok) throw new Error();
+      renderPeople(await res.json());
+    } catch {
+      els.peopleResults.innerHTML = `<div class="hx-people-note">Couldn't search right now.</div>`;
+    }
+  }
+
+  function renderPeople(people) {
+    if (!people.length) {
+      els.peopleResults.innerHTML =
+        `<div class="hx-people-note">Nobody found — fill the form below to add them.</div>`;
+      return;
+    }
+    els.peopleResults.innerHTML = people.map((p, i) => `
+      <button type="button" class="hx-person" data-i="${i}" ${p.in_this_job ? "disabled" : ""}>
+        <span class="hx-avatar" style="background:${avatarColor(p.full_name)}">${initials(p.full_name)}</span>
+        <span class="hx-person-txt">
+          <span class="hx-person-name">${esc(p.full_name)}</span>
+          <span class="hx-person-sub">
+            ${p.email ? esc(p.email) : ""}${p.headline ? ` · ${esc(p.headline)}` : ""}
+          </span>
+          ${p.also_in_vintti_as
+            ? `<span class="hx-person-aka">In Vintti as “${esc(p.also_in_vintti_as)}”</span>` : ""}
+        </span>
+        <span class="hx-person-tags">
+          ${p.in_this_job
+            ? `<span class="hx-person-tag is-in">Already here</span>`
+            : `<span class="hx-person-tag hx-person-${p.source}">${p.source === "hirex" ? "Hirex" : "Vintti"}</span>`}
+          ${p.source === "hirex" && p.pipelines
+            ? `<span class="hx-person-tag">${p.pipelines} pipeline${p.pipelines > 1 ? "s" : ""}</span>` : ""}
+          ${p.has_text
+            ? `<span class="hx-person-tag is-ai" title="We already have text the AI can score">AI ready</span>` : ""}
+        </span>
+      </button>`).join("");
+
+    els.peopleResults.querySelectorAll(".hx-person:not([disabled])").forEach((btn) => {
+      btn.addEventListener("click", () => addExisting(people[Number(btn.dataset.i)], btn));
+    });
+  }
+
+  async function addExisting(person, btn) {
+    btn.disabled = true;
+    btn.classList.add("is-busy");
+    try {
+      const res = await apiWrite(`/hirex/jobs/${jobId}/candidates/existing`, "POST", {
+        source: person.source, id: person.id,
+        stage: els.addForm.elements.stage ? els.addForm.elements.stage.value : "applied",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      closeAddDrawer();
+      activityLoaded = false;
+      await loadPipeline();
+      toast("ok", body.text_from
+        ? `${body.full_name} added — the AI can score them using ${body.text_from}`
+        : `${body.full_name} added`);
+      if (body.application_id) openCandDrawer(body.application_id);
+    } catch (err) {
+      btn.disabled = false;
+      btn.classList.remove("is-busy");
+      toast("err", err.message || "Couldn't add that person");
     }
   }
 
@@ -563,13 +668,7 @@
     renderStarPicker(a.rating || 0);
     els.candNotes.value = c.notes || "";
 
-    const contact = [];
-    if (c.email) contact.push(`<a href="mailto:${esc(c.email)}"><i class="fa-solid fa-envelope"></i>${esc(c.email)}</a>`);
-    if (c.phone) contact.push(`<span><i class="fa-solid fa-phone"></i>${esc(c.phone)}</span>`);
-    if (c.linkedin_url) contact.push(`<a href="${esc(linkUrl(c.linkedin_url))}" target="_blank" rel="noopener"><i class="fa-brands fa-linkedin"></i>LinkedIn</a>`);
-    if (c.location) contact.push(`<span><i class="fa-solid fa-location-dot"></i>${esc(c.location)}</span>`);
-    if (c.source) contact.push(`<span><i class="fa-solid fa-signal"></i>${esc(SOURCE_LABEL[c.source] || c.source)}</span>`);
-    els.candContact.innerHTML = contact.join("") || `<span class="hx-cell-muted">No contact details</span>`;
+    renderContact(c);
 
     els.candCv.innerHTML = "";
     els.candAnswers.innerHTML = "";
@@ -600,6 +699,120 @@
       els.candAi.innerHTML = "";
       renderCv((currentCand && currentCand.candidate) || {});
     }
+  }
+
+  /* =======================================================================
+     Candidate details — read-only summary that flips into a form.
+     Kept collapsed by default: this drawer is mostly for reviewing someone,
+     not for data entry, and a wall of inputs would bury the AI and scorecards.
+     ======================================================================= */
+  const ENGLISH_LEVELS = ["Beginner", "Intermediate", "Advanced", "Fluent", "Native"];
+  const EDITABLE_CAND_FIELDS = [
+    "first_name", "last_name", "email", "phone", "headline", "current_company",
+    "location", "country", "english_level", "linkedin_url", "area",
+    "desired_salary", "source",
+  ];
+
+  function renderContact(c) {
+    const bits = [];
+    if (c.email) bits.push(`<a href="mailto:${esc(c.email)}"><i class="fa-solid fa-envelope"></i>${esc(c.email)}</a>`);
+    if (c.phone) bits.push(`<span><i class="fa-solid fa-phone"></i>${esc(c.phone)}</span>`);
+    if (c.linkedin_url) bits.push(`<a href="${esc(linkUrl(c.linkedin_url))}" target="_blank" rel="noopener"><i class="fa-brands fa-linkedin"></i>LinkedIn</a>`);
+    const where = [c.location, c.country].filter(Boolean).join(", ");
+    if (where) bits.push(`<span><i class="fa-solid fa-location-dot"></i>${esc(where)}</span>`);
+    if (c.current_company) bits.push(`<span><i class="fa-solid fa-building"></i>${esc(c.current_company)}</span>`);
+    if (c.english_level) bits.push(`<span><i class="fa-solid fa-language"></i>${esc(c.english_level)}</span>`);
+    if (c.source) {
+      bits.push(`<span title="Where we originally found this person"><i class="fa-solid fa-signal"></i>Found via ${esc(sourceLabel(c.source))}</span>`);
+    }
+    // How they landed in this particular pipeline — a different fact.
+    const how = currentCand && currentCand.source;
+    if (how) {
+      bits.push(`<span title="How they entered this pipeline"><i class="fa-solid fa-arrow-right-to-bracket"></i>${
+        esc(APP_SOURCE_LABEL[String(how).toLowerCase()] || sourceLabel(how))}</span>`);
+    }
+
+    els.candContact.innerHTML =
+      (bits.join("") || `<span class="hx-cell-muted">No contact details yet</span>`) +
+      `<button type="button" class="hx-cand-editbtn" id="hxCandEditBtn">
+         <i class="fa-solid fa-pen"></i> Edit details
+       </button>`;
+    els.candEdit.hidden = true;
+    els.candEdit.innerHTML = "";
+    // Toggle: pressing it again collapses the form and drops the edits.
+    $("hxCandEditBtn").addEventListener("click", () => {
+      if (els.candEdit.hidden) openContactForm(c);
+      else renderContact(c);
+    });
+  }
+
+  function openContactForm(c) {
+    const text = (name, label, placeholder = "") => `
+      <label class="hx-field">
+        <span>${label}</span>
+        <input type="text" data-cand="${name}" value="${esc(c[name] || "")}" placeholder="${esc(placeholder)}" />
+      </label>`;
+
+    els.candEdit.innerHTML = `
+      <div class="hx-grid">
+        ${text("first_name", "First name")}
+        ${text("last_name", "Last name")}
+        ${text("email", "Email", "jane@email.com")}
+        ${text("phone", "Phone")}
+        ${text("headline", "Role / position", "Senior Backend Engineer")}
+        ${text("current_company", "Current company")}
+        ${text("location", "City")}
+        ${text("country", "Country")}
+        <label class="hx-field">
+          <span>English level</span>
+          <select data-cand="english_level">
+            <option value="">—</option>
+            ${ENGLISH_LEVELS.map((l) =>
+              `<option value="${l}" ${c.english_level === l ? "selected" : ""}>${l}</option>`).join("")}
+          </select>
+        </label>
+        ${text("area", "Area", "Marketing")}
+        ${text("linkedin_url", "LinkedIn", "linkedin.com/in/…")}
+        ${text("desired_salary", "Desired salary")}
+        <label class="hx-field hx-col-2">
+          <span>Source</span>
+          <select data-cand="source">
+            <option value="">—</option>
+            ${Object.entries(SOURCE_LABEL).map(([k, v]) =>
+              `<option value="${k}" ${c.source === k ? "selected" : ""}>${v}</option>`).join("")}
+            ${c.source && !SOURCE_LABEL[c.source]
+              ? `<option value="${esc(c.source)}" selected>${esc(c.source)}</option>` : ""}
+          </select>
+        </label>
+      </div>
+      <em class="hx-err" data-err="cand"></em>`;
+    els.candEdit.hidden = false;
+    setEditBtnState($("hxCandEditBtn"), true);
+    const first = els.candEdit.querySelector("input");
+    if (first) first.focus();
+  }
+
+  /** The button says what pressing it will do next. */
+  function setEditBtnState(btn, open) {
+    if (!btn) return;
+    btn.innerHTML = open
+      ? `<i class="fa-solid fa-xmark"></i> Cancel edit`
+      : `<i class="fa-solid fa-pen"></i> Edit details`;
+    btn.classList.toggle("is-open", open);
+  }
+
+  /** Only the fields the recruiter actually changed. */
+  function readContactForm() {
+    if (els.candEdit.hidden || !currentCand) return {};
+    const before = currentCand.candidate || {};
+    const patch = {};
+    EDITABLE_CAND_FIELDS.forEach((name) => {
+      const el = els.candEdit.querySelector(`[data-cand="${name}"]`);
+      if (!el) return;
+      const value = el.value.trim();
+      if (value !== String(before[name] ?? "")) patch[name] = value || null;
+    });
+    return patch;
   }
 
   /** Screening answers from the public apply page, plus any knockout flags.
@@ -832,20 +1045,29 @@
     const a = currentCand;
     const newStage = els.candStage.value;
     const newNotes = els.candNotes.value.trim();
+    // Anything edited in the details form travels with the notes in one PATCH.
+    const candPatch = readContactForm();
+    if ((a.candidate.notes || "") !== newNotes) candPatch.notes = newNotes || null;
+    if ("first_name" in candPatch && !candPatch.first_name) {
+      showErr(els.candEdit, "cand", "A first name is required");
+      return;
+    }
+
     els.candSave.disabled = true; els.candSave.textContent = "Saving…";
     try {
       const r1 = await apiWrite(`/hirex/applications/${a.application_id}`, "PATCH", { stage: newStage, rating: pickRating });
       if (!r1.ok) throw new Error();
-      if ((a.candidate.notes || "") !== newNotes) {
-        const r2 = await apiWrite(`/hirex/candidates/${a.candidate_id}`, "PATCH", { notes: newNotes || null });
-        if (!r2.ok) throw new Error();
+      if (Object.keys(candPatch).length) {
+        const r2 = await apiWrite(`/hirex/candidates/${a.candidate_id}`, "PATCH", candPatch);
+        const body = await r2.json().catch(() => ({}));
+        if (!r2.ok) throw new Error(body.error || "");
       }
       toast("ok", "Saved");
       activityLoaded = false;
       closeCandDrawer();
       loadPipeline();
-    } catch {
-      toast("err", "Couldn't save changes");
+    } catch (err) {
+      toast("err", err.message || "Couldn't save changes");
     } finally {
       els.candSave.disabled = false; els.candSave.textContent = "Save";
     }
@@ -1552,7 +1774,11 @@
   }
   function showErr(form, key, msg) {
     const em = form.querySelector(`.hx-err[data-err="${key}"]`);
-    if (em) { em.textContent = msg; em.closest(".hx-field").classList.add("has-error"); }
+    if (!em) return;
+    em.textContent = msg;
+    // Not every error message sits inside a field wrapper.
+    const field = em.closest(".hx-field");
+    if (field) field.classList.add("has-error");
   }
   function clearErr(form) {
     form.querySelectorAll(".hx-err").forEach((e) => (e.textContent = ""));

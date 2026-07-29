@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260728-1" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260729-8" />
 </head>
 
 <body class="light-mode">
@@ -35,6 +35,12 @@
         <div class="hx-search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input id="hxSearch" type="search" placeholder="Search candidates by name, email, or headline" autocomplete="off" />
+        </div>
+
+        <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-primary" id="hxNewCand">
+            <i class="fa-solid fa-user-plus"></i> New candidate
+          </button>
         </div>
       </header>
 
@@ -67,7 +73,7 @@
                 <th>Email</th>
                 <th class="hx-col-apps">Applications</th>
                 <th>Applied</th>
-                <th>Jobs</th>
+                <th>Jobs & stage</th>
                 <th>Source</th>
                 <th class="hx-col-openings">CV</th>
               </tr>
@@ -108,10 +114,77 @@
         </header>
         <div class="hx-drawer-body">
           <div class="hx-cand-contact" id="hxProfContact"></div>
+          <div class="hx-cand-edit" id="hxProfEdit" hidden></div>
           <div class="hx-cand-cv" id="hxProfCv"></div>
           <input type="file" id="hxCvInput" accept=".pdf,.doc,.docx" hidden />
           <div class="hx-prof-apps" id="hxProfApps"></div>
         </div>
+        <footer class="hx-drawer-foot" id="hxProfFoot" hidden>
+          <button class="hx-btn hx-btn-ghost" id="hxProfCancel" type="button">Cancel</button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-primary" id="hxProfSave" type="button">Save changes</button>
+          </div>
+        </footer>
+      </aside>
+
+      <!-- ============ New candidate drawer ============ -->
+      <div class="hx-scrim" id="hxNewScrim" hidden></div>
+      <aside class="hx-drawer" id="hxNewDrawer" aria-hidden="true">
+        <header class="hx-drawer-head">
+          <div><span class="hx-eyebrow">New</span><h2>New candidate</h2></div>
+          <button class="hx-icon-btn" id="hxNewClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <form class="hx-drawer-body" id="hxNewForm">
+          <div class="hx-grid" style="padding-top:12px">
+            <label class="hx-field">
+              <span>First name <b class="hx-req">*</b></span>
+              <input name="first_name" type="text" placeholder="Jane" required />
+              <em class="hx-err" data-err="first_name"></em>
+            </label>
+            <label class="hx-field"><span>Last name</span><input name="last_name" type="text" placeholder="Doe" /></label>
+            <label class="hx-field">
+              <span>Email</span>
+              <input name="email" type="email" placeholder="jane@email.com" />
+              <em class="hx-err" data-err="email"></em>
+            </label>
+            <label class="hx-field"><span>Phone</span><input name="phone" type="text" placeholder="+54 …" /></label>
+            <label class="hx-field hx-col-2"><span>Role / position</span><input name="headline" type="text" placeholder="Senior Backend Engineer" /></label>
+            <label class="hx-field"><span>Current company</span><input name="current_company" type="text" placeholder="Acme" /></label>
+            <label class="hx-field"><span>Area</span><input name="area" type="text" placeholder="Engineering" /></label>
+            <label class="hx-field"><span>City</span><input name="location" type="text" placeholder="Buenos Aires" /></label>
+            <label class="hx-field"><span>Country</span><input name="country" type="text" placeholder="Argentina" /></label>
+            <label class="hx-field">
+              <span>English level</span>
+              <select name="english_level" id="hxNewEnglish"></select>
+            </label>
+            <label class="hx-field"><span>Desired salary</span><input name="desired_salary" type="text" placeholder="USD 3,000 / month" /></label>
+            <label class="hx-field hx-col-2"><span>LinkedIn</span><input name="linkedin_url" type="text" placeholder="linkedin.com/in/…" /></label>
+            <label class="hx-field hx-col-2">
+              <span>Source</span>
+              <select name="source" id="hxNewSource"></select>
+            </label>
+            <label class="hx-field hx-col-2"><span>Notes</span><textarea name="notes" rows="3" placeholder="Anything worth remembering"></textarea></label>
+          </div>
+
+          <div class="hx-reuse-or"><span>where should they go?</span></div>
+
+          <div class="hx-grid" style="padding-top:12px">
+            <label class="hx-field">
+              <span>Add to a job <em class="hx-hint">optional</em></span>
+              <select name="job_id" id="hxNewJobSel"></select>
+            </label>
+            <label class="hx-field">
+              <span>Start stage</span>
+              <select name="stage" id="hxNewStage"></select>
+            </label>
+          </div>
+        </form>
+        <footer class="hx-drawer-foot">
+          <button class="hx-btn hx-btn-ghost" id="hxNewCancel" type="button">Cancel</button>
+          <div class="hx-foot-right">
+            <button class="hx-btn hx-btn-primary" id="hxNewSave" type="button">Create candidate</button>
+          </div>
+        </footer>
       </aside>
 
       <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
@@ -120,6 +193,6 @@
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-candidates.js?v=20260724-3" defer></script>
+  <script src="./assets/js/hirex-candidates.js?v=20260729-8" defer></script>
 </body>
 </html>

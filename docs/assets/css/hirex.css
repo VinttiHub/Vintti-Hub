@@ -745,9 +745,30 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-cand-cell-txt { min-width: 0; }
 .hx-cand-cell-name { font-weight: 600; color: var(--hx-ink); line-height: 1.2; }
 .hx-cand-cell-sub { font-size: 12px; color: var(--hx-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
-.hx-job-chips { display: flex; flex-wrap: wrap; gap: 5px; max-width: 260px; }
-.hx-job-chip { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; background: var(--hx-surface-2); border: 1px solid var(--hx-line); color: var(--hx-ink-2); white-space: nowrap; }
-.hx-job-chip.more { color: var(--hx-muted); }
+.hx-job-chips { display: flex; flex-wrap: wrap; gap: 5px; max-width: 320px; }
+.hx-job-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; padding: 3px 4px 3px 9px; border-radius: 999px;
+  background: var(--hx-surface-2); border: 1px solid var(--hx-line);
+  color: var(--hx-ink-2); white-space: nowrap; max-width: 100%;
+}
+.hx-job-chip-title { overflow: hidden; text-overflow: ellipsis; }
+.hx-job-chip.more { padding: 3px 9px; color: var(--hx-muted); }
+
+/* Which stage of that job's pipeline the candidate is sitting in. Colour comes
+   from the board (--s), so a stage reads the same everywhere in Hirex. */
+.hx-stage-tag {
+  flex: none;
+  padding: 1.5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  color: var(--s, var(--hx-muted));
+  background: color-mix(in srgb, var(--s, var(--hx-muted)) 13%, #fff);
+  border: 1px solid color-mix(in srgb, var(--s, var(--hx-muted)) 32%, #fff);
+}
 
 .hx-prof-apps { margin-top: 20px; border-top: 1px solid var(--hx-line); padding-top: 16px; }
 .hx-prof-apps h5 { margin: 0 0 12px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--hx-muted); }
@@ -755,7 +776,10 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-app-row:hover { border-color: var(--hx-accent); background: var(--hx-accent-wash); }
 .hx-app-info { min-width: 0; flex: 1; }
 .hx-app-title { font-size: 13.5px; font-weight: 600; color: var(--hx-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hx-app-meta { font-size: 12px; color: var(--hx-muted); margin-top: 2px; }
+.hx-app-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  font-size: 12px; color: var(--hx-muted); margin-top: 4px;
+}
 .hx-app-open { color: var(--hx-faint); font-size: 13px; flex: none; }
 
 /* ---------- Overview tab ---------- */
@@ -965,6 +989,85 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 
 /* LinkedIn sourcing modal */
 .hx-modal-mark-li { background: #eaf3fe; color: #0a66c2; }
+
+/* =====================================================================
+   "Already have this person?" — reuse before retyping
+   ===================================================================== */
+.hx-reuse { padding-top: 12px; }
+.hx-people { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.hx-people:empty { margin-top: 0; }
+.hx-people-note { padding: 12px 2px; font-size: 12.5px; color: var(--hx-muted); }
+
+.hx-person {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 11px; text-align: left;
+  border: 1px solid var(--hx-line); border-radius: var(--hx-r-sm);
+  background: var(--hx-surface); font: inherit; cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.hx-person:hover:not([disabled]) { border-color: var(--hx-accent); background: var(--hx-accent-wash); }
+.hx-person[disabled] { opacity: .55; cursor: default; }
+.hx-person.is-busy { opacity: .5; }
+.hx-person .hx-avatar { width: 28px; height: 28px; font-size: 11px; flex: none; }
+.hx-person-txt { flex: 1; min-width: 0; }
+.hx-person-name { display: block; font-size: 13.5px; font-weight: 550; color: var(--hx-ink); }
+.hx-person-sub {
+  display: block; font-size: 12px; color: var(--hx-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* --- Candidate details, editable --- */
+.hx-cand-editbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 4px; padding: 3px 10px;
+  border: 1px solid var(--hx-line); border-radius: 999px;
+  background: var(--hx-surface); color: var(--hx-muted);
+  font: inherit; font-size: 11.5px; font-weight: 550; cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.hx-cand-editbtn:hover { border-color: var(--hx-accent); color: var(--hx-accent); background: var(--hx-accent-wash); }
+.hx-cand-editbtn i { font-size: 9.5px; }
+/* Open state: reads as "press to close", not as the action you just took. */
+.hx-cand-editbtn.is-open {
+  border-color: var(--hx-accent); color: var(--hx-accent); background: var(--hx-accent-wash);
+}
+.hx-cand-editbtn.is-open i { font-size: 11px; }
+
+.hx-cand-edit {
+  margin-top: 12px;
+  padding: 4px 14px 14px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+}
+.hx-cand-edit .hx-grid { padding-bottom: 0; }
+.hx-cand-edit .hx-field > span { font-size: 11.5px; }
+.hx-cand-edit input, .hx-cand-edit select { font-size: 13.5px; padding: 8px 10px; }
+
+/* Why a search for one name returned a row with a different name on it. */
+.hx-person-aka {
+  display: block; margin-top: 3px;
+  font-size: 11px; color: var(--hx-accent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hx-person-tags { display: flex; flex-wrap: wrap; gap: 4px; flex: none; justify-content: flex-end; }
+.hx-person-tag {
+  padding: 1.5px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 650; white-space: nowrap;
+  background: var(--hx-surface-2); border: 1px solid var(--hx-line); color: var(--hx-muted);
+}
+.hx-person-hirex  { background: var(--hx-accent-wash); border-color: #d4dbff; color: var(--hx-accent); }
+.hx-person-vintti { background: #f4f0ff; border-color: #e0d6ff; color: #6c38ff; }
+.hx-person-tag.is-ai { background: var(--hx-lime); border-color: #b3ef5c; color: var(--hx-lime-ink); }
+.hx-person-tag.is-in { background: var(--hx-slate); border-color: #d5dae2; color: var(--hx-slate-ink); }
+
+/* Separator: reusing someone is the better path, so it comes first. */
+.hx-reuse-or {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0 0; color: var(--hx-faint); font-size: 11.5px;
+}
+.hx-reuse-or::before, .hx-reuse-or::after {
+  content: ""; flex: 1; height: 1px; background: var(--hx-line);
+}
 
 /* =====================================================================
    Opportunity picker — "New job from an opportunity"

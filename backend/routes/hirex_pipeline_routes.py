@@ -424,6 +424,103 @@ def delete_application(app_id):
 
 
 # --- Candidate directory -----------------------------------------------------
+@bp.route("/candidates", methods=["POST"])
+def create_candidate():
+    """Create a candidate from the directory, optionally dropping them into a job.
+
+    The job is optional on purpose: you can bank someone good now and decide
+    which pipeline they belong in later.
+    """
+    data = request.get_json(silent=True) or {}
+    first = (data.get("first_name") or "").strip()
+    if not first:
+        return jsonify({"error": "first_name is required"}), 400
+
+    stage = (data.get("stage") or "applied").strip()
+    if stage not in STAGE_SET:
+        return jsonify({"error": f"invalid stage '{stage}'"}), 400
+
+    job_id = data.get("job_id")
+    if job_id in ("", None):
+        job_id = None
+    else:
+        try:
+            job_id = int(job_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid job"}), 400
+
+    email = (data.get("email") or "").strip().lower() or None
+    actor = _actor_email()
+
+    conn = None
+    try:
+        conn = get_connection()
+        conn.autocommit = False
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SET LOCAL lock_timeout = '5s';")
+            cur.execute("SET LOCAL statement_timeout = '10s';")
+
+            if job_id is not None:
+                cur.execute("SELECT 1 FROM hirex_jobs WHERE job_id = %s;", (job_id,))
+                if not cur.fetchone():
+                    conn.rollback()
+                    return jsonify({"error": "job not found"}), 404
+
+            # Same soft dedup as the pipeline: one person, one record.
+            candidate_id = None
+            if email:
+                cur.execute(
+                    "SELECT candidate_id, TRIM(CONCAT_WS(' ', first_name, last_name)) AS full_name "
+                    "FROM hirex_candidates WHERE LOWER(email) = LOWER(%s) "
+                    "ORDER BY candidate_id LIMIT 1;",
+                    (email,),
+                )
+                hit = cur.fetchone()
+                if hit:
+                    conn.rollback()
+                    return jsonify({
+                        "error": f"{hit['full_name']} already uses that email. "
+                                 f"Search for them instead of creating a duplicate.",
+                        "candidate_id": hit["candidate_id"],
+                    }), 409
+
+            cols = {f: (data.get(f) or None) for f in CAND_FIELDS if data.get(f)}
+            cols["first_name"] = first
+            if email:
+                cols["email"] = email
+            cols["created_by"] = actor
+            names = list(cols)
+            cur.execute(
+                f"INSERT INTO hirex_candidates ({', '.join(names)}) "
+                f"VALUES ({', '.join(['%s'] * len(names))}) RETURNING candidate_id;",
+                tuple(cols[c] for c in names),
+            )
+            candidate_id = cur.fetchone()["candidate_id"]
+            full_name = " ".join(p for p in (first, (data.get("last_name") or "").strip()) if p)
+
+            app_id = None
+            if job_id is not None:
+                cur.execute(
+                    "INSERT INTO hirex_applications (job_id, candidate_id, stage, source) "
+                    "VALUES (%s, %s, %s, %s) RETURNING application_id;",
+                    (job_id, candidate_id, stage, cols.get("source") or "manual"),
+                )
+                app_id = cur.fetchone()["application_id"]
+                _log_activity(cur, job_id, actor, "candidate_added",
+                              {"candidate": full_name, "stage": stage, "from": "Candidates"})
+
+            conn.commit()
+        return jsonify({"candidate_id": candidate_id, "application_id": app_id,
+                        "full_name": full_name, "job_id": job_id}), 201
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @bp.route("/candidates", methods=["GET"])
 def list_candidates():
     """Global candidate directory with per-person aggregates (all jobs)."""
@@ -447,6 +544,9 @@ def list_candidates():
                        {DISPLAY_NAME} AS full_name,
                        c.email, c.phone, c.headline, c.location, c.country, c.area,
                        c.english_level, c.current_company, c.desired_salary,
+                       -- notes feeds the edit form on the Candidates page; without
+                       -- it the textarea renders empty and saving wipes them.
+                       c.notes,
                        c.linkedin_url, c.source, c.cv_file_name,
                        (c.cv_s3_key IS NOT NULL) AS has_cv,
                        COUNT(a.application_id) AS applications,

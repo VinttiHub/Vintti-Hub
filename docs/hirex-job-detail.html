@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260728-1" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260729-8" />
 </head>
 
 <body class="light-mode">
@@ -107,7 +107,22 @@
           <div><span class="hx-eyebrow">New</span><h2>Add candidate</h2></div>
           <button class="hx-icon-btn" id="hxAddClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
         </header>
-        <form class="hx-drawer-body" id="hxAddForm">
+        <div class="hx-drawer-body" style="padding-bottom:0">
+          <div class="hx-reuse">
+            <label class="hx-field">
+              <span>Already have this person? <em class="hx-hint">search Hirex and Vintti</em></span>
+              <div class="hx-search hx-search-sm">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="hxPeopleSearch" autocomplete="off"
+                       placeholder="Search by name or email…" />
+              </div>
+            </label>
+            <div class="hx-people" id="hxPeopleResults"></div>
+          </div>
+          <div class="hx-reuse-or"><span>or add someone new</span></div>
+        </div>
+
+        <form class="hx-drawer-body" id="hxAddForm" style="padding-top:0">
           <div class="hx-grid" style="padding-top:12px">
             <label class="hx-field">
               <span>First name <b class="hx-req">*</b></span>
@@ -171,6 +186,7 @@
             <div class="hx-stars" id="hxCandStars"></div>
           </div>
           <div class="hx-cand-contact" id="hxCandContact"></div>
+          <div class="hx-cand-edit" id="hxCandEdit" hidden></div>
 
           <div class="hx-cand-cv" id="hxCandCv"></div>
           <input type="file" id="hxCvInput" accept=".pdf,.doc,.docx" hidden />
@@ -248,6 +264,6 @@
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-detail.js?v=20260728-1" defer></script>
+  <script src="./assets/js/hirex-detail.js?v=20260729-8" defer></script>
 </body>
 </html>
