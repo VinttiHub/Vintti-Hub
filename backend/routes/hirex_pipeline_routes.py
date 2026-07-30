@@ -171,12 +171,19 @@ def job_overview(job_id):
         by_stage = {r["stage"]: r["n"] for r in cur.fetchall()}
 
         cur.execute(
-            """SELECT COALESCE(NULLIF(TRIM(c.source), ''), 'unknown') AS source, COUNT(*) AS n
+            # Group case-insensitively: the apply form writes "LinkedIn", Vintti
+            # wrote "Linkedin" and the manual picker writes "linkedin". They're
+            # the same channel, so counting them apart splits the chart in two.
+            # `label` keeps one real spelling for values we have no label for.
+            """SELECT LOWER(COALESCE(NULLIF(TRIM(c.source), ''), 'unknown')) AS source,
+                      MIN(COALESCE(NULLIF(TRIM(c.source), ''), 'unknown')) AS label,
+                      COUNT(*) AS n
                FROM hirex_applications a JOIN hirex_candidates c ON c.candidate_id = a.candidate_id
                WHERE a.job_id = %s GROUP BY 1 ORDER BY n DESC;""",
             (job_id,),
         )
-        by_source = [{"source": r["source"], "count": r["n"]} for r in cur.fetchall()]
+        by_source = [{"source": r["source"], "label": r["label"], "count": r["n"]}
+                     for r in cur.fetchall()]
 
         cur.execute(
             "SELECT COUNT(ai_score) AS analyzed, ROUND(AVG(ai_score))::int AS avg_score "

@@ -558,7 +558,10 @@
     const maxSrc = Math.max(1, ...srcs.map((s) => s.count));
     const srcBars = srcs.length
       ? srcs.map((s) => {
-          const label = s.source === "unknown" ? "Unknown" : sourceLabel(s.source);
+          // `source` is the lowercased grouping key; `label` keeps a real
+          // spelling for channels we have no canonical name for (Talentum, Turbo…).
+          const label = s.source === "unknown" ? "Unknown"
+                      : (SOURCE_LABEL[s.source] || s.label || s.source);
           return `<div class="hx-ov-bar-row">
             <span class="hx-ov-bar-label">${esc(label)}</span>
             <span class="hx-ov-bar"><span style="width:${(s.count / maxSrc * 100).toFixed(1)}%"></span></span>
