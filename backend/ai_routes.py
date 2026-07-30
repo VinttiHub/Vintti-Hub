@@ -34,6 +34,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 RESUME_LINKEDIN_SOURCE_LIMIT = 60000
 RESUME_CV_SOURCE_LIMIT = 80000
+# Límite para los editores por sección (/ai/improve_*). Antes cortaban a 2000 chars, o sea
+# el encabezado y el primer trabajo: el modelo no veía los roles de abajo y "completaba".
+# 30k alcanza para un CV entero + perfil de LinkedIn sin volar el costo de cada click.
+RESUME_SECTION_EDITOR_SOURCE_LIMIT = 30000
 RESUME_NOTES_LIMIT = 8000
 RESUME_SOURCE_CHUNK_SIZE = 12000
 RESUME_SOURCE_MAX_CHUNKS = 8
@@ -614,6 +618,119 @@ def _clean_generated_work_dates(entry: Dict[str, Any], today: datetime.date) -> 
     entry["current"] = current
     return entry
 
+SECTION_CHAT_HISTORY_LIMIT = 12
+SECTION_CHAT_TURN_CHARS = 800
+
+
+def _format_section_chat_history(history: Any) -> str:
+    """Arma el bloque de conversación para los editores por sección.
+
+    Sin esto cada prompt nacía sin memoria, así que un follow-up corto
+    ("ahora más corto", "lo mismo para Beta") no tenía a qué referirse.
+    """
+    if not isinstance(history, list) or not history:
+        return "(no earlier turns — this is the recruiter's first instruction)"
+
+    lines = []
+    for turn in history[-SECTION_CHAT_HISTORY_LIMIT:]:
+        if not isinstance(turn, dict):
+            continue
+        text = _strip_html_text(str(turn.get("content") or "")).strip()
+        if not text:
+            continue
+        role = str(turn.get("role") or "").strip().lower()
+        label = "RECRUITER ASKED" if role in ("user", "recruiter") else "YOU DID"
+        lines.append(f"{label}: {text[:SECTION_CHAT_TURN_CHARS]}")
+
+    return "\n".join(lines) or "(no earlier turns — this is the recruiter's first instruction)"
+
+
+SECTION_CHAT_RULES = """
+--- HOW TO READ THE CONVERSATION ---
+The recruiter is iterating on this section, not starting over. Earlier instructions in the
+conversation STILL APPLY unless a later one contradicts them — if they asked for longer
+bullets three turns ago and now ask to fix one company, keep the longer bullets.
+A short follow-up ("make it shorter", "now the same for the other role", "no, undo that")
+refers to this conversation, so resolve it against the turns above before acting.
+Change ONLY what was asked. Everything the recruiter did not mention must come back
+byte-for-byte identical — silently rewriting untouched parts is the thing that makes them
+lose trust in this tool.
+"""
+
+
+def _parse_section_edit_payload(content: str, primary_key: str):
+    """Devuelve (valor, summary) del editor por sección.
+
+    Tolera el formato viejo (array/texto pelado) por si el modelo contesta a la
+    antigua: así un cambio de formato no rompe el botón en producción.
+    """
+    cleaned = re.sub(
+        r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', str(content or "").strip()
+    )
+    try:
+        data = json.loads(cleaned)
+    except Exception:
+        return cleaned, ""
+
+    if isinstance(data, list):
+        return data, ""
+    if isinstance(data, dict):
+        summary = _normalize_change_summary(data.get("summary"))
+        for key in (primary_key, "entries", "items", "result", "value"):
+            if key in data:
+                return data[key], summary
+        return data, summary
+    return data, ""
+
+
+def _normalize_change_summary(value: Any) -> str:
+    """El modelo devuelve el summary como string o como lista de líneas.
+
+    Con str() a secas la lista llegaba al chat como "['Acme: ...', 'Beta: ...']",
+    con corchetes y comillas a la vista.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        lines = [str(v).strip() for v in value if str(v or "").strip()]
+        return "\n".join(f"• {line}" for line in lines)
+    return str(value).strip()
+
+
+def _sort_work_entries_reverse_chronological(entries: list) -> list:
+    """Ordena la experiencia de más reciente a más antigua.
+
+    El prompt ya lo pide, pero cuando los roles llegan de dos fuentes distintas
+    (CV escrito + LinkedIn) el modelo los va concatenando por fuente y el orden
+    sale mezclado. Acá es determinista y gratis.
+    Los roles sin fecha quedan al final, conservando su orden relativo.
+    """
+    def key(item):
+        idx, entry = item
+        start = str(entry.get("start_date") or "")
+        end = str(entry.get("end_date") or "")
+        has_date = bool(start or end)
+        # current primero, después por start_date desc; sin fecha, al fondo.
+        return (
+            0 if has_date else 1,
+            0 if entry.get("current") else 1,
+            _invert_date_for_sort(start),
+            _invert_date_for_sort(end),
+            idx,
+        )
+
+    return [e for _, e in sorted(enumerate(entries), key=key)]
+
+
+def _invert_date_for_sort(value: str) -> str:
+    """Convierte "YYYY-MM-DD" en una clave que ordena descendente como string."""
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if not digits:
+        return "￿"  # sin fecha -> al final dentro de su grupo
+    digits = digits.ljust(8, "0")[:8]
+    return "".join(chr(ord("9") - int(ch) + ord("0")) for ch in digits)
+
+
 def _format_description_to_html(description: Any, *, bullets_only: bool = False) -> str:
     """Convierte la descripción del modelo ("- bullet" por línea) a HTML.
 
@@ -627,6 +744,11 @@ def _format_description_to_html(description: Any, *, bullets_only: bool = False)
     """
     if not description:
         return ""
+    # Los editores por sección reciben la descripción YA en HTML (así está
+    # guardada) y a veces el modelo la devuelve igual. Sin este guard la
+    # volvíamos a envolver: <ul><li><ul><li>…</li></ul></li></ul>.
+    if re.search(r"<\s*(ul|ol|li|p|br)\b", str(description), re.I):
+        return str(description).strip()
     paragraphs, bullets = [], []
     for line in str(description).strip().split("\n"):
         stripped = line.strip()
@@ -973,6 +1095,86 @@ def _load_resume_generation_context(candidate_id, opportunity_id):
             pass
     return candidate, target
 
+def _load_section_editor_context(candidate_id, opportunity_id=None) -> Dict[str, str]:
+    """Contexto compartido para los editores por sección (/ai/improve_*).
+
+    Antes cada endpoint armaba su propio contexto y se quedaba corto de distintas
+    maneras: los scrapers recortados a 2000 chars (o sea, el encabezado y poco
+    más), `coresignal_scrapper` ignorado por completo — un candidato traído por
+    Coresignal llegaba con LinkedIn VACÍO — y ninguno sabía para qué vacante es
+    el CV, así que "hacelo más relevante para este cliente" era imposible.
+
+    Nunca lanza: si algo falla, se devuelve lo que se pudo leer.
+    """
+    ctx = {"name": "", "country": "", "linkedin": "", "cv": "", "target_role_block": ""}
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT COALESCE(name, ''), COALESCE(country, ''),
+                   COALESCE(linkedin_scrapper, ''), COALESCE(coresignal_scrapper, ''),
+                   COALESCE(cv_pdf_scrapper, ''), COALESCE(affinda_scrapper, '')
+            FROM candidates WHERE candidate_id = %s
+            """,
+            (candidate_id,),
+        )
+        row = cur.fetchone()
+        if row:
+            name, country, linkedin_raw, coresignal_raw, cv_pdf, affinda = row
+            ctx["name"] = name
+            ctx["country"] = country
+
+            # Mismo fallback que usa el front para la generación:
+            # linkedin_scrapper || coresignal_scrapper.
+            linkedin = (linkedin_raw or "").strip()
+            if not linkedin and (coresignal_raw or "").strip():
+                linkedin = _prune_deleted_coresignal(
+                    _clean_coresignal_html(coresignal_raw)
+                )
+            ctx["linkedin"] = _truncate_preserving_edges(
+                linkedin, RESUME_SECTION_EDITOR_SOURCE_LIMIT
+            )
+            ctx["cv"] = _truncate_preserving_edges(
+                ((cv_pdf or "").strip() or (affinda or "").strip()),
+                RESUME_SECTION_EDITOR_SOURCE_LIMIT,
+            )
+
+        if opportunity_id:
+            jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
+            cur.execute(
+                """
+                SELECT COALESCE(a.client_name, '')
+                FROM opportunity o
+                LEFT JOIN account a ON o.account_id = a.account_id
+                WHERE o.opportunity_id = %s
+                """,
+                (opportunity_id,),
+            )
+            name_row = cur.fetchone()
+            if opp_ctx or jd_plain:
+                ctx["target_role_block"] = _build_resume_target_role_block({
+                    "client_name": name_row[0] if name_row else "",
+                    "position": opp_ctx.get("position", ""),
+                    "career_country": opp_ctx.get("career_country", ""),
+                    "years_experience": str(opp_ctx.get("years_experience") or ""),
+                    "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
+                })
+        cur.close()
+    except Exception:
+        logging.exception(
+            "section editor context: could not load everything; continuing"
+        )
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+    return ctx
+
+
 def _ensure_cv_pdf_text(candidate_id) -> str:
     """Extrae el texto del CV subido si `candidates.cv_pdf_scrapper` está vacío.
 
@@ -1114,8 +1316,8 @@ DEEP DIVE TRANSCRIPT:
 FIRST INTERVIEW TRANSCRIPT:
 {first_interview_transcript}
 
-RECRUITER NOTES / COMMENTS:
-{notes}
+(The recruiter may have supplied additional facts and directions — see the RECRUITER
+INSTRUCTIONS block below the rules. Those count as source material too.)
 
 =========================
 ABSOLUTE RULES (violating any of these ruins the deliverable)
@@ -1125,15 +1327,20 @@ ABSOLUTE RULES (violating any of these ruins the deliverable)
    sizes, industries, tools, certifications, coursework or achievements.
 2. NO EXAGGERATION. Do not upgrade scope ("supported" is not "led"), do not turn a task
    into an achievement, do not add numbers that are not in the source.
-3. WHEN A ROLE IS SPARSE, WRITE FEWER BULLETS. One accurate bullet beats four padded ones.
-   Never pad, never restate the job title as a bullet, never write filler.
+3. WHEN A ROLE IS SPARSE, WRITE FEWER BULLETS — but never shallower ones. Dropping a bullet
+   you cannot ground is correct; stripping the detail out of a bullet you CAN ground is not.
+   One accurate bullet beats four padded ones. Never pad, never restate the job title as a
+   bullet, never write filler.
 4. NEVER WRITE META-COMMENTARY ABOUT THE SOURCES. Forbidden phrasings include:
    "the CV presents...", "the CV lists this role as...", "CV-wide context includes...",
    "listed software includes...", "according to the source", "the candidate's profile states".
    Write the fact directly in professional CV language, or omit it entirely.
-5. INCLUDE EVERY DISTINCT WORK EXPERIENCE ENTRY found in any source. Do not drop older,
-   shorter, freelance, internship, consulting, RPO, part-time or overlapping roles to save
-   space. Completeness of roles outranks length of descriptions.
+5. THE WRITTEN CV DECIDES WHICH ROLES APPEAR. The candidate chose what to put on their own
+   CV, and that choice is respected. The list of work experience entries comes from the CV
+   PDF, and EVERY role it lists must appear — never drop an older, shorter, freelance,
+   internship, consulting, RPO, part-time or overlapping role to save space. LinkedIn and
+   the interviews do NOT add roles; they only ENRICH the roles the CV already lists. See
+   "LINKEDIN ENRICHES THE CV'S ROLES" below for the exact procedure and the one fallback.
 6. OUTPUT ENGLISH. Translate job titles, degrees and descriptions into English. Keep company
    and institution proper names as they appear in the source.
 7. Do not use first person ("I", "my"). Do not use "Responsible for". Do not use markdown,
@@ -1147,6 +1354,42 @@ ABSOLUTE RULES (violating any of these ruins the deliverable)
 10. CARRY OVER EVERY NUMBER the source states for a role: portfolio and deal sizes, budgets,
    percentages, headcounts, account volumes, AUM growth, savings. These are the strongest
    part of a CV and dropping them is the most common way this output comes out weak.
+11. DEPTH IS NOT FABRICATION, AND THIN BULLETS ARE A DEFECT. The recurring complaint about
+   this output is that the bullets are too short to tell a client anything. "Managed monthly
+   close" is not the safe version of the truth — it is the useless version. Every fact the
+   source attaches to a piece of work (the system it ran on, who it was for, how often, how
+   many, what came out of it, why it existed) belongs INSIDE that bullet. Compressing a rich
+   source line into a stub is as much a failure as inventing one. Rules 1 and 2 tell you not
+   to add facts that are not there; they never tell you to leave out facts that are.
+
+=========================
+RECRUITER INSTRUCTIONS — HIGHEST AUTHORITY AFTER THE ABSOLUTE RULES
+=========================
+The block below was written by the recruiter who actually knows this candidate, usually
+because a previous version of this CV came out wrong. It may contain two kinds of content,
+and you must honour both:
+
+  (a) FACTS the recruiter is adding from their own knowledge — a tool, a client, an
+      employer, a responsibility, a metric that never made it into the CV or the call.
+      TREAT THESE AS SOURCE MATERIAL. The recruiter vouches for them, so using them is NOT
+      fabrication and ABSOLUTE RULE 1 does not block them. Put each fact exactly where the
+      recruiter says it belongs: "add QuickBooks and Xero to the work experience at Acme"
+      means those tools appear in the Acme role's bullets AND in the tools list, and
+      nowhere else.
+
+  (b) DIRECTIONS about how to write the CV — what to emphasise, what to cut, what to fix,
+      how long or short something should be, which role matters most. These OVERRIDE the
+      defaults written further down, including bullet counts, ordering and emphasis.
+
+Apply them precisely and completely, and re-read this block before you answer to confirm
+every instruction actually landed. If an instruction names a specific role or company, find
+that exact entry and apply it there — never approximately, never to a similar role. If an
+instruction contradicts a default in the sections below, the instruction wins. The one thing
+it cannot override is the ban on inventing facts that neither the sources nor the recruiter
+supplied. If the block is empty, ignore it entirely.
+
+RECRUITER INSTRUCTIONS:
+{notes}
 
 =========================
 TAILORING TO THE TARGET ROLE
@@ -1225,6 +1468,58 @@ WORK EXPERIENCE
 - One entry per distinct title/company. Keep a promotion as its own entry; do not merge it
   into the previous title, and do not split one role into several.
 
+*** LINKEDIN ENRICHES THE CV'S ROLES — IT NEVER ADDS NEW ONES ***
+Follow this procedure in order, before writing anything:
+
+STEP 1 — Build the role list from the CV PDF ALONE. Every role printed on the written CV
+gets an entry. Nothing else does.
+
+STEP 2 — For each of those roles, go find the SAME role in the LinkedIn scrape and in the
+transcripts, and fold their detail into that entry's bullets. This is where the CV gets
+better: LinkedIn and the interviews routinely describe responsibilities, tools, clients and
+scope that never fit on the printed page. Use all of it, on the role it belongs to.
+
+STEP 3 — A role that exists ONLY in LinkedIn or only in a transcript, with no counterpart on
+the written CV, IS EXCLUDED. The candidate deliberately left it off their own CV — an old
+call-centre job, a short stint, an unrelated role — and re-adding it overrides their choice
+and clutters the CV with work they did not want presented. Do not create an entry for it, and
+do not mention it in the About section either. This is not a completeness failure; it is the
+required behaviour.
+
+THE ONLY FALLBACK: if there is no usable CV PDF at all (missing, empty, or the extraction is
+unreadable garbage), then LinkedIn becomes the role list and STEP 3 does not apply — use
+every role LinkedIn gives you. Never leave the work experience empty just because the CV is
+missing.
+
+OVERRIDE: if the RECRUITER INSTRUCTIONS block explicitly asks for a role that is not on the
+written CV, add it. The recruiter outranks this rule.
+
+*** MATCHING THE SAME ROLE ACROSS SOURCES — NEVER LIST IT TWICE ***
+To do STEP 2 you must recognise when a CV role and a LinkedIn role are the same job. They
+are THE SAME ROLE — one entry, never two — when the company is the same and the date ranges
+are the same or clearly overlapping, even if:
+  * the titles are abbreviated differently: "Junior Brand Strategist" vs "Jr. Brand
+    Strategist", "Sr. Analyst" vs "Senior Analyst", "Acct Manager" vs "Account Manager".
+  * one source writes the title in Spanish and the other in English: "Coordinadora de
+    digital" vs "Digital Coordinator", "Gerente de Ventas" vs "Sales Manager".
+  * the company is written differently: "GARNIER.AGENCY" vs "Garnier BBDO Costa Rica",
+    "Acme Corp" vs "Acme". Same employer, written two ways.
+  * one source gives bullets and the other gives only the title and dates.
+When you merge: keep the FULLEST company name, keep the title in English, take the widest
+correct date range, and COMBINE the detail from both sources into one bullet list — that
+merged list is richer than either source alone, which is exactly what you want.
+
+Do NOT merge when the WRITTEN CV ITSELF shows two different titles at that company with
+different date ranges (a real promotion, or two separate stints). Those stay separate — see
+the STACKED TITLES rules below.
+
+But when the CV shows ONE entry at a company and LinkedIn splits that same tenure into two
+or three titles, follow the CV: keep the single entry the CV shows, and use the extra
+LinkedIn detail inside its bullets. The CV's structure is the one being respected.
+
+A role listed twice under two spellings is a visible defect that makes the CV look
+auto-generated — that is the error to watch for here.
+
 *** STACKED TITLES AT ONE COMPANY — READ THIS TWICE ***
 CVs very often print the company name ONCE and then stack two or more titles under it,
 each with its own date range, followed by a SINGLE shared bullet list. Example layout:
@@ -1264,8 +1559,9 @@ That is TWO work_experience entries, not one. Rules:
   context (scope, team, what the company does), make it the FIRST BULLET, not a paragraph.
   And if the source already states that context as one of its own bullets, keep it as a
   bullet — never promote a real bullet into an intro line.
-- 4-6 bullets for the roles most relevant to the target; 1-3 for less relevant or sparse
-  roles. Never more than 6.
+- 4-6 substantive bullets for the roles most relevant to the target; 1-3 for less relevant
+  or sparse roles. Never more than 6. Fewer, fuller bullets beat more, thinner ones — never
+  split one rich piece of work into three stubs just to reach a count.
 
 *** SPARSE ROLES — WHEN THE SOURCE ONLY GIVES TITLE, COMPANY AND DATES ***
 Designed/visual CVs often list roles with no bullets at all, and put the software in a
@@ -1290,9 +1586,62 @@ single global "Software"/"Skills" list. In that situation:
     phrased as work, with no invented scope, clients, metrics or tools. Example for a
     "Motion Designer" with no detail: "- Produced motion graphics and animated content."
     One line. Stop there.
-- Each bullet: one line, max ~25 words, starts with a strong verb. Past tense for finished
-  roles, present tense for the current role. Include the concrete object of the work
-  (system, process, market, deliverable, stakeholder) whenever the source names it.
+  * The BULLET DEPTH rules below do NOT apply here. They tell you to carry over detail the
+    source already contains; a sparse role has none, so a short bullet is the right answer.
+    Never use "the bullet looks too short" as a reason to invent context.
+
+*** BULLET DEPTH — THE MOST COMMON WEAKNESS OF THIS OUTPUT ***
+Clients read these bullets to decide whether to interview. A bullet that only names an
+activity ("Managed accounts payable") tells them nothing they could not already guess from
+the job title, and wastes the line.
+
+*** LENGTH IS A HARD, COUNTABLE REQUIREMENT — NOT A STYLE PREFERENCE ***
+TARGET: 25-40 words per bullet. HARD FLOOR: 20 words.
+COUNT THE WORDS of every bullet you write. A bullet of 8-15 words is a FAILED bullet, not a
+concise one, and it is the single defect this output is corrected for most often. If a
+bullet lands under 20 words, you have almost certainly thrown away detail the source gave
+you — go back to that role in the sources and find the tool, the volume, the cadence, the
+stakeholder, the deliverable or the outcome that you dropped, and put it back.
+The ONLY legitimate reason to publish a bullet under 20 words is that the source truly
+contains nothing more about that work (see SPARSE ROLES above). That is rare. Assume by
+default that the detail exists and you failed to look for it, not that it is missing.
+Do not exceed ~45 words either — past that it stops reading like a CV.
+
+Build each bullet in two parts:
+  (a) ACTION + OBJECT — a strong verb and the concrete thing it acted on.
+  (b) GROUNDED CONTEXT — one or two details that make the work legible to a reader who does
+      not know the company. This is where the length comes from, and every element of it
+      must already exist in the source material FOR THAT ROLE:
+        * the tool, system or platform the work ran on (QuickBooks, NetSuite, Salesforce)
+        * volume, value, headcount, portfolio size, number of entities/clients/markets
+        * the cadence (monthly close, weekly reporting cycle, quarterly board pack)
+        * who it was for or with (the CFO, US-based clients, the sales team, auditors)
+        * the deliverable produced (reconciliation, dashboard, forecast model, brief)
+        * what the company or business unit actually does, when the name does not say it
+        * the outcome or purpose the source states (faster close, cleaner data, funded deal)
+
+Same fact, too short then right — note that the right-hand versions add NO new facts, they
+only stop discarding the ones the source already gave:
+  WEAK:  "- Managed accounts payable and receivable."
+  RIGHT: "- Manages accounts payable and receivable in QuickBooks for a portfolio of 12 US
+          clients, owning the full monthly close and bank reconciliations."
+  WEAK:  "- Built financial models."
+  RIGHT: "- Builds underwriting models for real estate acquisitions, sizing debt and equity
+          on $4M+ construction loans targeting 25%-35% IRRs for the investment committee."
+  WEAK:  "- Handled social media."
+  RIGHT: "- Runs organic social media for Flormar and Super Salon on Instagram and TikTok,
+          sourcing and briefing creators and producing the monthly content calendar."
+Those expansions are legal only because the source stated QuickBooks, the 12 clients, the
+loan sizes, the brand names. If the source truly only supports the weak version, write the
+weak version — but search the transcripts and the rest of the CV first, because the detail
+usually IS there, just not in the same sentence.
+
+- NEVER SHORTEN A SOURCE BULLET. If the source already writes a long, detailed line, your
+  version carries the same content, rewritten in cleaner English — not summarized. Dropping
+  half of a source bullet is the single most common way this output comes out weak.
+- Each bullet: one line, starts with a strong verb. Past tense for finished roles, present
+  tense for the current role. Include the concrete object of the work (system, process,
+  market, deliverable, stakeholder) whenever the source names it.
 - Include metrics, volumes, budgets, team sizes and tool names ONLY when they appear in the
   source for THAT role — but when they DO appear, they are mandatory. If the source bullet
   says "projects totaling $10M+", "$4M+ in construction loans targeting 25%-35% IRRs",
@@ -1414,14 +1763,30 @@ LANGUAGES
 FINAL CHECK BEFORE ANSWERING
 =========================
 Go back over your draft and verify each of these. Fix anything that fails.
-- Every role from the sources is present.
-- STACKED TITLES: for every company, count the titles that have their own date range in the
-  source, and count your entries for that company. The two numbers must match. If the source
+- ROLE LIST: every role printed on the WRITTEN CV is present. Then check the reverse — for
+  each entry you produced, confirm that company appears on the written CV. If one does not,
+  it came from LinkedIn or a transcript only, and unless the recruiter asked for it or there
+  was no usable CV at all, DELETE IT.
+- STACKED TITLES: for every company, count the titles that have their own date range ON THE
+  WRITTEN CV, and count your entries for that company. The two numbers must match. If the CV
   shows two titles at one company and you produced one entry, you deleted a role — go back
   and split it.
+- NO DUPLICATE ROLES: list your entries and compare every pair. If two entries share the same
+  company and the same or overlapping dates, they are the same role reaching you from two
+  different sources under two spellings ("Junior" vs "Jr.", Spanish vs English, short vs long
+  company name). Merge them into one entry with the combined bullets and delete the extra.
 - No gaps you created: the date ranges of your entries must cover the same span the source
   covers for each company.
 - Every number in the source bullets you used appears in your bullets.
+- BULLET WORD COUNT — DO THIS ONE LITERALLY. Go bullet by bullet and count the words. For
+  every bullet under 20 words, return to that role in the sources and look for the tool,
+  volume, cadence, stakeholder, deliverable or outcome you left out, and rewrite the bullet
+  with it. Only if the source genuinely holds nothing more may the short bullet stay. Most
+  of your bullets should land in the 25-40 word range.
+- No bullet came out shorter or less specific than the source line it came from.
+- RECRUITER INSTRUCTIONS: re-read that block. Every fact the recruiter added appears in the
+  exact role they named, and every direction they gave was applied. If any instruction did
+  not land, fix it now — this is the most visible failure to the person reviewing the CV.
 - Every company and institution name is the full version the source uses; no "Unnamed" or
   invented placeholders anywhere.
 - Every bullet can be pointed back to a specific line in the source material.
@@ -1943,6 +2308,10 @@ Return STRICT JSON:
             data = request.json
             candidate_id = data['candidate_id']
             user_prompt = data.get('user_prompt', '').strip()
+            history_block = _format_section_chat_history(data.get('history'))
+            ctx = _load_section_editor_context(
+                candidate_id, data.get('opportunity_id')
+            )
 
             conn = get_connection()
             cursor = conn.cursor()
@@ -1952,12 +2321,11 @@ Return STRICT JSON:
             row = cursor.fetchone()
             tools = (row[0] if row else None) or "[]"
 
-            # Obtener scraps
-            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
+            # Las tools suelen vivir en una lista global al final del CV, así que
+            # recortar la fuente a 2000 chars era justo perderla.
+            cursor.execute("SELECT work_experience FROM resume WHERE candidate_id = %s", (candidate_id,))
             row = cursor.fetchone()
-            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
-            linkedin_scrapper = (linkedin_scrapper or "")
-            cv_pdf_scrapper = (cv_pdf_scrapper or "")
+            work_experience_for_tools = (row[0] if row else None) or "[]"
 
             prompt = f"""
     You are a resume tools editor.
@@ -1965,22 +2333,35 @@ Return STRICT JSON:
     --- CURRENT TOOLS ---
     {tools}
 
+    --- WORK EXPERIENCE (to judge how central and how long-used each tool is) ---
+    {work_experience_for_tools}
+
+    {ctx["target_role_block"]}
+
     --- LINKEDIN SCRAP ---
-    {linkedin_scrapper[:2000]}
+    {ctx["linkedin"]}
 
     --- PDF SCRAP ---
-    {cv_pdf_scrapper[:2000]}
+    {ctx["cv"]}
 
-    --- USER COMMENTS ---
+    --- CONVERSATION SO FAR (oldest first) ---
+    {history_block}
+{SECTION_CHAT_RULES}
+    --- RECRUITER'S LATEST INSTRUCTION (this is what you must act on now) ---
     {user_prompt}
 
-    Improve the tools section using this info. Output must be a JSON array of this format:
-    [{{"tool":"Excel","level":"Advanced"}},{{"tool":"QuickBooks","level":"Intermediate"}},{{"tool":"SAP","level":"Intermediate"}}]
+    Improve the tools section using this info. Return STRICT JSON, one object:
+    {{"entries": [{{"tool":"Excel","level":"Advanced"}},{{"tool":"QuickBooks","level":"Intermediate"}}],
+      "summary": "..."}}
 
+    - "entries" is the FULL updated tools list, not only the ones you touched.
+    - "summary" is a STRING (not a list): what changed, plain English, max 4 short lines
+      separated by \\n ("Added Xero (Intermediate)", "QuickBooks: Basic -> Advanced").
+      Never vague.
     - Infer the level (Basic, Intermediate, Advanced) based on context.
-    - Do NOT invent tools.
+    - Do NOT invent tools. The exception is a tool the recruiter names in their
+      instruction — they know the candidate, so add it where they say.
     - If no level is specified, infer from experience.
-    Return only the JSON array.
     - translate everything to english
     """
 
@@ -1992,14 +2373,16 @@ Return STRICT JSON:
             )
 
             content = chat.choices[0].message.content.strip()
-            tools_json = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content))
+            tools_json, change_summary = _parse_section_edit_payload(content, "tools")
+            if not isinstance(tools_json, list):
+                raise ValueError("The model did not return a tools list.")
 
             cursor.execute("UPDATE resume SET tools = %s WHERE candidate_id = %s", (json.dumps(tools_json), candidate_id))
             conn.commit()
             cursor.close()
             conn.close()
 
-            return jsonify({"tools": json.dumps(tools_json)})
+            return jsonify({"tools": json.dumps(tools_json), "summary": change_summary})
         except Exception as e:
             logging.error(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
@@ -2010,6 +2393,10 @@ Return STRICT JSON:
             data = request.json
             candidate_id = data['candidate_id']
             user_prompt = data.get('user_prompt', '').strip()
+            history_block = _format_section_chat_history(data.get('history'))
+            ctx = _load_section_editor_context(
+                candidate_id, data.get('opportunity_id')
+            )
 
             conn = get_connection()
             cursor = conn.cursor()
@@ -2018,46 +2405,100 @@ Return STRICT JSON:
             row = cursor.fetchone()
             work_experience = (row[0] if row else None) or "[]"
 
-            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            row = cursor.fetchone()
-            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
-            linkedin_scrapper = (linkedin_scrapper or "")
-            cv_pdf_scrapper = (cv_pdf_scrapper or "")
-
             prompt = f"""
     You are a resume work experience editor.
 
     --- CURRENT WORK EXPERIENCE ---
     {work_experience}
 
+    --- CANDIDATE ---
+    {ctx["name"]} ({ctx["country"]})
+
+    {ctx["target_role_block"]}
+
     --- LINKEDIN SCRAP ---
-    {linkedin_scrapper[:2000]}
+    {ctx["linkedin"]}
 
-    --- PDF SCRAP ---
-    {cv_pdf_scrapper[:2000]}
+    --- PDF SCRAP (the written CV — this decides which roles exist) ---
+    {ctx["cv"]}
 
-    --- USER COMMENTS ---
+    --- CONVERSATION SO FAR (oldest first) ---
+    {history_block}
+{SECTION_CHAT_RULES}
+    --- RECRUITER'S LATEST INSTRUCTION (this is what you must act on now) ---
     {user_prompt}
 
-    Improve the work experience section using this info. Output must be a JSON array with objects of this format:
-    [{{"title":"...", "company":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}}]
+    Improve the work experience section using this info. Return STRICT JSON, one object:
+    {{"entries": [ {{"title":"...", "company":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}} ],
+      "summary": "..."}}
 
+    - "entries" is the FULL updated section — include every role, not only the edited ones.
+    - "description" MUST be a bullet list in PLAIN TEXT: every line starts with "- " and
+      lines are separated by \\n. Never write HTML (<ul>, <li>, <p>) and never merge the
+      bullets into one paragraph — a role whose bullets got flattened into prose is a
+      broken entry. Example: "- Leads digital strategy...\\n- Runs website audits...".
+    - "summary" is a STRING, not a list. Plain English, what you actually changed, one
+      short line per change, max 4 lines separated by \\n, each starting with the company
+      name. Be concrete: "Acme Corp: added QuickBooks and the monthly close to the
+      bullets" — never vague ("improved the section"). If you changed nothing, say so
+      and why.
     - If month or day is missing, complete with 01
     - If end_date is missing or says "present", set current = true
     - Else set current = false
-    Return only the JSON array.
     - translate everything to english
+
+    WHICH ROLES EXIST — do not add roles. The entries in CURRENT WORK EXPERIENCE are the
+    role list; keep exactly those, and never create a new entry for a job you spot in the
+    LinkedIn scrape but that is not already there. The candidate left those off their own CV
+    on purpose. LinkedIn and the PDF are here to ENRICH the existing entries with detail
+    (responsibilities, tools, clients, scope, metrics) that did not fit on the page. Never
+    list the same role twice: if a role reaches you under two spellings ("Junior" vs "Jr.",
+    Spanish vs English title, short vs long company name), it is one entry. The only way a
+    new role gets added is if the RECRUITER INSTRUCTIONS explicitly ask for it.
+
+    RECRUITER INSTRUCTIONS — the block above was written by the recruiter who knows this
+    candidate, almost always because the current version came out wrong. It may contain:
+      (a) FACTS they are adding from their own knowledge (a tool, client, employer, metric
+          or responsibility missing from the CV). Treat these as source material — the
+          recruiter vouches for them, so using them is NOT fabrication. Put each fact
+          exactly where they say it belongs: "add QuickBooks and Xero to the work
+          experience at Acme" means those tools go into the Acme role's bullets and nowhere
+          else. Find that exact company, never a similar one.
+      (b) DIRECTIONS on how to write it, which override every default below.
+    Apply every instruction completely, then re-read the block to confirm each one landed.
+    The only thing it cannot override is inventing facts nobody supplied.
+
+    BULLET DEPTH — the usual defect here is bullets too short to tell a client anything.
+    "description" is bullets only, every line starting with "- ", 4-6 bullets for a rich
+    role and 1-3 for a sparse one. TARGET 25-40 WORDS PER BULLET, HARD FLOOR 20 — count the
+    words. A bullet of 8-15 words is a failed bullet, not a concise one. Each bullet is a
+    strong verb plus the concrete object of the work, plus one or two grounded details: the
+    tool or system used, volumes/values/headcounts, the cadence (monthly close, weekly
+    reporting), who it was for (the CFO, US clients, auditors), the deliverable produced, or
+    the stated outcome. Take those details ONLY from the sources or the recruiter block
+    above — never invent a tool, client, metric or scope, and never pad with filler like
+    "collaborated with cross-functional teams" or "various projects". If a bullet already in
+    CURRENT WORK EXPERIENCE is detailed, keep that detail; rewriting it shorter is a
+    regression. If the source genuinely has nothing more for a role, a short honest bullet
+    is correct — but that is rare, so look properly before settling for one.
     """
 
             chat = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
-                max_tokens=7000
+                # Antes 0.6: con fuentes completas y una orden de "agregá más info", la
+                # temperatura alta era una invitación a inventar.
+                temperature=0.2,
+                max_tokens=12000
             )
 
             content = chat.choices[0].message.content.strip()
-            work_json = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content))
+            work_json, change_summary = _parse_section_edit_payload(
+                content, "work_experience"
+            )
+            if not isinstance(work_json, list):
+                raise ValueError("The model did not return a work experience list.")
+            work_json = [e for e in work_json if isinstance(e, dict)]
 
             today = datetime.date.today()
             for entry in work_json:
@@ -2080,12 +2521,24 @@ Return STRICT JSON:
                     except:
                         entry["current"] = False
 
+                # El flujo de generación hacía esto y el editor no: por eso cada
+                # edición devolvía "- linea" en crudo y los bullets se veían como
+                # un párrafo aplastado en el CV.
+                entry["description"] = _format_description_to_html(
+                    entry.get("description", ""), bullets_only=True
+                )
+
+            work_json = _sort_work_entries_reverse_chronological(work_json)
+
             cursor.execute("UPDATE resume SET work_experience = %s WHERE candidate_id = %s", (json.dumps(work_json), candidate_id))
             conn.commit()
             cursor.close()
             conn.close()
 
-            return jsonify({"work_experience": json.dumps(work_json)})
+            return jsonify({
+                "work_experience": json.dumps(work_json),
+                "summary": change_summary,
+            })
 
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -2100,6 +2553,10 @@ Return STRICT JSON:
             data = request.json
             candidate_id = data['candidate_id']
             user_prompt = data.get('user_prompt', '').strip()
+            history_block = _format_section_chat_history(data.get('history'))
+            ctx = _load_section_editor_context(
+                candidate_id, data.get('opportunity_id')
+            )
 
             conn = get_connection()
             cursor = conn.cursor()
@@ -2108,13 +2565,6 @@ Return STRICT JSON:
             cursor.execute("SELECT education FROM resume WHERE candidate_id = %s", (candidate_id,))
             row = cursor.fetchone()
             education = (row[0] if row else None) or "[]"
-
-            # Obtener scraps
-            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            row = cursor.fetchone()
-            linkedin_scrapper, cv_pdf_scrapper = (row if row else (None, None))
-            linkedin_scrapper = (linkedin_scrapper or "")
-            cv_pdf_scrapper = (cv_pdf_scrapper or "")
 
             # Guardamos los title/country previos: el modelo a veces los omite y
             # el UPDATE de más abajo pisa el array entero, borrándolos.
@@ -2131,18 +2581,28 @@ Return STRICT JSON:
     --- CURRENT EDUCATION SECTION ---
     {education}
 
+    {ctx["target_role_block"]}
+
     --- LINKEDIN SCRAP ---
-    {linkedin_scrapper[:2000]}
+    {ctx["linkedin"]}
 
     --- PDF SCRAP ---
-    {cv_pdf_scrapper[:2000]}
+    {ctx["cv"]}
 
-    --- USER COMMENTS ---
+    --- CONVERSATION SO FAR (oldest first) ---
+    {history_block}
+{SECTION_CHAT_RULES}
+    --- RECRUITER'S LATEST INSTRUCTION (this is what you must act on now) ---
     {user_prompt}
 
-    Improve the education section using this info. Output must be a JSON array with objects of this format:
-    [{{"institution":"...", "title":"...", "country":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}}]
+    Improve the education section using this info. Return STRICT JSON, one object:
+    {{"entries": [ {{"institution":"...", "title":"...", "country":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}} ],
+      "summary": "..."}}
 
+    - "entries" is the FULL updated section, not only the entries you touched.
+    - "description" is plain text, two sentences on one line — no HTML, no "- " bullets.
+    - "summary" is a STRING (not a list): what changed, plain English, max 4 short lines
+      separated by \\n, each starting with the institution name. Never vague.
     - ALWAYS return "title" (the degree/program name) and "country" for every entry.
       Keep the values already present in the current education section unless the
       sources clearly correct them. Never drop them and never return them empty
@@ -2150,19 +2610,23 @@ Return STRICT JSON:
     - If month or day is missing, complete with 01
     - If end_date is missing or says "present", set current = true
     - Else set current = false
-    Return only the JSON array.
     - translate everything to english
     """
 
             chat = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
-                max_tokens=700
+                temperature=0.2,
+                max_tokens=1500
             )
 
             content = chat.choices[0].message.content.strip()
-            education_json = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content))
+            education_json, change_summary = _parse_section_edit_payload(
+                content, "education"
+            )
+            if not isinstance(education_json, list):
+                raise ValueError("The model did not return an education list.")
+            education_json = [e for e in education_json if isinstance(e, dict)]
 
             today = datetime.date.today()
             for entry in education_json:
@@ -2201,6 +2665,11 @@ Return STRICT JSON:
             for entry in education_json:
                 if not isinstance(entry, dict):
                     continue
+                # Igual que en work experience: el editor no formateaba y guardaba
+                # el texto crudo, mientras el flujo de generación sí lo hacía.
+                entry["description"] = _format_description_to_html(
+                    entry.get("description", "")
+                )
                 prev = _match_previous(entry)
                 if not prev:
                     entry.setdefault("title", "")
@@ -2215,7 +2684,10 @@ Return STRICT JSON:
             cursor.close()
             conn.close()
 
-            return jsonify({"education": json.dumps(education_json)})
+            return jsonify({
+                "education": json.dumps(education_json),
+                "summary": change_summary,
+            })
 
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -2230,6 +2702,10 @@ Return STRICT JSON:
             data = request.json
             candidate_id = data['candidate_id']
             user_prompt = data.get('user_prompt', '').strip()
+            history_block = _format_section_chat_history(data.get('history'))
+            ctx = _load_section_editor_context(
+                candidate_id, data.get('opportunity_id')
+            )
 
             conn = get_connection()
             cursor = conn.cursor()
@@ -2239,13 +2715,18 @@ Return STRICT JSON:
             result = cursor.fetchone()
             about, education, work_experience, tools = result if result else ("", "[]", "[]", "[]")
 
+            # El nombre sale de la base, no del request: el chat de sección no lo
+            # mandaba, así que el modelo escribía "The candidate" cuando le pedían
+            # justamente que usara el nombre.
+            candidate_name = (data.get("candidate_name") or "").strip() or ctx["name"]
+
             prompt = f"""
             You are a professional resume editor.
 
             Your task is to rewrite the candidate's "About" section (also known as Summary or Profile) using only the following information.
 
             --- CANDIDATE NAME ---
-            {data.get("candidate_name", "")}
+            {candidate_name or "(unknown — do NOT write a placeholder)"}
 
             --- EDUCATION ---
             {education}
@@ -2256,10 +2737,38 @@ Return STRICT JSON:
             --- TOOLS ---
             {tools}
 
-            --- USER COMMENT ---
+            {ctx["target_role_block"]}
+
+            --- LINKEDIN SCRAP ---
+            {ctx["linkedin"]}
+
+            --- CV PDF SCRAP ---
+            {ctx["cv"]}
+
+            --- CURRENT ABOUT (this is what you are editing) ---
+            {about or "(empty — write it from scratch)"}
+
+            --- CONVERSATION SO FAR (oldest first) ---
+            {history_block}
+{SECTION_CHAT_RULES}
+            --- RECRUITER'S LATEST INSTRUCTION (act on this now) ---
             {user_prompt}
 
+            Return STRICT JSON, one object:
+            {{"about": "the full rewritten About paragraph", "summary": "what you changed"}}
+            - "summary" is plain English, max 3 short lines, concrete about what moved or was
+              added ("Led with the FP&A work", "Added the MBA"). Never vague.
+
             Instructions:
+            - EDIT the CURRENT ABOUT above rather than starting over. Keep the sentences that
+              already work and change what the recruiter asked about. Rewriting the whole
+              paragraph every time makes their earlier fixes disappear.
+            - NEVER write "The candidate", "This candidate", "The professional" or a bare
+              "They" as the subject. They are empty filler that makes the CV read like a
+              form letter. Lead with the profession ("Digital Marketing Specialist with 5+
+              years...") or, if the recruiter asked for the name, with the real name from
+              CANDIDATE NAME above. If that name is unknown, lead with the profession —
+              never invent a name and never substitute the word "candidate" for one.
             - Write a **concise and professional summary (5–7 lines)** in the **third person**.
             - Deduce the candidate’s gender based on the name and context. If unclear, use **gender-neutral language without inventing names or making assumptions**.
             - If the user comment asks to focus on a particular skill, role, industry, or experience, **do not just repeat the comment**. Instead:
@@ -2267,8 +2776,9 @@ Return STRICT JSON:
                 - **Reorganize and highlight that experience** naturally within the summary.
                 - Do not start the summary with the explicit comment the user wrote.
             - Emphasize skills, tools, industries, strengths, and years of experience according to the user comment.
-            - Do **not** invent any information. Use only what is available.
-            - Return only the final text, no formatting, no explanation, no markdown.
+            - Do **not** invent any information. Use only what is available — except facts
+              the recruiter states in their instruction, which they vouch for.
+            - No markdown inside the About text itself.
             - Translate everything into English.
             """
 
@@ -2276,18 +2786,23 @@ Return STRICT JSON:
             chat = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
-                max_tokens=300
+                temperature=0.4,
+                max_tokens=900
             )
 
-            new_about = chat.choices[0].message.content.strip()
+            raw_about, change_summary = _parse_section_edit_payload(
+                chat.choices[0].message.content.strip(), "about"
+            )
+            new_about = _strip_html_text(str(raw_about or "")).strip()
+            if not new_about:
+                raise ValueError("The model returned an empty About section.")
 
             cursor.execute("UPDATE resume SET about = %s WHERE candidate_id = %s", (new_about, candidate_id))
             conn.commit()
             cursor.close()
             conn.close()
 
-            return jsonify({"about": new_about})
+            return jsonify({"about": new_about, "summary": change_summary})
 
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -2547,7 +3062,9 @@ Return STRICT JSON:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                max_tokens=12000,
+                # Bullets ahora son más largos (BULLET DEPTH en el prompt): subimos el techo
+                # porque en JSON mode una respuesta truncada es irrecuperable.
+                max_tokens=16000,
                 response_format={"type": "json_object"},
             )
 
@@ -2583,6 +3100,9 @@ Return STRICT JSON:
                 entry["description"] = _format_description_to_html(
                     entry.get("description", ""), bullets_only=True
                 )
+            # Con dos fuentes (CV + LinkedIn) el modelo concatena por fuente y el
+            # orden sale mezclado; acá lo forzamos.
+            work_entries = _sort_work_entries_reverse_chronological(work_entries)
 
             edu_entries = [e for e in json_data.get("education", []) if isinstance(e, dict)]
             for entry in edu_entries:

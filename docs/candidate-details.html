@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260729-2" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260730-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -121,33 +121,10 @@
               <span class="ai-section-chip ai-section-chip-soft">Recommended</span>
             </div>
 
+            <!-- Intro Call y Deep Dive quitados a pedido: sólo queda First Interview.
+                 candidate-details.js lee esos campos con optional chaining, así que
+                 viajan vacíos y el backend sigue aceptándolos sin romperse. -->
             <div class="ai-form-stack">
-              <div class="ai-input-card">
-                <div class="ai-input-head">
-                  <label for="ai-intro-call-link">Intro Call</label>
-                  <span class="ai-input-tag">Optional</span>
-                </div>
-                <div id="ai-intro-call-note" class="ai-note-box">
-                  Paste a Grain recording link to fetch the transcript automatically, or paste the transcript manually below.
-                </div>
-                <input id="ai-intro-call-link" type="url" placeholder="Paste Grain recording link here..." />
-                <label for="ai-intro-call-transcript" class="ai-secondary-label">Intro Call Transcript</label>
-                <textarea id="ai-intro-call-transcript" placeholder="Paste intro call transcript here..."></textarea>
-              </div>
-
-              <div class="ai-input-card">
-                <div class="ai-input-head">
-                  <label for="ai-deep-dive-link">Deep Dive</label>
-                  <span class="ai-input-tag">Optional</span>
-                </div>
-                <div id="ai-deep-dive-note" class="ai-note-box">
-                  Add another Grain link if you want more context, or paste the transcript manually below.
-                </div>
-                <input id="ai-deep-dive-link" type="url" placeholder="Paste Grain recording link here..." />
-                <label for="ai-deep-dive-transcript" class="ai-secondary-label">Deep Dive Transcript</label>
-                <textarea id="ai-deep-dive-transcript" placeholder="Paste deep dive transcript here..."></textarea>
-              </div>
-
               <div class="ai-input-card">
                 <div class="ai-input-head">
                   <label for="ai-first-interview-link">First Interview</label>
@@ -173,13 +150,26 @@
 
             <div class="ai-input-card ai-input-card-full">
               <label for="ai-comments">Do you want me to take something into account?</label>
-              <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
+              <div class="ai-note-box">
+                Facts and directions you give here take priority over everything else, and
+                apply to the whole CV at once. Add data the sources never had ("add QuickBooks
+                and Xero to the role at Acme"), or say how to write it ("lead with her
+                multi-entity consolidation experience", "drop the 2019 freelance role").
+                <br><br>
+                <strong>This runs when you generate</strong> — it's not a chat. Already generated
+                and just want to fix one section? Use the ✨ on that section instead: it edits
+                what's on screen, and generating again would wipe those edits.
+              </div>
+              <textarea id="ai-comments" placeholder="e.g. Add QuickBooks and Xero to the work experience at Acme Corp. Emphasize the FP&A work — that's what the client cares about."></textarea>
             </div>
           </section>
         </div>
 
         <div class="ai-popup-footer">
-          <p class="ai-footer-copy">Generate a stronger resume using VinttiHub sources plus your call notes.</p>
+          <p class="ai-footer-copy">
+            Builds the CV from scratch using VinttiHub sources plus your call notes.
+            <strong>Replaces the whole resume</strong>, including edits made from the ✨ section chats.
+          </p>
           <button id="ai-lets-go">✨ Let's Go!</button>
         </div>
       </div>
@@ -680,7 +670,7 @@
             <h2 class="cv-heading" data-icon="🛠️">Tools</h2>
             <div class="cv-heading-actions">
               <button id="saveToolsBtn" class="resume-save-btn" type="button">Save</button>
-              <button class="star-button" data-target="popup-about" title="Add comment">
+              <button class="star-button" data-target="popup-tools" title="Edit with AI">
                 <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
               </button>
             </div>
@@ -697,7 +687,9 @@
             <h2 class="cv-heading" data-icon="🌐">Languages</h2>
             <div class="cv-heading-actions">
               <button id="saveLanguagesBtn" class="resume-save-btn" type="button">Save</button>
-              <button class="star-button" data-target="popup-about" title="Add comment">
+              <!-- No hay endpoint /ai/improve_languages: sin data-target queda inerte
+                   en vez de abrir el chat de About y editar la sección equivocada. -->
+              <button class="star-button no-ai" title="No AI editor for Languages yet" aria-disabled="true">
                 <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
               </button>
             </div>
@@ -985,36 +977,85 @@
   </div>
 
   <!-- ===================== STAR POPUPS (AI prompts) ===================== -->
-  <div id="popup-about" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-about-title">
-    <button class="close-star-popup" aria-label="Close">✖</button>
-    <h3 id="popup-about-title">About Prompt</h3>
-    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-    <textarea placeholder="What would you like to improve in this section?"></textarea>
-    <button class="generate-btn">Generate</button>
+  <!--
+    Chats por sección. Editan lo que ya está en pantalla (no regeneran desde cero,
+    para eso está el ✨ AI Assistant). La lógica vive en candidate-details.js →
+    wireStarFlows/SECTION_CHATS; el historial se guarda por candidato+sección.
+  -->
+  <div id="popup-about" class="star-popup star-chat hidden" role="dialog" aria-modal="true" aria-labelledby="popup-about-title">
+    <div class="star-chat-dialog">
+      <button class="close-star-popup" aria-label="Close">✖</button>
+      <header class="star-chat-head">
+        <span class="star-chat-kicker">Editing</span>
+        <h3 id="popup-about-title">About</h3>
+        <p class="star-chat-sub">I edit what's on screen — I don't regenerate the CV. Ask for fixes, or give me facts I'm missing.</p>
+      </header>
+      <div class="star-chat-log" id="chatlog-about" aria-live="polite"></div>
+      <div class="star-chat-composer">
+        <textarea rows="2" placeholder="e.g. Lead with her FP&amp;A experience — that's what this client cares about."></textarea>
+        <div class="star-chat-actions">
+          <button type="button" class="star-chat-undo" hidden>↩ Undo last change</button>
+          <button type="button" class="generate-btn">Send</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="popup-education" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-education-title">
-    <button class="close-star-popup" aria-label="Close">✖</button>
-    <h3 id="popup-education-title">Education Prompt</h3>
-    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-    <textarea placeholder="What would you like to improve in this section?"></textarea>
-    <button class="generate-btn">Generate</button>
+  <div id="popup-education" class="star-popup star-chat hidden" role="dialog" aria-modal="true" aria-labelledby="popup-education-title">
+    <div class="star-chat-dialog">
+      <button class="close-star-popup" aria-label="Close">✖</button>
+      <header class="star-chat-head">
+        <span class="star-chat-kicker">Editing</span>
+        <h3 id="popup-education-title">Education</h3>
+        <p class="star-chat-sub">I edit what's on screen — I don't regenerate the CV. Name the institution so I fix the right entry.</p>
+      </header>
+      <div class="star-chat-log" id="chatlog-education" aria-live="polite"></div>
+      <div class="star-chat-composer">
+        <textarea rows="2" placeholder="e.g. The EUDE master's is in Strategic Marketing, not general marketing."></textarea>
+        <div class="star-chat-actions">
+          <button type="button" class="star-chat-undo" hidden>↩ Undo last change</button>
+          <button type="button" class="generate-btn">Send</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="popup-work" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-work-title">
-    <button class="close-star-popup" aria-label="Close">✖</button>
-    <h3 id="popup-work-title">Work Experience Prompt</h3>
-    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-    <textarea placeholder="What would you like to improve in this section?"></textarea>
-    <button class="generate-btn">Generate</button>
+  <div id="popup-work" class="star-popup star-chat hidden" role="dialog" aria-modal="true" aria-labelledby="popup-work-title">
+    <div class="star-chat-dialog">
+      <button class="close-star-popup" aria-label="Close">✖</button>
+      <header class="star-chat-head">
+        <span class="star-chat-kicker">Editing</span>
+        <h3 id="popup-work-title">Work Experience</h3>
+        <p class="star-chat-sub">I edit what's on screen — I don't regenerate the CV. Name the company so I apply it to the right role.</p>
+      </header>
+      <div class="star-chat-log" id="chatlog-work" aria-live="polite"></div>
+      <div class="star-chat-composer">
+        <textarea rows="2" placeholder="e.g. Add QuickBooks and Xero to the role at Acme Corp. Make the Beta Inc bullets longer."></textarea>
+        <div class="star-chat-actions">
+          <button type="button" class="star-chat-undo" hidden>↩ Undo last change</button>
+          <button type="button" class="generate-btn">Send</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="popup-tools" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-tools-title">
-    <button class="close-star-popup" aria-label="Close">✖</button>
-    <h3 id="popup-tools-title">Tools Prompt</h3>
-    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-    <textarea placeholder="What would you like to improve in this section?"></textarea>
-    <button class="generate-btn">Generate</button>
+  <div id="popup-tools" class="star-popup star-chat hidden" role="dialog" aria-modal="true" aria-labelledby="popup-tools-title">
+    <div class="star-chat-dialog">
+      <button class="close-star-popup" aria-label="Close">✖</button>
+      <header class="star-chat-head">
+        <span class="star-chat-kicker">Editing</span>
+        <h3 id="popup-tools-title">Tools</h3>
+        <p class="star-chat-sub">I edit what's on screen — I don't regenerate the CV. Add tools I missed or fix a level.</p>
+      </header>
+      <div class="star-chat-log" id="chatlog-tools" aria-live="polite"></div>
+      <div class="star-chat-composer">
+        <textarea rows="2" placeholder="e.g. Add Xero as Intermediate. NetSuite should be Advanced, she used it 5 years."></textarea>
+        <div class="star-chat-actions">
+          <button type="button" class="star-chat-undo" hidden>↩ Undo last change</button>
+          <button type="button" class="generate-btn">Send</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="reference-feedback-builder" class="hidden" role="dialog" aria-modal="true" aria-labelledby="reference-feedback-builder-title">
@@ -1125,7 +1166,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260729-2"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260730-5"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

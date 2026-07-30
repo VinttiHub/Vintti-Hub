@@ -5486,3 +5486,164 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 @media (max-width: 620px) {
   .cv-save-state { right: 12px; bottom: 12px; left: 12px; justify-content: center; }
 }
+
+/* ===== Chat por sección (star popups) =====================================
+   Convierte los popups de un solo disparo en un chat iterativo. Overridea
+   .star-popup de arriba, que era ancho fijo + textarea centrado. */
+/* El popup pasa a ser el OVERLAY (como #ai-popup) y .star-chat-dialog es el
+   panel. Antes .star-popup era el panel centrado con transform y el fondo
+   quedaba a la vista. */
+.star-popup.star-chat {
+  position: fixed;
+  inset: 0;
+  top: 0; left: 0;
+  transform: none;
+  width: auto;
+  max-height: none;
+  padding: 24px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top, rgba(252, 165, 165, 0.18), transparent 34%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  animation: fadeIn 0.2s ease-out;
+}
+.star-popup.star-chat.hidden { display: none; }
+
+.star-chat-dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #dbe6f7;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.star-chat-head { padding-right: 28px; }
+.star-chat-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #6c38ff;
+}
+.star-chat-head h3 { margin: 2px 0 4px; font-size: 20px; }
+.star-chat-sub { margin: 0; font-size: 13px; line-height: 1.45; color: #5b6478; }
+
+.star-chat-log {
+  flex: 1 1 auto;
+  min-height: 96px;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f8fc;
+  border: 1px solid #e6ecf6;
+}
+.star-chat-empty {
+  margin: auto;
+  text-align: center;
+  font-size: 13px;
+  color: #8790a3;
+  line-height: 1.5;
+}
+
+.star-chat-msg {
+  max-width: 86%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.star-chat-msg.is-user {
+  align-self: flex-end;
+  background: #6c38ff;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.star-chat-msg.is-ai {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #e2e8f4;
+  border-bottom-left-radius: 4px;
+}
+.star-chat-msg.is-error {
+  align-self: flex-start;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+}
+.star-chat-msg.is-pending { color: #8790a3; font-style: italic; }
+
+.star-chat-composer { display: flex; flex-direction: column; gap: 8px; }
+.star-popup.star-chat textarea {
+  /* Esta hoja no tiene box-sizing global: sin esto, width:100% + padding +
+     borde se desborda del panel por la derecha. */
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  height: auto;
+  min-height: 62px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #d7dfec;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+.star-popup.star-chat textarea:focus {
+  outline: none;
+  border-color: #6c38ff;
+  box-shadow: 0 0 0 3px rgba(108, 56, 255, .12);
+}
+
+.star-chat-actions { display: flex; align-items: center; gap: 8px; }
+.star-chat-hint { font-size: 11.5px; color: #8790a3; }
+.star-popup.star-chat .generate-btn {
+  /* margin-left:auto en vez de space-between: con Undo oculto, space-between
+     dejaba el Send pegado a la izquierda. */
+  margin: 0 0 0 auto;
+  background: #6c38ff;
+  color: #fff;
+  padding: 10px 20px;
+}
+.star-popup.star-chat .generate-btn:hover { background: #5a2ee0; }
+.star-popup.star-chat .generate-btn[disabled] {
+  background: #c9cfdb;
+  cursor: not-allowed;
+}
+.star-chat-undo {
+  background: none;
+  border: 1px solid #d7dfec;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #5b6478;
+}
+.star-chat-undo:hover { border-color: #6c38ff; color: #6c38ff; }
+.star-chat-undo[hidden] { display: none; }
+
+.star-button.no-ai { opacity: .35; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .star-popup.star-chat { padding: 10px; }
+  .star-chat-dialog { width: 100%; max-height: calc(100vh - 20px); }
+  .star-chat-log { max-height: 40vh; }
+}

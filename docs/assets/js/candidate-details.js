@@ -907,7 +907,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
 })();
 // --- STAR FLOWS: About / Education / Work / Tools --------------------------
 (function wireStarFlows(){
-  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  // Mismo auto-detect que wireAiGenerate: en local los ✨ de cada sección deben
+  // pegarle al backend local, no a producción.
+  const API_BASE =
+    (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+      ? 'http://127.0.0.1:5000'
+      : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const cid = new URLSearchParams(location.search).get('id');
 
   // helpers tooltip
@@ -927,9 +932,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
     el.__starTip = tip;
   }
   function hideStarTooltip(){ document.querySelectorAll('.star-tooltip').forEach(x=>x.remove()); }
-// 0) Lista de estrellas a deshabilitar SIEMPRE (hard-disable)
-const HARD_DISABLED = new Set(['popup-work','popup-education','popup-tools','popup-languages']);
-
+// Antes había un HARD_DISABLED con popup-work/education/tools que sólo funcionaba
+// a medias: disableStar usa stopPropagation, que NO frena a los otros listeners
+// del mismo elemento, y gateStarsBySources le sacaba la clase después. Resultado:
+// los botones abrían igual, por accidente. Ahora las 4 secciones tienen chat, así
+// que se habilitan de forma explícita y la única inerte (Languages, sin endpoint)
+// se marca en el HTML sin data-target.
 function disableStar(btn, msg='Este botón está deshabilitado temporalmente.'){
   btn.classList.add('disabled-star','hard-disabled');
   btn.setAttribute('aria-disabled','true');
@@ -947,11 +955,6 @@ function enableStar(btn){
   if (btn.__block){ btn.removeEventListener('click', btn.__block); btn.__block = null; }
 }
 
-// Marcar como deshabilitadas las que estén en HARD_DISABLED
-document.querySelectorAll('.star-button[data-target]').forEach(btn=>{
-  const id = btn.getAttribute('data-target');
-  if (HARD_DISABLED.has(id)) disableStar(btn, 'Este botón está deshabilitado por ahora.');
-});
 
   // abrir/cerrar popups
   document.querySelectorAll('.star-button[data-target]').forEach(btn=>{
@@ -966,7 +969,17 @@ document.querySelectorAll('.star-button[data-target]').forEach(btn=>{
     x.addEventListener('click', ()=> x.closest('.star-popup')?.classList.add('hidden'));
   });
   document.querySelectorAll('.star-popup').forEach(pop=>{
+    // En los chats .star-popup es el overlay y .star-chat-dialog el panel, así
+    // que e.target === pop sólo ocurre al clickear el fondo. En los popups
+    // viejos .star-popup ES el panel: ahí el click en su padding cerraba de más,
+    // por eso se excluyen.
+    if (!pop.classList.contains('star-chat')) return;
     pop.addEventListener('click', (e)=>{ if (e.target === pop) pop.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', (e)=>{
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.star-popup.star-chat:not(.hidden)')
+      .forEach(pop => pop.classList.add('hidden'));
   });
 
   // deshabilitar si faltan fuentes (linkedin/cv/affinda/coresignal/url)
@@ -1011,117 +1024,184 @@ document.querySelectorAll('.star-button[data-target]').forEach(btn=>{
     } catch(e){ console.warn('gateStarsBySources:', e); }
   })();
 
-  // ---- handlers de generación por popup -----------------------------------
-  function getTextArea(popupId){
-    return document.querySelector(`#${popupId} textarea`);
-  }
-  function loaderOn(id){ const el=document.getElementById(id); if (el) el.classList.remove('hidden'); }
-  function loaderOff(id){ const el=document.getElementById(id); if (el) el.classList.add('hidden'); }
+  // ---- Chat por sección ----------------------------------------------------
+  // Cada popup EDITA su sección partiendo del estado actual + el historial de la
+  // conversación. Es lo contrario del ✨ AI Assistant, que regenera el CV entero
+  // desde las fuentes y pisa lo que había.
+  const SECTION_CHATS = {
+    'popup-about':     { field:'about',           endpoint:'/ai/improve_about',           label:'About' },
+    'popup-work':      { field:'work_experience', endpoint:'/ai/improve_work_experience', label:'Work Experience' },
+    'popup-education': { field:'education',       endpoint:'/ai/improve_education',       label:'Education' },
+    'popup-tools':     { field:'tools',           endpoint:'/ai/improve_tools',           label:'Tools' },
+  };
+  const CHAT_TURN_LIMIT = 12;
+  const undoSnapshots = {};   // field -> valor previo, para el botón Undo
 
-  // About
-  const aboutBtn = document.querySelector('#popup-about .generate-btn');
-  if (aboutBtn){
-    aboutBtn.addEventListener('click', async ()=>{
-      const ta = getTextArea('popup-about');
-      const user_prompt = (ta?.value || '').trim();
-      const L = 'about-loader';
-      loaderOn(L);
-      try{
-        const res = await fetch(`${API_BASE}/ai/improve_about`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ candidate_id: cid, user_prompt })
-        });
-        const data = await res.json();
-        if (data.about){
-          // pinta + guarda usando tu API expuesta por resume.js
-          window.Resume?.applyGenerated({ about: data.about });
-        }
-        document.getElementById('popup-about')?.classList.add('hidden');
-      } catch(e){
-        console.error('improve_about failed', e);
-        alert('Error improving About section. Try again.');
-      } finally { loaderOff(L); }
-    });
+  const chatKey  = (field) => `hx_cvchat_${cid}_${field}`;
+  const logEl    = (popupId) => document.getElementById(`chatlog-${popupId.replace('popup-','')}`);
+
+  function loadHistory(field){
+    try {
+      const raw = JSON.parse(localStorage.getItem(chatKey(field)) || '[]');
+      return Array.isArray(raw) ? raw.slice(-CHAT_TURN_LIMIT) : [];
+    } catch { return []; }
+  }
+  function saveHistory(field, turns){
+    try { localStorage.setItem(chatKey(field), JSON.stringify(turns.slice(-CHAT_TURN_LIMIT))); }
+    catch {}   // quota llena o storage bloqueado: el chat sigue andando en memoria
   }
 
-  // Education
-  const eduBtn = document.querySelector('#popup-education .generate-btn');
-  if (eduBtn){
-    eduBtn.addEventListener('click', async ()=>{
-      const ta = getTextArea('popup-education');
-      const user_prompt = (ta?.value || '').trim();
-      if (!user_prompt) return alert('Please add a comment before generating.');
-      const L = 'about-loader'; // reusamos
-      loaderOn(L);
-      try{
-        const res = await fetch(`${API_BASE}/ai/improve_education`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ candidate_id: cid, user_prompt })
-        });
-        const data = await res.json();
-        if (data.education){
-          window.Resume?.applyGenerated({ education: data.education });
-        }
-        document.getElementById('popup-education')?.classList.add('hidden');
-      } catch(e){
-        console.error('improve_education failed', e);
-        alert('Error improving Education section. Try again.');
-      } finally { loaderOff(L); }
-    });
+  function bubble(text, kind){
+    const el = document.createElement('div');
+    el.className = `star-chat-msg is-${kind}`;
+    el.textContent = text;              // textContent: nunca innerHTML con texto del modelo
+    return el;
   }
 
-  // Work Experience
-  const workBtn = document.querySelector('#popup-work .generate-btn');
-  if (workBtn){
-    workBtn.addEventListener('click', async ()=>{
-      const ta = getTextArea('popup-work');
-      const user_prompt = (ta?.value || '').trim();
-      if (!user_prompt) return alert('Please add a comment before generating.');
-      const L = 'work-loader';
-      loaderOn(L);
-      try{
-        const res = await fetch(`${API_BASE}/ai/improve_work_experience`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ candidate_id: cid, user_prompt })
-        });
-        const data = await res.json();
-        if (data.work_experience){
-          window.Resume?.applyGenerated({ work_experience: data.work_experience });
-        }
-        document.getElementById('popup-work')?.classList.add('hidden');
-      } catch(e){
-        console.error('improve_work_experience failed', e);
-        alert('Error improving Work Experience section. Try again.');
-      } finally { loaderOff(L); }
-    });
+  function renderChat(popupId){
+    const cfg = SECTION_CHATS[popupId];
+    const box = logEl(popupId);
+    if (!cfg || !box) return;
+    const turns = loadHistory(cfg.field);
+    box.innerHTML = '';
+    if (!turns.length){
+      const empty = document.createElement('div');
+      empty.className = 'star-chat-empty';
+      empty.textContent = `Ask me to fix anything in ${cfg.label}. I keep the rest of the section untouched.`;
+      box.appendChild(empty);
+    } else {
+      turns.forEach(t => box.appendChild(bubble(t.content, t.role === 'user' ? 'user' : 'ai')));
+    }
+    box.scrollTop = box.scrollHeight;
+
+    const undoBtn = document.querySelector(`#${popupId} .star-chat-undo`);
+    if (undoBtn) undoBtn.hidden = !(cfg.field in undoSnapshots);
   }
 
-  // Tools
-  const toolsBtn = document.querySelector('#popup-tools .generate-btn');
-  if (toolsBtn){
-    toolsBtn.addEventListener('click', async ()=>{
-      const ta = getTextArea('popup-tools');
-      const user_prompt = (ta?.value || '').trim();
-      if (!user_prompt) return alert('Please add a comment before generating.');
-      const L = 'tools-loader';
-      loaderOn(L);
-      try{
-        const res = await fetch(`${API_BASE}/ai/improve_tools`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ candidate_id: cid, user_prompt })
-        });
-        const data = await res.json();
-        if (data.tools){
-          // Acepta string JSON o array; applyGenerated ya normaliza/coercea
-          window.Resume?.applyGenerated({ tools: data.tools });
-        }
-        document.getElementById('popup-tools')?.classList.add('hidden');
-      } catch(e){
-        console.error('improve_tools failed', e);
-        alert('Error improving Tools section. Try again.');
-      } finally { loaderOff(L); }
-    });
+  // La vacante deja que el editor sepa para qué cliente es el CV ("priorizá lo
+  // de FP&A"). Si el candidato no tiene oportunidad asociada, se manda null y el
+  // backend trabaja sin ella.
+  async function currentOpportunityId(){
+    try {
+      const fromPopup = window.__aiOpportunity?.id?.();
+      if (fromPopup) return fromPopup;
+    } catch {}
+    try { return await ensureCurrentOppId(cid, API_BASE); }
+    catch { return null; }
   }
+
+  async function fetchSectionSnapshot(field){
+    // El estado previo para poder deshacer. Si falla, se sigue igual: perder el
+    // undo es molesto, bloquear la edición es peor.
+    try {
+      const r = await fetch(`${API_BASE}/resumes/${cid}`);
+      if (!r.ok) return null;
+      const data = await r.json();
+      return data?.[field] ?? null;
+    } catch { return null; }
+  }
+
+  async function sendChat(popupId){
+    const cfg = SECTION_CHATS[popupId];
+    if (!cfg) return;
+    const ta = document.querySelector(`#${popupId} textarea`);
+    const sendBtn = document.querySelector(`#${popupId} .generate-btn`);
+    const box = logEl(popupId);
+    const message = (ta?.value || '').trim();
+    if (!message) { ta?.focus(); return; }
+    // El botón deshabilitado no frena a Enter: sin esto dos envíos rápidos se
+    // pisan y el segundo manda un historial desactualizado.
+    if (sendBtn?.disabled) return;
+
+    const history = loadHistory(cfg.field);        // turnos PREVIOS; el actual va aparte
+    const turns = history.concat([{ role:'user', content: message }]);
+    saveHistory(cfg.field, turns);
+    renderChat(popupId);
+    if (ta) ta.value = '';
+
+    const pending = bubble('Working on it…', 'pending');
+    box?.appendChild(pending);
+    if (box) box.scrollTop = box.scrollHeight;
+    if (sendBtn){ sendBtn.disabled = true; sendBtn.textContent = 'Working…'; }
+
+    const [snapshot, opportunityId] = await Promise.all([
+      fetchSectionSnapshot(cfg.field),
+      currentOpportunityId(),
+    ]);
+
+    try {
+      const res = await fetch(`${API_BASE}${cfg.endpoint}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          candidate_id: cid, user_prompt: message, history,
+          opportunity_id: opportunityId,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const value = data[cfg.field];
+      if (value === undefined || value === null) throw new Error('Empty response from the model.');
+
+      if (snapshot !== null) undoSnapshots[cfg.field] = snapshot;
+      window.Resume?.applyGenerated?.({ [cfg.field]: value });
+
+      const summary = (data.summary || '').trim() || `Updated ${cfg.label}.`;
+      pending.remove();
+      saveHistory(cfg.field, turns.concat([{ role:'assistant', content: summary }]));
+      renderChat(popupId);
+    } catch(e){
+      console.error(`${cfg.endpoint} failed`, e);
+      pending.remove();
+      box?.appendChild(bubble(`Couldn't apply that: ${e.message}. Your text is still in the box — try rephrasing.`, 'error'));
+      if (ta) ta.value = message;      // no perder lo que escribió
+      // El turno del usuario queda en el historial pero sin respuesta: lo sacamos
+      // para que el próximo intento no arrastre un turno huérfano.
+      saveHistory(cfg.field, history);
+    } finally {
+      if (sendBtn){ sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+      if (box) box.scrollTop = box.scrollHeight;
+    }
+  }
+
+  function undoChat(popupId){
+    const cfg = SECTION_CHATS[popupId];
+    if (!cfg || !(cfg.field in undoSnapshots)) return;
+    window.Resume?.applyGenerated?.({ [cfg.field]: undoSnapshots[cfg.field] });
+    delete undoSnapshots[cfg.field];
+    const turns = loadHistory(cfg.field).concat([
+      { role:'assistant', content:`↩ Reverted ${cfg.label} to the previous version.` }
+    ]);
+    saveHistory(cfg.field, turns);
+    renderChat(popupId);
+  }
+
+  Object.keys(SECTION_CHATS).forEach(popupId => {
+    const pop = document.getElementById(popupId);
+    if (!pop) return;
+
+    pop.querySelector('.generate-btn')?.addEventListener('click', () => sendChat(popupId));
+    pop.querySelector('.star-chat-undo')?.addEventListener('click', () => undoChat(popupId));
+
+    // Enter envía, Shift+Enter hace salto de línea.
+    pop.querySelector('textarea')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendChat(popupId); }
+    });
+
+    renderChat(popupId);
+  });
+
+  // Al abrir desde la estrella: repintar (puede haber historial de otra sesión)
+  // y dejar el cursor listo para escribir.
+  document.querySelectorAll('.star-button[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const popupId = btn.getAttribute('data-target');
+      if (!SECTION_CHATS[popupId]) return;
+      if (btn.classList.contains('disabled-star')) return;
+      renderChat(popupId);
+      setTimeout(() => document.querySelector(`#${popupId} textarea`)?.focus(), 30);
+    });
+  });
 })();
 
 
