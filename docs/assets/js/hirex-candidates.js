@@ -412,7 +412,15 @@
       $("hxCvView").addEventListener("click", () => viewCv(c.candidate_id));
       $("hxCvReplace").addEventListener("click", () => triggerCvUpload(c.candidate_id));
     } else {
-      els.profCv.innerHTML = `
+      // No file doesn't mean nothing to read: imported candidates carry profile
+      // text the AI rubric uses. Name the source so "No CV" isn't misleading.
+      els.profCv.innerHTML = c.has_text ? `
+        <div class="hx-cv-empty hx-cv-text">
+          <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-solid fa-file-lines"></i></span>
+          <p><b>No CV file</b>, but we have their profile text from
+             ${esc(c.cv_text_source || "an imported profile")}, which is what AI screening reads.</p>
+          <button class="hx-btn hx-btn-soft" id="hxCvUpload" type="button"><i class="fa-solid fa-upload"></i> Upload CV</button>
+        </div>` : `
         <div class="hx-cv-empty">
           <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-solid fa-file-arrow-up"></i></span>
           <p>No CV on file.</p>

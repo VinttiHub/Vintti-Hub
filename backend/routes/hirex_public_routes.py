@@ -406,7 +406,7 @@ def public_apply(token):
                 cols.update({
                     "cv_s3_key": cv_key, "cv_file_name": cv_file.filename[:255],
                     "cv_content_type": CONTENT_TYPES.get(cv_ext), "cv_size_bytes": len(cv_bytes),
-                    "cv_text": cv_text,
+                    "cv_text": cv_text, "cv_text_source": "the uploaded CV",
                 })
 
             if hit:
@@ -414,7 +414,8 @@ def public_apply(token):
                 # Returning applicant: fill blanks, never overwrite what we already know,
                 # except the CV — the newest one they sent us is the current one.
                 sets = [f"{c} = COALESCE(NULLIF({c}, ''), %s)" if c not in
-                        ("cv_s3_key", "cv_file_name", "cv_content_type", "cv_size_bytes", "cv_text", "cv_uploaded_at")
+                        ("cv_s3_key", "cv_file_name", "cv_content_type", "cv_size_bytes",
+                         "cv_text", "cv_text_source", "cv_uploaded_at")
                         else f"{c} = %s" for c in cols]
                 if cv_key:
                     sets.append("cv_uploaded_at = NOW()")

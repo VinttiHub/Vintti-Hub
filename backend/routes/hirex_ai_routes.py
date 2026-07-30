@@ -84,7 +84,8 @@ def upload_cv(candidate_id):
             cur.execute(
                 """UPDATE hirex_candidates
                    SET cv_s3_key=%s, cv_file_name=%s, cv_content_type=%s,
-                       cv_size_bytes=%s, cv_text=%s, cv_uploaded_at=NOW(), updated_at=NOW()
+                       cv_size_bytes=%s, cv_text=%s, cv_text_source='the uploaded CV',
+                       cv_uploaded_at=NOW(), updated_at=NOW()
                    WHERE candidate_id=%s
                    RETURNING candidate_id, cv_file_name, cv_uploaded_at;""",
                 (key, file.filename, ctype, len(data), cv_text, candidate_id),

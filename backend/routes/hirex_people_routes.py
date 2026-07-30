@@ -367,13 +367,15 @@ def add_existing_candidate(job_id):
                 }
                 if profile_text:
                     cols["cv_text"] = profile_text
+                    cols["cv_text_source"] = text_from
                 cols = {k: v for k, v in cols.items() if v is not None}
 
                 if candidate_id:
                     # Known to Hirex already: fill the gaps, never overwrite what
                     # a recruiter typed here.
                     keep = {"first_name", "last_name", "email", "phone", "country",
-                            "english_level", "linkedin_url", "source", "cv_text"}
+                            "english_level", "linkedin_url", "source", "cv_text",
+                            "cv_text_source"}
                     sets = [f"{c} = COALESCE(NULLIF({c}, ''), %s)" if c in keep else f"{c} = %s"
                             for c in cols]
                     cur.execute(

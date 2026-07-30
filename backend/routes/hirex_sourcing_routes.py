@@ -312,6 +312,7 @@ def add_candidate_from_linkedin(job_id):
             })
             if summary:
                 cols["cv_text"] = summary
+                cols["cv_text_source"] = "their LinkedIn profile"
 
             if existing:
                 candidate_id = existing["candidate_id"]
@@ -319,6 +320,8 @@ def add_candidate_from_linkedin(job_id):
                 # typed (COALESCE keeps the existing value when it isn't blank).
                 keep = {"first_name", "last_name", "email", "headline",
                         "current_company", "location", "country"}
+                # cv_text/cv_text_source are refreshed, not preserved: the newest
+                # profile we pulled is the current one.
                 sets = [f"{c} = COALESCE(NULLIF({c}, ''), %s)" if c in keep else f"{c} = %s"
                         for c in cols if c != "sourced_at"]
                 values = [cols[c] for c in cols if c != "sourced_at"]

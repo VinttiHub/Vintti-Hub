@@ -861,10 +861,14 @@
       $("hxCvView").addEventListener("click", () => viewCv(c.candidate_id));
       $("hxCvReplace").addEventListener("click", () => triggerCvUpload(c.candidate_id));
     } else {
+      // No file, but there may still be text the rubric can read — say where it
+      // came from, otherwise "no CV" next to a working Analyze button reads like a bug.
+      const from = c.cv_text_source || "an imported profile";
       els.candCv.innerHTML = c.has_text ? `
-        <div class="hx-cv-empty">
-          <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-brands fa-linkedin"></i></span>
-          <p>Sourced from LinkedIn. Their profile stands in for a CV, so AI screening works — upload one if you get it.</p>
+        <div class="hx-cv-empty hx-cv-text">
+          <span class="hx-cv-ic" style="margin:0 auto"><i class="fa-solid fa-file-lines"></i></span>
+          <p><b>No CV file</b>, but we have their profile text from ${esc(from)},
+             which is what AI screening reads. Upload a PDF if you get one.</p>
           <button class="hx-btn hx-btn-soft" id="hxCvUpload" type="button"><i class="fa-solid fa-upload"></i> Upload CV</button>
         </div>` : `
         <div class="hx-cv-empty">
@@ -922,7 +926,8 @@
           <div class="hx-ai-cta-txt">
             <h4>AI screening</h4>
             <p>${canAnalyze
-                  ? `Score this candidate against the job description${!c.has_cv ? ", using their LinkedIn profile" : ""}.`
+                  ? `Score this candidate against the job description, reading ${
+                      esc(c.has_cv ? "their CV" : (c.cv_text_source || "their imported profile"))}.`
                   : "Upload a CV to enable AI screening."}</p>
           </div>
           <button class="hx-btn hx-btn-primary" id="hxAnalyze" type="button" ${canAnalyze ? "" : "disabled"}>Analyze</button>
