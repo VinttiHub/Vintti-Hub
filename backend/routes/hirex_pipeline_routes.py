@@ -62,6 +62,9 @@ def _nest(row, with_analysis=False):
         "ai_analyzed_at": row.get("ai_analyzed_at"),
         "source": row.get("app_source"),
         "knockout_flags": row.get("knockout_flags") or [],
+        "interview_score": row.get("interview_score"),
+        "interview_analyzed_at": row.get("interview_analyzed_at"),
+        "has_interview": bool(row.get("has_interview")),
         "scorecards": {
             "count": int(row.get("sc_count") or 0),
             "avg": round(float(row["sc_avg"]), 2) if row.get("sc_avg") is not None else None,
@@ -95,6 +98,8 @@ def _nest(row, with_analysis=False):
     if with_analysis:
         out["ai_analysis"] = row.get("ai_analysis")
         out["answers"] = row.get("answers") or []
+        out["interview_analysis"] = row.get("interview_analysis")
+        out["interview_link"] = row.get("interview_link")
     return out
 
 
@@ -102,6 +107,8 @@ APP_JOIN_SELECT = f"""
     SELECT a.application_id, a.job_id, a.candidate_id, a.stage, a.rating,
            a.applied_at, a.updated_at, a.ai_score, a.ai_analyzed_at,
            a.source AS app_source, a.knockout_flags,
+           a.interview_score, a.interview_analyzed_at,
+           (a.interview_transcript IS NOT NULL) AS has_interview,
            c.first_name, c.last_name, {DISPLAY_NAME} AS full_name,
            c.email, c.phone, c.headline, c.location, c.country, c.area,
            c.english_level, c.current_company, c.desired_salary,
@@ -230,7 +237,9 @@ def get_application(app_id):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
-            APP_JOIN_SELECT.replace("c.cv_s3_key", "c.cv_s3_key, a.ai_analysis, a.answers")
+            APP_JOIN_SELECT.replace(
+                "c.cv_s3_key",
+                "c.cv_s3_key, a.ai_analysis, a.answers, a.interview_analysis, a.interview_link")
             + " WHERE a.application_id = %s;",
             (app_id,),
         )

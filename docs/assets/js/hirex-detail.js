@@ -85,6 +85,8 @@
       candStage: $("hxCandStage"), candStars: $("hxCandStars"), candContact: $("hxCandContact"),
       candCv: $("hxCandCv"), cvInput: $("hxCvInput"), candAi: $("hxCandAi"),
       candAnswers: $("hxCandAnswers"), candEdit: $("hxCandEdit"),
+      candInterview: $("hxCandInterview"),
+      candTabs: $("hxCandTabs"),
       scorecards: $("hxScorecards"),
       scScrim: $("hxScScrim"), scDrawer: $("hxScDrawer"), scTitle: $("hxScTitle"),
       scBody: $("hxScBody"), scClose: $("hxScClose"), scCancel: $("hxScCancel"),
@@ -120,6 +122,10 @@
     els.addSave.addEventListener("click", saveNewCandidate);
 
     // Candidate drawer
+    els.candTabs.addEventListener("click", (e) => {
+      const b = e.target.closest(".hx-subtab");
+      if (b) setCandTab(b.dataset.pane);
+    });
     els.candClose.addEventListener("click", closeCandDrawer);
     els.candScrim.addEventListener("click", closeCandDrawer);
     els.candSave.addEventListener("click", saveCandidate);
@@ -301,6 +307,9 @@
           ${c.has_cv ? `<span class="hx-cv-flag" title="CV on file"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           ${(a.knockout_flags || []).length ? `<span class="hx-ko-flag" title="Doesn't meet: ${esc((a.knockout_flags || []).join(" · "))}"><i class="fa-solid fa-flag"></i></span>` : ""}
           ${a.ai_score != null ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">AI ${a.ai_score}</span>` : ""}
+          ${a.interview_score != null
+            ? `<span class="hx-ai-chip hx-iv-chip" style="--c:${scoreColor(a.interview_score)}" title="Interview score"><i class="fa-solid fa-microphone-lines"></i>${a.interview_score}</span>`
+            : ""}
           ${consensusChip(a.scorecards)}
           ${starsHtml(a.rating)}
         </div>
@@ -337,6 +346,10 @@
       get: (a) => (a.candidate.full_name || "").toLowerCase() },
     { key: "ai",     label: `<i class="fa-solid fa-wand-magic-sparkles"></i> AI`, dir: -1,
       get: (a) => a.ai_score },
+    // Kept next to the CV score on purpose: the gap between the two is the
+    // point of scoring them apart.
+    { key: "iv",     label: `<i class="fa-solid fa-microphone-lines"></i> Interview`, dir: -1,
+      get: (a) => a.interview_score },
     { key: "eval",   label: "Eval", dir: -1,
       get: (a) => REC_VALUE[a.scorecards && a.scorecards.consensus] },
     { key: "stage",  label: "Stage", dir: 1,
@@ -433,6 +446,11 @@
         <td>${a.ai_score != null
               ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">${a.ai_score}</span>`
               : dash()}</td>
+        <td>${a.interview_score != null
+              ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.interview_score)}">${a.interview_score}</span>`
+              : (a.has_interview
+                  ? `<span class="hx-cell-muted" title="Interview attached but not scored yet">Not scored</span>`
+                  : dash())}</td>
         <td>${consensusChip(a.scorecards) || dash()}</td>
         <td><span class="hx-stage-tag" style="--s:${st.color}">${esc(st.label)}</span></td>
         <td>${starsHtml(a.rating) || dash()}</td>
@@ -803,13 +821,36 @@
 
     els.candCv.innerHTML = "";
     els.candAnswers.innerHTML = "";
+    els.candInterview.innerHTML = "";
     els.candAi.innerHTML = "";
     els.scorecards.innerHTML = "";
+    ["ai", "interview", "scorecards", "answers"].forEach((p) => setCandBadge(p, ""));
+    setCandTab("ai");
     openDrawer(els.candScrim, els.candDrawer);
     loadAppDetail(appId);
     renderScorecards(appId);
   }
   function closeCandDrawer() { closeDrawer(els.candScrim, els.candDrawer); currentCand = null; currentDetail = null; }
+
+  /* --- Candidate sub-tabs --------------------------------------------------
+     Four rubrics in one scroll column was the problem. Each gets its own pane,
+     and the badge carries the headline number so you can see there IS an
+     interview score without opening the tab. */
+  function setCandTab(pane) {
+    if (!pane) return;
+    els.candTabs.querySelectorAll(".hx-subtab").forEach((b) => {
+      b.classList.toggle("is-on", b.dataset.pane === pane);
+    });
+    els.candDrawer.querySelectorAll(".hx-subview").forEach((s) => {
+      s.hidden = s.dataset.pane !== pane;
+    });
+    const view = els.candDrawer.querySelector(".hx-subviews");
+    if (view) view.scrollTop = 0;
+  }
+  function setCandBadge(pane, text) {
+    const b = els.candTabs.querySelector(`.hx-subtab-badge[data-badge="${pane}"]`);
+    if (b) b.textContent = text == null ? "" : String(text);
+  }
 
   // --- CV + AI (per application) -------------------------------------------
   let currentDetail = null;
@@ -825,6 +866,7 @@
       currentDetail = detail;
       renderCv(detail.candidate);
       renderAnswers(detail);
+      renderInterview(detail);
       renderAi(detail);
     } catch {
       els.candAi.innerHTML = "";
@@ -951,7 +993,12 @@
   function renderAnswers(detail) {
     const answers = detail.answers || [];
     const flags = (currentCand && currentCand.knockout_flags) || [];
-    if (!answers.length && !flags.length) { els.candAnswers.innerHTML = ""; return; }
+    setCandBadge("answers", answers.length || "");
+    // Its own tab now, so an empty string would leave the pane looking broken.
+    if (!answers.length && !flags.length) {
+      els.candAnswers.innerHTML = `<p class="hx-pane-empty">This candidate didn't come through the application form, so there are no screening answers.</p>`;
+      return;
+    }
 
     const flagBox = flags.length ? `
       <div class="hx-ko-banner">
@@ -973,6 +1020,174 @@
 
     els.candAnswers.innerHTML = flagBox + (answers.length
       ? `<div class="hx-answers-box"><h4>Application answers</h4>${rows}</div>` : "");
+  }
+
+  /* =======================================================================
+     Interview — paste a Grain link (or the transcript) and score it against
+     the JD. Kept separate from the CV score on purpose: a CV says what someone
+     claims, the interview shows whether they can explain it.
+     ======================================================================= */
+  function renderInterview(detail) {
+    const has = !!detail.interview_link || !!detail.interview_analysis || detail.has_interview;
+    const analyzed = detail.interview_analysis;
+    setCandBadge("interview", analyzed && analyzed._composite_score != null
+      ? clampScore(analyzed._composite_score) : "");
+
+    if (!has) {
+      els.candInterview.innerHTML = `
+        <div class="hx-iv-add">
+          <label class="hx-field">
+            <span>Interview <em class="hx-hint">Grain link, or paste the transcript</em></span>
+            <input type="text" id="hxIvLink" placeholder="https://grain.com/share/recording/…" />
+            <em class="hx-err" data-err="iv"></em>
+          </label>
+          <textarea id="hxIvText" rows="3" placeholder="…or paste the transcript here"></textarea>
+          <button class="hx-btn hx-btn-soft" id="hxIvSave" type="button">
+            <i class="fa-solid fa-microphone-lines"></i> Attach interview
+          </button>
+        </div>`;
+      $("hxIvSave").addEventListener("click", () => saveInterview(detail.application_id));
+      return;
+    }
+
+    const link = detail.interview_link;
+    els.candInterview.innerHTML = `
+      <div class="hx-iv-box">
+        <div class="hx-iv-head">
+          <span class="hx-cv-ic"><i class="fa-solid fa-microphone-lines"></i></span>
+          <div class="hx-iv-info">
+            <div class="hx-iv-name">Interview on file</div>
+            ${link ? `<a href="${esc(linkUrl(link))}" target="_blank" rel="noopener" class="hx-iv-link">
+                        Open the recording <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`
+                   : `<div class="hx-cv-sub">Transcript pasted by hand</div>`}
+          </div>
+          <div class="hx-iv-actions">
+            ${analyzed ? `<button class="hx-btn hx-btn-ghost" id="hxIvRe" type="button">Re-score</button>`
+                       : `<button class="hx-btn hx-btn-primary" id="hxIvGo" type="button">Score interview</button>`}
+            <button class="hx-icon-btn" id="hxIvDel" title="Remove interview"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        </div>
+        ${analyzed ? interviewPanelHtml(analyzed, detail.interview_analyzed_at) : ""}
+      </div>`;
+
+    const go = $("hxIvGo") || $("hxIvRe");
+    if (go) go.addEventListener("click", () => analyzeInterview(detail.application_id));
+    $("hxIvDel").addEventListener("click", () => removeInterview(detail.application_id));
+  }
+
+  function interviewPanelHtml(a, at) {
+    const score = clampScore(a._composite_score);
+    const delta = a._vs_cv;
+    const rubric = a._rubric || [];
+    const byKey = Object.fromEntries((a.criteria || []).map((c) => [c.key, c]));
+
+    const bars = rubric.map((r) => {
+      const c = byKey[r.key] || {};
+      const na = !!c.not_applicable;
+      const v = na ? 0 : clampScore(c.score);
+      const ev = c.evidence && c.evidence !== "Not covered in the interview"
+        ? `<div class="hx-ev">“${esc(c.evidence)}”</div>`
+        : (c.verdict ? `<div class="hx-crit-verdict">${esc(c.verdict)}</div>` : "");
+      return `<div class="hx-crit">
+          <div class="hx-crit-head">
+            <span class="hx-crit-label">${esc(r.label)} <em>×${r.weight}</em></span>
+            <span class="hx-crit-score">${na ? "N/A" : v}</span>
+          </div>
+          <div class="hx-crit-bar"><span style="width:${na ? 0 : v}%;background:${na ? "#c7ccd4" : scoreColor(v)}"></span></div>
+          ${ev}
+        </div>`;
+    }).join("");
+
+    // Same section + list primitives as the CV panel, so both read identically.
+    const sec = (title, icon, body) =>
+      body ? `<div class="hx-ai-sec"><h5><i class="fa-solid ${icon}"></i>${title}</h5>${body}</div>` : "";
+    const list = (items, key1, key2, cls) => {
+      if (!Array.isArray(items) || !items.length) return "";
+      return `<ul class="hx-ai-list ${cls || ""}">` + items.map((i) => {
+        const main = typeof i === "string" ? i : (i[key1] || "");
+        const ev = typeof i === "string" ? "" : (i[key2] || "");
+        const showEv = ev && ev !== "Not covered in the interview";
+        return `<li>${esc(main)}${showEv ? `<span class="hx-ev">“${esc(ev)}”</span>` : ""}</li>`;
+      }).join("") + `</ul>`;
+    };
+
+    return `
+      <div class="hx-iv-result">
+        <div class="hx-iv-scores">
+          <div class="hx-iv-score" style="--c:${scoreColor(score)}">
+            <b>${score}</b><span>Interview</span>
+          </div>
+          ${delta != null ? `<div class="hx-iv-delta ${delta >= 0 ? "up" : "down"}">
+              <i class="fa-solid fa-arrow-${delta >= 0 ? "up" : "down"}"></i>
+              ${Math.abs(delta)} vs their CV
+              <em>${delta >= 0 ? "came across better than on paper"
+                               : "came across weaker than on paper"}</em>
+            </div>` : ""}
+          ${a.recommendation ? `<span class="hx-ai-rec hx-rec-${esc(a.recommendation)}">${esc(recLabel(a.recommendation))}</span>` : ""}
+        </div>
+        ${a.summary ? `<p class="hx-ai-summary">${esc(a.summary)}</p>` : ""}
+        ${sec("Score breakdown", "fa-sliders", bars)}
+        ${sec("Strengths", "fa-thumbs-up", list(a.strengths, "point", "evidence", "pos"))}
+        ${sec("Concerns", "fa-triangle-exclamation", list(a.concerns, "point", "evidence", "neg"))}
+        ${sec("Doesn't match their CV", "fa-scale-unbalanced", list(a.cv_contradictions, "claim", "said", "flag"))}
+        ${a.english_level ? sec("English heard", "fa-language", `<p class="hx-ai-summary" style="border:0;padding:0">${esc(a.english_level)}</p>`) : ""}
+        ${sec("Never probed", "fa-circle-question", list(a.unanswered))}
+        ${sec("Ask next time", "fa-comments", list(a.follow_up_questions))}
+        ${at ? `<div class="hx-ai-when">Scored ${esc(fmtDateTime(at))}</div>` : ""}
+      </div>`;
+  }
+
+  async function saveInterview(appId) {
+    const link = $("hxIvLink").value.trim();
+    const transcript = $("hxIvText").value.trim();
+    clearErr(els.candInterview);
+    if (!link && !transcript) {
+      showErr(els.candInterview, "iv", "Paste a Grain link or the transcript");
+      return;
+    }
+    const btn = $("hxIvSave");
+    btn.disabled = true;
+    btn.textContent = link ? "Fetching from Grain…" : "Saving…";
+    try {
+      const res = await apiWrite(`/hirex/applications/${appId}/interview`, "POST",
+                                 { link: link || null, transcript: transcript || null });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      toast("ok", `Interview attached (${body.chars.toLocaleString()} characters)`);
+      loadAppDetail(appId);
+    } catch (err) {
+      showErr(els.candInterview, "iv", err.message || "Couldn't attach the interview");
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-microphone-lines"></i> Attach interview`;
+    }
+  }
+
+  async function analyzeInterview(appId) {
+    els.candInterview.innerHTML =
+      `<div class="hx-ai-loading"><div class="hx-spinner"></div> Scoring the interview against the JD…</div>`;
+    try {
+      const res = await apiWrite(`/hirex/applications/${appId}/analyze-interview`, "POST", {});
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      toast("ok", `Interview scored ${body.interview_score}`);
+      activityLoaded = false;
+      loadAppDetail(appId);
+      loadPipeline();
+    } catch (err) {
+      toast("err", err.message || "Couldn't score the interview");
+      loadAppDetail(appId);
+    }
+  }
+
+  async function removeInterview(appId) {
+    if (!confirm("Remove this interview and its score?")) return;
+    try {
+      const res = await apiWrite(`/hirex/applications/${appId}/interview`, "DELETE", {});
+      if (!res.ok) throw new Error();
+      toast("ok", "Interview removed");
+      loadAppDetail(appId);
+      loadPipeline();
+    } catch { toast("err", "Couldn't remove the interview"); }
   }
 
   function renderCv(c) {
@@ -1046,6 +1261,8 @@
 
   function renderAi(detail) {
     const a = detail.ai_analysis;
+    const aiScore = a ? (a._composite_score != null ? a._composite_score : a.match_score) : null;
+    setCandBadge("ai", aiScore != null ? clampScore(aiScore) : "");
     if (!a) {
       // A sourced candidate has no CV file but does have their LinkedIn profile
       // as text, which is what the rubric actually reads.
@@ -1116,7 +1333,10 @@
         const na = !!c.not_applicable;
         const sc = na ? 0 : clampScore(c.score);
         const barCol = na ? "#c7ccd4" : scoreColor(sc);
-        const ev = c.evidence && c.evidence !== "Not found in CV" ? `<div class="hx-ev">“${esc(c.evidence)}”</div>` : (c.verdict ? `<div class="hx-crit-verdict">${esc(c.verdict)}</div>` : "");
+        // The model's "no evidence" sentinels are prose, not quotes — never show them
+        // inside quote marks, fall through to the verdict instead.
+        const noEv = ["Not found in CV", "Not covered in the interview"];
+        const ev = c.evidence && !noEv.includes(c.evidence.trim()) ? `<div class="hx-ev">“${esc(c.evidence)}”</div>` : (c.verdict ? `<div class="hx-crit-verdict">${esc(c.verdict)}</div>` : "");
         return `<div class="hx-crit">
           <div class="hx-crit-head">
             <span class="hx-crit-label">${esc(r.label)} <em>×${r.weight}</em></span>
@@ -1126,6 +1346,10 @@
           ${ev}
         </div>`;
       }).join(""));
+      // Without this the capped number looks arbitrary next to the sub-scores.
+      if (a._uncapped_score != null && a._fit_cap != null) {
+        rubricHtml += `<p class="hx-fit-cap"><i class="fa-solid fa-circle-arrow-down"></i>Weighted average was ${clampScore(a._uncapped_score)}, capped at ${clampScore(a._fit_cap)} — the total can't exceed the must-have skills score by more than 20.</p>`;
+      }
     }
 
     const meta = [];
@@ -1244,6 +1468,7 @@
     const sum = scData.summary || {};
     const me = currentUserEmail();
     const mine = cards.find((c) => (c.reviewer_email || "").toLowerCase() === me);
+    setCandBadge("scorecards", cards.length || "");
 
     let html = `<div class="hx-sc-head">
         <h5><i class="fa-solid fa-clipboard-check"></i> Evaluations ${cards.length ? `<span class="hx-sc-count">${cards.length}</span>` : ""}</h5>

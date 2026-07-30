@@ -684,6 +684,11 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   border: 1px solid color-mix(in srgb, var(--c, var(--hx-accent)) 30%, #fff);
 }
 
+/* Interview score on a board card. Same chip, but the mic distinguishes it from
+   the CV score sitting right next to it — two numbers, two different things. */
+.hx-iv-chip { display: inline-flex; align-items: center; gap: 4px; }
+.hx-iv-chip i { font-size: 10px; }
+
 /* Scorecard consensus. Deliberately reads as a word, not a number: the AI chip
    next to it is already numeric, and these two must not be confused. */
 /* Sentence case, not uppercase: "Strong No" is a third narrower than
@@ -815,6 +820,86 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
 .hx-ov-chart-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--hx-mono); font-size: 10px; color: var(--hx-faint); }
 
 /* ---------- Candidate drawer bits ---------- */
+/* ---------- Candidate modal (near-fullscreen, tabbed) ----------
+   The side drawer worked while a candidate was a name and a stage. Now that a
+   profile carries a CV, an AI rubric, an interview rubric and scorecards, 560px
+   of width squeezes every one of them. Same element, same IDs — it just opens
+   as a centred sheet with the evaluation split into tabs instead. */
+.hx-sheet {
+  inset: 24px; top: 24px; right: 24px; bottom: 24px; left: 24px;
+  width: auto; max-width: 1180px; margin: 0 auto;
+  border: 1px solid var(--hx-line); border-radius: 16px;
+  overflow: hidden;
+  transform: scale(.985) translateY(10px);
+  opacity: 0;
+  transition: transform .24s cubic-bezier(.22,.61,.36,1), opacity .18s ease;
+}
+.hx-sheet.is-open { transform: none; opacity: 1; }
+
+.hx-cand-layout { flex: 1; display: flex; min-height: 0; }
+
+.hx-cand-rail {
+  width: 320px; flex: 0 0 320px;
+  border-right: 1px solid var(--hx-line);
+  padding: 8px 20px 24px;
+  overflow-y: auto; overflow-x: hidden;
+}
+/* A 320px rail can't carry two columns of inputs. */
+.hx-cand-rail .hx-grid { grid-template-columns: 1fr; }
+.hx-rail-notes { margin-top: 18px; }
+
+.hx-cand-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.hx-subnav {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 0 24px; border-bottom: 1px solid var(--hx-line);
+}
+.hx-subtab {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 13px 12px; margin-bottom: -1px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--hx-muted); cursor: pointer; white-space: nowrap;
+}
+.hx-subtab:hover { color: var(--hx-ink); }
+.hx-subtab.is-on { color: var(--hx-ink); border-bottom-color: var(--hx-accent); }
+.hx-subtab-badge {
+  font-family: var(--hx-mono); font-size: 10px; line-height: 1;
+  padding: 3px 6px; border-radius: 999px;
+  background: var(--hx-slate); color: var(--hx-slate-ink);
+}
+.hx-subtab-badge:empty { display: none; }
+
+.hx-subviews { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 24px 28px; }
+.hx-pane-empty { margin: 22px 0 0; font-size: 13px; color: var(--hx-muted); }
+.hx-subview[hidden] { display: none; }
+/* These blocks were spaced to stack on top of each other in one scroll column.
+   Alone in a tab they don't need the separators. */
+.hx-subview > .hx-cand-cv,
+.hx-subview > .hx-ai-panel:first-child { margin-top: 14px; }
+.hx-subview > .hx-scorecards { margin-top: 14px; border-top: 0; padding-top: 0; }
+
+/* Stacked, there isn't room for two independent scroll areas — the rail would
+   pin itself open and leave the panes a few squeezed pixels. One scroll, with
+   the tabs sticking to the top so they stay reachable. */
+@media (max-width: 980px) {
+  .hx-sheet { inset: 0; border-radius: 0; border: 0; max-width: none; }
+  .hx-cand-layout { flex-direction: column; overflow-y: auto; }
+  .hx-cand-rail {
+    width: auto; flex: none;
+    border-right: 0; border-bottom: 1px solid var(--hx-line);
+    overflow: visible;
+  }
+  /* rows="6" wins over min-height, so set the height outright. */
+  .hx-rail-notes textarea { height: 84px; }
+  .hx-cand-main { min-height: 0; }
+  .hx-subnav {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--hx-surface);
+  }
+  .hx-subviews { overflow: visible; }
+}
+
 .hx-cand-head { display: flex; align-items: center; gap: 12px; }
 .hx-cand-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
 .hx-cand-sub { font-size: 13px; color: var(--hx-muted); }
@@ -922,6 +1007,15 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   padding-left: 10px; border-left: 2px solid var(--hx-line);
 }
 .hx-ai-list .hx-ev { margin-top: 3px; }
+
+/* Why the total is lower than the weighted average of the bars above it. */
+.hx-fit-cap {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin: 12px 0 0; padding: 9px 11px;
+  font-size: 12px; line-height: 1.45; color: var(--hx-slate-ink);
+  background: var(--hx-slate); border-radius: 8px;
+}
+.hx-fit-cap i { margin-top: 2px; opacity: .7; }
 
 /* ---------- Scorecards (Slice 4) ---------- */
 .hx-scorecards { margin-top: 20px; border-top: 1px solid var(--hx-line); padding-top: 16px; }
@@ -1063,6 +1157,55 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   .hx-viewbar { padding: 12px 18px 0; }
   .hx-pipe-table { margin: 12px 18px 24px; overflow-x: auto; }
 }
+
+/* =====================================================================
+   Interview — Grain transcript and its own score
+   ===================================================================== */
+.hx-interview:empty { display: none; }
+.hx-iv-add {
+  margin-top: 14px; padding: 14px;
+  border: 1px dashed var(--hx-line); border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+}
+.hx-iv-add textarea {
+  width: 100%; margin-top: 8px; padding: 9px 11px; resize: vertical;
+  border: 1px solid var(--hx-line); border-radius: var(--hx-r-sm);
+  background: var(--hx-surface); font: inherit; font-size: 13px; color: var(--hx-ink);
+}
+.hx-iv-add .hx-btn { margin-top: 10px; }
+
+.hx-iv-box {
+  margin-top: 14px;
+  border: 1px solid var(--hx-line); border-radius: var(--hx-r);
+  background: var(--hx-surface); overflow: hidden;
+}
+.hx-iv-head { display: flex; align-items: center; gap: 12px; padding: 13px 14px; }
+.hx-iv-info { flex: 1; min-width: 0; }
+.hx-iv-name { font-size: 13.5px; font-weight: 600; }
+.hx-iv-link { font-size: 12px; color: var(--hx-accent); text-decoration: none; }
+.hx-iv-link:hover { text-decoration: underline; }
+.hx-iv-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.hx-iv-result { padding: 0 14px 14px; border-top: 1px solid var(--hx-line-2); }
+
+.hx-iv-scores { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 0; }
+.hx-iv-score {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 62px; height: 62px; border-radius: 999px; flex: none;
+  color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff);
+  border: 2px solid color-mix(in srgb, var(--c) 45%, #fff);
+}
+.hx-iv-score b { font-family: var(--hx-mono); font-size: 19px; line-height: 1; }
+.hx-iv-score span { font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+
+/* The gap between paper and person — the reason these are scored apart. */
+.hx-iv-delta {
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: 12.5px; font-weight: 650;
+  padding: 6px 12px; border-radius: var(--hx-r-sm);
+}
+.hx-iv-delta em { font-style: normal; font-weight: 400; font-size: 11.5px; opacity: .8; }
+.hx-iv-delta.up   { background: #eaf9ef; color: #0a7c3e; }
+.hx-iv-delta.down { background: #fdeef2; color: #9c1836; }
 
 /* Profile text stands in for a CV file — informative, not a warning. */
 .hx-cv-empty.hx-cv-text {
