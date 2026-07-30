@@ -290,6 +290,27 @@ def search_people():
 # --- Add ---------------------------------------------------------------------
 @bp.route("/jobs/<int:job_id>/candidates/existing", methods=["POST"])
 def add_existing_candidate(job_id):
+    """From a job's pipeline: the destination is the job you're standing in."""
+    return _add_existing(job_id)
+
+
+@bp.route("/candidates/existing", methods=["POST"])
+def add_existing_from_directory():
+    """From the Candidates directory: the job is optional — importing someone
+    into the directory without assigning them anywhere is a valid outcome."""
+    data = request.get_json(silent=True) or {}
+    job_id = data.get("job_id")
+    if job_id in ("", None):
+        job_id = None
+    else:
+        try:
+            job_id = int(job_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid job"}), 400
+    return _add_existing(job_id)
+
+
+def _add_existing(job_id):
     data = request.get_json(silent=True) or {}
     source = (data.get("source") or "").strip()
     stage = (data.get("stage") or "applied").strip()
@@ -311,10 +332,11 @@ def add_existing_candidate(job_id):
             cur.execute("SET LOCAL lock_timeout = '5s';")
             cur.execute("SET LOCAL statement_timeout = '20s';")
 
-            cur.execute("SELECT 1 FROM hirex_jobs WHERE job_id = %s;", (job_id,))
-            if not cur.fetchone():
-                conn.rollback()
-                return jsonify({"error": "job not found"}), 404
+            if job_id is not None:
+                cur.execute("SELECT 1 FROM hirex_jobs WHERE job_id = %s;", (job_id,))
+                if not cur.fetchone():
+                    conn.rollback()
+                    return jsonify({"error": "job not found"}), 404
 
             text_from = None
             if source == "hirex":
@@ -393,29 +415,37 @@ def add_existing_candidate(job_id):
                     )
                     candidate_id = cur.fetchone()["candidate_id"]
 
-            cur.execute(
-                "SELECT application_id FROM hirex_applications WHERE job_id = %s AND candidate_id = %s;",
-                (job_id, candidate_id),
-            )
-            existing = cur.fetchone()
-            if existing:
-                conn.rollback()
-                return jsonify({"error": f"{full_name} is already in this pipeline.",
-                                "application_id": existing["application_id"]}), 409
+            app_id = None
+            if job_id is not None:
+                cur.execute(
+                    "SELECT application_id FROM hirex_applications WHERE job_id = %s AND candidate_id = %s;",
+                    (job_id, candidate_id),
+                )
+                existing_app = cur.fetchone()
+                if existing_app:
+                    conn.rollback()
+                    return jsonify({"error": f"{full_name} is already in this pipeline.",
+                                    "application_id": existing_app["application_id"]}), 409
 
-            cur.execute(
-                "INSERT INTO hirex_applications (job_id, candidate_id, stage, source) "
-                "VALUES (%s, %s, %s, %s) RETURNING application_id;",
-                (job_id, candidate_id, stage, "hirex" if source == "hirex" else "vintti"),
-            )
-            app_id = cur.fetchone()["application_id"]
-            cur.execute(
-                "INSERT INTO hirex_job_activity (job_id, actor_email, action, detail) "
-                "VALUES (%s,%s,%s,%s);",
-                (job_id, actor, "candidate_added",
-                 Json({"candidate": full_name, "stage": stage,
-                       "from": "Hirex" if source == "hirex" else "Vintti"})),
-            )
+                cur.execute(
+                    "INSERT INTO hirex_applications (job_id, candidate_id, stage, source) "
+                    "VALUES (%s, %s, %s, %s) RETURNING application_id;",
+                    (job_id, candidate_id, stage, "hirex" if source == "hirex" else "vintti"),
+                )
+                app_id = cur.fetchone()["application_id"]
+                cur.execute(
+                    "INSERT INTO hirex_job_activity (job_id, actor_email, action, detail) "
+                    "VALUES (%s,%s,%s,%s);",
+                    (job_id, actor, "candidate_added",
+                     Json({"candidate": full_name, "stage": stage,
+                           "from": "Hirex" if source == "hirex" else "Vintti"})),
+                )
+            elif source == "hirex":
+                # Already in Hirex and no job picked — nothing would happen.
+                conn.rollback()
+                return jsonify({"error": f"{full_name} is already in Hirex. "
+                                         f"Pick a job to add them to one.",
+                                "candidate_id": candidate_id}), 409
 
             cur.execute(
                 "SELECT (cv_text IS NOT NULL AND length(cv_text) > %s) AS has_text "
@@ -427,6 +457,7 @@ def add_existing_candidate(job_id):
 
         return jsonify({
             "application_id": app_id,
+            "job_id": job_id,
             "candidate_id": candidate_id,
             "full_name": full_name,
             "has_text": has_text,

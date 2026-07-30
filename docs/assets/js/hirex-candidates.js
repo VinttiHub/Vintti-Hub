@@ -53,6 +53,7 @@
       newForm: $("hxNewForm"), newClose: $("hxNewClose"), newCancel: $("hxNewCancel"),
       newSave: $("hxNewSave"), newJobSel: $("hxNewJobSel"), newStage: $("hxNewStage"),
       newEnglish: $("hxNewEnglish"), newSource: $("hxNewSource"),
+      peopleSearch: $("hxPeopleSearch"), peopleResults: $("hxPeopleResults"),
     };
 
     els.retry.addEventListener("click", loadCandidates);
@@ -83,6 +84,10 @@
     els.newCancel.addEventListener("click", closeNewDrawer);
     els.newScrim.addEventListener("click", closeNewDrawer);
     els.newSave.addEventListener("click", createCandidate);
+    els.peopleSearch.addEventListener("input", () => {
+      clearTimeout(peopleTimer);
+      peopleTimer = setTimeout(searchPeople, 260);
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
@@ -97,9 +102,84 @@
      Create a candidate straight from the directory. Picking a job is optional:
      you can bank someone good now and decide where they fit later.
      ======================================================================= */
+  /* Reuse before retyping. From here the useful case is someone who lives in
+     the legacy Vintti database and isn't in Hirex yet — picking them copies
+     them across, with the profile text the AI rubric can already read. */
+  let peopleTimer = null;
+
+  async function searchPeople() {
+    const q = els.peopleSearch.value.trim();
+    if (q.length < 2) { els.peopleResults.innerHTML = ""; return; }
+    els.peopleResults.innerHTML = `<div class="hx-people-note">Searching…</div>`;
+    try {
+      const res = await fetch(`${API_BASE}/hirex/people?q=${encodeURIComponent(q)}`,
+                              { credentials: "include" });
+      if (!res.ok) throw new Error();
+      renderPeople(await res.json());
+    } catch {
+      els.peopleResults.innerHTML = `<div class="hx-people-note">Couldn't search right now.</div>`;
+    }
+  }
+
+  function renderPeople(people) {
+    if (!people.length) {
+      els.peopleResults.innerHTML =
+        `<div class="hx-people-note">Nobody found — fill the form below to add them.</div>`;
+      return;
+    }
+    els.peopleResults.innerHTML = people.map((p, i) => `
+      <button type="button" class="hx-person" data-i="${i}">
+        <span class="hx-avatar" style="background:${avatarColor(p.full_name)}">${initials(p.full_name)}</span>
+        <span class="hx-person-txt">
+          <span class="hx-person-name">${esc(p.full_name)}</span>
+          <span class="hx-person-sub">
+            ${p.email ? esc(p.email) : ""}${p.headline ? ` · ${esc(p.headline)}` : ""}
+          </span>
+          ${p.also_in_vintti_as
+            ? `<span class="hx-person-aka">In Vintti as “${esc(p.also_in_vintti_as)}”</span>` : ""}
+        </span>
+        <span class="hx-person-tags">
+          <span class="hx-person-tag hx-person-${p.source}">${p.source === "hirex" ? "Hirex" : "Vintti"}</span>
+          ${p.source === "hirex" && p.pipelines
+            ? `<span class="hx-person-tag">${p.pipelines} pipeline${p.pipelines > 1 ? "s" : ""}</span>` : ""}
+          ${p.has_text
+            ? `<span class="hx-person-tag is-ai" title="We already have text the AI can score">AI ready</span>` : ""}
+        </span>
+      </button>`).join("");
+
+    els.peopleResults.querySelectorAll(".hx-person").forEach((btn) => {
+      btn.addEventListener("click", () => addExisting(people[Number(btn.dataset.i)], btn));
+    });
+  }
+
+  async function addExisting(person, btn) {
+    btn.disabled = true;
+    btn.classList.add("is-busy");
+    const jobId = els.newJobSel.value;
+    try {
+      const res = await apiWrite("/hirex/candidates/existing", "POST", {
+        source: person.source, id: person.id,
+        job_id: jobId || null, stage: els.newStage.value || "applied",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "");
+      closeNewDrawer();
+      toast("ok", body.job_id
+        ? `${body.full_name} added to the pipeline`
+        : `${body.full_name} imported into Hirex`);
+      loadCandidates();
+    } catch (err) {
+      btn.disabled = false;
+      btn.classList.remove("is-busy");
+      toast("err", err.message || "Couldn't add that person");
+    }
+  }
+
   async function openNewDrawer() {
     els.newForm.reset();
     clearErr(els.newForm);
+    els.peopleSearch.value = "";
+    els.peopleResults.innerHTML = "";
     els.newStage.value = "applied";
     els.newJobSel.innerHTML = `<option value="">Loading jobs…</option>`;
     openDrawer(els.newScrim, els.newDrawer);

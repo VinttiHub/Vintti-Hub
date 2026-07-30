@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
-  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260730-3" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260730-4" />
 </head>
 
 <body class="light-mode">
@@ -134,7 +134,36 @@
           <div><span class="hx-eyebrow">New</span><h2>New candidate</h2></div>
           <button class="hx-icon-btn" id="hxNewClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
         </header>
-        <form class="hx-drawer-body" id="hxNewForm">
+        <div class="hx-drawer-body" style="padding-bottom:0">
+          <div class="hx-reuse">
+            <label class="hx-field">
+              <span>Already have this person? <em class="hx-hint">search Hirex and Vintti</em></span>
+              <div class="hx-search hx-search-sm">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="hxPeopleSearch" autocomplete="off"
+                       placeholder="Search by name or email…" />
+              </div>
+            </label>
+            <div class="hx-people" id="hxPeopleResults"></div>
+          </div>
+        </div>
+
+        <form class="hx-drawer-body" id="hxNewForm" style="padding-top:4px">
+          <!-- Destination sits here so it's visible whether you pick someone
+               from the search above or fill in the form below. -->
+          <div class="hx-grid">
+            <label class="hx-field">
+              <span>Add to a job <em class="hx-hint">optional</em></span>
+              <select name="job_id" id="hxNewJobSel"></select>
+            </label>
+            <label class="hx-field">
+              <span>Start stage</span>
+              <select name="stage" id="hxNewStage"></select>
+            </label>
+          </div>
+
+          <div class="hx-reuse-or"><span>or add someone new</span></div>
+
           <div class="hx-grid" style="padding-top:12px">
             <label class="hx-field">
               <span>First name <b class="hx-req">*</b></span>
@@ -165,19 +194,6 @@
             </label>
             <label class="hx-field hx-col-2"><span>Notes</span><textarea name="notes" rows="3" placeholder="Anything worth remembering"></textarea></label>
           </div>
-
-          <div class="hx-reuse-or"><span>where should they go?</span></div>
-
-          <div class="hx-grid" style="padding-top:12px">
-            <label class="hx-field">
-              <span>Add to a job <em class="hx-hint">optional</em></span>
-              <select name="job_id" id="hxNewJobSel"></select>
-            </label>
-            <label class="hx-field">
-              <span>Start stage</span>
-              <select name="stage" id="hxNewStage"></select>
-            </label>
-          </div>
         </form>
         <footer class="hx-drawer-foot">
           <button class="hx-btn hx-btn-ghost" id="hxNewCancel" type="button">Cancel</button>
@@ -193,6 +209,6 @@
 
   <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
   <script src="./assets/js/sidebar.js?v=20260724-1" defer></script>
-  <script src="./assets/js/hirex-candidates.js?v=20260730-1" defer></script>
+  <script src="./assets/js/hirex-candidates.js?v=20260730-4" defer></script>
 </body>
 </html>
