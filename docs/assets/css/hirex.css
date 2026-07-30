@@ -1015,6 +1015,55 @@ main.main-content:has(.hirex-app) { padding: 0; margin: 0; background: var(--hx-
   display: block; font-size: 12px; color: var(--hx-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* =====================================================================
+   Pipeline: Board / Table
+   ===================================================================== */
+.hx-viewbar { display: flex; justify-content: flex-end; padding: 14px 28px 0; }
+.hx-viewtoggle {
+  display: inline-flex;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+  overflow: hidden;
+}
+.hx-viewbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border: 0; border-right: 1px solid var(--hx-line);
+  background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 550; color: var(--hx-muted);
+  transition: background .12s, color .12s;
+}
+.hx-viewbtn:last-child { border-right: 0; }
+.hx-viewbtn i { font-size: 11px; }
+.hx-viewbtn:hover:not(.is-on) { background: #f1f3f6; color: var(--hx-ink-2); }
+.hx-viewbtn.is-on { background: var(--hx-accent); color: #fff; }
+
+.hx-pipe-table { margin: 14px 28px 32px; }
+.hx-pipe-table .hx-avatar { width: 28px; height: 28px; font-size: 11px; }
+
+/* Sortable headers */
+.hx-th-sort { padding: 0 !important; }
+.hx-th-sort button {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 12px 16px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-family: var(--hx-mono);
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--hx-muted);
+  transition: color .12s, background .12s;
+}
+.hx-th-sort button:hover { background: #f1f3f6; color: var(--hx-ink-2); }
+.hx-th-sort button i { font-size: 9px; opacity: .45; }
+.hx-th-sort.is-sorted button { color: var(--hx-accent); }
+.hx-th-sort.is-sorted button i { opacity: 1; }
+
+.hx-table-empty td { padding: 34px 16px !important; text-align: center; color: var(--hx-muted); }
+.hx-table-empty:hover { background: none !important; }
+
+@media (max-width: 900px) {
+  .hx-viewbar { padding: 12px 18px 0; }
+  .hx-pipe-table { margin: 12px 18px 24px; overflow-x: auto; }
+}
+
 /* Profile text stands in for a CV file — informative, not a warning. */
 .hx-cv-empty.hx-cv-text {
   border-color: #cfe0ff;

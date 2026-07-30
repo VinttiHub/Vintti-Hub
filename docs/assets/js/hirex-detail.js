@@ -74,6 +74,9 @@
       ref: $("hxRef"), title: $("hxTitle"), meta: $("hxMeta"), editBtn: $("hxEditBtn"),
       addCand: $("hxAddCand"),
       board: $("hxBoard"), pipeLoading: $("hxPipeLoading"), pipeCount: $("hxPipeCount"),
+      boardView: $("hxBoardView"), tableView: $("hxTableView"),
+      tableHead: $("hxTableHead"), tableBody: $("hxTableBody"),
+      viewBtns: Array.from(document.querySelectorAll(".hx-viewbtn[data-view]")),
       overview: $("hxOverview"), activity: $("hxActivity"), about: $("hxAbout"),
       addScrim: $("hxAddScrim"), addDrawer: $("hxAddDrawer"), addForm: $("hxAddForm"),
       addStage: $("hxAddStage"), addClose: $("hxAddClose"), addCancel: $("hxAddCancel"), addSave: $("hxAddSave"),
@@ -104,6 +107,10 @@
 
     // Tabs
     els.tabs.forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+
+    // Board / Table
+    els.viewBtns.forEach((b) => b.addEventListener("click", () => setPipelineView(b.dataset.view)));
+    setPipelineView(localStorage.getItem(VIEW_KEY) === "table" ? "table" : "board");
 
     // Add drawer
     els.addCand.addEventListener("click", openAddDrawer);
@@ -258,6 +265,8 @@
   // --- Board ---------------------------------------------------------------
   function renderBoard() {
     els.pipeCount.textContent = apps.length;
+    // Keep the table in step — a stage move has to show in both views.
+    if (els.tableView && !els.tableView.hidden) renderTable();
     els.board.innerHTML = STAGES.map((s) => {
       const list = apps.filter((a) => a.stage === s.key);
       const cards = list.length
@@ -311,6 +320,125 @@
     return `<span class="hx-sc-chip hx-sc-${esc(sc.consensus)}" title="${esc(title)}">
               ${esc(label)}${sc.count > 1 ? ` <b>${sc.count}</b>` : ""}
             </span>`;
+  }
+
+  /* =======================================================================
+     Table view — the board answers "where is everyone?", this answers
+     "who do I look at first?". Same data, sorted, all stages at once.
+     ======================================================================= */
+  const VIEW_KEY = "hirex_pipeline_view";
+  const REC_VALUE = { strong_no: 1, no: 2, yes: 3, strong_yes: 4 };
+  const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.key, i]));
+
+  // `get` returns the value to sort by; null/undefined always sinks to the
+  // bottom, whichever direction you picked.
+  const COLUMNS = [
+    { key: "name",   label: "Name",  cls: "hx-col-title", dir: 1,
+      get: (a) => (a.candidate.full_name || "").toLowerCase() },
+    { key: "ai",     label: `<i class="fa-solid fa-wand-magic-sparkles"></i> AI`, dir: -1,
+      get: (a) => a.ai_score },
+    { key: "eval",   label: "Eval", dir: -1,
+      get: (a) => REC_VALUE[a.scorecards && a.scorecards.consensus] },
+    { key: "stage",  label: "Stage", dir: 1,
+      get: (a) => STAGE_ORDER[a.stage] },       // pipeline order, not alphabetical
+    { key: "rating", label: "Rating", dir: -1,
+      get: (a) => a.rating || null },
+    { key: "cv",     label: "CV", dir: -1,
+      get: (a) => (a.candidate.has_cv ? 2 : a.candidate.has_text ? 1 : null) },
+    { key: "applied", label: "Applied", dir: -1,
+      get: (a) => (a.applied_at ? new Date(a.applied_at).getTime() : null) },
+  ];
+  let sort = { key: "ai", dir: -1 };   // the reason this view exists
+
+  function setPipelineView(view) {
+    const table = view === "table";
+    els.viewBtns.forEach((b) => b.classList.toggle("is-on", b.dataset.view === view));
+    els.boardView.hidden = table;
+    els.tableView.hidden = !table;
+    localStorage.setItem(VIEW_KEY, view);
+    if (table) renderTable();
+  }
+
+  function sortedApps() {
+    const col = COLUMNS.find((c) => c.key === sort.key) || COLUMNS[1];
+    return apps.slice().sort((x, y) => {
+      const a = col.get(x), b = col.get(y);
+      const aEmpty = a === null || a === undefined || a === "";
+      const bEmpty = b === null || b === undefined || b === "";
+      // Someone not scored yet must never top the list just for being blank.
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      if (a < b) return -sort.dir;
+      if (a > b) return sort.dir;
+      return 0;
+    });
+  }
+
+  function renderTable() {
+    els.tableHead.innerHTML = COLUMNS.map((c) => {
+      const on = sort.key === c.key;
+      const arrow = on ? (sort.dir === 1 ? "fa-arrow-up-short-wide" : "fa-arrow-down-wide-short")
+                       : "fa-sort";
+      return `<th class="hx-th-sort ${c.cls || ""}${on ? " is-sorted" : ""}"
+                  data-col="${c.key}"
+                  aria-sort="${on ? (sort.dir === 1 ? "ascending" : "descending") : "none"}">
+                <button type="button">${c.label} <i class="fa-solid ${arrow}"></i></button>
+              </th>`;
+    }).join("");
+    els.tableHead.querySelectorAll(".hx-th-sort").forEach((th) => {
+      th.addEventListener("click", () => {
+        const col = COLUMNS.find((c) => c.key === th.dataset.col);
+        // Re-clicking flips; a fresh column starts the way you'd want it.
+        sort = sort.key === col.key ? { key: col.key, dir: -sort.dir }
+                                    : { key: col.key, dir: col.dir };
+        renderTable();
+      });
+    });
+
+    const rows = sortedApps();
+    els.tableBody.innerHTML = rows.length ? rows.map(rowHtml).join("") : `
+      <tr class="hx-table-empty"><td colspan="${COLUMNS.length}">
+        No candidates in this pipeline yet.
+      </td></tr>`;
+    els.tableBody.querySelectorAll("tr[data-app-id]").forEach((tr) => {
+      tr.addEventListener("click", () => openCandDrawer(Number(tr.dataset.appId)));
+    });
+  }
+
+  function rowHtml(a) {
+    const c = a.candidate;
+    const st = STAGES.find((s) => s.key === a.stage) || { label: a.stage, color: "#9aa2ad" };
+    const cv = c.has_cv
+      ? `<i class="fa-solid fa-paperclip hx-cv-flag" title="CV on file"></i>`
+      : c.has_text
+        ? `<i class="fa-solid fa-file-lines hx-cv-flag" style="opacity:.5"
+              title="No file, but we have their profile text${c.cv_text_source ? ` from ${esc(c.cv_text_source)}` : ""}"></i>`
+        : dash();
+    return `
+      <tr data-app-id="${a.application_id}">
+        <td class="hx-col-title">
+          <div class="hx-cand-cell">
+            <span class="hx-avatar" style="background:${avatarColor(c.full_name)}">${initials(c.full_name)}</span>
+            <div class="hx-cand-cell-txt">
+              <div class="hx-cand-cell-name">
+                ${esc(c.full_name)}
+                ${(a.knockout_flags || []).length
+                  ? `<i class="fa-solid fa-flag hx-ko-flag" title="Doesn't meet: ${esc((a.knockout_flags || []).join(" · "))}"></i>` : ""}
+              </div>
+              ${c.headline ? `<div class="hx-cand-cell-sub">${esc(c.headline)}</div>` : ""}
+            </div>
+          </div>
+        </td>
+        <td>${a.ai_score != null
+              ? `<span class="hx-ai-chip" style="--c:${scoreColor(a.ai_score)}">${a.ai_score}</span>`
+              : dash()}</td>
+        <td>${consensusChip(a.scorecards) || dash()}</td>
+        <td><span class="hx-stage-tag" style="--s:${st.color}">${esc(st.label)}</span></td>
+        <td>${starsHtml(a.rating) || dash()}</td>
+        <td>${cv}</td>
+        <td><span class="hx-cell-muted">${esc(fmtDate(a.applied_at))}</span></td>
+      </tr>`;
   }
 
   function wireBoard() {
@@ -1815,6 +1943,7 @@
     for (let n = 1; n <= 5; n++) s += `<i class="fa-solid fa-star${n <= rating ? " on" : ""}"></i>`;
     return s + "</span>";
   }
+  function dash() { return `<span class="hx-cell-muted">—</span>`; }
   function jobRef(id) { return `HX-${String(id).padStart(4, "0")}`; }
   function initials(name) {
     const p = String(name || "").trim().split(/\s+/);
