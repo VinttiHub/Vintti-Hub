@@ -336,9 +336,12 @@
     if (!jobs.length) {
       const filtered = filters.status || filters.priority || filters.q;
       els.emptyTitle.textContent = filtered ? "No matching jobs" : "No jobs yet";
+      // The default view hides archived jobs, so an empty list here isn't proof
+      // there are none — say where the rest would be.
       els.emptyText.textContent = filtered
         ? "Try adjusting or clearing your filters."
-        : "Open your first vacancy to start building the pipeline.";
+        : "Open your first vacancy to start building the pipeline. "
+          + "Archived jobs are hidden — pick “All, incl. archived” to see them.";
       els.emptyNew.style.display = filtered ? "none" : "";
       showState("empty");
       els.count.innerHTML = "";

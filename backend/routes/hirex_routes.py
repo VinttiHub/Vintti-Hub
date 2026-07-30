@@ -148,9 +148,17 @@ def list_jobs():
     """List jobs with optional filters: status, priority, department, recruiter, q."""
     args = request.args
     where, params = [], []
-    if args.get("status"):
+
+    # Archiving is meant to get a job out of the way, so archived jobs are hidden
+    # unless you ask for them: either by picking Archived, or with status=all.
+    status = (args.get("status") or "").strip()
+    if status == "all":
+        pass
+    elif status:
         where.append("status = %s")
-        params.append(args["status"])
+        params.append(status)
+    else:
+        where.append("status <> 'archived'")
     if args.get("priority"):
         where.append("priority = %s")
         params.append(args["priority"])
