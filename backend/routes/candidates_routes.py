@@ -2141,9 +2141,36 @@ def is_candidate_hired(candidate_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        # La fuente de verdad es opportunity.candidato_contratado. Tener fila en
+        # hire_opportunity NO significa estar contratado: el formulario público de
+        # referencias crea filas para candidatos que siguen en pipeline, y una opp
+        # ganada suele arrastrar filas de todos los candidatos que compitieron por
+        # ella (el contratado fue otro).
+        #
+        # El único caso que el campo no cubre es la opp que se cerró en Close Win
+        # sin pasar por "Signed" (que es el paso que escribe candidato_contratado):
+        # queda en NULL y el candidato no puede abrir la pestaña Hire para cargar
+        # start date/salary, así que se queda en "unhired" sin salida posible.
+        # Sólo se infiere cuando NO hay ambigüedad: el campo está vacío y ese
+        # candidato es la ÚNICA fila de hire de esa opp.
         cursor.execute("""
-            SELECT 1 FROM opportunity WHERE candidato_contratado = %s LIMIT 1
-        """, (candidate_id,))
+            SELECT 1
+            WHERE EXISTS (
+                SELECT 1 FROM opportunity WHERE candidato_contratado = %s
+            ) OR EXISTS (
+                SELECT 1
+                FROM hire_opportunity h
+                JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+                WHERE h.candidate_id = %s
+                  AND TRIM(o.opp_stage) IN ('Signed', 'Close Win')
+                  AND o.candidato_contratado IS NULL
+                  AND (
+                    SELECT COUNT(*) FROM hire_opportunity h2
+                    WHERE h2.opportunity_id = h.opportunity_id
+                  ) = 1
+            )
+            LIMIT 1
+        """, (candidate_id, candidate_id))
         result = cursor.fetchone()
         cursor.close()
         conn.close()

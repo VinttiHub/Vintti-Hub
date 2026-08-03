@@ -671,7 +671,13 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
     # lo escribe el flujo Signed del popup. Una opp que va directo a Close Win
     # (o que se cargó a mano) queda con el campo en NULL aunque el hire exista en
     # hire_opportunity, y el mail se moría en "missing_candidate" sin avisar.
-    # Por eso el COALESCE con el hire real de la opp.
+    # Por eso el COALESCE con el hire de la opp.
+    #
+    # El HAVING COUNT(*) = 1 no es opcional: una opp ganada suele tener filas de
+    # hire_opportunity de TODOS los candidatos que compitieron (las crea el
+    # formulario de referencias), y el contratado fue uno solo. Si hay más de una
+    # fila no hay forma de saber cuál es, y mandar el mail con el nombre
+    # equivocado es peor que no mandarlo: ahí cae en "missing_candidate" como antes.
     cur.execute(
         """
         SELECT
@@ -687,12 +693,11 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
         LEFT JOIN account a ON a.account_id = o.account_id
         LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
         LEFT JOIN LATERAL (
-            SELECT h.candidate_id
+            SELECT MIN(h.candidate_id) AS candidate_id
             FROM hire_opportunity h
             WHERE h.opportunity_id = o.opportunity_id
               AND h.candidate_id IS NOT NULL
-            ORDER BY h.candidate_id DESC
-            LIMIT 1
+            HAVING COUNT(*) = 1
         ) ho ON o.candidato_contratado IS NULL
         LEFT JOIN candidates hc ON hc.candidate_id = ho.candidate_id
         WHERE o.opportunity_id = %s
