@@ -3177,6 +3177,37 @@ html body .month-year .btn-clear:active{
     0 12px 28px rgba(96, 165, 250, 0.12);
 }
 
+/* Dropdown de área del puesto: mismo look que los inputs del builder. */
+#reference-feedback-builder select {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 18px;
+  background: #fff;
+  font-family: 'Onest', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+#reference-feedback-builder select:focus {
+  border-color: rgba(96, 165, 250, 0.5);
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(191, 219, 254, 0.4),
+    0 12px 28px rgba(96, 165, 250, 0.12);
+}
+
+.reference-feedback-area-hint {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
 #reference-feedback-builder .btn-soft {
   min-height: 48px;
   border-radius: 16px;

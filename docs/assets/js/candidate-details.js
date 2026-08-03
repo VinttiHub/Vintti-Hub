@@ -2820,6 +2820,110 @@ function getReferenceValuesFromForm(idx) {
   };
 }
 
+// Preguntas extra por área del puesto. El dropdown del builder inyecta el set
+// del área elegida sobre las preguntas base; cambiar de área saca las anteriores
+// y pone las nuevas, así nunca quedan mezcladas dos áreas.
+const REFERENCE_AREA_QUESTIONS = {
+  design: {
+    label: 'Design',
+    build: (label) => [
+      `Can you describe a project where ${label} delivered exceptional creative work? What made it stand out?`,
+      `How did ${label} handle feedback and design revisions from clients?`,
+      `How well did ${label} manage deadlines?`,
+    ],
+  },
+  marketing: {
+    label: 'Marketing',
+    build: (label) => [
+      `Can you share an example of a campaign or initiative where ${label} made a significant impact?`,
+      `Was ${label} proactive in bringing new ideas and identifying growth opportunities?`,
+    ],
+  },
+  c_level: {
+    label: 'C-Level positions',
+    build: (label) => [
+      `How would you describe ${label}'s leadership and decision-making during high-pressure situations?`,
+      `Can you share an example of a strategic initiative ${label} led and the impact it had on the business?`,
+      `How effectively did ${label} influence clients and align teams toward company goals?`,
+    ],
+  },
+  tech: {
+    label: 'Tech / IT',
+    build: (label) => [
+      `How well did ${label} manage deadlines?`,
+      `How well did ${label} balance speed and quality in their work?`,
+      `How did ${label} handle technical challenges?`,
+    ],
+  },
+  accounting: {
+    label: 'Accounting',
+    build: (label) => [
+      `Was ${label} able to consistently meet deadlines while maintaining high-quality work, especially during month-end or year-end close?`,
+      `How would you describe ${label}'s attention to detail and accuracy when handling accounting information?`,
+    ],
+  },
+  finance: {
+    label: 'Finance',
+    build: (label) => [
+      `How strong were ${label}'s analytical and financial decision-making skills?`,
+      `How well did ${label} balance accuracy, business priorities, and tight deadlines?`,
+      `How proactive was ${label} in identifying financial risks or opportunities for improvement?`,
+    ],
+  },
+  sales: {
+    label: 'Sales',
+    build: (label) => [
+      `How would you describe ${label}'s ability to build relationships and earn the trust of prospects or clients?`,
+      `How did ${label} respond to feedback and coaching when they were not meeting targets?`,
+      `What were ${label}'s sales targets and KPIs? Could you share the specific metrics and how they performed against them?`,
+    ],
+  },
+  customer_support: {
+    label: 'Customer Support',
+    build: (label) => [
+      `How did ${label} handle difficult or dissatisfied customers?`,
+      `How well did ${label} balance productivity with delivering a high-quality customer experience?`,
+      `Was ${label} able to work independently while following established processes and policies?`,
+    ],
+  },
+  executive_assistant: {
+    label: 'Executive Assistant',
+    build: (label) => [
+      `How effectively did ${label} manage the executive's calendar, priorities, and competing deadlines?`,
+      `How well did ${label} anticipate the executive's needs and handle tasks proactively without requiring close supervision?`,
+    ],
+  },
+};
+
+function getReferenceAreaQuestions(areaKey, candidateName) {
+  const area = REFERENCE_AREA_QUESTIONS[areaKey];
+  if (!area) return [];
+  return area.build(candidateName || 'the candidate');
+}
+
+// La última pregunta base es el cierre ("anything else..."), así que las del área
+// entran justo antes para que el formulario no termine con un cambio de tema.
+function insertReferenceAreaQuestions(questions, areaQuestions) {
+  if (!areaQuestions.length) return questions;
+  const closerIndex = questions.findIndex(q => /^Is there anything else you'd like to share/i.test(String(q || '')));
+  if (closerIndex === -1) return [...questions, ...areaQuestions];
+  return [...questions.slice(0, closerIndex), ...areaQuestions, ...questions.slice(closerIndex)];
+}
+
+// Cuando se reabre un form ya generado, las preguntas vienen de la base: detecta
+// qué área se había usado para que el dropdown arranque en el valor correcto y
+// cambiarlo siga limpiando las anteriores.
+function detectReferenceArea(questions, candidateName) {
+  const list = Array.isArray(questions) ? questions.map(q => String(q || '')) : [];
+  for (const key of Object.keys(REFERENCE_AREA_QUESTIONS)) {
+    const areaQuestions = getReferenceAreaQuestions(key, candidateName);
+    if (areaQuestions.length && areaQuestions.every(q => list.includes(q))) {
+      return { key, questions: areaQuestions };
+    }
+  }
+  return { key: '', questions: [] };
+}
+
 function getDefaultReferenceQuestions(candidateName) {
   const label = candidateName || 'the candidate';
   return [
@@ -2954,6 +3058,35 @@ function renderReferenceFeedbackQuestionPreview() {
   `).join('');
 }
 
+// Llena el <select> de área una sola vez (desde REFERENCE_AREA_QUESTIONS, así no
+// se desincroniza con las preguntas) y lo deja en el valor que corresponde.
+function syncReferenceAreaSelect(areaKey = '') {
+  const select = document.getElementById('reference-feedback-area');
+  if (!select) return;
+  if (!select.dataset.filled) {
+    Object.entries(REFERENCE_AREA_QUESTIONS).forEach(([key, area]) => {
+      const option = document.createElement('option');
+      option.value = key;
+      option.textContent = area.label;
+      select.appendChild(option);
+    });
+    select.dataset.filled = '1';
+  }
+  select.value = areaKey || '';
+}
+
+function applyReferenceAreaQuestions(areaKey = '') {
+  const draft = window.__referenceFeedbackDraft;
+  if (!draft) return;
+  const previous = Array.isArray(draft.areaQuestions) ? draft.areaQuestions : [];
+  const kept = (draft.questions || []).filter(q => !previous.includes(q));
+  const next = getReferenceAreaQuestions(areaKey, draft.candidateName);
+  draft.questions = insertReferenceAreaQuestions(kept, next);
+  draft.areaKey = areaKey || '';
+  draft.areaQuestions = next;
+  renderReferenceFeedbackQuestionPreview();
+}
+
 function setReferenceFeedbackLink(url = '') {
   const input = document.getElementById('reference-feedback-link');
   if (input) input.value = url || '';
@@ -2971,14 +3104,21 @@ function openReferenceFeedbackBuilder(referenceNumber) {
 
   const candidateName = getCandidateDisplayName();
   const existing = window.__referenceFeedbackRequests?.[String(referenceNumber)] || null;
+  const questions = existing?.questions?.length
+    ? [...existing.questions]
+    : getDefaultReferenceQuestions(candidateName);
+  const detectedArea = detectReferenceArea(questions, candidateName);
   window.__referenceFeedbackDraft = {
     referenceNumber,
     reference,
     candidateName,
-    questions: existing?.questions?.length ? [...existing.questions] : getDefaultReferenceQuestions(candidateName),
+    questions,
+    areaKey: detectedArea.key,
+    areaQuestions: detectedArea.questions,
     publicUrl: existing?.public_url || '',
     submittedAt: existing?.submitted_at || null,
   };
+  syncReferenceAreaSelect(detectedArea.key);
 
   const target = document.getElementById('reference-feedback-builder-target');
   if (target) target.textContent = `Reference ${referenceNumber} • ${reference.reference_name}`;
@@ -3388,6 +3528,10 @@ if (hireRevenue){
         renderReferenceFeedbackQuestionPreview();
       }
     }
+  });
+
+  document.getElementById('reference-feedback-area')?.addEventListener('change', (event) => {
+    applyReferenceAreaQuestions(event.target.value || '');
   });
 
   document.getElementById('reference-feedback-add-question')?.addEventListener('click', () => {
