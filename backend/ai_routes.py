@@ -1680,10 +1680,31 @@ DATES (work experience)
 EDUCATION
 =========================
 - One entry per degree/program. Include certifications only if they are substantial programs.
-- NEVER UPGRADE THE LEVEL OF A DEGREE. Copy the qualification exactly as the source names it.
-  A "Técnico Superior" / "Advanced Technical Degree" is NOT a Bachelor's. A "Diplomado" or
-  a certificate is not a Master's. Keep the source's own wording for the qualification; if
-  the CV and LinkedIn disagree, use the more conservative (lower) one.
+- NEVER UPGRADE THE LEVEL OF A DEGREE, AND ALWAYS WRITE IT IN ENGLISH. These are two
+  separate rules and they do not conflict: you may not change WHAT the qualification is,
+  and you must write it in the CLIENT'S LANGUAGE. Keeping the source's own level is
+  mandatory; keeping the source's own Spanish or Portuguese wording is a defect — this CV
+  goes to a US client and every "title" must be English.
+  * Translate the qualification literally, at the exact same academic level:
+    "Licenciatura en Administración de Empresas" -> "Bachelor's Degree in Business
+    Administration"; "Contador Público" -> "Public Accountant"; "Técnico Superior en
+    Comercio Exterior" -> "Advanced Technical Degree in Foreign Trade"; "Tecnicatura en
+    Programación" -> "Technical Degree in Programming"; "Diplomado en Finanzas" ->
+    "Diploma in Finance"; "Maestría"/"Magíster" -> "Master's Degree"; "Especialización"
+    -> "Postgraduate Specialization"; "Curso de..." -> "Course in...".
+  * "Bachiller"/"Bachillerato" is SECONDARY SCHOOL -> "High School Diploma". It is NEVER
+    a "Bachelor's Degree" — that false friend is the most common error here.
+  * A "Técnico Superior" / "Advanced Technical Degree" is NOT a Bachelor's. A "Diplomado"
+    or a certificate is not a Master's. If the CV and LinkedIn disagree on the level, use
+    the more conservative (lower) one.
+  * Translating is NOT inventing. What is forbidden is changing the level, adding a field
+    of study, a specialization, honours or a thesis the source never named, or "improving"
+    a vague program into a specific one. If a qualification has no clean English
+    equivalent, translate it word for word and stop there — never leave it in Spanish and
+    never guess an equivalent that implies a higher level.
+- The institution name is a proper name: leave it exactly as the source writes it. Do NOT
+  translate "Universidad Nacional de Córdoba" or "Instituto Tecnológico de Monterrey".
+- "description" and "country" are English too ("Spain", not "España").
 - "description": EXACTLY two sentences on a SINGLE line (no line breaks, no "- " bullets,
   ~30-45 words total) briefly describing the subjects the program covers, plus any explicit
   detail from the source (thesis, honors, specialization, exchange, notable coursework).
@@ -2610,7 +2631,21 @@ Return STRICT JSON:
     - If month or day is missing, complete with 01
     - If end_date is missing or says "present", set current = true
     - Else set current = false
-    - translate everything to english
+    - EVERYTHING IS IN ENGLISH: "title", "description" and "country". This CV goes to a US
+      client, so a degree left in Spanish or Portuguese is a defect — if an entry already
+      on screen is in Spanish, translate it even if the recruiter did not ask.
+      Translating is NOT changing the entry, so it does not break the rule above.
+    - NEVER UPGRADE THE LEVEL OF A DEGREE when translating it. Same level, English words:
+      "Licenciatura en X" -> "Bachelor's Degree in X"; "Contador Público" -> "Public
+      Accountant"; "Técnico Superior en X" -> "Advanced Technical Degree in X";
+      "Tecnicatura" -> "Technical Degree"; "Diplomado" -> "Diploma"; "Maestría" ->
+      "Master's Degree"; "Especialización" -> "Postgraduate Specialization".
+      "Bachiller"/"Bachillerato" is secondary school -> "High School Diploma", NEVER
+      "Bachelor's Degree". Never add a field of study, specialization or honours the
+      source did not name, and never invent a program name — if you cannot map it,
+      translate it word for word.
+    - The institution is a proper name: keep it exactly as it is, do not translate
+      "Universidad Nacional de Córdoba".
     """
 
             chat = call_openai_with_retry(
