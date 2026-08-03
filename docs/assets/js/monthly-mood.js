@@ -132,6 +132,12 @@
       && a.getDate() === b.getDate();
   }
 
+  // Cuántos días después del arranque sigue disponible el wrapped del mes pasado.
+  // Antes era un único día: si ese día no entrabas al hub (PTO, feriado, licencia),
+  // te perdías el wrapped entero. Como el flag de "ya lo viste" sólo se guarda cuando
+  // el overlay realmente se pinta, tener ventana no lo muestra dos veces.
+  const RECAP_WINDOW_DAYS = 7;
+
   function getRecapSchedule(date = new Date()) {
     const currentMonthStart = startOfMonth(date);
     const currentMonthStartWeekday = currentMonthStart.getDay();
@@ -148,7 +154,13 @@
       targetYear: targetMonthDate.getFullYear(),
       targetMonth: targetMonthDate.getMonth() + 1,
       displayDate,
+      windowEnd: shiftDate(displayDate, RECAP_WINDOW_DAYS - 1),
     };
+  }
+
+  function isWithinRecapWindow(date, schedule) {
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    return day >= schedule.displayDate.getTime() && day <= schedule.windowEnd.getTime();
   }
 
   function buildWatermarkDataUri(emoji) {
@@ -361,8 +373,7 @@
   }
 
   function isMonthClosingWindow(date = new Date()) {
-    const schedule = getRecapSchedule(date);
-    return isSameLocalDay(date, schedule.displayDate);
+    return isWithinRecapWindow(date, getRecapSchedule(date));
   }
 
   function getSortedMoodCounts(payload) {
@@ -589,24 +600,45 @@
 
   async function maybeShowMonthlyMoodRecap({ force = false, delayMs = 0 } = {}) {
     if (recapShownInSession && !force) return false;
-    const schedule = getRecapSchedule(new Date());
-    if (!force && !isSameLocalDay(new Date(), schedule.displayDate)) return false;
+    const now = new Date();
+    const schedule = getRecapSchedule(now);
+    if (!force && !isWithinRecapWindow(now, schedule)) return false;
 
     const userId = getUserId();
     if (!userId) return false;
 
-    const payload = await fetchMonthlyRecap({
-      year: schedule.targetYear,
-      month: schedule.targetMonth,
-    });
+    // Reserva el turno para que dos llamadas en la misma pestaña no pidan el
+    // recap a la vez. Si algo falla se libera, así el siguiente intento sirve.
+    if (!force) recapShownInSession = true;
+
+    let payload;
+    try {
+      payload = await fetchMonthlyRecap({
+        year: schedule.targetYear,
+        month: schedule.targetMonth,
+      });
+    } catch (error) {
+      if (!force) recapShownInSession = false;
+      throw error;
+    }
+
     const storagePayload = { year: payload?.year, month: payload?.month, userId };
     if (!force && alreadySawMonthRecap(storagePayload)) return false;
 
-    if (!force) {
-      recapShownInSession = true;
-      markMonthRecapSeen(storagePayload);
-    }
-    window.setTimeout(() => showMonthlyRecapOverlay(payload), Math.max(0, Number(delayMs) || 0));
+    // El flag se guarda DESPUÉS de pintar el overlay, no antes. Si se guardaba
+    // antes y la usuaria navegaba dentro del delay (el login espera 1.85s), el
+    // wrapped no llegaba a aparecer pero el mes quedaba marcado como visto y ya
+    // no volvía a salir nunca. En local no pasaba porque localStorage es por
+    // origen: 127.0.0.1 no comparte el flag con vinttihub.vintti.com.
+    window.setTimeout(() => {
+      try {
+        showMonthlyRecapOverlay(payload);
+        if (!force) markMonthRecapSeen(storagePayload);
+      } catch (error) {
+        if (!force) recapShownInSession = false;
+        console.warn('Failed to render monthly mood recap', error);
+      }
+    }, Math.max(0, Number(delayMs) || 0));
     return true;
   }
 

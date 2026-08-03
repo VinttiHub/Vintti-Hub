@@ -3121,7 +3121,9 @@ if (finalUid != null) {
         if (!shown) return queueMonthlyMoodRecap({ delayMs: 1850 });
         return shown;
       })
-      .catch(() => {});
+      // Si el chequeo de cumpleaños explota (red, perfil sin cargar), el wrapped
+      // igual tiene que intentarse: antes se lo comía este catch vacío.
+      .catch(() => queueMonthlyMoodRecap({ delayMs: 1850 }));
   } catch (err) {
     console.error('Error en login:', err);
     alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
@@ -4443,5 +4445,5 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!shown) return queueMonthlyMoodRecap({ delayMs: 700 });
       return shown;
     })
-    .catch(() => {});
+    .catch(() => queueMonthlyMoodRecap({ delayMs: 700 }));
 });
