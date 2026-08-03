@@ -1683,13 +1683,17 @@ body {
   z-index: 1001;               /* botón por encima de la lista */
 }
 
-/* Signed mode: renderizar la lista inline para que no se superponga con Save */
-#closeWinPopup.signed-mode .popup-content{
+/* Signed mode: renderizar la lista inline para que no se superponga con Save.
+   .needs-hire = Close Win de una opp que llegó sin contratado, así que también
+   muestra el buscador y necesita el mismo tratamiento. */
+#closeWinPopup.signed-mode .popup-content,
+#closeWinPopup.needs-hire .popup-content{
   width: min(520px, 92vw);
   max-width: 520px;
   overflow: visible;
 }
-#closeWinPopup.signed-mode .autocomplete-list{
+#closeWinPopup.signed-mode .autocomplete-list,
+#closeWinPopup.needs-hire .autocomplete-list{
   position: static;
   inset: auto;
   margin-top: 6px;
@@ -1697,15 +1701,16 @@ body {
   max-height: 240px;
   z-index: auto;
 }
-#closeWinPopup.signed-mode #saveCloseWin{
+#closeWinPopup.signed-mode #saveCloseWin,
+#closeWinPopup.needs-hire #saveCloseWin{
   width: 100%;
   max-width: 220px;
   margin-top: 4px;
   z-index: auto;
 }
 
-/* Close Win mode: aseguramos que la lista quede oculta */
-#closeWinPopup.close-win-mode #closeWinHireList{
+/* Close Win mode: la lista queda oculta, salvo cuando hay que elegir contratado */
+#closeWinPopup.close-win-mode:not(.needs-hire) #closeWinHireList{
   display: none !important;
 }
 

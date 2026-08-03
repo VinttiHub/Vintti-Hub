@@ -3652,7 +3652,7 @@ function setupCloseWinAutocomplete(){
 
 
 // Popup Signed / Close Win (same modal, different required fields)
-function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } = {}) {
+async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } = {}) {
   const popup = document.getElementById('closeWinPopup');
   const titleEl = document.getElementById('closeWinTitle');
   const hireLabel = document.querySelector('label[for="closeWinHireInput"]');
@@ -3663,16 +3663,31 @@ function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } =
   popup.style.display = 'flex';
 
   const isSignedMode = mode === 'signed';
+
+  // El contratado se enlaza en el paso Signed. Una opp que salta directo a
+  // Close Win (típico en Replacements, donde el deal ya estaba cerrado) llegaba
+  // acá con candidato_contratado en NULL y se cerraba SIN hire: sin pestaña Hire
+  // para cargar salary/fee, sin mail de Close Win y con el crédito del Credit
+  // Loop en $0. El único aviso era un alert al final, fácil de saltear.
+  // Cuando falta, este popup también pide el candidato antes de dejar cerrar.
+  const missingHire = !isSignedMode && !(await getHiredCandidateIdFromOpportunity(opportunityId));
+  const showHire = isSignedMode || missingHire;
+
   popup.classList.toggle('signed-mode', isSignedMode);
   popup.classList.toggle('close-win-mode', !isSignedMode);
+  popup.classList.toggle('needs-hire', missingHire);
 
-  if (titleEl) titleEl.textContent = isSignedMode ? 'Select Hired Candidate' : 'Set Close Win Date';
-  if (hireLabel) hireLabel.style.display = isSignedMode ? '' : 'none';
-  if (hireBox) hireBox.style.display = isSignedMode ? '' : 'none';
+  if (titleEl) {
+    titleEl.textContent = isSignedMode
+      ? 'Select Hired Candidate'
+      : (missingHire ? 'Set Close Win Info' : 'Set Close Win Date');
+  }
+  if (hireLabel) hireLabel.style.display = showHire ? '' : 'none';
+  if (hireBox) hireBox.style.display = showHire ? '' : 'none';
   if (dateLabel) dateLabel.style.display = isSignedMode ? 'none' : '';
   if (dateInput) dateInput.style.display = isSignedMode ? 'none' : '';
 
-  if (isSignedMode) {
+  if (showHire) {
     // inicializa autocomplete solo cuando se necesita seleccionar candidato
     setupCloseWinAutocomplete();
     cwSelectedId = null;
@@ -3723,8 +3738,25 @@ function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } =
         alert('Please select a close date.');
         return;
       }
+      if (missingHire && !cwSelectedId) {
+        alert('Please select the hired candidate.');
+        return;
+      }
 
-      // Close Win: solo guardar fecha de cierre y cambiar stage
+      // Si la opp llega sin contratado, lo enlazamos ANTES de mover el stage:
+      // el mail de Close Win y el sync del Credit Loop corren justo después de
+      // patchOpportunityStage y los dos necesitan el candidato ya cargado.
+      if (missingHire) {
+        await patchOppFields(opportunityId, { candidato_contratado: cwSelectedId });
+        const hireRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${cwSelectedId}/hire`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opportunity_id: Number(opportunityId) })
+        });
+        if (!hireRes.ok) throw new Error(await hireRes.text());
+      }
+
+      // Close Win: guardar fecha de cierre y cambiar stage
       await patchOppFields(opportunityId, {
         opp_close_date: date
       });
