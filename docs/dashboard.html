@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=101">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=104">
 </head>
 <body>
 
@@ -3475,12 +3475,24 @@
         </button>
       </header>
 
-      <!-- Annual Revenue Sales · Outbound (AE + AM) · acumulado YTD · estilo batería -->
-      <div class="ae-card s-12">
+      <!-- Annual Revenue Sales · Outbound · acumulado YTD · estilo batería
+           Toggle AE / AE+AM: setea data-override-book en los bindings de la card
+           (y en sus paneles del drawer) y refetchea. Default = AE + AM, que es
+           como venía la card antes del toggle. -->
+      <div class="ae-card s-12" data-book-card data-book-active="ae">
         <header class="ae-card__head">
           <div>
             <h2 class="ae-card__title">Annual Gross Revenue · Outbound</h2>
-            <p class="ae-card__sub">Staffing + Recruiting · acumulado YTD · AE's + AM · Gross (salary + fee)</p>
+            <p class="ae-card__sub">
+              Staffing + Recruiting · acumulado YTD ·
+              <span data-book-pane="ae_am">AE's + AM</span><span data-book-pane="ae">AE's</span>
+              · Gross (salary + fee)
+            </p>
+          </div>
+          <div class="ae-card__window-toggle" role="tablist" aria-label="Book"
+               data-book-toggle data-book-panels="rev-outbound-staffing rev-outbound-recruiting">
+            <button type="button" class="is-active" data-book-set="ae" role="tab" aria-selected="true">Solo AE</button>
+            <button type="button" data-book-set="ae_am" role="tab" aria-selected="false">AE + AM</button>
           </div>
         </header>
         <div class="ae-card__body">
@@ -3490,17 +3502,17 @@
               <div class="ae-battery__shell">
                 <div class="ae-battery__fills">
                   <div class="ae-battery__fill ae-battery__fill--recruiting"
-                       data-chart="sa_kpi_revenue_outbound_ytd" data-bind="progress-fill" data-axis="height"
+                       data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="progress-fill" data-axis="height"
                        data-field="recruiting_pct_of_total" data-reduce="first">
                     <span class="ae-battery__amount"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
                   </div>
                   <div class="ae-battery__fill ae-battery__fill--staffing"
-                       data-chart="sa_kpi_revenue_outbound_ytd" data-bind="progress-fill" data-axis="height"
+                       data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="progress-fill" data-axis="height"
                        data-field="staffing_pct_of_total" data-reduce="first">
                     <span class="ae-battery__amount"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
                   </div>
                 </div>
@@ -3513,11 +3525,11 @@
               <div class="ae-hero">
                 <span class="ae-hero__period">Acumulado · YTD</span>
                 <span class="ae-hero__amount"
-                      data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                      data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                       data-field="total_revenue" data-reduce="first" data-fmt="currency-k">—</span>
                 <div class="ae-hero__inline">
                   <span class="ae-hero__meta">
-                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="total_count" data-reduce="first" data-fmt="int">—</span> contratos + close wins
                   </span>
                 </div>
@@ -3531,7 +3543,7 @@
                       Staffing
                     </span>
                     <span class="ae-rows__amount"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
                     <button type="button" class="ae-rows__action" data-kpi-detail-open="rev-outbound-staffing"
                             aria-label="Ver detalle Staffing">
@@ -3542,14 +3554,14 @@
                   </div>
                   <div class="ae-rows__bar">
                     <span class="ae-rows__bar-fill ae-rows__bar-fill--staffing"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="progress-fill"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="progress-fill"
                           data-field="staffing_pct_of_total" data-reduce="first"></span>
                   </div>
                   <div class="ae-rows__legend">
-                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
                     del total ·
-                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="staffing_count" data-reduce="first" data-fmt="int">—</span> cuentas
                   </div>
                 </li>
@@ -3561,7 +3573,7 @@
                       Recruiting
                     </span>
                     <span class="ae-rows__amount"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
                     <button type="button" class="ae-rows__action" data-kpi-detail-open="rev-outbound-recruiting"
                             aria-label="Ver detalle Recruiting">
@@ -3572,14 +3584,14 @@
                   </div>
                   <div class="ae-rows__bar">
                     <span class="ae-rows__bar-fill ae-rows__bar-fill--recruiting"
-                          data-chart="sa_kpi_revenue_outbound_ytd" data-bind="progress-fill"
+                          data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="progress-fill"
                           data-field="recruiting_pct_of_total" data-reduce="first"></span>
                   </div>
                   <div class="ae-rows__legend">
-                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
                     del total ·
-                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text"
+                    <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text"
                           data-field="recruiting_count" data-reduce="first" data-fmt="int">—</span> close wins
                   </div>
                 </li>
@@ -7455,7 +7467,7 @@
         <!-- Panels · Revenue Outbound · Staffing / Recruiting -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="rev-outbound-staffing">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">Revenue Outbound · AE's + AM</span>
+            <span class="kpi-drawer__eyebrow" data-book-mirror>Revenue Outbound · <span data-book-pane="ae_am">AE's + AM</span><span data-book-pane="ae">AE's</span></span>
             <h3 class="kpi-drawer__title">Staffing · MRR acumulado YTD</h3>
             <p class="kpi-drawer__sub">Aporte YTD de cada contrato Staffing activo (suma de su MRR mensual en el año) · canal Outbound.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
@@ -7463,13 +7475,13 @@
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
               <span class="kpi-drawer__hero__label">Staffing · YTD</span>
-              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="staffing_count" data-reduce="first" data-fmt="int">—</span> cuentas · <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="staffing_count" data-reduce="first" data-fmt="int">—</span> cuentas · <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total</span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle por contrato</h4>
               <div class="dtable-wrap"
-                   data-chart="sa_table_revenue_outbound_staffing_detail" data-bind="dtable"
+                   data-chart="sa_table_revenue_outbound_staffing_detail" data-override-book="ae" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,candidate_name|Contractor|raw,start_d|Start|raw,mrr|Aporte YTD|currency-k"
                    data-empty-text="Sin contratos Staffing outbound (AE's+AM)."></div>
             </section>
@@ -7478,7 +7490,7 @@
 
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="rev-outbound-recruiting">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">Revenue Outbound · AE's + AM</span>
+            <span class="kpi-drawer__eyebrow" data-book-mirror>Revenue Outbound · <span data-book-pane="ae_am">AE's + AM</span><span data-book-pane="ae">AE's</span></span>
             <h3 class="kpi-drawer__title">Recruiting · revenue YTD</h3>
             <p class="kpi-drawer__sub">Close wins Recruiting del año (one-time) · canal Outbound.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
@@ -7486,13 +7498,13 @@
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
               <span class="kpi-drawer__hero__label">Recruiting · YTD</span>
-              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="recruiting_count" data-reduce="first" data-fmt="int">—</span> close wins · <span data-chart="sa_kpi_revenue_outbound_ytd" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="recruiting_count" data-reduce="first" data-fmt="int">—</span> close wins · <span data-chart="sa_kpi_revenue_outbound_ytd" data-override-book="ae" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total</span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle por close</h4>
               <div class="dtable-wrap"
-                   data-chart="sa_table_revenue_outbound_recruiting_detail" data-bind="dtable"
+                   data-chart="sa_table_revenue_outbound_recruiting_detail" data-override-book="ae" data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
                    data-empty-text="Sin close wins Recruiting outbound (AE's+AM) este año."></div>
             </section>
@@ -9077,7 +9089,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=134" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=136" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

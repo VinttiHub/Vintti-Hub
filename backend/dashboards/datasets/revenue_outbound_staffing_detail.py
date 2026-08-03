@@ -39,8 +39,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("hasta"))
         or today_ar()
     )
+    # Mismo toggle AE / AE+AM que la card: el drawer tiene que mostrar las
+    # mismas filas que suman al número de arriba.
+    _book = str(filters.get("book") or "").strip().lower()
+    _scope = (
+        "AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s"
+        if _book in ("ae", "aes", "ae_only")
+        else "AND (TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s\n"
+             "     OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s)"
+    )
 
-    sql = """
+    sql = f"""
         WITH params AS (
           SELECT %(corte)s::date AS corte_d, DATE_TRUNC('year', %(corte)s::date)::date AS year_start
         ),
@@ -73,8 +82,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date >= p.year_start
             AND o.opp_close_date <= p.corte_d
             AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
-            AND (TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
-                 OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s)
+            {_scope}
         ),
         opps_in_month AS (
           SELECT DISTINCT ON (m.mes, h.opportunity_id, h.candidate_id)

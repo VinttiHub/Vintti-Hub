@@ -986,6 +986,16 @@
     const axis = (el.dataset.axis || 'width').toLowerCase();
     if (axis === 'height') {
       el.style.height = pct;
+      // El "$0" del centro de la pila (.ae-battery__shell::after) es SOLO el
+      // placeholder de "sin datos". Cuando una capa es 0 pero la otra tiene
+      // plata, la parte vacía de la pila lo dejaba flotando y se leía como un
+      // dato real. Se apaga apenas alguna capa de ESTA pila tenga altura.
+      const shell = el.closest('.ae-battery__shell');
+      if (shell) {
+        const anyFilled = [...shell.querySelectorAll('.ae-battery__fill')]
+          .some(f => parseFloat(f.style.height) > 0);
+        shell.classList.toggle('has-fill', anyFilled);
+      }
     } else if (axis === 'css-var') {
       // For conic-gradient donuts and similar: drive a CSS var instead of width/height.
       el.style.setProperty(el.dataset.cssVar || '--pct', pct);
@@ -3625,6 +3635,55 @@
     });
   }
 
+  // Toggle AE / AE+AM (card "Annual Gross Revenue · Outbound"). Setea
+  // data-override-book en los bindings del card y en los paneles del drawer que
+  // el grupo declara en data-book-panels, y refetchea. El atributo en <html>
+  // maneja los textos que cambian ("AE's + AM" ↔ "AE's") vía CSS.
+  function bindBookToggles() {
+    document.querySelectorAll('[data-book-toggle]').forEach(group => {
+      const card = group.closest('[data-book-card]') || group.closest('.ae-card');
+      const panelKeys = (group.dataset.bookPanels || '').split(/\s+/).filter(Boolean);
+      group.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-book-set]');
+        if (!btn) return;
+        const book = btn.dataset.bookSet;
+        if (card && card.dataset.bookActive === book) return;
+
+        group.querySelectorAll('[data-book-set]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        if (card) card.dataset.bookActive = book;
+        document.documentElement.setAttribute('data-book-outbound', book);
+
+        const els = [...(card || document).querySelectorAll('[data-chart][data-override-book]')];
+        panelKeys.forEach(key => {
+          document
+            .querySelectorAll(`[data-kpi-detail-panel="${key}"] [data-chart][data-override-book]`)
+            .forEach(el => els.push(el));
+        });
+        els.forEach(el => el.setAttribute('data-override-book', book));
+
+        const groups = new Map();
+        els.forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            // Cachear: el drawer re-renderiza desde cache cuando se abre.
+            lastFetchedRows.set(compKeyFor(chartKey, overrides), r.rows || []);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (err) { console.error('book toggle', chartKey, err); }
+        }
+      });
+    });
+  }
+
   function syncMonthChips(month) {
     const txt = month ? formatMonthHuman(month) : '';
     document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
@@ -4563,6 +4622,7 @@
     bindPeriodToggles();
     bindGlobalPeriodToggles();
     bindLeadTypeToggles();
+    bindBookToggles();
     bindDtableFilters();
     bindGlossary();
     bindStickyHead();

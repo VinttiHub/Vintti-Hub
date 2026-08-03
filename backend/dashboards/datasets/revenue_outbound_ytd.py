@@ -42,13 +42,29 @@ def _parse_date(value: str | None) -> date | None:
 
 
 # Scope outbound + unión AE/AM (mismo predicado para Staffing y Recruiting).
-_SCOPE = """
+_SCOPE_AE_AM = """
     LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
     AND (
       TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
       OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s
     )
 """
+
+# Mismo canal, pero solo el book de los AE's: sin las cuentas que entran por la AM.
+_SCOPE_AE = """
+    LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
+    AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
+"""
+
+
+def scope_for(filters: dict) -> str:
+    """Elige el book según el filtro `book` que manda el toggle de la card.
+
+    'ae' → solo AE's; cualquier otra cosa (incluido vacío) → AE + AM, que es lo
+    que la card venía mostrando antes de que existiera el toggle.
+    """
+    book = str((filters or {}).get("book") or "").strip().lower()
+    return _SCOPE_AE if book in ("ae", "aes", "ae_only") else _SCOPE_AE_AM
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
@@ -58,6 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("hasta"))
         or today_ar()
     )
+    _scope = scope_for(filters)
 
     sql = f"""
         WITH params AS (
@@ -97,7 +114,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND ho.candidate_id IS NOT NULL AND ho.account_id IS NOT NULL
             AND TRIM(o.opp_stage) = 'Close Win'
             AND o.opp_close_date IS NOT NULL
-            AND {_SCOPE}
+            AND {_scope}
         ),
         opps_in_month AS (
           -- Solo contratos cuyo Close Win cae en el período (año en curso / PY):
@@ -169,7 +186,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND o.opp_close_date >= p.year_start_py AND o.opp_close_date <= p.corte_d
             AND TRIM(o.opp_stage) = 'Close Win'
-            AND {_SCOPE}
+            AND {_scope}
         )
         SELECT
           (SELECT corte_d FROM params) AS corte,

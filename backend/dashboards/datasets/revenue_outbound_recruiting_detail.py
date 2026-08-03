@@ -38,7 +38,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or today_ar()
     )
 
-    sql = """
+    # Mismo toggle AE / AE+AM que la card (ver revenue_outbound_ytd).
+    _book = str(filters.get("book") or "").strip().lower()
+    _scope = (
+        "AND TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s"
+        if _book in ("ae", "aes", "ae_only")
+        else "AND (TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s\n"
+             "     OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s)"
+    )
+
+    sql = f"""
         WITH params AS (
           SELECT %(corte)s::date AS corte_d, DATE_TRUNC('year', %(corte)s::date)::date AS year_start
         )
@@ -57,8 +66,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           AND o.opp_close_date IS NOT NULL
           AND o.opp_close_date >= p.year_start AND o.opp_close_date <= p.corte_d
           AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'outbound'
-          AND (TRIM(LOWER(o.opp_sales_lead)) IN %(ae_leads)s
-               OR TRIM(LOWER(a.account_manager)) IN %(am_leads)s)
+          {_scope}
         GROUP BY o.opp_close_date, a.client_name, o.opp_position_name, o.opportunity_id
         ORDER BY o.opp_close_date DESC, revenue DESC;
     """

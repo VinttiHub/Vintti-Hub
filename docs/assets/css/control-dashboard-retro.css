@@ -3477,6 +3477,14 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .ae-card[data-window-active="30d"]  [data-window-pane="30d"]  { display: block; }
 .ae-card[data-window-active="week"] [data-window-pane="week"] { display: block; }
 
+/* Book AE / AE+AM (Annual Gross Revenue · Outbound). El estado vive en <html>
+   porque los textos que cambian están en el card Y en los paneles del drawer,
+   que son subárboles separados. Default AE (sin atributo) → no hay flash. */
+[data-book-pane] { display: none; }
+[data-book-pane="ae"] { display: inline; }
+:root[data-book-outbound="ae_am"] [data-book-pane="ae"] { display: none; }
+:root[data-book-outbound="ae_am"] [data-book-pane="ae_am"] { display: inline; }
+
 .ae-pane { display: flex; flex-direction: column; gap: 18px; }
 
 /* =====================================================================
@@ -3544,6 +3552,10 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   pointer-events: none;
   font-variant-numeric: tabular-nums;
 }
+/* …pero SOLO cuando la pila está realmente vacía. Con una capa en 0 y la otra
+   con plata, el "$0" quedaba flotando en el aire vacío y parecía un dato.
+   renderProgressFill pone .has-fill cuando alguna capa tiene altura. */
+.ae-battery__shell.has-fill::after { content: none; }
 /* Meta dashed line — sits at the very top of the shell interior (offset
    from the top by a small padding so the dashed line is visible). The
    fills below scale relative to this line (pct_of_goal = 100% reaches it). */
