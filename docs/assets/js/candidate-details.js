@@ -1824,16 +1824,14 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
 
         try {
           if (shouldNotify) {
-            const modalResult = await captureInactiveMetadataFromModal({
+            // El motivo es opcional ("I'll do it later" / se carga después desde
+            // el popup de status): cerrar el modal NO puede descartar la baja ni
+            // frenar el mail de churn, que era lo que pasaba antes.
+            await captureInactiveMetadataFromModal({
               candidateName,
               clientName,
               roleName
             });
-            if (!modalResult) {
-              endInp.value = prevValue;
-              endInp.dataset.previousEndDate = prevValue;
-              return;
-            }
           }
 
           await persistEndDateFields();

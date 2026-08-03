@@ -667,6 +667,11 @@ def _closed_lost_email_html(ctx: Dict[str, Any]) -> str:
 
 
 def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any]]:
+    # El contratado sale de opportunity.candidato_contratado, PERO ese campo solo
+    # lo escribe el flujo Signed del popup. Una opp que va directo a Close Win
+    # (o que se cargó a mano) queda con el campo en NULL aunque el hire exista en
+    # hire_opportunity, y el mail se moría en "missing_candidate" sin avisar.
+    # Por eso el COALESCE con el hire real de la opp.
     cur.execute(
         """
         SELECT
@@ -674,13 +679,22 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
             o.opp_stage,
             o.opp_position_name,
             o.opp_close_date::date AS opp_close_date,
-            o.candidato_contratado AS candidate_id,
+            COALESCE(o.candidato_contratado, ho.candidate_id) AS candidate_id,
             a.client_name,
             a.where_come_from,
-            c.name AS candidate_name
+            COALESCE(c.name, hc.name) AS candidate_name
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
         LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+        LEFT JOIN LATERAL (
+            SELECT h.candidate_id
+            FROM hire_opportunity h
+            WHERE h.opportunity_id = o.opportunity_id
+              AND h.candidate_id IS NOT NULL
+            ORDER BY h.candidate_id DESC
+            LIMIT 1
+        ) ho ON o.candidato_contratado IS NULL
+        LEFT JOIN candidates hc ON hc.candidate_id = ho.candidate_id
         WHERE o.opportunity_id = %s
         LIMIT 1
         """,

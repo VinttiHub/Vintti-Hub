@@ -1372,6 +1372,10 @@ if (endInputS) {
 
     try {
       if (shouldNotify) {
+        // El modal del motivo es OPCIONAL: su botón dice "I'll do it later" y el
+        // motivo se puede cargar después desde el popup de status. Antes, cerrarlo
+        // o saltearlo descartaba el cambio entero en silencio — no se guardaba la
+        // end date y no salía el mail de churn. Ahora el modal nunca bloquea.
         inactiveModalResult = await captureInactiveMetadataFromAccount({
           candidateId,
           candidateName: candidate.name,
@@ -1379,11 +1383,6 @@ if (endInputS) {
           roleName: candidate.opp_position_name,
           opportunityId: oppId
         });
-        if (!inactiveModalResult) {
-          endInputS.value = prevValue;
-          endInputS.dataset.previousEndDate = prevValue;
-          return;
-        }
       }
 
       await persistEndDate();
@@ -1837,6 +1836,8 @@ function createRecruitingRow(candidate, options = {}) {
 
       try {
         if (shouldNotify) {
+          // Ver la nota en el handler de Staffing: el motivo es opcional y no
+          // puede descartar la baja ni frenar el mail de churn.
           inactiveModalResult = await captureInactiveMetadataFromAccount({
             candidateId,
             candidateName: candidate.name,
@@ -1844,11 +1845,6 @@ function createRecruitingRow(candidate, options = {}) {
             roleName: candidate.opp_position_name,
             opportunityId: oppId
           });
-          if (!inactiveModalResult) {
-            endInput.value = prevValue;
-            endInput.dataset.previousEndDate = prevValue;
-            return;
-          }
         }
 
         await persistEndDate();
