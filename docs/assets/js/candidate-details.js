@@ -2825,7 +2825,9 @@ function getDefaultReferenceQuestions(candidateName) {
   return [
     `What was your working relationship with ${label}? Could you please tell me ${label}'s weaknesses and strengths?`,
     `How would you describe ${label}'s overall performance?`,
+    `How would you describe ${label}'s responsiveness to emails, messages, and time-sensitive requests?`,
     `Why did ${label} leave the company (or why did you stop working together)?`,
+    `When did ${label} stop working with your company?`,
     `Would you rehire or work with ${label} again? Why or why not?`,
     `Are there any areas where you feel ${label} might need additional support or development?`,
     `Is there anything else you'd like to share about ${label}'s work style or personality?`,
