@@ -93,13 +93,18 @@ def _require_editor():
 #   reduce : first (rows[0]) | last (rows[-1]) | sum (Σ)
 #   fmt    : money | int | pct   (solo para display y para write de filas de TEXTO)
 # ---------------------------------------------------------------------------
+# El card "Annual Gross Revenue · Outbound" del dashboard arranca en Solo AE, así
+# que el sheet tiene que escribir lo mismo: book="ae" saca del cálculo las cuentas
+# que entran por la AM. El resto de los datasets de acá ya son AE-only de origen.
+_AE_ONLY = {"book": "ae"}
+
 METRICS = [
     {"key": "annual_revenue", "match": "annual revenue outbound",
-     "dataset": "revenue_outbound_ytd", "field": "total_revenue", "reduce": "first", "fmt": "money", "filters": {}},
+     "dataset": "revenue_outbound_ytd", "field": "total_revenue", "reduce": "first", "fmt": "money", "filters": _AE_ONLY},
     {"key": "staffing", "match": "staffing",
-     "dataset": "revenue_outbound_ytd", "field": "staffing_revenue", "reduce": "first", "fmt": "money", "filters": {}},
+     "dataset": "revenue_outbound_ytd", "field": "staffing_revenue", "reduce": "first", "fmt": "money", "filters": _AE_ONLY},
     {"key": "recruiting", "match": "recruiting",
-     "dataset": "revenue_outbound_ytd", "field": "recruiting_revenue", "reduce": "first", "fmt": "money", "filters": {}},
+     "dataset": "revenue_outbound_ytd", "field": "recruiting_revenue", "reduce": "first", "fmt": "money", "filters": _AE_ONLY},
     {"key": "gmrr", "match": "gmrr",
      "dataset": "sales_mrr_staffing_ae_history", "field": "gmrr", "reduce": "last", "fmt": "money", "filters": {}},
     {"key": "mrr", "match": "mrr",
