@@ -2715,6 +2715,7 @@ DEFAULT_APRIORA_QUESTIONS = [
     "Just so you know, if you continue moving forward in the process, we'll be asking for references and, at the final stage, a resignation letter. Are you comfortable with both of these?",
     "Are you participating in other processes?",
     "Do you have your own computer to work? this is very important since you will be working with your own computer",
+    "Are you a USA Citizen?",
 ]
 
 
