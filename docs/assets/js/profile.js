@@ -459,22 +459,31 @@ function renderOrgBranch(parentId, childrenByLeaderId, depth=1, pathIds=new Set(
   if (depth > 10) return "";
   const children = safeOrgChildren(parentId, childrenByLeaderId, pathIds);
   if (!children.length) return "";
-  const cls = ["org-children", children.length >= 6 ? "is-dense" : ""].filter(Boolean).join(" ");
+  const nodes = children.map((child)=>{
+    const cid = Number(child?.user_id);
+    const nextPath = new Set(pathIds);
+    if (Number.isFinite(cid) && cid > 0) nextPath.add(cid);
+    const hasChildren = safeOrgChildren(cid, childrenByLeaderId, nextPath).length > 0;
+    return { child, cid, nextPath, hasChildren };
+  });
+  // Si algún hermano tiene su propio subárbol, la fila no puede envolver: los
+  // que sobran caerían debajo de los hijos de ese hermano y parecerían sus
+  // reportes. Con puras hojas, envolver es seguro y queda más compacto.
+  const hasBranches = nodes.some((node)=> node.hasChildren);
+  const cls = [
+    "org-children",
+    hasBranches ? "has-branches" : "",
+    children.length >= 6 ? "is-dense" : ""
+  ].filter(Boolean).join(" ");
   return `
     <div class="${cls}" data-depth="${depth}">
-      ${children.map((child)=>{
-        const cid = Number(child?.user_id);
-        const nextPath = new Set(pathIds);
-        if (Number.isFinite(cid) && cid > 0) nextPath.add(cid);
-        const hasChildren = safeOrgChildren(cid, childrenByLeaderId, nextPath).length > 0;
-        return `
+      ${nodes.map(({ child, cid, nextPath, hasChildren })=> `
           <div class="org-node">
             <span class="org-connector" aria-hidden="true"></span>
             ${renderOrgPersonCard(child, { isLeader: hasChildren, isLeaf: !hasChildren })}
             ${renderOrgBranch(cid, childrenByLeaderId, depth + 1, nextPath)}
           </div>
-        `;
-      }).join("")}
+        `).join("")}
     </div>
   `;
 }
@@ -685,6 +694,7 @@ const LEADER_ACCESS_EMAILS = new Set([
   "jazmin@vintti.com",
   "agostina@vintti.com",
   "bahia@vintti.com",
+  "justo@vintti.com",
   "lucia@vintti.com",
   "camila@vintti.com",
   "mia@vintti.com",

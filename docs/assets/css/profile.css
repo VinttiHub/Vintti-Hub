@@ -691,11 +691,16 @@ input:focus, select:focus, textarea:focus{
   background: rgba(59,130,246,.4);
 }
 
+/* `safe center` centra mientras entre, pero cae a flex-start apenas desborda.
+   Con `center` a secas, una rama más ancha que el contenedor se desborda hacia
+   los DOS lados y el sobrante de la izquierda queda fuera del área scrolleable
+   (no existe scroll negativo): esas tarjetas no se podían ver nunca, ni
+   corriendo la barra. */
 .org-dept-grid{
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: safe center;
   align-items: flex-start;
   gap: 10px 8px;
 }
@@ -729,10 +734,11 @@ input:focus, select:focus, textarea:focus{
 }
 
 .org-children{
+  position: relative;
   margin: 6px auto 0;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: safe center;
   align-items: flex-start;
   gap: 8px 8px;
   max-width: 360px;
@@ -742,12 +748,43 @@ input:focus, select:focus, textarea:focus{
   max-width: 400px;
 }
 
+/* Envolver está bien mientras TODOS los hermanos sean hojas: la segunda fila
+   no se puede confundir con los hijos de nadie. Pero si alguno trae subárbol
+   propio, su nodo es más alto y los hermanos que sobran caen debajo de SUS
+   hijos, con lo que el organigrama muestra una jerarquía falsa. En ese caso
+   —y sólo en ese— la fila va entera. La marca .has-branches la pone
+   renderOrgBranch() en profile.js. */
+.org-children.has-branches{
+  flex-wrap: nowrap;
+  max-width: none;
+}
+
 .org-node{
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
+
+/* Barra que une a los hermanos, sólo en filas de una sola línea: cada nodo
+   aporta su tramo y el primero y el último se recortan a su propio centro.
+   Se ancla al nodo (no a un ancho de tarjeta fijo) para seguir alineada
+   aunque un hermano del borde traiga subárbol y sea más ancho que una
+   tarjeta. En filas que envuelven no se dibuja, porque cruzaría el hueco
+   entre líneas. */
+.org-children.has-branches > .org-node::before{
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(59,130,246,.36);
+}
+
+.org-children.has-branches > .org-node:first-child::before{ left: 50%; }
+.org-children.has-branches > .org-node:last-child::before{ right: 50%; }
 
 .org-connector{
   width: 2px;
