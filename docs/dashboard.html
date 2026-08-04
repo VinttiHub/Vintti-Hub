@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=104">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=105">
 </head>
 <body>
 
@@ -2966,6 +2966,24 @@
             <div class="churn-panel__bar-track">
               <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
             </div>
+            <div class="churn-panel__stats">
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Cohorte</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Bajas</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Buyout</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Activos</span>
+              </div>
+            </div>
           </div>
           <div class="churn-panel churn-panel--m3" data-kpi-detail-open="retention-cand-m3" role="button" tabindex="0" aria-label="Ver detalle M3 Churn Candidato">
             <span class="churn-panel__label">M3 — Primeros 3 meses</span>
@@ -2977,6 +2995,24 @@
             </div>
             <div class="churn-panel__bar-track">
               <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+            <div class="churn-panel__stats">
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Cohorte</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Bajas</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Buyout</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Activos</span>
+              </div>
             </div>
           </div>
         </div>
@@ -3001,6 +3037,24 @@
             <div class="churn-panel__bar-track">
               <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
             </div>
+            <div class="churn-panel__stats">
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Cohorte</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Bajas</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Buyout</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Activos</span>
+              </div>
+            </div>
           </div>
           <div class="churn-panel churn-panel--m3" data-kpi-detail-open="retention-client-m3" role="button" tabindex="0" aria-label="Ver detalle M3 Churn Cliente">
             <span class="churn-panel__label">M3 — Primeros 3 meses</span>
@@ -3012,6 +3066,24 @@
             </div>
             <div class="churn-panel__bar-track">
               <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+            <div class="churn-panel__stats">
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Cohorte</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Bajas</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Buyout</span>
+              </div>
+              <div class="churn-panel__stat">
+                <span class="churn-panel__stat-val" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                <span class="churn-panel__stat-lab">Activos</span>
+              </div>
             </div>
           </div>
         </div>
@@ -8201,6 +8273,21 @@
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> candidatos</span>
             </div>
             <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn M1</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate · no cuentan como churn</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub">de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en la cohorte</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle cohorte · M1 Candidato</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_ae_candidate_churn_detail" data-override-meses="1" data-bind="dtable"
@@ -8223,6 +8310,21 @@
               <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> candidatos</span>
             </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn M3</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate · no cuentan como churn</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub">de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en la cohorte</span>
+                </div>
+              </div>
+            </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle cohorte · M3 Candidato</h4>
               <div class="dtable-wrap"
@@ -8247,6 +8349,21 @@
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> clientes</span>
             </div>
             <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn M1</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate · no cuentan como churn</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub">de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> en la cohorte</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle cohorte · M1 Cliente</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_ae_client_churn_detail" data-override-meses="1" data-bind="dtable"
@@ -8269,6 +8386,21 @@
               <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> clientes</span>
             </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn M3</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate · no cuentan como churn</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span></span>
+                  <span class="kpi-drawer__stat__sub">de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> en la cohorte</span>
+                </div>
+              </div>
+            </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle cohorte · M3 Cliente</h4>
               <div class="dtable-wrap"

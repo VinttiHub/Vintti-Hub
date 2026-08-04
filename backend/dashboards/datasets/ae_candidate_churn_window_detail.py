@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -34,12 +36,18 @@ def _parse_meses(value) -> int:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     meses = _parse_meses(filters.get("meses"))
     window_days = 90 if meses == 3 else 30
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or today_ar()
-    )
+    # Debe anclar la ventana igual que ae_candidate_churn_window: si el detalle
+    # usa otro corte que su card, el drawer lista una cohorte distinta de la que
+    # el número dice contar.
+    if filters and (filters.get("desde") or filters.get("hasta") or filters.get("mes")):
+        _, corte = window_bounds(filters)
+    else:
+        corte = (
+            _parse_date(filters.get("corte"))
+            or _parse_date(filters.get("cutoff"))
+            or _parse_date(filters.get("fecha_corte"))
+            or today_ar()
+        )
 
     # Detalle de la cohorte M1/M3 de candidatos (AE M+B). Misma lógica que
     # ae_candidate_churn_window, pero una fila por hire con su estado al corte.

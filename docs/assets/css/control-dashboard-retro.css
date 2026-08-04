@@ -4378,6 +4378,46 @@ button.dcard__pill:hover { filter: brightness(0.96); transform: translateY(-1px)
 .churn-panel__bar-fill { display: block; height: 100%; width: 0%; border-radius: 99px; }
 .churn-panel--m1 .churn-panel__bar-fill { background: #003bff; }
 .churn-panel--m3 .churn-panel__bar-fill { background: #6c38ff; }
+
+/* Desglose de la cohorte, al mismo nivel que la card 3/6m de Account Management:
+   cuántos clientes entraron, cuántos se dieron de baja, cuántas fueron buyout y
+   cuántos siguen activos al corte. El acento sale de --churn-accent para no
+   repetir un bloque de reglas por cada panel. */
+.churn-panel--m1 { --churn-accent: #003bff; }
+.churn-panel--m3 { --churn-accent: #6c38ff; }
+/* 2x2 y no 4 en línea: la card es s-6, así que cada panel queda en ~220px y
+   con 4 columnas las etiquetas ("COHORTE", "ACTIVOS") se pisaban entre sí. */
+.churn-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--churn-accent) 18%, transparent);
+}
+.churn-panel__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.churn-panel__stat-val {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--churn-accent);
+}
+.churn-panel__stat-lab {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (max-width: 720px) { .churn-panels { grid-template-columns: 1fr; } }
 
 /* Referrals Generated — anillo + texto + pills por ventana */

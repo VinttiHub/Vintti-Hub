@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from ._now import today_ar
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -34,12 +36,20 @@ def _parse_meses(value) -> int:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     meses = _parse_meses(filters.get("meses"))
     window_days = 90 if meses == 3 else 30
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or today_ar()
-    )
+    # Mantiene la ventana de 30/90 días, pero ancla su fin (`corte`) al filtro
+    # global (Desde/Hasta o Mes) cuando está presente. Sin esto la card ignoraba
+    # el período elegido y siempre mostraba los últimos 30/90 días desde hoy,
+    # así que al filtrar por un trimestre devolvía un número que no correspondía.
+    # Mismo criterio que candidate_churn_window_summary (Account Management).
+    if filters and (filters.get("desde") or filters.get("hasta") or filters.get("mes")):
+        _, corte = window_bounds(filters)
+    else:
+        corte = (
+            _parse_date(filters.get("corte"))
+            or _parse_date(filters.get("cutoff"))
+            or _parse_date(filters.get("fecha_corte"))
+            or today_ar()
+        )
 
     # M1/M3 churn de clientes (Staffing) — solo AE (Mariano+Bahía por opp_sales_lead).
     # Cohorte rolling: cuentas cuyo PRIMER hire arrancó en los últimos window_days.
@@ -102,16 +112,30 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               ELSE 'BAJA_REAL'
             END AS baja_tipo
           FROM cohort
+        ),
+        totals AS (
+          SELECT
+            COUNT(*)::int                                          AS clientes,
+            COUNT(*) FILTER (WHERE baja_tipo IS NOT NULL)::int     AS bajas,
+            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::int   AS bajas_real,
+            COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_BUYOUT')::int AS bajas_buyout,
+            COUNT(*) FILTER (WHERE baja_tipo IS NULL)::int         AS activos_al_corte
+          FROM classified
         )
         SELECT
-          COUNT(*)::int                                          AS clientes,
-          COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::int   AS bajas_real,
-          COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_BUYOUT')::int AS bajas_buyout,
-          ROUND(100.0 * COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::numeric
-                / NULLIF(COUNT(*), 0), 1)::float                 AS churn_real_pct,
-          ROUND(100.0 - 100.0 * COUNT(*) FILTER (WHERE baja_tipo = 'BAJA_REAL')::numeric
-                / NULLIF(COUNT(*), 0), 1)::float                 AS retention_pct
-        FROM classified;
+          clientes,
+          bajas,
+          bajas_real,
+          bajas_buyout,
+          activos_al_corte,
+          ROUND(100.0 * bajas::numeric        / NULLIF(clientes, 0), 1)::float AS churn_pct,
+          ROUND(100.0 * bajas_real::numeric   / NULLIF(clientes, 0), 1)::float AS churn_real_pct,
+          ROUND(100.0 * bajas_buyout::numeric / NULLIF(clientes, 0), 1)::float AS buyout_pct,
+          -- Retención se mantiene contra bajas reales (no buyout), que es como
+          -- ya venía alimentando la barra de progreso de la card.
+          ROUND(100.0 - 100.0 * bajas_real::numeric
+                / NULLIF(clientes, 0), 1)::float                              AS retention_pct
+        FROM totals;
     """
 
     return sql, {"corte": corte, "window_days": window_days}
@@ -123,9 +147,13 @@ DATASET = {
     "dimensions": [],
     "measures": [
         {"key": "clientes", "label": "Clientes (cohorte)", "type": "number"},
+        {"key": "bajas", "label": "Bajas total", "type": "number"},
         {"key": "bajas_real", "label": "Bajas reales", "type": "number"},
         {"key": "bajas_buyout", "label": "Bajas buyout", "type": "number"},
+        {"key": "activos_al_corte", "label": "Activos al corte", "type": "number"},
+        {"key": "churn_pct", "label": "Churn total %", "type": "percent"},
         {"key": "churn_real_pct", "label": "Churn real %", "type": "percent"},
+        {"key": "buyout_pct", "label": "Churn buyout %", "type": "percent"},
         {"key": "retention_pct", "label": "Retención %", "type": "percent"},
     ],
     "default_filters": {},
