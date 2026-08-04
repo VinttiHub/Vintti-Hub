@@ -2176,6 +2176,16 @@ async function onAdminDeleteConfirm(){
     await loadAdminUsersList();
     await ensureAdminLeaderOptions(true);
     if (typeof loadInactiveEmployees === "function") { try { await loadInactiveEmployees(); } catch(_e){} }
+    // Desactivar deja un offboarding pendiente, pero initOffboarding() sólo
+    // corre al cargar la página: sin esto la tarjeta y el botón de Offboarding
+    // siguen ocultos y el formulario ni siquiera existe en el DOM, así que
+    // quien desactiva no ve nada hasta recargar. Además, si es el hiring
+    // manager (el único que puede enviarlo), le abrimos el formulario ya.
+    try { await initOffboarding(); } catch(_e){ console.error("initOffboarding", _e); }
+    try {
+      const rec = await offbFetch(`/offboarding/${encodeURIComponent(userId)}`);
+      if (offbCanSubmit(rec)) await openOffboardingForm(userId);
+    } catch(_e){ /* sin permiso o sin registro: la tarjeta ya quedó visible */ }
   }catch(err){
     console.error("admin deactivate error:", err);
     setAdminDeleteStatus(err?.message || "Could not deactivate user.", false);
@@ -3748,6 +3758,11 @@ function renderInactiveTable(rows){
 }
 
 async function offbMark(userId, action){
+  // Completar es irreversible desde la UI: saca el registro de la lista de
+  // pendientes y ya no hay forma de volver a abrirlo.
+  if (action === "complete" && !confirm("Mark this offboarding as completed? It will leave the pending list and can't be reopened from here.")){
+    return;
+  }
   try{
     await offbFetch(`/offboarding/${encodeURIComponent(userId)}/${action}`, { method: "POST" });
     await loadInactiveEmployees();

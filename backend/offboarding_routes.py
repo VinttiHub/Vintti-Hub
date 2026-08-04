@@ -163,10 +163,12 @@ def _serialize(row: dict) -> dict:
 _SELECT_JOIN = """
     SELECT o.*, u.user_name, u.role, u.email_vintti, u.lider,
            u.address AS employee_address,
-           m.user_name AS manager_name
+           m.user_name AS manager_name,
+           COALESCE(ma.is_active, TRUE) AS manager_is_active
     FROM offboarding o
     JOIN users u ON u.user_id = o.user_id
     LEFT JOIN users m ON m.user_id = COALESCE(o.hiring_manager_id, u.lider)
+    LEFT JOIN admin_user_access ma ON ma.user_id = COALESCE(o.hiring_manager_id, u.lider)
 """
 
 
@@ -424,7 +426,7 @@ def offboarding_submit(user_id: int):
     return jsonify(result)
 
 
-def _mark(user_id: int, sql: str):
+def _mark(user_id: int, sql: str, guard=None):
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -439,6 +441,10 @@ def _mark(user_id: int, sql: str):
             row = dict(row)
             if not _can_act(requester, row):
                 return _err("Only the Hiring Manager can update this offboarding.", 403)
+            if guard is not None:
+                blocked = guard(row)
+                if blocked:
+                    return _err(blocked, 409)
             cur.execute(sql, (requester["email"], user_id))
             cur.execute(_SELECT_JOIN + " WHERE o.user_id = %s", (user_id,))
             out = dict(cur.fetchone())
@@ -446,6 +452,22 @@ def _mark(user_id: int, sql: str):
     finally:
         conn.close()
     return jsonify(_serialize(out))
+
+
+def _require_submitted_form(row: dict):
+    """Completar sin haber enviado el formulario deja el registro cerrado y
+    vacío (sin end_date ni reason) y lo saca de /offboarding/pending, o sea que
+    ya no se puede recuperar desde la UI. Pasó con un empleado real.
+
+    Excepción: sólo el hiring manager puede enviar el formulario (_can_submit).
+    Si no hay manager, o el manager también está desactivado y no puede entrar,
+    nadie podría enviarlo nunca; bloquear el cierre ahí dejaría el registro
+    trabado para siempre, así que se permite completarlo."""
+    if row.get("form_submitted_at"):
+        return None
+    if _manager_id(row) is None or not row.get("manager_is_active", True):
+        return None
+    return "Send the offboarding form before marking it as completed."
 
 
 @bp.post("/offboarding/<int:user_id>/complete")
@@ -458,6 +480,7 @@ def offboarding_complete(user_id: int):
                completed_by_email = %s, updated_at = now()
          WHERE user_id = %s
         """,
+        guard=_require_submitted_form,
     )
 
 
