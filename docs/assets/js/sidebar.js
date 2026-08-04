@@ -113,12 +113,14 @@
     ]).has(email));
 
     setDisplay('salesLink', new Set([
-      'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com', 'camila@vintti.com'
+      'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com', 'camila@vintti.com',
+      'justo@vintti.com'
     ]).has(email));
 
     const dashOk = new Set([
       'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com',
-      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com', 'camila@vintti.com'
+      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com', 'camila@vintti.com',
+      'justo@vintti.com'
     ]).has(email);
     setDisplay('dashboardLink', dashOk);
     setDisplay('customDashboardLink', dashOk);
@@ -138,7 +140,8 @@
     const summaryLink = document.getElementById('summaryLink');
     const allowedEmails = new Set([
       'agustin@vintti.com','bahia@vintti.com','manuela@vintti.com','pgonzales@vintti.com','lara@vintti.com',
-      'agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com', 'camila@vintti.com'
+      'agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com', 'camila@vintti.com',
+      'justo@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
   }
