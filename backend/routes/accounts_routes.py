@@ -54,6 +54,15 @@ def _is_closed_lost_stage(stage):
     return str(stage or "").strip().lower() == "closed lost"
 
 
+# Stages en los que la contratación sigue siendo real. Cualquier otro stage
+# significa que el deal se cayó y el hire debe deshacerse.
+STAGES_KEEPING_HIRE = {"signed", "close win", "closed lost"}
+
+
+def _stage_keeps_hire(stage):
+    return str(stage or "").strip().lower() in STAGES_KEEPING_HIRE
+
+
 def _mark_signed_hire_active(cursor, opportunity_id):
     cursor.execute(
         """
@@ -79,6 +88,73 @@ def _mark_signed_hire_active(cursor, opportunity_id):
             carga_active = COALESCE(hire_opportunity.carga_active, CURRENT_DATE)
         """,
         (candidate_id, opportunity_id, row.get("account_id")),
+    )
+    return True
+
+
+def _unmark_signed_hire_active(cursor, opportunity_id):
+    """Deshace la contratación cuando la opp retrocede a un stage pre-firma.
+
+    Espejo de _mark_signed_hire_active. NO borra la fila de hire_opportunity: el
+    formulario público de referencias también escribe ahí (reference_1_*, etc.)
+    para candidatos que ni siquiera fueron contratados, así que borrarla perdería
+    esa data. Alcanza con limpiar las fechas: los datasets filtran por
+    "start_d IS NOT NULL" (carga_active, y si no start_date), de modo que sin
+    fechas la fila deja de contar en todas las métricas.
+    """
+    cursor.execute(
+        """
+        SELECT candidato_contratado
+        FROM opportunity
+        WHERE opportunity_id = %s
+        LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    row = cursor.fetchone() or {}
+    candidate_id = row.get("candidato_contratado")
+    if not candidate_id:
+        return False
+
+    cursor.execute(
+        """
+        UPDATE hire_opportunity
+           SET carga_active = NULL,
+               start_date = NULL
+         WHERE candidate_id = %s AND opportunity_id = %s
+        """,
+        (candidate_id, opportunity_id),
+    )
+
+    cursor.execute(
+        """
+        UPDATE candidates_batches cb
+           SET status = NULL
+         WHERE cb.candidate_id = %s
+           AND cb.status = 'Candidate hired'
+           AND EXISTS (
+                 SELECT 1
+                   FROM batch b
+                  WHERE b.batch_id = cb.batch_id
+                    AND b.opportunity_id = %s
+           )
+        """,
+        (candidate_id, opportunity_id),
+    )
+
+    cursor.execute(
+        """
+        UPDATE opportunity
+           SET candidato_contratado = NULL
+         WHERE opportunity_id = %s
+        """,
+        (opportunity_id,),
+    )
+
+    logging.info(
+        "↩️ Contratación revertida (fechas limpiadas): opportunity_id=%s candidate_id=%s",
+        opportunity_id,
+        candidate_id,
     )
     return True
 
@@ -1122,6 +1198,10 @@ def update_opportunity_stage(opportunity_id):
                     create_stage_todos(cursor, opportunity_id, new_stage)
                     if _is_signed_stage(new_stage):
                         _mark_signed_hire_active(cursor, opportunity_id)
+                    elif not _stage_keeps_hire(new_stage):
+                        # La opp retrocede a un stage pre-firma: el deal se cayó,
+                        # así que el hire no debe seguir contando en las métricas.
+                        _unmark_signed_hire_active(cursor, opportunity_id)
 
                 if str(new_stage or "").strip().lower() == "close win" and account_id:
                     credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)

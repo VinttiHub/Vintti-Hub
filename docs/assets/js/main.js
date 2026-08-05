@@ -2501,14 +2501,24 @@ function requiresStageConfirm(stage) {
   return !['Sourcing', 'Interviewing', 'Stop', 'Close Win', 'Closed Lost'].includes(stage);
 }
 
-function openStageConfirmPopup({ newStage, onConfirm, onCancel }) {
+// Stages en los que la contratación sigue siendo real. Salir de Signed hacia
+// cualquier otro stage deshace el hire en el backend (ver _unmark_signed_hire_active).
+const STAGES_KEEPING_HIRE = ['Signed', 'Close Win', 'Closed Lost'];
+
+function revertsHireOnStageChange(previousStage, newStage) {
+  return String(previousStage || '').trim() === 'Signed'
+    && !STAGES_KEEPING_HIRE.includes(String(newStage || '').trim());
+}
+
+function openStageConfirmPopup({ newStage, onConfirm, onCancel, message: customMessage }) {
   const popup = document.getElementById('stageConfirmPopup');
   const message = document.getElementById('stageConfirmMessage');
   const yesBtn = document.getElementById('stageConfirmYes');
   const noBtn = document.getElementById('stageConfirmNo');
   if (!popup || !message || !yesBtn || !noBtn) return;
 
-  message.textContent = `Are you sure you want to change this stage to "${newStage}"?`;
+  message.textContent = customMessage
+    || `Are you sure you want to change this stage to "${newStage}"?`;
   popup.style.display = 'flex';
 
   const cleanup = () => {
@@ -2528,6 +2538,66 @@ function openStageConfirmPopup({ newStage, onConfirm, onCancel }) {
   };
 }
 
+async function dispatchStageChange(opportunityId, newStage, previousStage, dropdownElement, { skipConfirm = false } = {}) {
+    if (newStage === 'Sourcing') {
+      openSourcingPopup(opportunityId, dropdownElement);
+      return;
+    }
+    if (newStage === 'Interviewing') {
+      openInterviewingPopup(opportunityId, dropdownElement);
+      return;
+    }
+    if (newStage === 'Signed') {
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, dropdownElement, { mode: 'signed' }));
+      return;
+    }
+    if (newStage === 'Close Win') {
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, dropdownElement, { mode: 'close-win' }));
+      return;
+    }
+    if (newStage === 'Closed Lost') {
+      openCloseLostPopup(opportunityId, dropdownElement);
+      return;
+    }
+    if (newStage === 'Stop') {
+      try {
+        await patchOppFields(opportunityId, { nda_signature_or_start_date: null });
+      } catch (err) {
+        alert(err.message || 'Failed to clear start date.');
+        dropdownElement.value = previousStage;
+        updateStageDropdownStyle(dropdownElement, previousStage);
+        return;
+      }
+    }
+    if (requiresStageConfirm(newStage) && !skipConfirm) {
+      dropdownElement.value = previousStage;
+      updateStageDropdownStyle(dropdownElement, previousStage);
+      openStageConfirmPopup({
+        newStage,
+        onConfirm: async () => {
+          dropdownElement.value = newStage;
+          updateStageDropdownStyle(dropdownElement, newStage);
+          const ok = await patchOpportunityStage(opportunityId, newStage, dropdownElement);
+          if (!ok) {
+            dropdownElement.value = previousStage;
+            updateStageDropdownStyle(dropdownElement, previousStage);
+          }
+        },
+        onCancel: () => {
+          dropdownElement.value = previousStage;
+          updateStageDropdownStyle(dropdownElement, previousStage);
+        }
+      });
+      return;
+    }
+
+    const ok = await patchOpportunityStage(opportunityId, newStage, dropdownElement);
+    if (!ok) {
+      dropdownElement.value = previousStage;
+      updateStageDropdownStyle(dropdownElement, previousStage);
+    }
+}
+
 document.addEventListener('change', async (e) => {
     if (e.target && e.target.classList.contains('stage-dropdown')) {
       const newStage = e.target.value;
@@ -2541,63 +2611,30 @@ document.addEventListener('change', async (e) => {
 
     console.log('🟡 Stage dropdown changed! Opportunity ID:', opportunityId, 'New Stage:', newStage);
 
-    if (newStage === 'Sourcing') {
-      openSourcingPopup(opportunityId, e.target);
-      return;
-    }    
-    if (newStage === 'Interviewing') {
-      openInterviewingPopup(opportunityId, e.target);
-      return;
-    }
-    if (newStage === 'Signed') {
-      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target, { mode: 'signed' }));
-      return;
-    }
-    if (newStage === 'Close Win') {
-      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target, { mode: 'close-win' }));
-      return;
-    }
-    if (newStage === 'Closed Lost') {
-      openCloseLostPopup(opportunityId, e.target);
-      return;
-    }
-    if (newStage === 'Stop') {
-      try {
-        await patchOppFields(opportunityId, { nda_signature_or_start_date: null });
-      } catch (err) {
-        alert(err.message || 'Failed to clear start date.');
-        e.target.value = previousStage;
-        updateStageDropdownStyle(e.target, previousStage);
-        return;
-      }
-    }
-    if (requiresStageConfirm(newStage)) {
-      e.target.value = previousStage;
-      updateStageDropdownStyle(e.target, previousStage);
+    // Salir de Signed hacia atrás deshace la contratación en el backend: avisar
+    // antes, porque se borra el registro de hire y se limpia el contratado.
+    if (revertsHireOnStageChange(previousStage, newStage)) {
+      const dropdownElement = e.target;
+      dropdownElement.value = previousStage;
+      updateStageDropdownStyle(dropdownElement, previousStage);
       openStageConfirmPopup({
         newStage,
+        message: `Esta oportunidad está en Signed. Al moverla a "${newStage}" se va a deshacer la contratación: se borra el registro de hire y se limpia el candidato contratado, y deja de contar en el dashboard. ¿Seguro?`,
         onConfirm: async () => {
-          e.target.value = newStage;
-          updateStageDropdownStyle(e.target, newStage);
-          const ok = await patchOpportunityStage(opportunityId, newStage, e.target);
-          if (!ok) {
-            e.target.value = previousStage;
-            updateStageDropdownStyle(e.target, previousStage);
-          }
+          dropdownElement.value = newStage;
+          updateStageDropdownStyle(dropdownElement, newStage);
+          // Ya confirmó acá: no volver a preguntar en el confirm genérico.
+          await dispatchStageChange(opportunityId, newStage, previousStage, dropdownElement, { skipConfirm: true });
         },
         onCancel: () => {
-          e.target.value = previousStage;
-          updateStageDropdownStyle(e.target, previousStage);
+          dropdownElement.value = previousStage;
+          updateStageDropdownStyle(dropdownElement, previousStage);
         }
       });
       return;
     }
 
-    const ok = await patchOpportunityStage(opportunityId, newStage, e.target);
-    if (!ok) {
-      e.target.value = previousStage;
-      updateStageDropdownStyle(e.target, previousStage);
-    }
+    await dispatchStageChange(opportunityId, newStage, previousStage, e.target);
 
   }
 });
