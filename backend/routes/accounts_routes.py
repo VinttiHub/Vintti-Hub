@@ -2771,7 +2771,7 @@ def get_alex_interviews(opportunity_id):
     })
 
 
-def _create_alex_job_bg(opportunity_id, jd_text):
+def _create_alex_job_bg(opportunity_id, jd_text, title=None):
     """Corre en un hilo: hace el createJob (que en Apriora tarda ~1-2 min) sin
     bloquear la respuesta HTTP. El front detecta que quedó lista cuando la position
     aparece en Apriora (polling), así que aquí solo disparamos y logueamos."""
@@ -2780,9 +2780,12 @@ def _create_alex_job_bg(opportunity_id, jd_text):
         AlexClient().create_job(
             external_job_id=opportunity_id,
             job_description=jd_text,
+            job_title=title,
             additional_questions=DEFAULT_APRIORA_QUESTIONS,
+            additional_generation_context=DEFAULT_APRIORA_GENERATION_CONTEXT,
         )
-        logging.info("Apriora createJob OK (bg) opp %s", opportunity_id)
+        logging.info("Apriora createJob OK (bg) opp %s title=%r (jd %s chars)",
+                     opportunity_id, title, len(jd_text))
     except Exception as e:
         logging.warning("Apriora createJob (bg) falló opp %s: %s", opportunity_id, e)
 
@@ -2798,13 +2801,23 @@ DEFAULT_APRIORA_QUESTIONS = [
     "Are you a USA Citizen?",
 ]
 
+# Contexto extra para sesgar la generación (campo additionalGenerationContext de
+# createJob): refuerza el criterio de inglés que va anexado a la JD, porque Apriora
+# no tiene un campo de rubric propiamente dicho.
+DEFAULT_APRIORA_GENERATION_CONTEXT = (
+    "Always include a grading criterion named \"C1 Level of English\" that scores the "
+    "candidate's spoken English against CEFR C1. Do not add a separate question about it."
+)
+
 
 @bp.route('/opportunities/<int:opportunity_id>/alex/create_position', methods=['POST'])
 def create_alex_position(opportunity_id):
     """Crea en Apriora la job (interviewer) de esta opportunity a partir de su job
     description. Enlaza por externalJobId = opportunity_id. Evita duplicados: si ya
     hay una position vinculada (por externalJobId o por el id en el nombre), no crea otra."""
-    from utils.alex import AlexClient, AlexError, html_to_text, account_initials
+    from utils.alex import (
+        AlexClient, AlexError, html_to_text, account_initials, append_grading_criteria,
+    )
 
     try:
         client = AlexClient()
@@ -2835,14 +2848,14 @@ def create_alex_position(opportunity_id):
         }), 400
 
     # Título en Apriora = OPPORTUNITY NAME + " | " + INICIALES DE LA ACCOUNT
-    # (ej. "Tax Manager | SA"). createJob no tiene campo de título: Apriora lo deriva
-    # de la PRIMERA línea con etiqueta de puesto de la job description.
+    # (ej. "Tax Manager | SA"). Va en el campo `jobTitle` de createJob, que es
+    # autoritativo: sin él Apriora INFIERE el título leyendo el cuerpo de la JD y se
+    # queda con el rol que menciona el texto (la opp 759 "prueba apriora c1/c2" quedó
+    # como "Account Executive" porque la JD hablaba de ese puesto).
     #
-    # OJO: la JD casi siempre trae su propia cabecera de rol ("💼 Position: Tax Manager",
-    # "Job Title:", "Role:", "Puesto:"…). Si la dejamos, Apriora prefiere ESA (rol limpio)
-    # sobre la que anteponemos con el sufijo → se perdía el "| SA". Por eso quitamos esa
-    # cabecera nativa (cualquiera sea su forma/emoji) y dejamos UNA sola línea de título:
-    # la nuestra, con el tag de la account.
+    # Además limpiamos la cabecera de rol nativa de la JD ("💼 Position: Tax Manager",
+    # "Job Title:", "Role:", "Puesto:"…) y anteponemos la nuestra, para que el texto no
+    # contradiga al jobTitle.
     opp_name = (row[1] or "").strip()
     initials = account_initials(row[2])
     title = f"{opp_name} | {initials}" if (opp_name and initials) else (opp_name or initials)
@@ -2852,6 +2865,10 @@ def create_alex_position(opportunity_id):
             '', jd_text, count=1, flags=re.IGNORECASE)
         jd_text = f"Job Title: {title}\n\n{jd_body.lstrip()}"
 
+    # Criterios de grading fijos (inglés C1). Van AL FINAL y DESPUÉS del guard de
+    # largo mínimo, para que el guard siga midiendo la JD real.
+    jd_text = append_grading_criteria(jd_text)
+
     # Fire-and-forget: la generación en Apriora tarda ~1-2 min. En vez de bloquear
     # la respuesta, disparamos el createJob en un hilo y devolvemos 202 al instante.
     # El front detecta que quedó lista cuando la position aparece en Apriora (polling).
@@ -2859,7 +2876,7 @@ def create_alex_position(opportunity_id):
     # rechaza; además el botón se deshabilita en la UI si ya existe.)
     threading.Thread(
         target=_create_alex_job_bg,
-        args=(opportunity_id, jd_text),
+        args=(opportunity_id, jd_text, title),
         daemon=True,
     ).start()
     return jsonify({"started": True, "opportunity_id": opportunity_id}), 202

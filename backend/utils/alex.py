@@ -44,6 +44,39 @@ def html_to_text(value):
     return s.strip()
 
 
+# Criterios de evaluación que lleva TODA entrevista creada desde el Hub.
+# (nombre, instrucciones) — ver append_grading_criteria().
+APRIORA_GRADING_CRITERIA = [
+    (
+        "C1 Level of English",
+        "Grade whether the transcript shows C1-level English (CEFR). Strong: wide, "
+        "precise vocabulary including idioms; varied complex grammar with rare errors; "
+        "coherent, well-linked answers; expresses nuanced and abstract ideas easily. "
+        "Weak: basic or repetitive vocabulary; simple sentences with frequent grammar "
+        "errors; disjointed answers; avoids or fails at complex ideas. Judge language "
+        "quality only — not answer length, opinions, or content.",
+    ),
+]
+
+
+def append_grading_criteria(jd_text, criteria=APRIORA_GRADING_CRITERIA):
+    """Anexa a la JD un bloque de criterios de evaluación. createJob no tiene campo
+    de rubric: Apriora deriva los criterios del jobDescription, así que este es el
+    único punto de inyección. La nota de "no preguntar" evita que además genere una
+    pregunta de inglés (el criterio se juzga sobre el transcript completo)."""
+    if not criteria:
+        return jd_text
+    lines = [
+        "Evaluation Criteria",
+        "",
+        "These are scoring criteria only — do not turn them into interview questions.",
+        "Grade them from the candidate's answers to the rest of the interview.",
+    ]
+    for name, instructions in criteria:
+        lines.extend(["", str(name), str(instructions)])
+    return f"{str(jd_text or '').rstrip()}\n\n" + "\n".join(lines)
+
+
 # Sufijos legales que no aportan a las iniciales (Elevate Clinics Inc -> EC).
 _INITIALS_SKIP = {"inc", "llc", "ltd", "corp", "co", "sa", "srl", "sas", "sl", "plc", "the"}
 
@@ -134,21 +167,31 @@ class AlexClient:
         return _extract_list(payload)
 
     def create_job(self, external_job_id, job_description, additional_questions=None,
-                   intelligently_order_questions=False, active=None):
+                   intelligently_order_questions=False, active=None,
+                   additional_generation_context=None, job_title=None):
         """Crea una job (interviewer) en Apriora desde una job description.
         `external_job_id` debe ser único por company (usamos el opportunity_id del
         Hub, que además sirve para enlazar después por externalJobId).
+        `job_title` fija el título de la position. SIEMPRE mandarlo: si va vacío,
+        Apriora lo INFIERE del cuerpo de la JD y se queda con el rol que menciona el
+        texto (ej. "Account Executive") en vez del opportunity name del Hub.
         `intelligently_order_questions=False` => las preguntas extra se agregan al
         final en el orden dado (no las intercala Apriora).
+        `additional_generation_context` sesga la generación de la entrevista (texto
+        libre); lo usamos para reforzar los criterios de grading fijos.
         Devuelve el dict de respuesta (payload = interviewerId)."""
         body = {
             "externalJobId": str(external_job_id),
             "jobDescription": job_description,
         }
+        if job_title:
+            body["jobTitle"] = job_title
         if additional_questions:
             body["additionalQuestions"] = additional_questions
             # Enviar explícito para que NO reordene/intercale las preguntas extra.
             body["intelligentlyOrderQuestions"] = bool(intelligently_order_questions)
+        if additional_generation_context:
+            body["additionalGenerationContext"] = additional_generation_context
         if active is not None:
             body["active"] = active
         return self._request("POST", "/createJob", json=body)
