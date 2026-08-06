@@ -4,6 +4,34 @@
   box-sizing: border-box;
 }
 
+/* ========================= MARCA / ACENTO =========================
+   El CV client-version se sirve en dos marcas. Vintti core en azul, y
+   Vintti AI cuando el candidato pertenece a una cuenta con vintti_ai = true
+   (el JS marca body[data-vintti-ai="true"]).
+
+   Los valores de Vintti AI salen de los tokens del sitio vintti.com/ai
+   (--_vintti-ai---base--*): azul #5c6af7 sobre fondo #0d1117.
+
+   Se usa rgba(var(--cv-accent-rgb), a) en vez de color-mix() porque el
+   export a PDF pasa por html2canvas, que resuelve bien las custom
+   properties pero no siempre color-mix. */
+:root {
+  --cv-accent: #003BFF;
+  --cv-accent-rgb: 0, 59, 255;
+  --cv-accent-tint: #e8edff;
+}
+
+body[data-vintti-ai="true"] {
+  --cv-accent: #5c6af7;
+  --cv-accent-rgb: 92, 106, 247;
+  --cv-accent-tint: #eceefe;
+  /* Chrome oscuro: sólo header y footer. El cuerpo del CV queda claro para
+     que el texto largo siga siendo legible y el PDF, imprimible. */
+  --cv-chrome-bg: #0d1117;
+  --cv-chrome-fg: #ffffff;
+  --cv-chrome-accent: #a9b2fb;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -28,11 +56,60 @@ html, body {
 }
 
 .cv-subtitle {
-  color: #003BFF;
+  color: var(--cv-accent);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 12px;
+}
+
+/* ---- Vintti AI: banda oscura a todo el ancho con el logo blanco ----
+   Es lo primero que ve el cliente y lo que separa esta versión de la de
+   Vintti core. El logo oficial ya viene en blanco, así que no se recolorea. */
+body[data-vintti-ai="true"] .cv-header {
+  max-width: none;
+  margin: 0;
+  padding: 22px 32px;
+  background: var(--cv-chrome-bg);
+  justify-content: flex-start;
+}
+
+body[data-vintti-ai="true"] .header-left {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+body[data-vintti-ai="true"] .vintti-logo {
+  display: none;
+}
+
+/* El logo AI vive en el HTML de las dos variantes, pero sólo se muestra en la
+   variante AI. Se oculta desde acá y no con el atributo [hidden]: cualquier
+   regla de clase con display le gana a [hidden] por especificidad, y el logo
+   (blanco) terminaba visible sobre el fondo claro del CV de Vintti core. */
+.vintti-ai-logo {
+  display: none;
+}
+
+body[data-vintti-ai="true"] .vintti-ai-logo {
+  display: block;
+  height: 30px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+body[data-vintti-ai="true"] .cv-subtitle {
+  color: var(--cv-chrome-accent);
+  white-space: nowrap;
+}
+
+body[data-vintti-ai="true"] .cv-container {
+  margin-top: 34px;
 }
 
 /* ========================= CONTENEDOR PRINCIPAL ========================= */
@@ -66,7 +143,7 @@ html, body {
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #003BFF;
+  color: var(--cv-accent);
   letter-spacing: 0.15em;
   margin-bottom: 12px;
   position: relative;
@@ -108,26 +185,26 @@ html, body {
   gap: 8px;
   padding: 10px 20px;
   border-radius: 999px;
-  background: #e8edff;
-  color: #003BFF;
+  background: var(--cv-accent-tint);
+  color: var(--cv-accent);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-decoration: none;
-  border: 1px solid rgba(0, 59, 255, 0.2);
-  box-shadow: 0 6px 16px rgba(0, 59, 255, 0.12);
+  border: 1px solid rgba(var(--cv-accent-rgb), 0.2);
+  box-shadow: 0 6px 16px rgba(var(--cv-accent-rgb), 0.12);
   transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .video-link-button:hover {
-  background: #003BFF;
+  background: var(--cv-accent);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(0, 59, 255, 0.25);
+  box-shadow: 0 10px 24px rgba(var(--cv-accent-rgb), 0.25);
   transform: translateY(-1px);
 }
 
 .video-link-button:focus-visible {
-  outline: 2px solid #003BFF;
+  outline: 2px solid var(--cv-accent);
   outline-offset: 3px;
 }
 
@@ -139,8 +216,8 @@ html, body {
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  background: rgba(0, 59, 255, 0.15);
-  color: #003BFF;
+  background: rgba(var(--cv-accent-rgb), 0.15);
+  color: var(--cv-accent);
   transition: background 0.2s ease, color 0.2s ease;
 }
 
@@ -167,7 +244,7 @@ html, body {
 #workExperienceList .entry-subtitle {
   font-size: 14px;
   font-weight: 500;
-  color: #003BFF;
+  color: var(--cv-accent);
   margin-bottom: 6px;
 }
 
@@ -243,8 +320,8 @@ html, body {
 }
 
 .level-dot.filled {
-  background: #003BFF;
-  border-color: #003BFF;
+  background: var(--cv-accent);
+  border-color: var(--cv-accent);
 }
 
 /* responsive – una sola columna en móviles */
@@ -264,11 +341,33 @@ html, body {
 }
 
 .cv-footer a {
-  color: #003BFF;
+  color: var(--cv-accent);
   text-decoration: none;
 }
 .cv-footer a:hover {
   text-decoration: underline;
+}
+
+/* Footer oscuro que cierra la banda del header en la variante Vintti AI.
+   Se le saca el padding inferior al root para que la banda llegue al borde
+   en vez de quedar flotando sobre el gris de la página. */
+body[data-vintti-ai="true"] .resume-page-root {
+  padding-bottom: 0;
+}
+
+body[data-vintti-ai="true"] .cv-footer {
+  background: var(--cv-chrome-bg);
+  color: #94a3b8;
+  margin: 40px 0 0;
+  padding: 22px 32px 26px;
+}
+
+body[data-vintti-ai="true"] .cv-footer strong {
+  color: #fff;
+}
+
+body[data-vintti-ai="true"] .cv-footer a {
+  color: var(--cv-chrome-accent);
 }
 
 /* ========================= RATING ========================= */
@@ -598,9 +697,9 @@ body[data-pdf-export="true"] .resume-rating {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #003BFF;
+  background-color: var(--cv-accent);
   border: 2px solid #fff;
-  box-shadow: 0 0 0 2px #003BFF;
+  box-shadow: 0 0 0 2px var(--cv-accent);
   z-index: 2;
 }
 
@@ -650,7 +749,7 @@ body[data-pdf-export="true"] .resume-rating {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #003BFF;
+  color: var(--cv-accent);
   margin-bottom: 4px;
 }
 
@@ -801,7 +900,7 @@ body[data-talent-drop="true"] .resume-rating {
   color: #fff;
   font-weight: 700;
   font-size: 18px;
-  background: var(--logo-bg, #003BFF);
+  background: var(--logo-bg, var(--cv-accent));
   border-color: transparent;
 }
 

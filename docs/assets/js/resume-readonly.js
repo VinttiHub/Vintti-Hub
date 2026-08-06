@@ -45,6 +45,76 @@ document.addEventListener("DOMContentLoaded", async () => {
     downloadBtn.remove();
   }
 
+  /* ---------------- Marca del CV: Vintti core vs Vintti AI ----------------
+     El client-version de un candidato ligado a una cuenta Vintti AI sale con
+     la marca de vintti.com/ai: banda oscura con el logo blanco arriba y abajo,
+     y azul #5c6af7 como acento. El cuerpo queda claro a propósito, para que el
+     texto largo siga siendo legible y el PDF, imprimible.
+
+     El flag lo calcula el backend en GET /candidates/:id cruzando procesos y
+     hires contra account.vintti_ai, así que el link que se le manda al cliente
+     es el mismo de siempre — no hay que elegir botón ni pasar nada por la URL.
+
+     Se resuelve ANTES de pintar nada para que el hero del PDF ya salga bien. */
+  const VINTTI_BRAND = {
+    key: "vintti",
+    subtitle: "Top Candidate Profile",
+    footerName: "Vintti",
+    footerUrl: "https://www.vintti.com",
+    footerUrlLabel: "vintti.com",
+    accent: "#003BFF",
+    heroBg: "linear-gradient(135deg, #ecf1ff, #f8faff)",
+    heroBorder: "1px solid rgba(0,59,255,0.15)",
+    heroMark: '<span style="color:#003BFF;">vintti</span>',
+    heroSubtitleColor: "#5b6bad",
+    watermark: "vintti",
+    watermarkColor: "rgba(0,59,255,0.22)",
+  };
+  const VINTTI_AI_BRAND = {
+    key: "vintti_ai",
+    subtitle: "AI Talent Profile",
+    footerName: "Vintti AI",
+    footerUrl: "https://www.vintti.com/ai",
+    footerUrlLabel: "vintti.com/ai",
+    accent: "#5c6af7",
+    heroBg: "#0d1117",
+    heroBorder: "1px solid #ffffff12",
+    heroMark: '<span style="color:#fff;">vintti</span><span style="color:#5c6af7;">ai</span>',
+    heroSubtitleColor: "#a9b2fb",
+    watermark: "vintti ai",
+    watermarkColor: "rgba(92,106,247,0.22)",
+  };
+
+  const parseBrandFlag = (value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    return ["true", "t", "1", "yes"].includes(String(value || "").toLowerCase().trim());
+  };
+
+  // Se reutiliza más abajo para nombre y país: evita pedir el candidato dos veces.
+  let candidateMeta = null;
+  if (candidateId) {
+    try {
+      const metaRes = await fetch(`${API_BASE}/candidates/${candidateId}`);
+      candidateMeta = await metaRes.json();
+    } catch (_) {
+      candidateMeta = null;
+    }
+  }
+
+  // ?brand=ai | ?brand=vintti fuerza la marca, para previsualizar la variante
+  // antes de que el candidato esté ligado a una cuenta AI. Sin el parámetro
+  // manda siempre el flag de la base.
+  const brandOverride = String(urlParams.get("brand") || "").toLowerCase();
+  const isVinttiAi = brandOverride === "ai"
+    ? true
+    : brandOverride === "vintti"
+      ? false
+      : parseBrandFlag(candidateMeta && candidateMeta.vintti_ai);
+  const BRAND = isVinttiAi ? VINTTI_AI_BRAND : VINTTI_BRAND;
+  if (bodyEl && isVinttiAi) bodyEl.dataset.vinttiAi = "true";
+  applyBrandChrome(BRAND);
+
   if (isPdfExport) {
     document.documentElement.style.backgroundColor = "#fff";
     if (ratingEl) ratingEl.remove();
@@ -57,17 +127,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       Object.assign(hero.style, {
         width: "100%",
         padding: "28px 0 18px",
-        background: "linear-gradient(135deg, #ecf1ff, #f8faff)",
+        background: BRAND.heroBg,
         textAlign: "center",
-        borderBottom: "1px solid rgba(0,59,255,0.15)",
+        borderBottom: BRAND.heroBorder,
         marginBottom: "32px",
         boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
         position: "relative",
         zIndex: "3",
       });
       hero.innerHTML = `
-        <div style="font-size:40px;font-weight:700;letter-spacing:6px;color:#003BFF;text-transform:lowercase;margin-bottom:8px;">vintti</div>
-        <div style="font-size:13px;letter-spacing:0.3em;text-transform:uppercase;color:#5b6bad;font-weight:600;">Top Candidate Profile</div>
+        <div style="font-size:40px;font-weight:700;letter-spacing:6px;text-transform:lowercase;margin-bottom:8px;">${BRAND.heroMark}</div>
+        <div style="font-size:13px;letter-spacing:0.3em;text-transform:uppercase;color:${BRAND.heroSubtitleColor};font-weight:600;">${BRAND.subtitle}</div>
       `;
       bodyEl.insertBefore(hero, bodyEl.firstChild || null);
 
@@ -85,7 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         left: "50%",
         fontSize: "340px",
         fontWeight: "700",
-        color: "rgba(0,59,255,0.22)",
+        color: BRAND.watermarkColor,
         textTransform: "uppercase",
         letterSpacing: "32px",
         userSelect: "none",
@@ -96,7 +166,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       offsets.forEach((offsetX) => {
         offsets.forEach((offsetY) => {
           const mark = document.createElement("div");
-          mark.textContent = "vintti";
+          mark.textContent = BRAND.watermark;
           Object.assign(mark.style, baseMarkStyle, {
             transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) rotate(-30deg)`,
           });
@@ -326,8 +396,8 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     console.log("🛠️ Tools:", data.tools);
     console.log("📹 Video Link:", data.video_link);
     // Nombre del candidato (fetch adicional)
-    const nameRes = await fetch(`${API_BASE}/candidates/${candidateId}`);
-    const nameData = await nameRes.json();
+    // Ya se pidió arriba para resolver la marca; se reutiliza.
+    const nameData = candidateMeta || await (await fetch(`${API_BASE}/candidates/${candidateId}`)).json();
     const displayName = nameData.name || "Unnamed Candidate";
     const candidateNameTitle = document.getElementById("candidateNameTitle");
     const firstName = renderCandidateName(candidateNameTitle, displayName, isTalentDrop);
@@ -865,7 +935,7 @@ const videoDiv = document.getElementById("readonly-video-link");
       linkText.style.border = "none";
     linkText.style.padding = "0";
     linkText.style.boxShadow = "none";
-    linkText.style.color = "#003BFF";
+    linkText.style.color = BRAND.accent;
     linkText.style.textTransform = "none";
     linkText.style.letterSpacing = "normal";
     linkText.style.fontWeight = "500";
@@ -895,7 +965,7 @@ if (isPdfExport) {
   if (container) {
     const pdfFooter = document.createElement("div");
     pdfFooter.className = "pdf-footer-note";
-    pdfFooter.textContent = "Powered by Vintti · All rights reserved.";
+    pdfFooter.textContent = `Powered by ${BRAND.footerName} · All rights reserved.`;
     Object.assign(pdfFooter.style, {
       textAlign: "center",
       marginTop: "40px",
@@ -1345,4 +1415,32 @@ function wireResumeDownload({ button, target, getFileName, bodyEl }) {
       }
     }
   });
+}
+
+/* Aplica la marca elegida (Vintti core o Vintti AI) al header, footer y título de
+   la página. Se llama antes de pintar el contenido para que el export a PDF —que
+   rasteriza #resume-readonly-page con html2canvas— capture ya la marca correcta.
+   Es top-level, así que todo entra por parámetro. */
+function applyBrandChrome(brand) {
+  if (!brand) return;
+
+  const subtitle = document.querySelector(".cv-header .cv-subtitle");
+  if (subtitle) subtitle.textContent = brand.subtitle;
+
+  // Los dos logos viven en el HTML de las dos variantes. Quién se muestra lo
+  // decide el CSS vía body[data-vintti-ai]; esto sólo mantiene el atributo en
+  // sincronía para lectores de pantalla y por si el CSS no cargó.
+  const aiLogo = document.querySelector(".cv-header .vintti-ai-logo");
+  if (aiLogo) aiLogo.hidden = brand.key !== "vintti_ai";
+
+  const footerName = document.querySelector(".cv-footer strong");
+  if (footerName) footerName.textContent = brand.footerName;
+
+  const footerLink = document.querySelector(".cv-footer a");
+  if (footerLink) {
+    footerLink.href = brand.footerUrl;
+    footerLink.textContent = brand.footerUrlLabel;
+  }
+
+  document.title = `${brand.footerName} · Candidate Profile`;
 }

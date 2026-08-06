@@ -1220,7 +1220,26 @@ def get_candidate_by_id(candidate_id):
                 c.reference_2_email,
                 c.reference_2_linkedin,
                 bl.blacklist_id,
-                COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted
+                COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted,
+                -- Workspace del candidato: TRUE si está ligado (proceso o hire) a una
+                -- cuenta Vintti AI. Lo consume el CV client-version (resume-readonly)
+                -- para elegir el branding. Misma lógica que GET /candidates.
+                (
+                  EXISTS (
+                    SELECT 1
+                    FROM opportunity_candidates oc_ai
+                    JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
+                    JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+                    WHERE oc_ai.candidate_id = c.candidate_id
+                      AND COALESCE(a_ai.vintti_ai, FALSE)
+                  ) OR EXISTS (
+                    SELECT 1
+                    FROM hire_opportunity h_ai
+                    JOIN account a_ai ON a_ai.account_id = h_ai.account_id
+                    WHERE h_ai.candidate_id = c.candidate_id
+                      AND COALESCE(a_ai.vintti_ai, FALSE)
+                  )
+                ) AS vintti_ai
             FROM candidates c
             LEFT JOIN LATERAL (
                 SELECT b.blacklist_id
