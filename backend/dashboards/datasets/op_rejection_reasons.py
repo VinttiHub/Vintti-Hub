@@ -17,6 +17,7 @@ REASON_CASE = """
       WHEN 'client rejected after interviewing'  THEN 'Client Rejected after interviewing'
       WHEN 'candidate failed test'               THEN 'Candidate Failed Test'
       WHEN 'candidate abandoned process'         THEN 'Candidate abandoned process'
+      WHEN 'client abandoned process'            THEN 'Client abandoned process'
       ELSE NULL
     END
 """

@@ -1140,6 +1140,7 @@
     'Client Rejected after interviewing': '#4ba9ff',
     'Candidate Failed Test': '#ff1fdb',
     'Candidate abandoned process': '#c1ff72',
+    'Client abandoned process': '#a687ff',      // violeta 60% — hermano de "Candidate abandoned"
     // Origen del candidato en close wins (Hunteo vs Applicant)
     'Hunteo': '#c1ff72',      // verde lime
     'Applicant': '#ff1fdb',   // rosado magenta

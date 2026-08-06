@@ -4221,6 +4221,7 @@ function getCanonicalCandidateStatus(status) {
     'client rejected after interviewing': 'Client Rejected after interviewing',
     'candidate failed test': 'Candidate Failed Test',
     'candidate abandoned process': 'Candidate abandoned process',
+    'client abandoned process': 'Client abandoned process',
     'client hired': 'Candidate hired',
     'candidate hired': 'Candidate hired'
   };
