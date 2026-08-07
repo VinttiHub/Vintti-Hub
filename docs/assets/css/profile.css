@@ -5019,6 +5019,18 @@ input:focus, select:focus, textarea:focus{
   padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700;
   background:#fee2e2; color:#b91c1c;
 }
+/* Invitación pendiente: nunca setearon su password. */
+.admin-user-pending-badge{
+  display:inline-flex; align-items:center; margin-left:8px;
+  padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700;
+  background:#e0e7ff; color:#3730a3;
+}
+.admin-user-pending-badge.is-expired{
+  background:#fef3c7; color:#92400e;
+}
+.admin-users-foot{
+  display:flex; justify-content:flex-end; min-height:18px; margin-top:10px;
+}
 .btn.tiny{ padding:5px 10px; font-size:12px; border-radius:8px; }
 .btn.ghost{ background:transparent; }
 .btn.ghost:hover{ background:#f1f5f9; }

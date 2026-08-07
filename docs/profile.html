@@ -5,7 +5,7 @@
   <title>My Profile • Vintti Hub</title>
   <script src="./assets/js/auth-guard.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="./assets/css/profile.css?v=20260804-orgtree3" rel="stylesheet" />
+  <link href="./assets/css/profile.css?v=20260807-resendinvite" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=14" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -619,12 +619,15 @@
       <div>
         <p class="eyebrow">User management</p>
         <h2 class="admin-card__title">Manage teammates</h2>
-        <p class="admin-card__sub">Deactivate a user to start their offboarding. This blocks their access and hides them from active views, but keeps all their history.</p>
+        <p class="admin-card__sub">Resend the invite if someone never set their password and their link expired. Deactivate a user to start their offboarding: this blocks their access and hides them from active views, but keeps all their history.</p>
       </div>
       <span class="admin-chip">Admins only</span>
     </header>
 
     <div id="adminUsersList" class="admin-users" aria-live="polite"></div>
+    <footer class="admin-users-foot">
+      <span id="adminUsersStatus" class="toast" role="status" aria-live="polite"></span>
+    </footer>
   </div>
 
   <div class="admin-card admin-card--users" id="adminOffboardingCard" hidden>
@@ -787,7 +790,7 @@
 <script src="./assets/js/avatar-map.js?v=20260630-1" defer></script>
 <script src="./assets/js/monthly-mood.js?v=14" defer></script>
 <script src="./assets/js/main.js?v=20260805-hire1" defer></script>
-<script src="./assets/js/profile.js?v=20260804-offbform2" defer></script>
+<script src="./assets/js/profile.js?v=20260807-resendinvite" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

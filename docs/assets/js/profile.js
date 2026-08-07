@@ -221,6 +221,13 @@ document.addEventListener("click", (e)=>{
     }
   }
 
+  const adminResendBtn = t.closest?.("[data-admin-resend]");
+  if (adminResendBtn){
+    e.preventDefault();
+    onAdminResendInvite(adminResendBtn);
+    return;
+  }
+
   const adminDeleteBtn = t.closest?.("[data-admin-delete]");
   if (adminDeleteBtn){
     e.preventDefault();
@@ -727,6 +734,9 @@ let ADMIN_LEADER_LOADED = false;
 let ADMIN_USERS_CACHE = [];
 let ADMIN_DELETE_TARGET = null;
 let ADMIN_DELETE_STATUS_TIMER = null;
+// user_id -> { invite_valid, invite_expires_at } de quienes nunca setearon password.
+let ADMIN_INVITE_STATUS = new Map();
+let ADMIN_USERS_STATUS_TIMER = null;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
@@ -2115,6 +2125,29 @@ function renderAdminUsers(users){
 
     const actions = document.createElement("div");
     actions.className = "admin-user-actions";
+
+    // Invitación pendiente: nunca seteó password. El link dura 48h y no hay forma
+    // de reenviarlo creando el usuario de nuevo (da 409 por email duplicado).
+    const invite = ADMIN_INVITE_STATUS.get(Number(user?.user_id));
+    if (invite && !isInactive){
+      const badge = document.createElement("span");
+      badge.className = "admin-user-pending-badge";
+      badge.textContent = invite.invite_valid ? "Invite pending" : "Invite expired";
+      if (!invite.invite_valid) badge.classList.add("is-expired");
+      details.appendChild(badge);
+
+      const resend = document.createElement("button");
+      resend.type = "button";
+      resend.className = "btn ghost";
+      resend.textContent = "Resend invite";
+      resend.title = invite.invite_valid
+        ? "Send a new password setup link (invalidates the current one)."
+        : "Their link expired. Send a new password setup link.";
+      resend.setAttribute("data-admin-resend", String(user?.user_id || ""));
+      resend.setAttribute("data-user-name", String(user?.user_name || ""));
+      actions.appendChild(resend);
+    }
+
     const del = document.createElement("button");
     del.type = "button";
     del.className = "btn danger";
@@ -2144,7 +2177,10 @@ async function loadAdminUsersList(){
     host.innerHTML = `<div class="admin-users-empty">Loading users...</div>`;
   }
   try{
-    const res = await api(`/users`, { method: "GET" });
+    const [res] = await Promise.all([
+      api(`/users`, { method: "GET" }),
+      loadAdminInviteStatus()
+    ]);
     if (!res.ok) throw new Error("Could not load users.");
     const rows = await res.json();
     ADMIN_USERS_CACHE = Array.isArray(rows) ? rows : [];
@@ -2154,6 +2190,55 @@ async function loadAdminUsersList(){
     if (host){
       host.innerHTML = `<div class="admin-users-empty">Could not load users.</div>`;
     }
+  }
+}
+
+function setAdminUsersStatus(text, ok = true){
+  const toast = document.getElementById("adminUsersStatus");
+  if (!toast) return;
+  toast.textContent = text;
+  toast.style.color = ok ? "#0f766e" : "#b91c1c";
+  if (ADMIN_USERS_STATUS_TIMER) clearTimeout(ADMIN_USERS_STATUS_TIMER);
+  if (text){
+    ADMIN_USERS_STATUS_TIMER = setTimeout(()=> { toast.textContent = ""; }, 6000);
+  }
+}
+
+// Sólo responde a admins; para el resto se ignora y no se muestran botones de invite.
+async function loadAdminInviteStatus(){
+  try{
+    const res = await api(`/admin/users/invite-status`, { method: "GET" });
+    if (!res.ok){ ADMIN_INVITE_STATUS = new Map(); return; }
+    const data = await res.json().catch(()=> null);
+    const rows = Array.isArray(data?.users) ? data.users : [];
+    ADMIN_INVITE_STATUS = new Map(rows.map((row)=> [Number(row?.user_id), row]));
+  }catch(err){
+    console.error("admin invite status error:", err);
+    ADMIN_INVITE_STATUS = new Map();
+  }
+}
+
+async function onAdminResendInvite(btn){
+  const userId = Number(btn.getAttribute("data-admin-resend"));
+  if (!userId || btn.disabled) return;
+  const name = (btn.getAttribute("data-user-name") || "").trim();
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  setAdminUsersStatus("Sending invite…", true);
+  try{
+    const res = await api(`/admin/users/${encodeURIComponent(userId)}/resend-invite`, { method: "POST" });
+    const data = await res.json().catch(()=> null);
+    if (!res.ok || !data?.ok){
+      throw new Error(data?.error || data?.message || "Could not resend the invite.");
+    }
+    setAdminUsersStatus(`Invite sent${name ? ` to ${name}` : ""}. The link is valid for 48 hours.`, true);
+    await loadAdminUsersList();
+  }catch(err){
+    console.error("admin resend invite error:", err);
+    setAdminUsersStatus(err?.message || "Could not resend the invite.", false);
+    btn.disabled = false;
+    btn.textContent = label;
   }
 }
 

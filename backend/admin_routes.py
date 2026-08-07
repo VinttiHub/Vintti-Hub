@@ -27,6 +27,8 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 ensure_admin_user_access_table()
 
+INVITE_TOKEN_TTL_HOURS = 48
+
 DEFAULT_VACACIONES_ACUMULADAS = 0
 DEFAULT_VACACIONES_HABILES = 15
 DEFAULT_VACACIONES_CONSUMIDAS = 0
@@ -87,6 +89,27 @@ def _as_bool(value, default: bool) -> bool:
 
 def _friendly_error(message: str, status: int = 400):
     return jsonify({"error": message}), status
+
+
+def _load_admin_requester(cur, requester_id: int):
+    """Devuelve (requester_row, error_response). Mismo gate que create/deactivate."""
+    cur.execute(
+        "SELECT user_id, user_name, email_vintti FROM users WHERE user_id = %s",
+        (requester_id,),
+    )
+    requester = cur.fetchone()
+    if not requester:
+        return None, _friendly_error("You need an active Hub session to continue.", 401)
+    if normalize_email(requester.get("email_vintti")) not in ADMIN_ALLOWED_EMAILS:
+        return None, _friendly_error("You do not have access to this tool.", 403)
+    return requester, None
+
+
+def _as_aware(value):
+    """reset_token_expires_at puede volver naive según el driver/columna."""
+    if value is None or getattr(value, "tzinfo", None) is not None:
+        return value
+    return value.replace(tzinfo=BOGOTA_TZ)
 
 
 ROLE_KEYWORDS = {
@@ -329,7 +352,7 @@ def create_hub_user():
 
             if send_invite and is_active:
                 invite_token = secrets.token_urlsafe(32)
-                expires_at = datetime.now(BOGOTA_TZ) + timedelta(hours=48)
+                expires_at = datetime.now(BOGOTA_TZ) + timedelta(hours=INVITE_TOKEN_TTL_HOURS)
                 cur.execute(
                     """
                     UPDATE users
@@ -464,8 +487,150 @@ def delete_hub_user(user_id: int):
     return _deactivate_endpoint(user_id)
 
 
+@bp.get("/users/invite-status")
+def hub_users_invite_status():
+    """Usuarios que todavía no setearon contraseña (invitación pendiente) y si su
+    link sigue vivo. Alimenta el badge + botón "Resend invite" del Access Manager."""
+    requester_id = _current_user_id()
+    if not requester_id:
+        return _friendly_error("Please log in again to continue.", 401)
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _, error = _load_admin_requester(cur, requester_id)
+            if error:
+                return error
+
+            cur.execute(
+                """
+                SELECT u.user_id, u.reset_token_expires_at
+                  FROM users u
+                  LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                 WHERE u.password IS NULL
+                   AND COALESCE(aua.is_active, TRUE)
+                """
+            )
+            rows = cur.fetchall()
+    except Exception:
+        logging.exception("Failed to load Hub invite status")
+        return _friendly_error("We could not load invite status right now.", 500)
+    finally:
+        conn.close()
+
+    now = datetime.now(BOGOTA_TZ)
+    users = []
+    for row in rows:
+        expires_at = _as_aware(row.get("reset_token_expires_at"))
+        users.append(
+            {
+                "user_id": int(row["user_id"]),
+                "invite_expires_at": expires_at.isoformat() if expires_at else None,
+                "invite_valid": bool(expires_at and expires_at > now),
+            }
+        )
+
+    return jsonify({"ok": True, "users": users}), 200
+
+
+@bp.post("/users/<int:user_id>/resend-invite")
+def resend_hub_user_invite(user_id: int):
+    """Regenera el token de setup de contraseña (48h) y reenvía el mail de invitación.
+    Sirve cuando el link original expiró: crear el usuario de nuevo da 409."""
+    requester_id = _current_user_id()
+    if not requester_id:
+        return _friendly_error("Please log in again to continue.", 401)
+
+    conn = get_connection()
+    requester = None
+    target = None
+    invite_token = None
+    expires_at = None
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            requester, error = _load_admin_requester(cur, requester_id)
+            if error:
+                return error
+
+            cur.execute(
+                """
+                SELECT u.user_id,
+                       u.user_name,
+                       u.email_vintti,
+                       (u.password IS NOT NULL) AS has_password,
+                       COALESCE(aua.is_active, TRUE) AS is_active
+                  FROM users u
+                  LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                 WHERE u.user_id = %s
+                """,
+                (user_id,),
+            )
+            target = cur.fetchone()
+            if not target:
+                return _friendly_error("User not found.", 404)
+
+            target_email = normalize_email(target.get("email_vintti"))
+            if not target_email or not EMAIL_RE.match(target_email):
+                return _friendly_error("That user has no valid email on file.", 400)
+            if not target.get("is_active"):
+                return _friendly_error(
+                    "That user is deactivated. Reactivate them before resending the invite.", 409
+                )
+            if target.get("has_password"):
+                return _friendly_error(
+                    "That user already set a password. They can use "
+                    "“Forgot / Change password?” on the login page.",
+                    409,
+                )
+
+            invite_token = secrets.token_urlsafe(32)
+            expires_at = datetime.now(BOGOTA_TZ) + timedelta(hours=INVITE_TOKEN_TTL_HOURS)
+            cur.execute(
+                """
+                UPDATE users
+                   SET reset_token = %s,
+                       reset_token_expires_at = %s
+                 WHERE user_id = %s
+                """,
+                (invite_token, expires_at, user_id),
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception("Failed to regenerate invite token for Hub user")
+        return _friendly_error("We could not resend that invite right now. Please try again later.", 500)
+    finally:
+        conn.close()
+
+    invite_sent = _send_invite_email(
+        target_email=target["email_vintti"],
+        full_name=(target.get("user_name") or "").strip(),
+        token=invite_token,
+        invited_by=requester.get("user_name") if requester else None,
+        resend=True,
+    )
+    if not invite_sent:
+        # El token nuevo ya quedó guardado; reintentar simplemente lo regenera.
+        return _friendly_error(
+            "We created a new link but could not send the email. Please try again.", 502
+        )
+
+    return (
+        jsonify(
+            {
+                "ok": True,
+                "user_id": user_id,
+                "invite_sent": True,
+                "invite_expires_at": expires_at.isoformat(),
+            }
+        ),
+        200,
+    )
+
+
 def _send_invite_email(
-    target_email: str, full_name: str, token: str, invited_by: Optional[str]
+    target_email: str, full_name: str, token: str, invited_by: Optional[str], resend: bool = False
 ) -> bool:
     api_key = os.environ.get("SENDGRID_API_KEY")
     if not api_key:
@@ -474,19 +639,33 @@ def _send_invite_email(
 
     reset_link = f"{FRONT_BASE_URL.rstrip('/')}/reset_password.html?token={token}"
     greeter = invited_by or "The Vintti Team"
+    subject = "Your new Vintti HUB access link" if resend else "You're invited to Vintti HUB"
+    intro_plain = (
+        "Here is a fresh link to set up your Vintti HUB account — the previous one expired."
+        if resend
+        else f"{greeter} just granted you access to Vintti HUB."
+    )
+    intro_html = (
+        "Here is a fresh link to set up your <strong>Vintti HUB</strong> account — "
+        "the previous one expired."
+        if resend
+        else f"<strong>{greeter}</strong> just granted you access to <strong>Vintti HUB</strong>."
+    )
     plain_body = f"""Hi {full_name}!
 
-{greeter} just granted you access to Vintti HUB.
+{intro_plain}
 
 Click the link below to set your password and log in:
 {reset_link}
+
+This link is valid for {INVITE_TOKEN_TTL_HOURS} hours.
 
 If you weren't expecting this, you can ignore it."""
 
     html_body = f"""
 <div style="font-family:Onest,Arial,sans-serif;color:#111;line-height:1.6;font-size:15px;">
   <p>Hi {full_name.split()[0] if full_name else ''} 👋</p>
-  <p><strong>{greeter}</strong> just granted you access to <strong>Vintti HUB</strong>.</p>
+  <p>{intro_html}</p>
   <p>Set your password and get started by tapping the button:</p>
   <p style="margin:20px 0;">
     <a href="{reset_link}"
@@ -497,6 +676,7 @@ If you weren't expecting this, you can ignore it."""
   </p>
   <p>If the button does not work, copy this link:</p>
   <p style="font-size:13px;color:#555;word-break:break-all;">{reset_link}</p>
+  <p style="font-size:13px;color:#555;">This link is valid for {INVITE_TOKEN_TTL_HOURS} hours.</p>
   <p style="margin-top:24px;font-size:12px;color:#94a3b8;">
     If you weren't expecting this invite you can safely ignore it.
   </p>
