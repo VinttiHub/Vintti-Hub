@@ -2798,7 +2798,11 @@ DEFAULT_APRIORA_QUESTIONS = [
     "Just so you know, if you continue moving forward in the process, we'll be asking for references and, at the final stage, a resignation letter. Are you comfortable with both of these?",
     "Are you participating in other processes?",
     "Do you have your own computer to work? this is very important since you will be working with your own computer",
-    "Are you a USA Citizen?",
+    # Lleva el contexto adentro a propósito: Apriora deriva la instrucción que le da
+    # a Alex del TEXTO de la pregunta (no hay campo de instructions por pregunta en la
+    # API), así que una pregunta pelada — "Are you a USA Citizen?" — producía una
+    # instrucción mínima y la pregunta sonaba fuera de lugar en la entrevista.
+    "Because this position is hired as an independent contractor based outside the United States, we are not able to move forward with candidates who hold U.S. citizenship. Just so we can confirm — are you a U.S. citizen?",
 ]
 
 # Contexto extra para sesgar la generación (campo additionalGenerationContext de
