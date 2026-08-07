@@ -21,6 +21,7 @@ LEADER_ACCESS_EMAILS = {
     "jazmin@vintti.com",
     "agostina@vintti.com",
     "bahia@vintti.com",
+    "justo@vintti.com",
     "lucia@vintti.com",
     "camila@vintti.com",
     "mia@vintti.com",
