@@ -57,6 +57,10 @@
 
   // --- State ---------------------------------------------------------------
   const jobId = Number(new URLSearchParams(location.search).get("id"));
+  // ?app=<application_id> opens straight onto that candidate — this is how the
+  // links in Hirex Ask answers land you on the right person, not just the job.
+  const deepLinkAppId = Number(new URLSearchParams(location.search).get("app")) || null;
+  let deepLinkOpened = false;
   let job = null;
   let apps = [];
   let activityLoaded = false;
@@ -199,6 +203,13 @@
       const data = await res.json();
       apps = data.applications || [];
       renderBoard();
+      // Only on the first load: reopening after every stage move would fight
+      // the user for control of the drawer.
+      if (deepLinkAppId && !deepLinkOpened) {
+        deepLinkOpened = true;
+        switchTab("pipeline");
+        openCandDrawer(deepLinkAppId);
+      }
     } catch {
       toast("err", "Couldn't load the pipeline");
     } finally {

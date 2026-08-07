@@ -3359,7 +3359,8 @@ Return STRICT JSON:
             return jsonify({"error": str(e)}), 500
 
 
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3, response_format=None):
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3, response_format=None,
+                           tools=None, tool_choice=None):
         for attempt in range(retries):
             try:
                 kwargs = dict(
@@ -3370,6 +3371,11 @@ def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, re
                 )
                 if response_format is not None:
                     kwargs["response_format"] = response_format
+                # Tool calling. Only sent when asked for, so the ~15 existing
+                # callers keep the exact request body they had before.
+                if tools is not None:
+                    kwargs["tools"] = tools
+                    kwargs["tool_choice"] = tool_choice or "auto"
                 response = openai.chat.completions.create(**kwargs)
                 return response
             except openai.RateLimitError as e:

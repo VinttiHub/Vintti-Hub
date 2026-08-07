@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hirex · Ask</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260615-6" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="hirex-app" id="hirexApp">
+
+      <!-- ============ Topbar ============ -->
+      <header class="hx-topbar">
+        <div class="hx-brand">
+          <span class="hx-logo">Hirex</span>
+          <span class="hx-eyebrow">Applicant Tracking</span>
+        </div>
+        <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-primary" id="hxNewChat">
+            <i class="fa-solid fa-plus"></i> New chat
+          </button>
+        </div>
+      </header>
+
+      <!-- ============ Module nav ============ -->
+      <nav class="hx-modnav" aria-label="Hirex modules">
+        <a class="hx-mod" href="hirex.html">Jobs</a>
+        <a class="hx-mod" href="hirex-candidates.html">Candidates</a>
+        <a class="hx-mod is-active" href="hirex-ask.html">Ask</a>
+        <!-- <button class="hx-mod" disabled>Reports <span class="hx-soon">Soon</span></button>
+        <button class="hx-mod" disabled>Settings <span class="hx-soon">Soon</span></button> -->
+      </nav>
+
+      <!-- ============ Ask view ============ -->
+      <section class="hx-view hx-ask" id="hxAskView">
+
+        <!-- Recents rail -->
+        <aside class="hx-ask-rail" id="hxRail">
+          <div class="hx-ask-rail-head">
+            <span>Recents</span>
+            <button class="hx-icon-btn" id="hxRailNew" title="New chat" aria-label="New chat">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+          </div>
+          <ul class="hx-ask-threads" id="hxThreads"></ul>
+          <p class="hx-ask-rail-empty" id="hxRailEmpty">Your conversations will show up here.</p>
+        </aside>
+
+        <!-- Conversation column -->
+        <div class="hx-ask-main">
+
+          <!-- Empty state: the hero prompt -->
+          <div class="hx-ask-hero" id="hxHero">
+            <h1 class="hx-ask-title">What would you like to know about your candidates?</h1>
+            <p class="hx-ask-sub">Ask in plain language — Hirex reads your jobs, pipelines, CVs and evaluations.</p>
+            <div class="hx-ask-suggest" id="hxSuggest"></div>
+          </div>
+
+          <!-- Conversation -->
+          <div class="hx-ask-log" id="hxLog" hidden></div>
+
+          <!-- Composer -->
+          <form class="hx-ask-composer" id="hxForm" autocomplete="off">
+            <div class="hx-ask-inputwrap">
+              <textarea id="hxInput" rows="1" placeholder="Search, filter or analyze your candidates…"
+                        aria-label="Ask about your candidates"></textarea>
+              <button class="hx-ask-send" id="hxSend" type="submit" title="Send" aria-label="Send">
+                <i class="fa-solid fa-arrow-up"></i>
+              </button>
+            </div>
+            <p class="hx-ask-foot">Hirex AI reads your data but never changes it. It can make mistakes — check what matters.</p>
+          </form>
+        </div>
+      </section>
+
+      <div class="hx-toasts" id="hxToasts" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <script src="./assets/js/hirex-config.js?v=20260724-1" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260804-justo1" defer></script>
+  <script src="./assets/js/hirex-ask.js?v=20260806-1" defer></script>
+</body>
+</html>

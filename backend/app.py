@@ -51,6 +51,7 @@ from routes.hirex_public_routes import bp as hirex_public_bp
 from routes.hirex_opportunity_routes import bp as hirex_opp_bp
 from routes.hirex_sourcing_routes import bp as hirex_sourcing_bp
 from routes.hirex_people_routes import bp as hirex_people_bp
+from routes.hirex_chat_routes import bp as hirex_chat_bp
 
 
 
@@ -116,6 +117,7 @@ def create_app() -> Flask:
     app.register_blueprint(hirex_opp_bp)
     app.register_blueprint(hirex_sourcing_bp)
     app.register_blueprint(hirex_people_bp)
+    app.register_blueprint(hirex_chat_bp)
 
     @app.after_request
     def apply_cors_headers(response):
