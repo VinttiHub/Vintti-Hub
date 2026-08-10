@@ -700,6 +700,45 @@ def get_candidates_light():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Columnas "blob" de la tabla candidates: son volcados crudos de scrapers y
+# pesan decenas de KB por fila (medido: coresignal_scrapper llega a ~100 KB en
+# un solo candidato). Con `SELECT c.*` el listado completo salía ~258 MB / ~20 s.
+# Las pantallas que sí las necesitan (candidate-details, resume, ResumeTab.jsx,
+# AiAssistantModal.jsx) traen el candidato de a uno por GET /candidates/<id>,
+# que las sigue devolviendo intactas.
+CANDIDATE_BLOB_COLUMNS = frozenset({
+    'coresignal_scrapper',
+    'linkedin_scrapper',
+    'cv_pdf_scrapper',
+    'affinda_scrapper',
+})
+
+_candidate_list_columns_cache = None
+
+
+def _candidate_list_columns(cur):
+    """Columnas de `candidates` menos los blobs, cacheadas por proceso.
+
+    Se leen de information_schema en vez de hardcodearlas para que una columna
+    nueva aparezca sola en el listado (que es lo que hacía `c.*`), sin que haya
+    que acordarse de tocar esta función.
+    """
+    global _candidate_list_columns_cache
+    if _candidate_list_columns_cache is None:
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'candidates'
+            ORDER BY ordinal_position
+        """)
+        names = [r['column_name'] for r in cur.fetchall()]
+        kept = [n for n in names if n not in CANDIDATE_BLOB_COLUMNS]
+        if not kept:
+            raise RuntimeError('No se pudieron leer las columnas de candidates')
+        _candidate_list_columns_cache = ', '.join(f'c."{n}"' for n in kept)
+    return _candidate_list_columns_cache
+
+
 @bp.route('/candidates', methods=['GET'])
 def get_candidates():
     search = request.args.get('search')
@@ -709,9 +748,9 @@ def get_candidates():
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT
-              c.*,
+              {_candidate_list_columns(cur)},
               CASE
                 WHEN EXISTS (
                   SELECT 1
