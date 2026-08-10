@@ -12,7 +12,6 @@ from psycopg2.extras import RealDictCursor
 
 from admin_access import (
     ADMIN_ALLOWED_EMAILS,
-    ensure_admin_user_access_table,
     normalize_email,
 )
 from db import get_connection
@@ -25,7 +24,7 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 FRONT_BASE_URL = os.environ.get("FRONT_BASE_URL", "https://vinttihub.vintti.com")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-ensure_admin_user_access_table()
+# La tabla se crea en background desde create_app(); ver admin_access.py.
 
 INVITE_TOKEN_TTL_HOURS = 48
 

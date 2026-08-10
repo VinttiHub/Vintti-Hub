@@ -1,11 +1,10 @@
 from flask import Blueprint, jsonify, request
 
-from admin_access import ensure_admin_user_access_table
 from db import get_connection
 
 bp = Blueprint('auth', __name__)
 
-ensure_admin_user_access_table()
+# La tabla se crea en background desde create_app(); ver admin_access.py.
 
 
 @bp.route('/login', methods=['POST', 'OPTIONS'])

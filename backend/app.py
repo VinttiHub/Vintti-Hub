@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, request
 from flask_cors import CORS
 
+from admin_access import bootstrap_admin_user_access_table_async
 from admin_routes import bp as admin_bp
 from ai_candidate_search_routes import bp_candidate_search
 from ai_routes import register_ai_routes
@@ -64,6 +65,16 @@ def create_app() -> Flask:
     init_services()
 
     app = Flask(__name__)
+
+    # Crea admin_user_access sin bloquear el arranque (App Runner paga este boot
+    # en cada cold start). Ver admin_access.bootstrap_admin_user_access_table_async.
+    bootstrap_admin_user_access_table_async()
+
+    @app.route("/health")
+    def health():
+        """Ping barato para warm-up y monitoreo: no toca RDS a propósito."""
+        return {"status": "ok"}, 200
+
     register_ai_routes(app)
     register_password_reset_routes(app)
     register_send_email_route(app)
