@@ -1,0 +1,181 @@
+/* ============================================================
+   Metrics tab (opportunity-detail)
+   Mismo lenguaje visual que el overview de Hirex, pero con la
+   paleta de marca de Vintti y los tokens de opportunity-detail.
+   Prefijo `om-` para no chocar con nada del resto de la página.
+   ============================================================ */
+
+#metrics {
+  --om-ink: #0a1f44;
+  --om-ink-2: #40506b;
+  --om-muted: #7a879e;
+  --om-faint: #a4aec2;
+  --om-line: #e8ecf4;
+  --om-line-2: #eef1f7;
+  --om-surface: #ffffff;
+  --om-accent: #003bff;
+  --om-shadow: 0 1px 2px rgba(10, 31, 68, .04), 0 8px 24px rgba(10, 31, 68, .05);
+}
+
+.om-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.om-header h2 { margin: 0; }
+/* `.subtitle` solo está estilada dentro de #job y .candidates-header, así que
+   acá se repite el mismo tamaño para que las pestañas se vean iguales. */
+.om-header .subtitle {
+  margin: .2rem 0 0;
+  font-size: .9rem;
+  color: var(--om-muted);
+}
+
+.om-refresh-btn {
+  border: 1px solid var(--om-line);
+  background: var(--om-surface);
+  color: var(--om-ink-2);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .2s ease, color .2s ease, transform .2s ease;
+}
+.om-refresh-btn:hover { border-color: var(--om-accent); color: var(--om-accent); }
+.om-refresh-btn:active { transform: translateY(1px); }
+.om-refresh-btn[disabled] { opacity: .55; cursor: default; }
+
+.om-body { display: flex; flex-direction: column; gap: 28px; padding-bottom: 40px; }
+
+.om-section > h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--om-ink);
+}
+
+.om-card {
+  background: var(--om-surface);
+  border: 1px solid var(--om-line);
+  border-radius: 18px;
+  box-shadow: var(--om-shadow);
+  padding: 18px 18px 16px;
+}
+.om-card > h4 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--om-muted);
+  font-weight: 700;
+}
+
+/* ---------- KPI cards ---------- */
+.om-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.om-kpi { display: flex; flex-direction: column; gap: 3px; }
+.om-kpi .om-big {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  color: var(--om-ink);
+}
+.om-kpi .om-big .om-unit { font-size: 15px; font-weight: 600; margin-left: 3px; }
+.om-kpi .om-label { font-size: 12.5px; font-weight: 600; color: var(--om-ink-2); }
+.om-kpi .om-sub { font-size: 11.5px; color: var(--om-muted); margin-top: 2px; }
+.om-kpi .om-sub b { color: var(--om-accent); font-weight: 700; }
+
+/* ---------- Bars (stages / sources / statuses) ---------- */
+.om-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.om-bars { display: flex; flex-direction: column; gap: 11px; }
+.om-bar-row {
+  display: grid;
+  grid-template-columns: 148px 1fr 34px;
+  align-items: center;
+  gap: 10px;
+}
+.om-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--om-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.om-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.om-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--om-line-2);
+  overflow: hidden;
+}
+.om-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--om-accent);
+  transition: width .4s ease;
+}
+.om-bar-n {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--om-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.om-none { font-size: 12.5px; color: var(--om-faint); padding: 8px 0; margin: 0; }
+
+/* ---------- Batch chart ---------- */
+.om-chart { display: flex; align-items: flex-end; gap: 6px; height: 110px; padding-top: 6px; }
+.om-chart-bar { flex: 1; display: flex; align-items: flex-end; height: 100%; min-width: 0; }
+.om-chart-bar > span {
+  width: 100%;
+  min-height: 3px;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--om-accent) 45%, #fff);
+  transition: height .4s ease, background .2s ease;
+}
+.om-chart-bar:hover > span { background: var(--om-accent); }
+.om-chart-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--om-faint);
+}
+
+/* ---------- States ---------- */
+.om-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 0;
+  color: var(--om-muted);
+  font-size: .92rem;
+}
+.om-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 59, 255, .14);
+  border-top-color: var(--om-accent);
+  animation: omSpin .9s linear infinite;
+}
+@keyframes omSpin { to { transform: rotate(360deg); } }
+
+@media (max-width: 900px) {
+  .om-grid2 { grid-template-columns: 1fr; }
+  .om-bar-row { grid-template-columns: 116px 1fr 30px; }
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ from routes.candidates_routes import bp as candidates_bp
 from routes.careers_routes import bp as careers_bp
 from routes.applicants_routes import bp as applicants_bp
 from routes.metrics_routes import bp as metrics_bp
+from routes.opportunity_metrics_routes import bp as opportunity_metrics_bp
 from routes.system_routes import bp as system_bp
 from routes.tracks_routes import bp as tracks_bp
 from routes.users_routes import bp as users_api_bp
@@ -86,6 +88,7 @@ def create_app() -> Flask:
     app.register_blueprint(accounts_bp)
     app.register_blueprint(candidates_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(opportunity_metrics_bp)
     app.register_blueprint(moods_bp)
     app.register_blueprint(tracks_bp)
     app.register_blueprint(careers_bp)
@@ -119,10 +122,19 @@ def create_app() -> Flask:
     app.register_blueprint(hirex_people_bp)
     app.register_blueprint(hirex_chat_bp)
 
+    # Solo en local: cualquier puerto de loopback. Se activa con VINTTI_LOCAL_DEV=1
+    # en backend/.env (gitignored); App Runner nunca tiene esa variable, así que
+    # producción sigue aceptando únicamente vinttihub.vintti.com.
+    local_dev = os.environ.get('VINTTI_LOCAL_DEV') == '1'
+    LOOPBACK_ORIGIN_RE = re.compile(r'^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$')
+
     @app.after_request
     def apply_cors_headers(response):
         origin = request.headers.get('Origin')
         allowed_origins = ['https://vinttihub.vintti.com', 'http://localhost:5500', 'http://127.0.0.1:5500']
+
+        if local_dev and origin and LOOPBACK_ORIGIN_RE.match(origin):
+            allowed_origins.append(origin)
 
         if origin in allowed_origins:
             response.headers['Access-Control-Allow-Origin'] = origin

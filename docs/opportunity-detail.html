@@ -14,6 +14,7 @@
 
   <!-- ===== Styles ===== -->
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260721o-alex" />
+  <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260810-1" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"/>
@@ -44,6 +45,7 @@
       <div class="detail-tabs" role="tablist" aria-label="Opportunity sections">
         <button type="button" class="nav-item active" aria-selected="true">Overview</button>
         <button type="button" class="nav-item" aria-selected="false">Information</button>
+        <button type="button" class="nav-item" aria-selected="false">Metrics</button>
         <button type="button" class="nav-item" aria-selected="false">Job Description</button>
         <button type="button" class="nav-item" aria-selected="false">Pipeline</button>
         <button type="button" class="nav-item" aria-selected="false">Candidates</button>
@@ -225,6 +227,20 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- ========== Metrics ========== -->
+    <!-- Ojo: las pestañas se emparejan por índice con las .detail-section, así que
+         esta sección tiene que quedar en el mismo orden que el botón "Metrics". -->
+    <section id="metrics" class="detail-section hidden">
+      <div class="om-header">
+        <div>
+          <h2>Metrics</h2>
+          <p class="subtitle">How this opportunity is performing end to end.</p>
+        </div>
+        <button id="om-refresh-btn" class="om-refresh-btn" type="button">Refresh</button>
+      </div>
+      <div id="om-body" class="om-body"></div>
     </section>
 
     <!-- ========== Job Description ========== -->
@@ -436,6 +452,7 @@
         </table>
       </div>
     </section>
+
   </main>
 
   <!-- ===== AI Assistant (hidden by default) ===== -->
@@ -1027,6 +1044,7 @@ the Vintti team</textarea>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
   <script src="./assets/js/pipeline.js?v=20260723a-alex" defer></script>
   <script src="./assets/js/opportunity-detail.js?v=20260806-clientaband" defer></script>
+  <script src="./assets/js/opportunity-metrics.js?v=20260810-3" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->
   <script>
