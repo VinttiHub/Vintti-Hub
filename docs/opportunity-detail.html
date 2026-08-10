@@ -7,18 +7,33 @@
   <title>Opportunity Details</title>
   <script src="./assets/js/auth-guard.js"></script>
 
+  <!-- Abre DNS + TCP + TLS contra la API en paralelo con el CSS/JS.
+       Sin esto el primer fetch paga ~240 ms de handshake antes de pedir nada. -->
+  <link rel="preconnect" href="https://7m6mw95m8y.us-east-2.awsapprunner.com" crossorigin>
+  <link rel="dns-prefetch" href="https://7m6mw95m8y.us-east-2.awsapprunner.com">
+
   <!-- ===== Fonts ===== -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Critical CSS del overlay, inline: garantiza que tape la página desde el
+       primer paint, sin esperar a que baje opportunity-detail.css. -->
+  <style>
+    #opp-loading-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#fff}
+    #opp-loading-overlay.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+  </style>
 
   <!-- ===== Styles ===== -->
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260810-loading" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260810-1" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Font Awesome (102 KB) sólo pinta los iconos ⭐/WhatsApp de las tarjetas del
+       Pipeline, que no se ven en el tab inicial. Se carga sin bloquear el render. -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        media="print" onload="this.media='all';this.onload=null">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
   <!-- ===== Web Components / UI libs (modules load fast, safe to keep in head) ===== -->
   <!-- Keep ONE emoji-picker include (the duplicate was removed) -->
@@ -1049,14 +1064,14 @@ the Vintti team</textarea>
   <!-- Choices.js (multiselects) -->
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js" defer></script>
 
-  <!-- Phone input lib (kept; only remove if confirmed unused across your JS) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js" defer></script>
+  <!-- intl-tel-input eliminado (CSS + JS): confirmado que ningún script de
+       assets/js lo instancia. El teléfono usa el <select> #phone-country-code. -->
 
   <!-- Your app bundles -->
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
   <script src="./assets/js/pipeline.js?v=20260723a-alex" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260810-loading" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260810-perf" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260810-3" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->

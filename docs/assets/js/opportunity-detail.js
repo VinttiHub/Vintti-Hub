@@ -978,10 +978,6 @@ const HIDDEN_HR_EMAILS = new Set([
   'agustina.barbero@vintti.com',
   'pilar.fernandez@vintti.com'
 ]);
-const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
-
-let __cands = { data: [], idx: [], ts: 0 };
-let __candsInFlight = null;
 let __recruiterEmails = null;
 let __recruiterEmailsInFlight = null;
 
@@ -1696,49 +1692,14 @@ function openApplicantLinkPopup() {
   popup.classList.remove('hidden');
 }
 
-function buildIndex(list) {
-  return list.map(c => ({ ...c, _haystack: norm(`${c.name} ${c.linkedin} ${c.phone}`) }));
-}
-
-async function fetchAllCandidates() {
-  const r = await fetch(`${API_BASE}/candidates`, { cache: 'no-store' });
-  const data = await r.json();
-  __cands = { data, idx: buildIndex(data), ts: Date.now() };
-  try { localStorage.setItem('all_candidates_cache', JSON.stringify({ ts: __cands.ts, data })); } catch {}
-  return __cands;
-}
-
-async function getCandidatesCached() {
-  const fresh = (Date.now() - __cands.ts) < CAND_CACHE_TTL && __cands.idx.length;
-  if (fresh) return __cands;
-  if (__candsInFlight) return __candsInFlight; // ya hay una petición andando
-
-  // Warm start desde localStorage si existe
-  if (!__cands.data.length) {
-    try {
-      const raw = localStorage.getItem('all_candidates_cache');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        __cands = { data: parsed.data || [], idx: buildIndex(parsed.data || []), ts: parsed.ts || 0 };
-      }
-    } catch {}
-  }
-  __candsInFlight = fetchAllCandidates().finally(() => { __candsInFlight = null; });
-  return __candsInFlight;
-}
-
-// 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
-// Trae TODOS los candidatos (payload grande) sólo para el buscador del pipeline.
-// Lo posponemos a que el navegador esté ocioso para que no le pelee ancho de
-// banda al fetch de la opportunity, que es lo que el usuario está esperando.
-document.addEventListener('DOMContentLoaded', () => {
-  const warm = () => getCandidatesCached();
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(warm, { timeout: 4000 });
-  } else {
-    setTimeout(warm, 1500);
-  }
-});
+// ⛔️ Acá vivían buildIndex/fetchAllCandidates/getCandidatesCached, más un
+// "precalentamiento" que corría en cada carga de la página.
+// Medido contra producción, GET /candidates devuelve ~258 MB y tarda ~20 s: el
+// SELECT hace `c.*`, que arrastra `coresignal_scrapper` (~43 KB de JSON
+// scrapeado por candidato). Encima nadie consumía el resultado en esta página
+// —el buscador del pipeline pega contra /candidates/search?q=— y el
+// localStorage.setItem() reventaba por cuota en silencio. Todo eliminado.
+// Ojo: /candidates sigue siendo enorme para quien sí lo llama (main.js).
 document.addEventListener('DOMContentLoaded', setupDeleteOpportunityControls);
 document.addEventListener('DOMContentLoaded', setupApplicantLinkButton);
 
