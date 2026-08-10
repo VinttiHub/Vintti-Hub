@@ -20,6 +20,7 @@ from utils.credit_loop import (
     maybe_send_credit_available_email_for_new_opportunity,
     update_credit_status,
 )
+from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.hr_lead_todo import create_assignment_todo, create_replacement_todo, create_stage_todos
 from utils.storage_utils import (
     get_account_pdf_keys,
@@ -89,6 +90,7 @@ def _mark_signed_hire_active(cursor, opportunity_id):
         """,
         (candidate_id, opportunity_id, row.get("account_id")),
     )
+    clear_stale_hire_for_opportunity(cursor, opportunity_id, candidate_id)
     return True
 
 
@@ -1466,6 +1468,9 @@ def update_opportunity_fields(opportunity_id):
                     except (TypeError, ValueError):
                         return jsonify({'error': 'candidato_contratado must be an integer'}), 400
 
+                    # SOLO los batches de ESTA opportunity: el fallback sin filtro
+                    # de opp que había acá pisaba batches de otras opps del mismo
+                    # candidato cuando no tenía batch en esta.
                     cursor.execute("""
                         UPDATE candidates_batches cb
                            SET status = %s
@@ -1477,13 +1482,10 @@ def update_opportunity_fields(opportunity_id):
                                     AND b.opportunity_id = %s
                            )
                     """, ('Candidate hired', candidate_hired_id, opportunity_id))
-                    if cursor.rowcount == 0:
-                        cursor.execute("""
-                            UPDATE candidates_batches
-                               SET status = %s
-                             WHERE candidate_id = %s
-                        """, ('Candidate hired', candidate_hired_id))
                     logging.info("🟢 candidates_batches actualizado")
+
+                    # si la opp venía de otro contratado, deshacer su hire
+                    clear_stale_hire_for_opportunity(cursor, opportunity_id, candidate_hired_id)
 
                 if previous is not None:
                     new_hr_lead = (data.get("opp_hr_lead") or "").strip() if "opp_hr_lead" in data else None

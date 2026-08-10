@@ -23,6 +23,7 @@ from utils.storage_utils import (
     set_cv_keys,
 )
 from utils.credit_loop import remove_unused_credits_for_inactive_source_hires
+from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.types import to_bool
 
 bp = Blueprint('candidates', __name__)
@@ -1782,6 +1783,11 @@ def handle_candidate_hire_data(candidate_id):
                 WHERE opportunity_id = %s
             """, (candidate_id, opportunity_id))
 
+        # La opp puede venir de otro contratado (firmó, se cayó, y el puesto se lo
+        # lleva este candidato). Sin esto la fila del anterior queda con fechas y
+        # sigue contando como contractor activo en todos los datasets.
+        clear_stale_hire_for_opportunity(cur, opportunity_id, candidate_id)
+
         # 3) upsert into hire_opportunity for this exact (candidate_id, opportunity_id)
         cur.execute("""
             INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
@@ -1970,7 +1976,11 @@ def handle_candidate_hire_data(candidate_id):
             """, (candidate_id, opportunity_id, account_id))
             created = True
 
-        # status alignment for batches
+        # status alignment for batches — SOLO los batches de ESTA opportunity.
+        # Antes había un fallback sin filtro de opp para cuando rowcount == 0:
+        # si el candidato no tenía batch en esta opp (pasa: se lo suma al proceso
+        # sin batch), marcaba "Candidate hired" en los batches de CUALQUIER otra
+        # opp suya. Así fue como la 692 (Closed Lost) quedó con un contratado.
         cur.execute("""
             UPDATE candidates_batches cb
                SET status = %s
@@ -1982,12 +1992,6 @@ def handle_candidate_hire_data(candidate_id):
                     AND b.opportunity_id = %s
                )
         """, ('Candidate hired', candidate_id, opportunity_id))
-        if cur.rowcount == 0:
-            cur.execute("""
-                UPDATE candidates_batches
-                   SET status = %s
-                 WHERE candidate_id = %s
-            """, ('Candidate hired', candidate_id))
 
         # derive end_date from buyout if needed (only if caller didn’t set end_date)
         if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):
