@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260721o-alex" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260810-loading" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260810-1" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -28,6 +28,19 @@
 </head>
 
 <body>
+  <!-- ===== Loading overlay =====
+       Se pinta visible desde el HTML (sin esperar JS) para que nunca se vea la
+       Opp vacía. opportunity-detail.js lo esconde apenas termina de pintar los
+       datos de /opportunities/<id>. -->
+  <div id="opp-loading-overlay" class="opp-loading-overlay" role="status" aria-live="polite">
+    <div class="opp-loading-card">
+      <div class="opp-loading-spinner" aria-hidden="true"></div>
+      <p class="opp-loading-title" id="opp-loading-title">Loading opportunity…</p>
+      <p class="opp-loading-sub" id="opp-loading-sub">Bringing the latest data from the server.</p>
+      <button type="button" id="opp-loading-retry" class="opp-loading-retry hidden">Try again</button>
+    </div>
+  </div>
+
   <!-- ===== Fixed back button (with fallback) ===== -->
   <!-- <div id="fixedBackContainer">
     <button id="goBackButton" class="go-back-button" data-fallback="/opportunities.html">
@@ -1043,7 +1056,7 @@ the Vintti team</textarea>
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
   <script src="./assets/js/pipeline.js?v=20260723a-alex" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260806-clientaband" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260810-loading" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260810-3" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->

@@ -292,6 +292,84 @@ function getOpportunityId() {
   return '';
 }
 
+/* ===========================================================
+   Loading overlay
+   El overlay ya viene visible desde el HTML, así que el usuario nunca ve la
+   Opp vacía. Lo escondemos apenas terminamos de pintar el payload principal
+   (/opportunities/<id>); todo lo secundario (hire, leads, traffic light) sigue
+   hidratando por detrás. Si algo falla o tarda demasiado mostramos un estado
+   de error con botón "Try again", así nadie necesita hacer refresh a mano.
+   =========================================================== */
+const OPP_LOADING_TIMEOUT_MS = 30000;
+
+const __oppLoading = {
+  el: null,
+  watchdog: null,
+  done: false,
+
+  _refs() {
+    if (!this.el) this.el = document.getElementById('opp-loading-overlay');
+    return {
+      overlay: this.el,
+      title: document.getElementById('opp-loading-title'),
+      sub: document.getElementById('opp-loading-sub'),
+      retry: document.getElementById('opp-loading-retry'),
+    };
+  },
+
+  start() {
+    const { overlay, title, sub, retry } = this._refs();
+    if (!overlay) return;
+    this.done = false;
+    overlay.classList.remove('is-hidden', 'is-error');
+    if (title) title.textContent = 'Loading opportunity…';
+    if (sub) sub.textContent = 'Bringing the latest data from the server.';
+    if (retry) retry.classList.add('hidden');
+
+    clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => {
+      // Si el backend no respondió (cold start de App Runner, red, etc.) no
+      // dejamos al usuario mirando un spinner infinito.
+      this.fail('This is taking longer than usual. The server may be waking up.');
+    }, OPP_LOADING_TIMEOUT_MS);
+  },
+
+  hide() {
+    const { overlay } = this._refs();
+    this.done = true;
+    clearTimeout(this.watchdog);
+    if (overlay) overlay.classList.add('is-hidden');
+  },
+
+  fail(message) {
+    if (this.done) return;
+    const { overlay, title, sub, retry } = this._refs();
+    clearTimeout(this.watchdog);
+    if (!overlay) return;
+    overlay.classList.remove('is-hidden');
+    overlay.classList.add('is-error');
+    if (title) title.textContent = "We couldn't load this opportunity";
+    if (sub) sub.textContent = message || 'Something went wrong while fetching the data.';
+    if (retry) retry.classList.remove('hidden');
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('opp-loading-retry')?.addEventListener('click', () => {
+    __oppLoading.start();
+    loadOpportunityData();
+  });
+
+  // Red de seguridad: si un error de JS impidió que loadOpportunityData()
+  // arrancara, el overlay quedaría girando para siempre. Este timer garantiza
+  // que el usuario siempre termine con un botón "Try again" a mano.
+  setTimeout(() => {
+    if (!__oppLoading.done && !__oppLoading.watchdog) {
+      __oppLoading.fail('Something interrupted the page while loading.');
+    }
+  }, OPP_LOADING_TIMEOUT_MS);
+});
+
 function setCareerTrafficLight(state) {
   const el = document.getElementById('career-traffic-light');
   if (!el) return;
@@ -1650,7 +1728,17 @@ async function getCandidatesCached() {
 }
 
 // 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
-document.addEventListener('DOMContentLoaded', () => { getCandidatesCached(); });
+// Trae TODOS los candidatos (payload grande) sólo para el buscador del pipeline.
+// Lo posponemos a que el navegador esté ocioso para que no le pelee ancho de
+// banda al fetch de la opportunity, que es lo que el usuario está esperando.
+document.addEventListener('DOMContentLoaded', () => {
+  const warm = () => getCandidatesCached();
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(warm, { timeout: 4000 });
+  } else {
+    setTimeout(warm, 1500);
+  }
+});
 document.addEventListener('DOMContentLoaded', setupDeleteOpportunityControls);
 document.addEventListener('DOMContentLoaded', setupApplicantLinkButton);
 
@@ -1824,8 +1912,9 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
 
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
-  loadTurvoMeetings();
-  syncTurvoMeetingsOnce();
+  // Turbo ya se carga al hacer click en su pestaña; dispararlo también en el
+  // load inicial sólo competía con el fetch principal (y syncTurvoMeetingsOnce
+  // pega contra la API de Turvo, que es lenta).
   console.log('🔎 hireCandidateId after load:', window.hireCandidateId);
 
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
@@ -3472,11 +3561,18 @@ async function publishCareerNow() {
 async function loadOpportunityData() {
   const params = new URLSearchParams(window.location.search);
   const opportunityId = params.get('id');
-  if (!opportunityId) return;
+  if (!opportunityId) {
+    __oppLoading.fail('No opportunity id in the URL.');
+    return;
+  }
+
+  __oppLoading.start();
 
   try {
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (!data || data.error) throw new Error(data?.error || 'Empty payload');
     window.currentOpportunityData = data;
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
@@ -3545,6 +3641,23 @@ async function loadOpportunityData() {
     } else {
       document.getElementById('signed-tag').textContent = '—';
     }
+
+    // Expected fee / revenue e "interviewed candidates": van acá (y no al final)
+    // para que queden pintados antes de esconder el overlay.
+    document.getElementById('expected-fee-input').value = data.expected_fee ?? '';
+    document.getElementById('expected-revenue-input').value = data.expected_revenue ?? '';
+    const interviewedCountInput = document.getElementById('interviewed-count-input');
+    if (interviewedCountInput) {
+      interviewedCountInput.value = data.cantidad_entrevistados ?? '';
+    }
+
+    // Stage: sale del mismo payload (el SELECT hace `o.*`), así evitamos el
+    // fetch a /opportunities/light que traía TODAS las opportunities.
+    paintOpportunityStage(data.opp_stage);
+
+    // ✅ Ya está todo lo visible del payload principal: sacamos el overlay.
+    // Lo que queda (hire, leads, traffic light) hidrata por detrás.
+    __oppLoading.hide();
 
     // 🔹 Mostrar el HIRE y guardar id en dataset + variable global (con fallback)
     try {
@@ -3681,60 +3794,44 @@ async function loadOpportunityData() {
 
         } catch (err) {
           console.error("Error loading opportunity:", err);
+          // Solo cuenta si el payload principal nunca llegó a pintarse; si ya
+          // escondimos el overlay, __oppLoading.fail() es no-op.
+          __oppLoading.fail('The server did not respond. Check your connection and try again.');
         }
-        try {
-  const lightRes = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light');
-  const lightData = await lightRes.json();
-  const currentId = opportunityId;
-  const opp = lightData.find(o => o.opportunity_id == currentId); // usa comparación flexible con ==
 
-  if (opp && opp.opp_stage) {
-    const stageText = opp.opp_stage;
-    const stageTag = document.getElementById('stage-tag');
-    const stageSpan = document.getElementById('stage-text');
-
-    stageSpan.textContent = stageText;
-
-    // Limpiar clases anteriores por si hay recarga
-    stageTag.className = 'opportunity-stage-card';
-
-    // Generar clase CSS dinámicamente
-    const cssClass = `stage-color-${stageText.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`;
-    stageTag.classList.add(cssClass);
-  }
-} catch (err) {
-  console.error("❌ Error loading stage from opportunities/light:", err);
+  // Traffic light del career site: llega a Google Sheets y es lento, así que
+  // lo dejamos correr sin await para que no retrase nada.
+  updateCareerSheetTrafficLight();
 }
 
+function paintOpportunityStage(rawStage) {
+  const stageText = (rawStage || '').toString().trim();
+  const stageTag = document.getElementById('stage-tag');
+  const stageSpan = document.getElementById('stage-text');
+  if (!stageTag || !stageSpan) return;
+
+  // Limpiar clases anteriores por si hay recarga
+  stageTag.className = 'opportunity-stage-card';
+
+  if (!stageText) {
+    stageSpan.textContent = '—';
+    return;
+  }
+
+  stageSpan.textContent = stageText;
+  const cssClass = `stage-color-${stageText.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`;
+  stageTag.classList.add(cssClass);
+}
+
+// Top-level a propósito: estaba declarada dentro de loadOpportunityData, así que
+// las llamadas desde los handlers de edición tiraban ReferenceError.
 function updateJobDescriptionSummary() {
   const title = (document.getElementById('details-opportunity-name')?.value || '').trim();
   const client = (document.getElementById('client-name-input')?.value || '').trim();
-  const timezone = (document.getElementById('timezone-input')?.value || '').trim();
-  const years = (document.getElementById('years-experience-input')?.value || '').trim();
-  const modelRaw = (
-    document.getElementById('details-model')?.value ||
-    document.getElementById('model-select')?.value ||
-    ''
-  ).trim();
-  const model = modelRaw ? modelRaw.charAt(0).toUpperCase() + modelRaw.slice(1) : '—';
 
   document.getElementById('job-role-title').textContent = title || 'Job Description';
   document.getElementById('job-meta-client').textContent = client || 'Client not assigned';
 }
-  await updateCareerSheetTrafficLight();
-
- const d = window.currentOpportunityData || {};
- document.getElementById('expected-fee-input').value = d.expected_fee ?? '';
- document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
- // Prefill del contador "Number of interviewed candidates" desde la BD (fuente de
- // verdad). Corre aquí —tras cargar los datos de la opp— porque en DOMContentLoaded
- // el opportunity_id aún no está listo. La actualización desde Alex AI vive en
- // pipeline.js mediante el botón "🔄 Traer de Alex".
- const interviewedCountInput = document.getElementById('interviewed-count-input');
- if (interviewedCountInput) {
-   interviewedCountInput.value = d.cantidad_entrevistados ?? '';
- }
-      }
 function formatDate(dateStr) {
   return toYMD(dateStr);
 }
