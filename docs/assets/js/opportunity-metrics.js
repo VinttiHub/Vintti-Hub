@@ -103,22 +103,50 @@
       </div>`;
     }
     const max = Math.max(1, ...batches.map((b) => b.count));
+    // Con pocos batches entra la fecha bajo cada barra; con muchos se apiñan y
+    // se cae al pie con el rango (primera → última presentación).
+    const perBarLabels = batches.length <= 8;
+
     const chart = batches.map((b) => {
-      const when = b.presentation_date ? fmtDay(b.presentation_date, { month: 'short', day: 'numeric' }) : 'No date';
-      return `<span class="om-chart-bar" title="Batch ${esc(b.batch_number)} · ${when}: ${b.count} candidate${b.count === 1 ? '' : 's'}">
-        <span style="height:${((b.count / max) * 100).toFixed(1)}%"></span>
-      </span>`;
+      const when = b.presentation_date
+        ? fmtDay(b.presentation_date, { month: 'short', day: 'numeric' })
+        : 'No date';
+      const pct = (b.count / max) * 100;
+      // El número va dentro de la barra si hay lugar; si no, flotando justo
+      // encima. Antes solo existía en el `title`, o sea el tooltip del sistema.
+      const inside = pct >= 34;
+      const label = inside
+        ? `<b class="om-chart-val is-in">${b.count}</b>`
+        : `<b class="om-chart-val is-out" style="bottom:calc(${pct.toFixed(1)}% + 7px)">${b.count}</b>`;
+
+      return `<div class="om-chart-col">
+        <span class="om-chart-bar">
+          <span class="om-chart-fill" style="height:${pct.toFixed(1)}%">${inside ? label : ''}</span>
+          ${inside ? '' : label}
+          <span class="om-chart-tip" role="tooltip">
+            <b>${b.count} candidate${b.count === 1 ? '' : 's'}</b>
+            <i>Batch ${esc(b.batch_number)} · ${esc(when)}</i>
+          </span>
+        </span>
+        ${perBarLabels ? `<span class="om-chart-x">${esc(when)}</span>` : ''}
+      </div>`;
     }).join('');
-    const first = batches[0];
-    const last = batches[batches.length - 1];
-    const foot = batches.length > 1
-      ? `<span>${first.presentation_date ? fmtDay(first.presentation_date, { month: 'short', day: 'numeric' }) : `Batch ${esc(first.batch_number)}`}</span>
-         <span>${last.presentation_date ? fmtDay(last.presentation_date, { month: 'short', day: 'numeric' }) : `Batch ${esc(last.batch_number)}`}</span>`
-      : `<span>Batch ${esc(first.batch_number)}</span><span>${first.presentation_date ? fmtDay(first.presentation_date, { month: 'short', day: 'numeric' }) : ''}</span>`;
+
+    let foot = '';
+    if (!perBarLabels) {
+      const when = (b) => (b.presentation_date
+        ? fmtDay(b.presentation_date, { month: 'short', day: 'numeric' })
+        : `Batch ${b.batch_number}`);
+      foot = `<div class="om-chart-foot">
+        <span>${esc(when(batches[0]))}</span>
+        <span>${esc(when(batches[batches.length - 1]))}</span>
+      </div>`;
+    }
+
     return `<div class="om-card">
       <h4>Candidates presented · by batch</h4>
       <div class="om-chart">${chart}</div>
-      <div class="om-chart-foot">${foot}</div>
+      ${foot}
     </div>`;
   }
 
@@ -215,15 +243,30 @@
     if (btn) btn.disabled = true;
     body.innerHTML = `<div class="om-state"><div class="om-spinner"></div><p>Loading metrics…</p></div>`;
 
+    // Sin timeout, un fetch que nunca resuelve deja el spinner girando para
+    // siempre y no queda ni un rastro de por qué. El AbortController lo corta.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+
     try {
-      const res = await fetch(`${API_BASE}/opportunities/${encodeURIComponent(id)}/metrics`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = `${API_BASE}/opportunities/${encodeURIComponent(id)}/metrics`;
+      const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
       render(await res.json());
       loaded = true;
     } catch (err) {
+      const detail = err && err.name === 'AbortError'
+        ? `The request to ${API_BASE} timed out after 20s.`
+        : `${(err && err.message) || err}`;
       console.error('❌ metrics:', err);
-      body.innerHTML = `<div class="om-state"><p>Couldn't load the metrics for this opportunity.</p></div>`;
+      body.innerHTML = `<div class="om-state">
+        <p>Couldn't load the metrics for this opportunity.</p>
+        <p class="om-state-detail">${esc(detail)}</p>
+        <button type="button" class="om-refresh-btn" id="om-retry-btn">Try again</button>
+      </div>`;
+      $('om-retry-btn')?.addEventListener('click', () => load(true));
     } finally {
+      clearTimeout(timer);
       loading = false;
       if (btn) btn.disabled = false;
     }
