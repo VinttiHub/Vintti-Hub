@@ -62,7 +62,59 @@
     });
   }
 
+  /* ---------- Modo compacto ----------
+     Un botón en el header esconde el banner de mood y los filtros, y achica el
+     header, para que la tabla gane alto. La preferencia se guarda y se comparte
+     entre opportunities, crm y candidates: quien lo compacta en una lo quiere
+     compactado en las tres. */
+  const COMPACT_KEY = 'vintti_tables_compact';
+
+  function applyCompact(on) {
+    document.body.classList.toggle('is-compact', on);
+    try { localStorage.setItem(COMPACT_KEY, on ? '1' : '0'); } catch (e) {}
+    const btn = document.querySelector('.compact-toggle');
+    if (!btn) return;
+    // Texto explícito, no sólo un chevron: el botón tiene que decir qué hace.
+    const label = on ? 'Show filters' : 'Hide filters';
+    const labelEl = btn.querySelector('.compact-toggle-label');
+    if (labelEl) labelEl.textContent = label;
+    btn.setAttribute('aria-expanded', String(!on));
+    btn.title = on
+      ? 'Show the filters again'
+      : 'Hide the filters to make the table taller';
+    btn.setAttribute('aria-label', btn.title);
+  }
+
+  function mountCompactToggle() {
+    const header = document.querySelector('.main-content > .page-header');
+    if (!header || header.querySelector('.compact-toggle')) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'compact-toggle';
+    const icon = document.createElement('span');
+    icon.className = 'compact-toggle-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '⌃';
+    const label = document.createElement('span');
+    label.className = 'compact-toggle-label';
+    btn.appendChild(icon);
+    btn.appendChild(label);
+    btn.addEventListener('click', function () {
+      applyCompact(!document.body.classList.contains('is-compact'));
+    });
+    (header.querySelector('.page-actions') || header).appendChild(btn);
+
+    // Por defecto arranca COMPACTADO: la tabla es lo que la gente viene a ver,
+    // y los filtros quedan a un click. Sólo se respeta otra cosa si el usuario
+    // ya eligió explícitamente.
+    let saved = null;
+    try { saved = localStorage.getItem(COMPACT_KEY); } catch (e) {}
+    applyCompact(saved === null ? true : saved === '1');
+  }
+
   function start() {
+    mountCompactToggle();
     scan();
     // DataTables crea el footer después de que carguen los datos, y el CRM
     // destruye y recrea la tabla en cada refresh.

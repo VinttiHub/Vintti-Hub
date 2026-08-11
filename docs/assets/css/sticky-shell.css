@@ -79,6 +79,70 @@
     border-bottom-right-radius: 18px;
   }
 
+  /* ---------- Modo compacto ----------
+     El botón lo inyecta sticky-shell.js dentro de .page-actions; el estado vive
+     en body.is-compact y se guarda en localStorage. Los tres headers son
+     idénticos (banner #0044ff, padding 20px 30px, título 28px), así que un solo
+     bloque sirve para las tres páginas. */
+  /* Pastilla con texto, no un iconito: un chevron solo no dice qué hace.
+     Mismas medidas y lenguaje visual que los .refresh-btn del banner. */
+  body.app-shell .compact-toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .2);
+    border: 1px solid rgba(255, 255, 255, .45);
+    color: #fff;
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+  }
+
+  body.app-shell .compact-toggle:hover {
+    background: rgba(255, 255, 255, .35);
+    border-color: rgba(255, 255, 255, .7);
+  }
+
+  body.app-shell .compact-toggle:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  body.app-shell .compact-toggle-icon {
+    display: inline-block;
+    font-size: 12px;
+    line-height: 1;
+    transition: transform .2s ease;
+  }
+
+  /* Compactado: la flecha apunta hacia abajo ("desplegar"). */
+  body.app-shell.is-compact .compact-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  /* Los filtros NO están en el mismo lugar en las tres páginas:
+       - opportunities y crm: <details class="filters-collapsible"> colgando
+         directo de .main-content
+       - candidates: ese <details> va anidado dentro de .table-controls-wrapper,
+         así que hay que esconder el wrapper (contiene sólo filtros y el buscador
+         por nombre; si escondiéramos sólo el <details> quedaría el hueco).
+
+     El !important no es capricho: candidates.css declara
+     `.table-controls-wrapper { display: flex !important }`, y sin él un
+     display:none normal pierde por más específico que sea el selector. */
+  body.app-shell.is-compact .monthly-mood-banner,
+  body.app-shell.is-compact .main-content > .filters-collapsible,
+  body.app-shell.is-compact .main-content > .table-controls-wrapper {
+    display: none !important;
+  }
+
   /* ---------- Opportunities ---------- */
   body.app-shell .table-card {
     flex: 1 1 auto;
@@ -181,4 +245,11 @@
     padding-top: 20px;
     box-shadow: 0 6px 0 0 #fff; /* border-spacing de esta tabla = 6px */
   }
+}
+
+/* En mobile las páginas ya usan el <details> de filtros con su propio summary,
+   así que el botón de compactar no aplica (y quedaría sin estilar, porque todo
+   lo de arriba vive dentro del media query de desktop). */
+@media (max-width: 900px) {
+  .compact-toggle { display: none; }
 }
