@@ -296,7 +296,7 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
         return
     hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
     sales_lead = str(ctx.get('opp_sales_lead') or '').strip().lower()
-    recipients = ['pgonzales@vintti.com']
+    recipients = ['pgonzales@vintti.com', 'agostina@vintti.com']
     if hr_lead:
         recipients.insert(0, hr_lead)
     if not recipients:
