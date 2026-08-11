@@ -18,18 +18,26 @@ from ._sales_scope import sales_leads as _sales_leads
 
 import logging
 import os
-import threading
 from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
 from typing import Any
 
+# Mismo patrón defensivo que usa este módulo para HubSpot: el backend se importa
+# a veces como paquete `backend.*` y a veces con `backend/` como raíz.
+try:
+    from backend.utils import shared_cache  # type: ignore
+except ImportError:
+    from utils import shared_cache  # type: ignore
+
 log = logging.getLogger(__name__)
 
 
-_CACHE: dict[str, tuple[float, int]] = {}
-_CACHE_LOCK = threading.Lock()
+# El cache vive en Postgres (utils/shared_cache), no en memoria: con 3 workers de
+# gunicorn x hasta 5 instancias de App Runner, un dict a nivel módulo daba hasta
+# 15 copias con TTLs independientes, y el dashboard mostraba números distintos
+# según en qué proceso cayera el refresh.
 _CACHE_TTL_SECONDS = 300
 
 
@@ -68,11 +76,9 @@ def _parse_hubspot_date(raw: Any) -> date | None:
 
 def _fetch_sql_count(win_ini: date, win_fin: date, owner_emails: list[str]) -> int:
     cache_key = f"sales__{'+'.join(owner_emails)}__{win_ini.isoformat()}__{win_fin.isoformat()}"
-    now = datetime.utcnow().timestamp()
-    with _CACHE_LOCK:
-        cached = _CACHE.get(cache_key)
-        if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
-            return cached[1]
+    hit, cached = shared_cache.get(cache_key)
+    if hit:
+        return int(cached)
 
     try:
         from backend.utils.hubspot import HubSpotClient  # type: ignore
@@ -81,8 +87,7 @@ def _fetch_sql_count(win_ini: date, win_fin: date, owner_emails: list[str]) -> i
             from utils.hubspot import HubSpotClient  # type: ignore
         except ImportError:
             log.warning("HubSpotClient unavailable; SQL count = 0")
-            with _CACHE_LOCK:
-                _CACHE[cache_key] = (now, 0)
+            shared_cache.set(cache_key, 0, _CACHE_TTL_SECONDS)
             return 0
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
@@ -117,8 +122,7 @@ def _fetch_sql_count(win_ini: date, win_fin: date, owner_emails: list[str]) -> i
     except Exception as exc:  # noqa: BLE001
         log.warning("HubSpot SQL fetch failed: %s", exc)
 
-    with _CACHE_LOCK:
-        _CACHE[cache_key] = (now, count)
+    shared_cache.set(cache_key, count, _CACHE_TTL_SECONDS)
     return count
 
 

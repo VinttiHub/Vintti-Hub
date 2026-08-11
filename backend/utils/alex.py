@@ -16,14 +16,18 @@ import unicodedata
 
 import requests
 
+from . import shared_cache
+
 
 ALEX_API_BASE = "https://api.alex.com/v1/api"
 
-# Cache en memoria de la lista de positions (compartida por proceso). Alex no
-# ofrece filtrar positions por substring del nombre, así que listamos todas y
-# hacemos el match localmente; el TTL corto evita re-listar en cada request.
-_POSITIONS_CACHE = {"expires_at": 0.0, "data": None}
-_POSITIONS_TTL_SECONDS = 60.0
+# Alex no ofrece filtrar positions por substring del nombre, así que listamos
+# todas y hacemos el match localmente; el TTL corto evita re-listar en cada
+# request. El cache vive en Postgres (utils/shared_cache) y no en memoria: con
+# varios workers, dos clicks seguidos en "Traer de Apriora" podían caer en
+# procesos con caches distintos y devolver números distintos.
+_POSITIONS_CACHE_KEY = "alex__positions"
+_POSITIONS_TTL_SECONDS = 60
 
 
 class AlexError(RuntimeError):
@@ -140,19 +144,22 @@ class AlexClient:
         raise AlexError(f"Alex {method} {path} rate-limited after retries (last={last_status})")
 
     def list_positions(self, status="Active", use_cache=True):
-        """Lista las positions de Alex. Cachea el resultado por proceso (TTL corto)."""
+        """Lista las positions de Alex. Cachea el resultado en Postgres (TTL corto),
+        compartido por todos los workers e instancias."""
+        # La clave incluye el status porque los llamadores piden tanto "Active"
+        # como todas (status=None), y son listas distintas.
+        cache_key = f"{_POSITIONS_CACHE_KEY}__{status or 'all'}"
         if use_cache:
-            now = time.time()
-            if _POSITIONS_CACHE["data"] is not None and now < _POSITIONS_CACHE["expires_at"]:
-                return _POSITIONS_CACHE["data"]
+            hit, cached = shared_cache.get(cache_key)
+            if hit:
+                return cached
         params = {}
         if status:
             params["status"] = status
         payload = self._request("GET", "/positions", params=params)
         positions = _extract_list(payload)
         if use_cache:
-            _POSITIONS_CACHE["data"] = positions
-            _POSITIONS_CACHE["expires_at"] = time.time() + _POSITIONS_TTL_SECONDS
+            shared_cache.set(cache_key, positions, _POSITIONS_TTL_SECONDS)
         return positions
 
     def list_candidates(self, position_id):

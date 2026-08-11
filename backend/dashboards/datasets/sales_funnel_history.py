@@ -13,15 +13,20 @@ from ._sales_scope import sales_leads as _sales_leads
 
 import logging
 import os
-import threading
 from datetime import date, datetime
 from typing import Any
+
+# Mismo patrón defensivo que usa este módulo para HubSpot: el backend se importa
+# a veces como paquete `backend.*` y a veces con `backend/` como raíz.
+try:
+    from backend.utils import shared_cache  # type: ignore
+except ImportError:
+    from utils import shared_cache  # type: ignore
 
 log = logging.getLogger(__name__)
 
 
-_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
-_CACHE_LOCK = threading.Lock()
+# Cache en Postgres, no en memoria: ver utils/shared_cache.py.
 _CACHE_TTL_SECONDS = 300
 
 
@@ -45,11 +50,9 @@ def _fetch_sql_by_month(owner_emails: list[str]) -> dict[str, int]:
     """Returns {'YYYY-MM-01': count, ...} for the entire HubSpot SQL history
     owned by the given emails, bucketed by createdate month."""
     cache_key = f"hist__{'+'.join(owner_emails)}"
-    now = datetime.utcnow().timestamp()
-    with _CACHE_LOCK:
-        cached = _CACHE.get(cache_key)
-        if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
-            return cached[1]
+    hit, cached = shared_cache.get(cache_key)
+    if hit:
+        return {str(k): int(v) for k, v in (cached or {}).items()}
 
     counts: dict[str, int] = {}
     try:
@@ -59,8 +62,7 @@ def _fetch_sql_by_month(owner_emails: list[str]) -> dict[str, int]:
             from utils.hubspot import HubSpotClient  # type: ignore
         except ImportError:
             log.warning("HubSpotClient unavailable; SQL counts will be empty")
-            with _CACHE_LOCK:
-                _CACHE[cache_key] = (now, counts)
+            shared_cache.set(cache_key, counts, _CACHE_TTL_SECONDS)
             return counts
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
@@ -96,8 +98,7 @@ def _fetch_sql_by_month(owner_emails: list[str]) -> dict[str, int]:
     except Exception as exc:  # noqa: BLE001
         log.warning("HubSpot SQL monthly fetch failed: %s", exc)
 
-    with _CACHE_LOCK:
-        _CACHE[cache_key] = (now, counts)
+    shared_cache.set(cache_key, counts, _CACHE_TTL_SECONDS)
     return counts
 
 
