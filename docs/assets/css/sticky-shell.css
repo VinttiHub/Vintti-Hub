@@ -1,0 +1,184 @@
+/* =========================================================
+   STICKY SHELL
+   Page header + filters stay put; only the table scrolls,
+   with its own sticky <thead>.
+
+   Used by: opportunities.html, crm.html, candidates.html
+   (add class="app-shell" to <body> and load this file last)
+
+   Desktop only (>= 901px). On mobile the pages keep the
+   regular page scroll defined in mobile.css.
+   ========================================================= */
+
+@media (min-width: 901px) {
+
+  /* ---------- Shell ---------- */
+  html:has(body.app-shell) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body.app-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  body.app-shell .main-content {
+    height: 100vh;
+    min-height: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto; /* fallback: si la ventana es muy baja, el bloque entero scrollea */
+  }
+
+  /* En desktop el <details> de filtros va siempre abierto (su summary está
+     oculto). Chrome 131+ colapsa el contenido con ::details-content aunque
+     mobile.css fuerce display:block, así que hay que desactivarlo aquí. */
+  details.filters-collapsible:not([open])::details-content {
+    content-visibility: visible;
+  }
+
+  /* Header y filtros: alto natural, nunca se encogen ni scrollean.
+     El banner de mood lo inyecta monthly-mood.js como primer hijo. */
+  body.app-shell .main-content > .monthly-mood-banner,
+  body.app-shell .main-content > .page-header,
+  body.app-shell .main-content > .filters-collapsible,
+  body.app-shell .main-content > .table-controls-wrapper {
+    flex: 0 0 auto;
+  }
+
+  /* ---------- Footer de la tabla (info + paginación) ----------
+     El div .dt-sticky-footer lo crea el `dom:` de cada tabla
+     ('lrt<"dt-sticky-footer"ip>' en crm.js, main.js y candidate.js), y
+     sticky-shell.js lo SACA del contenedor que scrollea y lo deja como hermano
+     justo debajo.
+
+     Por eso acá no hay position:sticky: al estar fuera del área scrolleable no
+     se puede ir con el scroll. Con sticky el ancla dependía de cuál de los
+     contenedores anidados scrolleaba, y en candidates se anclaba al equivocado
+     (quedaban filas por encima y por debajo del footer). */
+  body.app-shell .dt-sticky-footer {
+    flex: 0 0 auto;
+    background: #fff;
+    /* .dataTables_info va float:left y .dataTables_paginate float:right;
+       flow-root arma un BFC para que el div los contenga y tenga alto real. */
+    display: flow-root;
+    padding: 10px 30px 4px;
+    border-top: 1px solid #f0f0f0;
+    box-sizing: border-box;
+  }
+
+  /* Las esquinas redondeadas de la tarjeta pasan a estar en el footer, que
+     ahora es el último elemento del bloque blanco. */
+  body.app-shell .main-content > .dt-sticky-footer,
+  body.app-shell .table-card > .dt-sticky-footer,
+  body.app-shell .table-container > .dt-sticky-footer {
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+  }
+
+  /* ---------- Opportunities ---------- */
+  body.app-shell .table-card {
+    flex: 1 1 auto;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+
+  body.app-shell .table-scroll-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto; /* scroll horizontal (ya existía) + vertical de la tabla */
+  }
+
+  body.app-shell #opportunityTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    /* tapa el border-spacing (8px) para que las filas no asomen bajo el header */
+    box-shadow: 0 8px 0 0 #fff;
+  }
+
+  /* ---------- CRM ---------- */
+  body.app-shell #accountTable_wrapper {
+    flex: 1 1 auto;
+    min-height: 240px;
+    overflow: auto;
+    background: #fff;
+    /* Sólo las esquinas de arriba: el footer, que ahora va debajo como hermano,
+       cierra el bloque blanco con las de abajo. */
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+    padding: 0 30px;
+    box-sizing: border-box;
+  }
+
+  body.app-shell #accountTable {
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    /* crm.css le pone overflow:hidden a la <table>, y eso la convierte en
+       scroll container y rompe el sticky del thead */
+    overflow: visible;
+  }
+
+  body.app-shell #accountTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    padding-top: 20px;
+    box-shadow: 0 8px 0 0 #fff;
+  }
+
+  body.app-shell #crmEmptyState {
+    flex: 0 0 auto;
+  }
+
+  /* ---------- Candidates ---------- */
+  body.app-shell .table-container {
+    flex: 1 1 auto;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    /* auto (no hidden) para que la tabla siga scrolleando aunque DataTables
+       todavía no la haya envuelto */
+    overflow: auto;
+  }
+
+  /* Por id, no por `.dataTables_wrapper`: el footer reubicado lleva esa misma
+     clase (la necesita para heredar el estilo de DataTables), y con el selector
+     de clase le caían encima el `flex: 1 1 auto` y el `overflow: auto` de acá,
+     que lo hacían crecer y scrollear. */
+  body.app-shell .table-container > #candidatesTable_wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    /* Sin padding-bottom: el footer va debajo, ya fuera de este contenedor. */
+    padding: 0 30px;
+    box-sizing: border-box;
+  }
+
+  body.app-shell #candidatesTable {
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    /* idem candidates.css: overflow:hidden en la <table> rompe el sticky */
+    overflow: visible;
+  }
+
+  body.app-shell #candidatesTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    padding-top: 20px;
+    box-shadow: 0 6px 0 0 #fff; /* border-spacing de esta tabla = 6px */
+  }
+}

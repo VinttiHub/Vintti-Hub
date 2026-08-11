@@ -2654,7 +2654,10 @@ document.addEventListener('DOMContentLoaded', () => {
         responsive: true,
         pageLength: 50,
         deferRender: true,
-        dom: 'lrtip',
+        // El info + la paginación van envueltos en .dt-sticky-footer para poder
+        // fijarlos abajo del área scrolleable (ver sticky-shell.css). Antes
+        // quedaban al final del scroll y había que bajar toda la tabla.
+        dom: 'lrt<"dt-sticky-footer"ip>',
         lengthMenu: [[50, 100, 150], [50, 100, 150]],
         order: [[1, 'asc']],
         language: {

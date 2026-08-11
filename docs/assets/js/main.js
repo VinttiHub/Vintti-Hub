@@ -1641,7 +1641,10 @@ const table = $('#opportunityTable').DataTable({
   responsive: true,
   pageLength: 50,                         // puedes dejar 50 por defecto…
   lengthMenu: [[50, 100, 150, -1], [50, 100, 150, 'All']], // …pero permite ver “All”
-  dom: 'lrtip',
+  // El info + la paginación van envueltos en .dt-sticky-footer para poder
+  // fijarlos abajo del área scrolleable (ver sticky-shell.css). Antes
+  // quedaban al final del scroll y había que bajar toda la tabla.
+  dom: 'lrt<"dt-sticky-footer"ip>',
   ordering: false,
   columnDefs: [
     { targets: [0], width: "8%" },
