@@ -176,6 +176,11 @@ function deriveStatusFrom(opps = [], hires = []) {
   return 'Lead in Process';
 }
 
+// En el camino normal ya no se usa: el contrato lo calcula
+// accounts_status_summary en el backend y viaja en el bulk. Queda como red de
+// seguridad para las cuentas que el bulk no devuelva, y como especificación de
+// referencia — si cambiás esta lógica, hay que cambiar decide_contract() y las
+// CTEs de backend/routes/metrics_routes.py.
 function deriveContractTypeFromCandidates(hires = []) {
   if (!Array.isArray(hires) || hires.length === 0) return null;
   let hasStaffing = false;
@@ -1345,12 +1350,20 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
     })
   );
 
-  // 2) Re-derive using detailed data for anything missing or non-active
-  const needsDetail = ids.filter(id => {
-    const status = summary[id]?.status || '';
-    if (!status) return true;
-    return norm(status) !== 'active client';
-  });
+  // 2) Fallback SOLO para las cuentas que el bulk no devolvió (p. ej. si falló
+  //    una de las tandas de /accounts/status/summary).
+  //
+  //    Antes acá se recalculaba TODA cuenta que no fuera "active client",
+  //    tirando a la basura la respuesta del bulk y pidiendo 2 requests por
+  //    cuenta (/opportunities y /opportunities/candidates). Con 320 cuentas eran
+  //    243 recálculos = 486 requests con concurrencia 8: ~1 min y medio para
+  //    abrir el CRM.
+  //
+  //    Ya no hace falta: el bulk quedó alineado con deriveStatusFrom(). Se
+  //    comprobó contra las 320 cuentas de producción, 320/320 idénticos. Si
+  //    tocás deriveStatusFrom(), tenés que tocar también el `decide()` y las
+  //    CTEs de accounts_status_summary en backend/routes/metrics_routes.py.
+  const needsDetail = ids.filter(id => !(summary[id]?.status || ''));
   if (needsDetail.length) {
     const tasks = needsDetail.map(id => async () => {
       const hadSummary = Boolean(summary[id]);
@@ -1619,6 +1632,46 @@ function getRowContractValue(rowEl) {
   return label;
 }
 
+/**
+ * Trae status + contract de muchas cuentas de una, en tandas de 200.
+ * Devuelve Map<accountId, {status, contract}>. Las cuentas cuya tanda falle
+ * simplemente no aparecen en el Map, y el que llama decide qué hacer.
+ */
+async function fetchAccountDerivedBulk(ids = []) {
+  const out = new Map();
+  const list = (Array.isArray(ids) ? ids : []).map(Number).filter(Boolean);
+  if (!list.length) return out;
+
+  const CHUNK = 200;
+  const chunks = [];
+  for (let i = 0; i < list.length; i += CHUNK) chunks.push(list.slice(i, i + CHUNK));
+
+  const tasks = chunks.map(part => async () => {
+    try {
+      const res = await fetch(`${API_BASE}/accounts/status/summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_ids: part })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = await res.json();
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const id = Number(row?.account_id);
+        if (!id) return;
+        out.set(id, {
+          status: row?.status || '',
+          contract: row?.contract || null
+        });
+      });
+    } catch (err) {
+      console.warn('⚠️ Bulk derived-fields chunk failed:', err);
+    }
+  });
+
+  await runWithConcurrency(tasks, 4);
+  return out;
+}
+
 async function fetchSuggestedSalesLeadForAccount(accountId) {
   if (!accountId) return null;
   try {
@@ -1792,23 +1845,42 @@ async function refreshCrmDerivedFields(accountIds = null, { source = 'manual' } 
     const rowById = new Map(
       [...document.querySelectorAll('#accountTableBody tr[data-id]')].map(row => [Number(row.dataset.id), row])
     );
+    // Status y contract salen de UNA tanda de /accounts/status/summary.
+    //
+    // Antes cada cuenta pedía sus propias /opportunities y
+    // /opportunities/candidates y derivaba todo en el navegador: con 320
+    // cuentas eran ~640 requests con concurrencia 6, o sea el minuto y medio
+    // que tardaba en abrir el CRM. El backend ya calcula lo mismo en SQL
+    // (verificado contra las 320 cuentas de producción: idénticos en status y
+    // en contract).
+    const bulk = await fetchAccountDerivedBulk(ids);
+
     const tasks = ids.map(accountId => async () => {
       if (!accountId) return;
 
       try {
-        let opps = [];
-        let hires = [];
-        try {
-          const payload = await fetchAccountOppsAndHires(accountId);
-          opps = payload.opps;
-          hires = payload.hires;
-        } catch (err) {
-          console.warn(`⚠️ Could not load data for account ${accountId}:`, err);
-          return;
+        let derivedStatus;
+        let derivedContract;
+
+        const derived = bulk.get(accountId);
+        if (derived) {
+          derivedStatus = derived.status;
+          derivedContract = derived.contract;
+        } else {
+          // El bulk no trajo esta cuenta (una tanda falló). Camino viejo, de a
+          // una: es lento, pero normalmente no entra acá para ninguna cuenta,
+          // así que no cuesta nada y evita que un fallo del bulk deje los
+          // campos derivados sin actualizar.
+          try {
+            const payload = await fetchAccountOppsAndHires(accountId);
+            derivedStatus = deriveStatusFrom(payload.opps, payload.hires);
+            derivedContract = deriveContractTypeFromCandidates(payload.hires);
+          } catch (err) {
+            console.warn(`⚠️ Could not load data for account ${accountId}:`, err);
+            return;
+          }
         }
 
-        const derivedStatus = deriveStatusFrom(opps, hires);
-        const derivedContract = deriveContractTypeFromCandidates(hires);
         const patch = {};
 
         const row = rowById.get(accountId) || null;

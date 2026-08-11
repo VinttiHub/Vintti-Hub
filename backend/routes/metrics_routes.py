@@ -304,16 +304,24 @@ def accounts_status_summary():
               WHERE account_id = ANY(%s)
               GROUP BY account_id
             ),
+            -- "Tiene candidatos" se define por opportunity.candidato_contratado,
+            -- igual que GET /accounts/<id>/opportunities/candidates, que es de
+            -- donde el CRM sacaba el dato al recalcular en el navegador.
+            --
+            -- Antes esto arrancaba en `JOIN hire_opportunity`, y así contaba
+            -- hires fantasma: filas de hire_opportunity que existen sólo para
+            -- guardar las reference checks de un candidato (sin start_date ni
+            -- status) en opps que después se perdieron. Esas cuentas salían
+            -- "Inactive Client" cuando en realidad son "Lead Lost".
             hires AS (
               SELECT
                 o.account_id,
                 COUNT(*) > 0 AS has_candidates,
+                -- Espeja isActiveHire() de crm.js sobre el status derivado:
+                -- 'inactive' si hay end_date, 'active' si la opp está en Close Win.
                 BOOL_OR(
-                  TRIM(COALESCE(o.opp_stage, '')) = 'Close Win'
-                  AND (
-                    h.end_date IS NULL
-                    OR lower(COALESCE(h.status, '')) = 'active'
-                  )
+                  h.end_date IS NULL
+                  AND TRIM(COALESCE(o.opp_stage, '')) = 'Close Win'
                 ) AS any_active,
                 BOOL_OR(
                   (
@@ -324,9 +332,34 @@ def accounts_status_summary():
                     h.buyout_daterange IS NOT NULL
                     AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL
                   )
-                ) AS has_buyout
+                ) AS has_buyout,
+                -- Tipo de contrato: espeja deriveContractTypeFromCandidates() de
+                -- crm.js. Ojo: ahí el buyout SÓLO cuenta para hires activos
+                -- (está después del early-return de isActiveHire), a diferencia
+                -- de has_buyout de arriba, que mira todas las filas.
+                BOOL_OR(
+                  (h.end_date IS NULL AND TRIM(COALESCE(o.opp_stage, '')) = 'Close Win')
+                  AND lower(COALESCE(o.opp_model, '')) LIKE '%%staff%%'
+                ) AS contract_staffing,
+                BOOL_OR(
+                  (h.end_date IS NULL AND TRIM(COALESCE(o.opp_stage, '')) = 'Close Win')
+                  AND (
+                    lower(COALESCE(o.opp_model, '')) LIKE '%%recruit%%'
+                    OR (
+                      h.buyout_dolar IS NOT NULL
+                      AND NULLIF(TRIM(CAST(h.buyout_dolar AS TEXT)), '') IS NOT NULL
+                    )
+                    OR (
+                      h.buyout_daterange IS NOT NULL
+                      AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL
+                    )
+                  )
+                ) AS contract_recruiting
               FROM opportunity o
-              JOIN hire_opportunity h ON h.opportunity_id = o.opportunity_id
+              JOIN candidates c ON c.candidate_id = o.candidato_contratado
+              LEFT JOIN hire_opportunity h
+                     ON h.opportunity_id = o.opportunity_id
+                    AND h.candidate_id   = c.candidate_id
               WHERE o.account_id = ANY(%s)
               GROUP BY o.account_id
             )
@@ -337,7 +370,9 @@ def accounts_status_summary():
               COALESCE(hi.has_buyout, FALSE)     AS has_buyout,
               COALESCE(op.total_opps, 0) > 0     AS has_opps,
               COALESCE(op.has_pipeline, FALSE)   AS has_pipeline,
-              (COALESCE(op.total_opps,0) > 0 AND COALESCE(op.lost_opps,0) = COALESCE(op.total_opps,0)) AS all_lost
+              (COALESCE(op.total_opps,0) > 0 AND COALESCE(op.lost_opps,0) = COALESCE(op.total_opps,0)) AS all_lost,
+              COALESCE(hi.contract_staffing, FALSE)   AS contract_staffing,
+              COALESCE(hi.contract_recruiting, FALSE) AS contract_recruiting
             FROM account a
             LEFT JOIN opps  op ON op.account_id = a.account_id
             LEFT JOIN hires hi ON hi.account_id = a.account_id
@@ -364,11 +399,25 @@ def accounts_status_summary():
                 return 'Inactive Client'
             return 'Lead in Process'
 
+        def decide_contract(staffing, recruiting):
+            """Espeja deriveContractTypeFromCandidates() de crm.js."""
+            if staffing and recruiting:
+                return 'Mix'
+            if staffing:
+                return 'Staffing'
+            if recruiting:
+                return 'Recruiting'
+            return None
+
         out = []
-        for (acc_id, has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost) in rows:
+        for (acc_id, has_candidates, any_active, has_buyout, has_opps, has_pipeline,
+             all_lost, contract_staffing, contract_recruiting) in rows:
             out.append({
                 "account_id": acc_id,
-                "status": decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost)
+                "status": decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost),
+                # `contract` viaja acá para que el CRM no tenga que pedir
+                # /opportunities y /opportunities/candidates por cada cuenta.
+                "contract": decide_contract(contract_staffing, contract_recruiting),
             })
         return jsonify(out)
     except Exception as exc:
