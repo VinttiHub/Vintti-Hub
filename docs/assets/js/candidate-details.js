@@ -2777,7 +2777,7 @@ function hasAnyReferenceOverviewValue(values = {}) {
 
 async function loadCandidateReferenceOverviewFallback() {
   try {
-    const url = new URL('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/candidate_references/context');
+    const url = new URL(`${REFERENCE_API_BASE}/public/candidate_references/context`);
     url.searchParams.set('candidate_id', candidateId);
     if (window.__currentOppId) url.searchParams.set('opportunity_id', window.__currentOppId);
     const res = await fetch(url.toString());
@@ -2938,9 +2938,68 @@ function getDefaultReferenceQuestions(candidateName) {
   ];
 }
 
+// Same auto-detect the ✨ AI blocks below already use: served from localhost,
+// talk to the local backend. Without this the reference block would read from
+// production, which doesn't know about the AI columns yet.
+// Override per visit with ?api=<url>.
+const REFERENCE_API_BASE = (() => {
+  const override = new URLSearchParams(location.search).get('api');
+  if (override) return override.replace(/\/$/, '');
+  return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+})();
+
+const REFERENCE_RUNNING_LOCAL = REFERENCE_API_BASE.includes('127.0.0.1') || REFERENCE_API_BASE.includes('localhost');
+
+/** The backend always mints the production form URL. Locally, point it at the
+ *  page being served here so the form can actually be filled in and submitted. */
+function localizeReferenceFormUrl(url) {
+  if (!url || !REFERENCE_RUNNING_LOCAL) return url;
+  try {
+    const parsed = new URL(url);
+    return `${location.origin}/reference-feedback-form.html${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
+// Declared ahead of renderReferenceFeedbackActions so it is never read from the
+// temporal dead zone, whichever render path fires first.
+const REFERENCE_FLAG_META = {
+  green: { emoji: '🟢', label: 'Solid' },
+  amber: { emoji: '🟡', label: 'Check' },
+  red: { emoji: '🔴', label: 'Red flag' },
+  unknown: { emoji: '⚪', label: 'Not analyzed' },
+};
+
+const REFERENCE_REASON_LABELS = {
+  green: "Why it's solid",
+  amber: 'Why to check',
+  red: "Why it's a red flag",
+  unknown: 'Not analyzed',
+};
+
+// Which dimension tripped the flag — deliberately wider than "technical".
+const REFERENCE_CONCERN_LABELS = {
+  performance: 'Performance',
+  resilience: 'Resilience & pressure',
+  emotional: 'Emotional maturity',
+  behavior: 'Behaviour & teamwork',
+  reliability: 'Reliability',
+  integrity: 'Integrity',
+  communication: 'Communication',
+  technical: 'Technical',
+  growth: 'Growth & coachability',
+  fit: 'Role fit',
+  departure: 'Departure',
+  vague: 'Evasive answer',
+  other: 'Other',
+};
+
 async function loadReferenceFeedbackRequests(opportunityId = null) {
   try {
-    const url = new URL('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/reference_feedback/candidate');
+    const url = new URL(`${REFERENCE_API_BASE}/public/reference_feedback/candidate`);
     url.searchParams.set('candidate_id', candidateId);
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error(`Failed to load reference feedback requests (${res.status})`);
@@ -2948,7 +3007,10 @@ async function loadReferenceFeedbackRequests(opportunityId = null) {
     const requestMap = {};
     const submittedRefs = new Set();
     (data?.items || []).forEach((item) => {
-      requestMap[String(item.reference_number)] = item;
+      requestMap[String(item.reference_number)] = {
+        ...item,
+        public_url: localizeReferenceFormUrl(item.public_url || ''),
+      };
       if (item?.submitted_at) submittedRefs.add(Number(item.reference_number));
     });
     window.__referenceFeedbackRequests = requestMap;
@@ -2973,28 +3035,163 @@ function renderReferenceFeedbackActions(idx, hasReference = false) {
     return;
   }
 
-  const statusText = submitted
+  // Gated on the row we actually have, NOT on `submitted`: that Set is built by
+  // parsing the notes HTML, which aggregates every opportunity, so it can claim
+  // a reference replied while this row never did.
+  const hasResponse = Boolean(requestInfo?.submitted_at);
+  const analysis = requestInfo?.ai_analysis || null;
+
+  const statusText = hasResponse
     ? 'Response received'
     : requestInfo
     ? 'Form ready to share'
     : 'No feedback form yet';
-  const statusClass = submitted ? 'reference-overview-chip is-complete' : 'reference-overview-chip';
-  const buttonLabel = requestInfo ? 'Edit / share feedback form' : 'Create feedback form';
-  const viewButton = submitted && requestInfo
-    ? `<button type="button" class="reference-overview-action-btn is-secondary" data-reference-feedback-view="${idx}">View responses</button>`
-    : '';
+  const statusClass = hasResponse ? 'reference-overview-chip is-complete' : 'reference-overview-chip';
+  const countsChip = analysis ? referenceFlagCountsChip(analysis) : '';
+
+  // Exactly one primary action per state — whatever the next real step is.
+  // Everything else is demoted into the ··· menu so the card reads at a glance.
+  let primary;
+  if (!requestInfo) {
+    primary = { attr: `data-reference-feedback-builder="${idx}"`, label: 'Create feedback form' };
+  } else if (!hasResponse) {
+    primary = { attr: `data-reference-feedback-builder="${idx}"`, label: 'Share feedback form' };
+  } else if (!analysis) {
+    primary = { attr: `data-reference-feedback-analyze="${idx}"`, label: '✨ Analyze with AI' };
+  } else {
+    primary = { attr: `data-reference-feedback-view="${idx}"`, label: 'View responses & flags' };
+  }
+
+  const menuItems = [];
+  if (hasResponse && !analysis) {
+    menuItems.push(`<button type="button" role="menuitem" data-reference-feedback-view="${idx}">View responses</button>`);
+  }
+  if (requestInfo && hasResponse) {
+    menuItems.push(`<button type="button" role="menuitem" data-reference-feedback-builder="${idx}">Edit / share form</button>`);
+  }
+
   const currentUserEmail = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase().trim();
-  const deleteButton = REFERENCE_DELETE_ALLOWED_EMAILS.has(currentUserEmail)
-    ? `<button type="button" class="reference-overview-action-btn is-danger" data-reference-delete="${idx}">Delete reference</button>`
-    : '';
+  if (REFERENCE_DELETE_ALLOWED_EMAILS.has(currentUserEmail)) {
+    if (menuItems.length) menuItems.push('<hr />');
+    menuItems.push(`<button type="button" role="menuitem" class="is-danger" data-reference-delete="${idx}">Delete reference</button>`);
+  }
+
+  const menu = menuItems.length ? `
+    <div class="reference-menu">
+      <button type="button" class="reference-menu-toggle" data-reference-menu-toggle="${idx}"
+              aria-haspopup="true" aria-expanded="false" aria-label="More actions">⋯</button>
+      <div class="reference-menu-list" role="menu" hidden>${menuItems.join('')}</div>
+    </div>
+  ` : '';
 
   host.innerHTML = `
-    <span class="${statusClass}">${statusText}</span>
-    ${viewButton}
-    <button type="button" class="reference-overview-action-btn" data-reference-feedback-builder="${idx}">
-      ${buttonLabel}
-    </button>
-    ${deleteButton}
+    ${menu}
+    <div class="reference-status-row">
+      <span class="${statusClass}">${statusText}</span>
+      ${countsChip}
+    </div>
+    <button type="button" class="reference-primary-btn" ${primary.attr}>${primary.label}</button>
+  `;
+}
+
+/** Menus live inside a host that is re-rendered wholesale, so they only ever
+ *  need closing, never restoring. */
+function closeReferenceMenus(except = null) {
+  document.querySelectorAll('.reference-menu-list').forEach((list) => {
+    if (list === except) return;
+    list.hidden = true;
+    list.previousElementSibling?.setAttribute('aria-expanded', 'false');
+  });
+}
+
+/* ===== AI flagging of reference answers ===== */
+
+function referenceFlagMeta(flag) {
+  return REFERENCE_FLAG_META[flag] || REFERENCE_FLAG_META.unknown;
+}
+
+function referenceFlagCountsChip(analysis) {
+  const counts = analysis?.counts || {};
+  const parts = ['green', 'amber', 'red']
+    .filter((flag) => counts[flag])
+    .map((flag) => `${REFERENCE_FLAG_META[flag].emoji} ${counts[flag]}`);
+  if (!parts.length) return '';
+  return `<span class="reference-overview-chip is-ai-counts" title="AI flags across the answers">${parts.join(' ')}</span>`;
+}
+
+async function analyzeReferenceFeedback(referenceNumber, button) {
+  const requestInfo = window.__referenceFeedbackRequests?.[String(referenceNumber)];
+  if (!requestInfo?.request_id) {
+    alert('This reference has no feedback form on record yet.');
+    return;
+  }
+  if (!requestInfo.submitted_at) {
+    alert('This reference has not submitted the form yet.');
+    return;
+  }
+
+  const originalLabel = button?.innerHTML;
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = '✨ Analyzing…';
+  }
+
+  try {
+    const userEmail = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').trim();
+    const res = await fetch(
+      `${REFERENCE_API_BASE}/candidates/${encodeURIComponent(candidateId)}/reference_feedback/${referenceNumber}/analyze`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Email': userEmail },
+        body: JSON.stringify({ request_id: requestInfo.request_id }),
+      },
+    );
+
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // 503 is the OpenAI budget being exhausted — a real, actionable message
+      // that must not be flattened into "something went wrong".
+      alert(payload.error || `We could not analyze this reference (${res.status}).`);
+      return;
+    }
+
+    requestInfo.ai_analysis = payload.analysis;
+    await loadReferenceFeedbackRequests(window.__currentOppId).catch(console.error);
+    await openReferenceFeedbackResponses(referenceNumber);
+    showCuteToast(
+      payload.email_sent
+        ? 'Analysis ready — emailed to the team ✨'
+        : 'Analysis ready ✨ (the email could not be sent)',
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+    }
+  }
+}
+
+function buildReferenceRecencyBanner(recency) {
+  if (!recency) return '';
+  const meta = referenceFlagMeta(recency.flag);
+  const bits = [];
+  if (recency.stated_company) {
+    const period = recency.stated_period ? ` (${escapeReferenceHtml(recency.stated_period)})` : '';
+    bits.push(`<div><strong>Says they worked together at:</strong> ${escapeReferenceHtml(recency.stated_company)}${period}</div>`);
+  }
+  if (recency.matched_company) {
+    bits.push(`<div><strong>Matched CV entry:</strong> ${escapeReferenceHtml(recency.matched_company)} (${escapeReferenceHtml(recency.matched_period || '')})</div>`);
+  }
+  if (recency.used_fallback_company) {
+    bits.push('<div class="reference-recency-note">Submitted before we started asking where they worked together — matched against the company on file instead.</div>');
+  }
+
+  return `
+    <div class="reference-recency-banner reference-flag--${escapeReferenceHtml(recency.flag || 'unknown')}">
+      <div class="reference-recency-head">${meta.emoji} ${escapeReferenceHtml(recency.headline || 'Reference check')}</div>
+      ${recency.reason ? `<div class="reference-recency-reason">${escapeReferenceHtml(recency.reason)}</div>` : ''}
+      ${bits.join('')}
+    </div>
   `;
 }
 
@@ -3002,7 +3199,7 @@ async function deleteReference(referenceNumber) {
   const referenceName = window.__currentReferenceOverviewValues?.[`reference_${referenceNumber}_name`] || `Reference ${referenceNumber}`;
   if (!window.confirm(`Delete ${referenceName} and its feedback?`)) return;
 
-  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/candidate_references/delete_reference', {
+  const response = await fetch(`${REFERENCE_API_BASE}/public/candidate_references/delete_reference`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -3171,7 +3368,7 @@ async function generateReferenceFeedbackForm() {
       questions: draft.questions,
     };
 
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/reference_feedback/request', {
+    const res = await fetch(`${REFERENCE_API_BASE}/public/reference_feedback/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -3183,11 +3380,11 @@ async function generateReferenceFeedbackForm() {
     }
 
     const saved = await res.json();
-    draft.publicUrl = saved.public_url || '';
+    draft.publicUrl = localizeReferenceFormUrl(saved.public_url || '');
     draft.submittedAt = saved.submitted_at || null;
     window.__referenceFeedbackRequests[String(draft.referenceNumber)] = {
       ...saved,
-      public_url: saved.public_url || '',
+      public_url: draft.publicUrl,
       reference_number: draft.referenceNumber,
       questions: Array.isArray(saved.questions) ? saved.questions : [...payload.questions],
       answers: Array.isArray(saved.answers) ? saved.answers : [],
@@ -3228,13 +3425,57 @@ async function openReferenceFeedbackResponses(referenceNumber) {
 
   const questions = Array.isArray(requestInfo.questions) ? requestInfo.questions : [];
   const answers = Array.isArray(requestInfo.answers) ? requestInfo.answers : [];
-  content.innerHTML = questions.map((question, index) => `
-    <article class="reference-feedback-response-item">
-      <div class="reference-feedback-response-label">Question ${index + 1}</div>
-      <div class="reference-feedback-response-question">${escapeReferenceHtml(question)}</div>
-      <div class="reference-feedback-response-answer">${escapeReferenceHtml(answers[index] || '—')}</div>
-    </article>
-  `).join('');
+  const analysis = requestInfo.ai_analysis || null;
+  const flagItems = Array.isArray(analysis?.items) ? analysis.items : [];
+
+  const banner = analysis
+    ? buildReferenceRecencyBanner(analysis.reference_recency)
+    : '<div class="reference-recency-banner reference-flag--unknown">'
+      + '<div class="reference-recency-head">✨ Not analyzed yet</div>'
+      + '<div class="reference-recency-reason">Use "Analyze with AI" to flag each answer.</div>'
+      + '</div>';
+
+  // Built as one innerHTML assignment: this container is written wholesale, so
+  // a sibling banner element would be clobbered on the next render.
+  const items = questions.map((question, index) => {
+    const item = flagItems[index];
+    const meta = item ? referenceFlagMeta(item.flag) : null;
+    const pill = item
+      ? `<span class="reference-flag-pill reference-flag--${escapeReferenceHtml(item.flag)}">${meta.emoji} ${meta.label}</span>`
+      : '';
+    const concernLabel = item && item.concern && item.concern !== 'none'
+      ? REFERENCE_CONCERN_LABELS[item.concern] || item.concern
+      : '';
+    const concernTag = concernLabel
+      ? `<span class="reference-flag-concern">${escapeReferenceHtml(concernLabel)}</span>`
+      : '';
+    const reason = item?.reason
+      ? `<div class="reference-flag-reason reference-flag-reason--${escapeReferenceHtml(item.flag)}">
+           <span class="reference-flag-reason-label">${escapeReferenceHtml(REFERENCE_REASON_LABELS[item.flag] || REFERENCE_REASON_LABELS.unknown)}</span>
+           ${escapeReferenceHtml(item.reason)}
+         </div>`
+      : '';
+    return `
+      <article class="reference-feedback-response-item">
+        <div class="reference-feedback-response-label">Question ${index + 1} ${pill}${concernTag}</div>
+        <div class="reference-feedback-response-question">${escapeReferenceHtml(question)}</div>
+        <div class="reference-feedback-response-answer">${escapeReferenceHtml(answers[index] || '—')}</div>
+        ${reason}
+      </article>
+    `;
+  }).join('');
+
+  // Re-analyze lives here rather than on the card: this is where you can see the
+  // result and actually judge whether it is worth running again.
+  const toolbar = `
+    <div class="reference-response-toolbar">
+      <button type="button" class="reference-overview-action-btn is-ai" data-reference-feedback-analyze="${referenceNumber}">
+        ${analysis ? '↻ Re-analyze' : '✨ Analyze with AI'}
+      </button>
+    </div>
+  `;
+
+  content.innerHTML = banner + toolbar + items;
 
   modal.classList.remove('hidden');
 }
@@ -3266,8 +3507,9 @@ function buildReferenceOverviewMarkup(idx, values = {}) {
   if (phone) lines.push(`<div><strong>Phone:</strong> ${escapeReferenceHtml(phone)}</div>`);
   if (email) lines.push(`<div><strong>Email:</strong> <a href="mailto:${escapeReferenceHtml(email)}">${escapeReferenceHtml(email)}</a></div>`);
   if (linkedin) {
+    // Show a short label: the raw URL carries utm_* params that ate four lines.
     const href = normalizeReferenceLink(linkedin);
-    lines.push(`<div><strong>LinkedIn:</strong> <a href="${escapeReferenceHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeReferenceHtml(linkedin)}</a></div>`);
+    lines.push(`<div><strong>LinkedIn:</strong> <a href="${escapeReferenceHtml(href)}" target="_blank" rel="noopener noreferrer" title="${escapeReferenceHtml(linkedin)}">Open profile ↗</a></div>`);
   }
   body.innerHTML = lines.join('');
   renderReferenceFeedbackActions(idx, hasAny);
@@ -3281,11 +3523,29 @@ function renderReferenceOverview(values = {}) {
   const statusEl = document.getElementById('overview-reference-status');
   if (!statusEl) return;
 
-  const isComplete = [1, 2].every((idx) => (
-    ['name', 'position', 'company', 'phone', 'email', 'linkedin'].every((field) => values[`reference_${idx}_${field}`])
-  ));
-  statusEl.textContent = isComplete ? 'References received' : 'Waiting for references';
-  statusEl.classList.toggle('is-complete', isComplete);
+  // This used to report whether the six CONTACT fields were filled, which read as
+  // "Waiting for references" long after a reference had actually replied. Report
+  // the state of the feedback loop instead — that is what anyone is watching for.
+  const onFile = [1, 2].filter((idx) => (
+    ['name', 'position', 'company', 'phone', 'email', 'linkedin'].some((field) => values[`reference_${idx}_${field}`])
+  )).length;
+  const answered = [1, 2].filter((idx) => (
+    Boolean(window.__referenceFeedbackRequests?.[String(idx)]?.submitted_at)
+  )).length;
+  const reds = [1, 2].reduce((total, idx) => (
+    total + (window.__referenceFeedbackRequests?.[String(idx)]?.ai_analysis?.counts?.red || 0)
+  ), 0);
+
+  let label;
+  if (!onFile) label = 'Waiting for references';
+  else if (!answered) label = 'Waiting for feedback';
+  else if (answered < 2) label = `${answered} of 2 responses received`;
+  else label = 'All responses received';
+  if (reds) label += ` · 🔴 ${reds}`;
+
+  statusEl.textContent = label;
+  statusEl.classList.toggle('is-complete', answered >= 2);
+  statusEl.classList.toggle('has-red-flags', reds > 0);
 }
 
 if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
@@ -3499,6 +3759,21 @@ if (hireRevenue){
   const referenceFeedbackBuilder = document.getElementById('reference-feedback-builder');
   const referenceFeedbackQuestionInput = document.getElementById('reference-feedback-question-input');
   document.addEventListener('click', async (event) => {
+    const menuToggle = event.target.closest('[data-reference-menu-toggle]');
+    if (menuToggle) {
+      event.preventDefault();
+      const list = menuToggle.nextElementSibling;
+      const willOpen = list?.hidden;
+      closeReferenceMenus(willOpen ? list : null);
+      if (list) {
+        list.hidden = !willOpen;
+        menuToggle.setAttribute('aria-expanded', String(Boolean(willOpen)));
+      }
+      return;
+    }
+    // Any other click dismisses an open menu, including a click on one of its items.
+    closeReferenceMenus();
+
     const builderBtn = event.target.closest('[data-reference-feedback-builder]');
     if (builderBtn) {
       event.preventDefault();
@@ -3510,6 +3785,16 @@ if (hireRevenue){
     if (viewBtn) {
       event.preventDefault();
       openReferenceFeedbackResponses(Number(viewBtn.getAttribute('data-reference-feedback-view'))).catch(console.error);
+      return;
+    }
+
+    const analyzeBtn = event.target.closest('[data-reference-feedback-analyze]');
+    if (analyzeBtn) {
+      event.preventDefault();
+      analyzeReferenceFeedback(
+        Number(analyzeBtn.getAttribute('data-reference-feedback-analyze')),
+        analyzeBtn,
+      ).catch(console.error);
       return;
     }
 

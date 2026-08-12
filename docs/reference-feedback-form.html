@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Reference Feedback • Vintti</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="./assets/css/reference-feedback-form.css?v=2" />
+  <link rel="stylesheet" href="./assets/css/reference-feedback-form.css?v=3" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4" />
 </head>
 <body>
@@ -36,6 +36,28 @@
       </header>
 
       <form class="form" id="referenceFeedbackForm">
+        <section class="card">
+          <div class="card-head">
+            <h2>About your work together</h2>
+            <p>This tells us where your paths crossed, so we can place your feedback in context.</p>
+          </div>
+          <div class="shared-grid">
+            <label class="feedback-question shared-company">
+              <span>Company where you worked with <strong id="sharedCandidateLabel">the candidate</strong></span>
+              <input type="text" id="sharedCompany" name="shared_company" autocomplete="organization" required />
+            </label>
+            <label class="feedback-question">
+              <span>From (year)</span>
+              <input type="number" id="sharedFromYear" name="shared_from_year" inputmode="numeric" min="1950" required />
+            </label>
+            <label class="feedback-question">
+              <span>Until (year)</span>
+              <input type="number" id="sharedToYear" name="shared_to_year" inputmode="numeric" min="1950" required />
+            </label>
+          </div>
+          <p id="sharedYearsError" class="shared-error hidden" role="alert"></p>
+        </section>
+
         <section class="card">
           <div class="card-head">
             <h2>Questions</h2>
@@ -70,6 +92,6 @@
     </div>
   </div>
 
-  <script src="./assets/js/reference-feedback-form.js?v=2"></script>
+  <script src="./assets/js/reference-feedback-form.js?v=3"></script>
 </body>
 </html>

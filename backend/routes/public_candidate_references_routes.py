@@ -5,6 +5,9 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from db import get_connection
+# Same CTA block the feedback mails use, so the button looks and behaves
+# identically across every reference email.
+from routes.public_reference_feedback_routes import profile_cta_block
 
 
 bp = Blueprint('public_candidate_references', __name__, url_prefix='/public/candidate_references')
@@ -261,7 +264,7 @@ def _fetch_reference_email_context(cur, candidate_id, opportunity_id=None):
     return cur.fetchone()
 
 
-def _reference_email_html(ctx, merged, refs_to_include):
+def _reference_email_html(ctx, merged, refs_to_include, candidate_id=None):
     sections = []
     for idx in refs_to_include:
         sections.append(
@@ -280,6 +283,12 @@ def _reference_email_html(ctx, merged, refs_to_include):
     return f"""
     <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
       <h2 style="margin:0 0 12px;">Candidate reference update</h2>
+      {profile_cta_block(
+          candidate_id,
+          '🔗 Open in VinttiHub',
+          'Go to the candidate profile to review these references and send them the '
+          'feedback form.',
+      )}
       <p style="margin:0 0 10px;"><b>Candidate:</b> {_escape_html(ctx.get('candidate_name') or 'Candidate')}</p>
       <p style="margin:0 0 10px;"><b>Opportunity:</b> {_escape_html(ctx.get('opp_position_name') or '—')}</p>
       <p style="margin:0 0 10px;"><b>Account:</b> {_escape_html(ctx.get('account_name') or '—')}</p>
@@ -308,21 +317,21 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
     if len(submitted_refs) == 1:
         ref_idx = submitted_refs[0]
         subject = f"Reference {ref_idx} received for {candidate_name} • {opportunity_name}"
-        _send_email(subject, _reference_email_html(ctx, merged, [ref_idx]), recipients)
+        _send_email(subject, _reference_email_html(ctx, merged, [ref_idx], candidate_id=candidate_id), recipients)
 
     if len(submitted_refs) >= 2 and before_complete and after_complete:
         combined_recipients = list(recipients)
         if sales_lead:
             combined_recipients.append(sales_lead)
         subject = f"References updated for {candidate_name} • {opportunity_name}"
-        _send_email(subject, _reference_email_html(ctx, merged, [1, 2]), combined_recipients)
+        _send_email(subject, _reference_email_html(ctx, merged, [1, 2], candidate_id=candidate_id), combined_recipients)
 
     if after_complete and not before_complete:
         combined_recipients = list(recipients)
         if sales_lead:
             combined_recipients.append(sales_lead)
         subject = f"Both references received for {candidate_name} • {opportunity_name}"
-        _send_email(subject, _reference_email_html(ctx, merged, [1, 2]), combined_recipients)
+        _send_email(subject, _reference_email_html(ctx, merged, [1, 2], candidate_id=candidate_id), combined_recipients)
 
 
 def _resolve_candidate_hire(cur, candidate_id, opportunity_id=None):

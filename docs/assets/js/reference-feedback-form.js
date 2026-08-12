@@ -9,7 +9,50 @@ const API_BASE =
   const referenceLabel = document.getElementById('feedbackReferenceLabel');
   const questionsHost = document.getElementById('referenceFeedbackQuestions');
   const submittedOverlay = document.getElementById('referenceFeedbackSubmittedOverlay');
+  const sharedCandidateLabel = document.getElementById('sharedCandidateLabel');
+  const sharedCompanyInput = document.getElementById('sharedCompany');
+  const sharedFromInput = document.getElementById('sharedFromYear');
+  const sharedToInput = document.getElementById('sharedToYear');
+  const sharedYearsError = document.getElementById('sharedYearsError');
   document.querySelectorAll('.success-box').forEach((node) => node.remove());
+
+  const CURRENT_YEAR = new Date().getFullYear();
+  [sharedFromInput, sharedToInput].forEach((input) => {
+    if (input) input.max = String(CURRENT_YEAR);
+  });
+
+  function showSharedError(message) {
+    if (!sharedYearsError) return;
+    sharedYearsError.textContent = message || '';
+    sharedYearsError.classList.toggle('hidden', !message);
+  }
+
+  /** Returns the shared-work fields, or null when they don't hold together. */
+  function readSharedWork() {
+    const company = (sharedCompanyInput?.value || '').trim();
+    const from = Number(sharedFromInput?.value);
+    const to = Number(sharedToInput?.value);
+
+    if (!company) {
+      showSharedError('Please tell us where you worked with the candidate.');
+      return null;
+    }
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+      showSharedError('Please fill in both years.');
+      return null;
+    }
+    if (from < 1950 || to > CURRENT_YEAR) {
+      showSharedError(`Years must be between 1950 and ${CURRENT_YEAR}.`);
+      return null;
+    }
+    if (from > to) {
+      showSharedError('The "from" year cannot be later than the "until" year.');
+      return null;
+    }
+
+    showSharedError('');
+    return { shared_company: company, shared_from_year: from, shared_to_year: to };
+  }
 
   function qs(name) {
     return new URLSearchParams(window.location.search).get(name);
@@ -43,6 +86,16 @@ const API_BASE =
         <textarea name="answer_${index + 1}" rows="4" required>${escapeHtml(answers[index] || '')}</textarea>
       </label>
     `).join('');
+  }
+
+  function applySharedContext(ctx = {}) {
+    if (sharedCandidateLabel) {
+      sharedCandidateLabel.textContent = ctx.candidate_name || 'the candidate';
+    }
+    // Re-opening an already-submitted form should show what was sent.
+    if (sharedCompanyInput && ctx.shared_company) sharedCompanyInput.value = ctx.shared_company;
+    if (sharedFromInput && ctx.shared_from_year) sharedFromInput.value = ctx.shared_from_year;
+    if (sharedToInput && ctx.shared_to_year) sharedToInput.value = ctx.shared_to_year;
   }
 
   function decodePayload(value) {
@@ -120,6 +173,7 @@ const API_BASE =
       candidateLabel.textContent = payload.candidate_name || 'Candidate';
       referenceLabel.textContent = payload.reference_name || `Reference ${payload.reference_number}`;
       renderQuestions(payload.questions || [], payload.answers || []);
+      applySharedContext(payload);
       return payload;
     }
     if (!token) {
@@ -138,10 +192,17 @@ const API_BASE =
     candidateLabel.textContent = ctx.candidate_name || 'Candidate';
     referenceLabel.textContent = ctx.reference_name || `Reference ${ctx.reference_number}`;
     renderQuestions(ctx.questions || [], ctx.answers || []);
+    applySharedContext(ctx);
     return ctx;
   }
 
   async function submitFeedback(context = {}) {
+    const sharedWork = readSharedWork();
+    if (!sharedWork) {
+      sharedYearsError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     const token = getToken();
     const answers = Array.from(questionsHost.querySelectorAll('textarea')).map((textarea) => textarea.value.trim());
     let res;
@@ -149,7 +210,7 @@ const API_BASE =
       res = await fetch(`${getApiBase(context)}/public/reference_feedback/submit?t=${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, ...sharedWork }),
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
@@ -201,6 +262,7 @@ const API_BASE =
           candidate_name: context.candidate_name || '',
           questions: context.questions || [],
           answers,
+          ...sharedWork,
         }),
       });
       if (!persistRes.ok) {

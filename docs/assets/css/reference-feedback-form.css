@@ -24,6 +24,40 @@
   min-height: 120px;
 }
 
+/* "Where did you work together" — company takes the full row, years share the next. */
+.shared-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 14px 18px 4px;
+}
+
+.shared-grid .shared-company {
+  grid-column: 1 / -1;
+}
+
+.shared-grid input {
+  min-height: 0;
+}
+
+.shared-error {
+  margin: 0;
+  padding: 0 18px 18px;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shared-error.hidden {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .shared-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .submitted-overlay {
   position: fixed;
   inset: 0;

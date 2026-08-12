@@ -44,10 +44,24 @@ def _serialize_row(row):
         'candidate_name': row.get('candidate_name'),
         'questions': row.get('questions') or [],
         'answers': row.get('answers') or [],
+        'shared_company': row.get('shared_company'),
+        'shared_from_year': row.get('shared_from_year'),
+        'shared_to_year': row.get('shared_to_year'),
+        'ai_analysis': row.get('ai_analysis'),
+        'ai_analyzed_at': row['ai_analyzed_at'].isoformat() if row.get('ai_analyzed_at') else None,
         'submitted_at': row['submitted_at'].isoformat() if row.get('submitted_at') else None,
         'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
         'updated_at': row['updated_at'].isoformat() if row.get('updated_at') else None,
     }
+
+
+def _clean_year(value):
+    """Years come from a public form — reject anything that isn't plausible."""
+    try:
+        year = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return year if 1950 <= year <= datetime.utcnow().year + 1 else None
 
 
 def _escape_html(value):
@@ -259,11 +273,51 @@ def _render_feedback_reference_card(row):
     """
 
 
-def _reference_feedback_email_html(ctx, feedback_rows):
+def candidate_profile_url(candidate_id):
+    return f"https://vinttihub.vintti.com/candidate-details.html?id={candidate_id}"
+
+
+def profile_cta_block(candidate_id, title, body, margin='0 0 20px'):
+    """The email is where people find out something landed, so it is also where
+    they should be told what to do about it — and given the one click to do it.
+    Shared by the submit notification and the AI-analysis mail."""
+    if not candidate_id:
+        return ''
+    url = candidate_profile_url(candidate_id)
+    return f"""
+    <div style="margin:{margin};padding:18px 20px;border-radius:16px;
+                background:#eef2ff;border:1px solid #c7d2fe;">
+      <div style="font-size:16px;font-weight:800;color:#312e81;margin-bottom:6px;">
+        {title}
+      </div>
+      <div style="color:#3730a3;margin-bottom:14px;">
+        {body}
+      </div>
+      <a href="{url}"
+         style="display:inline-block;padding:11px 20px;border-radius:12px;
+                background:#4f46e5;color:#ffffff;text-decoration:none;
+                font-weight:700;font-size:14px;">
+        Open candidate profile →
+      </a>
+    </div>
+    """
+
+
+def _next_step_banner(candidate_id):
+    return profile_cta_block(
+        candidate_id,
+        '✨ You can now analyze this feedback',
+        'Open the candidate profile and hit <b>Analyze with AI</b> to flag every answer '
+        'green, amber or red — with the reason for each one.',
+    )
+
+
+def _reference_feedback_email_html(ctx, feedback_rows, candidate_id=None):
     sections = ''.join(_render_feedback_reference_card(row) for row in feedback_rows or [])
     return f"""
     <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
       <h2 style="margin:0 0 12px;">Reference feedback received</h2>
+      {_next_step_banner(candidate_id)}
       <p style="margin:0 0 10px;"><b>Candidate:</b> {_escape_html(ctx.get('candidate_name') or 'Candidate')}</p>
       <p style="margin:0 0 10px;"><b>Opportunity:</b> {_escape_html(ctx.get('opp_position_name') or '—')}</p>
       <p style="margin:0 0 10px;"><b>Account:</b> {_escape_html(ctx.get('account_name') or '—')}</p>
@@ -272,16 +326,28 @@ def _reference_feedback_email_html(ctx, feedback_rows):
     """
 
 
+def reference_feedback_recipients(ctx, include_sales_lead=False):
+    """Who hears about a reference. Shared by the submit notification and the
+    AI-analysis mail so there is a single rule for the whole circuit.
+
+    The sales lead is only looped in once BOTH references are in — they want the
+    full picture, not half of it.
+    """
+    hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
+    recipients = ['pgonzales@vintti.com', 'agostina@vintti.com']
+    if hr_lead:
+        recipients.insert(0, hr_lead)
+    if include_sales_lead:
+        sales_lead = str(ctx.get('opp_sales_lead') or '').strip().lower()
+        if sales_lead:
+            recipients.append(sales_lead)
+    return recipients
+
+
 def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, submitted_reference_number):
     ctx = _fetch_reference_feedback_email_context(cur, candidate_id, opportunity_id)
     if not ctx:
         return
-
-    hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
-    sales_lead = str(ctx.get('opp_sales_lead') or '').strip().lower()
-    recipients = ['pgonzales@vintti.com', 'agostina@vintti.com']
-    if hr_lead:
-        recipients.insert(0, hr_lead)
 
     cur.execute(
         """
@@ -314,16 +380,21 @@ def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, su
     candidate_name = ctx.get('candidate_name') or 'Candidate'
     opportunity_name = ctx.get('opp_position_name') or 'Opportunity'
 
-    if len(latest_by_reference) >= 2:
-        if sales_lead:
-            recipients.append(sales_lead)
+    both_in = len(latest_by_reference) >= 2
+    recipients = reference_feedback_recipients(ctx, include_sales_lead=both_in)
+
+    if both_in:
         subject = f"Reference feedback completed for {candidate_name} • {opportunity_name}"
         rows_for_email = [latest_by_reference[idx] for idx in (1, 2) if idx in latest_by_reference]
     else:
         subject = f"Reference {submitted_reference_number} feedback completed for {candidate_name} • {opportunity_name}"
         rows_for_email = [latest_by_reference[submitted_reference_number]]
 
-    _send_email(subject, _reference_feedback_email_html(ctx, rows_for_email), recipients)
+    _send_email(
+        subject,
+        _reference_feedback_email_html(ctx, rows_for_email, candidate_id=candidate_id),
+        recipients,
+    )
 
 
 def _sync_feedback_notes_to_candidate_and_hire(cur, candidate_id, opportunity_id=None):
@@ -450,6 +521,11 @@ def upsert_reference_feedback_request():
                         candidate_name = %s,
                         questions = %s,
                         answers = '[]'::jsonb,
+                        shared_company = NULL,
+                        shared_from_year = NULL,
+                        shared_to_year = NULL,
+                        ai_analysis = NULL,
+                        ai_analyzed_at = NULL,
                         submitted_at = NULL,
                         updated_at = NOW()
                     WHERE request_id IN (SELECT request_id FROM existing)
@@ -526,6 +602,11 @@ def upsert_reference_feedback_request():
                     candidate_name = EXCLUDED.candidate_name,
                     questions = EXCLUDED.questions,
                     answers = '[]'::jsonb,
+                    shared_company = NULL,
+                    shared_from_year = NULL,
+                    shared_to_year = NULL,
+                    ai_analysis = NULL,
+                    ai_analyzed_at = NULL,
                     submitted_at = NULL,
                     updated_at = NOW()
                 RETURNING *
@@ -581,7 +662,7 @@ def list_reference_feedback_requests():
                 SELECT DISTINCT ON (reference_number) *
                 FROM reference_feedback_requests
                 WHERE candidate_id = %s
-                ORDER BY reference_number ASC, updated_at DESC
+                ORDER BY reference_number ASC, updated_at DESC, request_id DESC
                 """,
                 (candidate_id,),
             )
@@ -633,6 +714,9 @@ def submit_reference_feedback():
 
     data = request.get_json(silent=True) or {}
     answers = _clean_list(data.get('answers'))
+    shared_company = _clean_text(data.get('shared_company'))
+    shared_from_year = _clean_year(data.get('shared_from_year'))
+    shared_to_year = _clean_year(data.get('shared_to_year'))
 
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -655,16 +739,31 @@ def submit_reference_feedback():
             return jsonify({'error': 'answers count must match questions count'}), 400
 
         submitted_at = datetime.utcnow()
+        # New answers invalidate any previous AI analysis — cleared in the SAME
+        # statement so the external reference's submit path keeps a single point
+        # of failure.
         cur.execute(
             """
             UPDATE reference_feedback_requests
             SET answers = %s,
+                shared_company = %s,
+                shared_from_year = %s,
+                shared_to_year = %s,
+                ai_analysis = NULL,
+                ai_analyzed_at = NULL,
                 submitted_at = %s,
                 updated_at = NOW()
             WHERE request_id = %s
             RETURNING *
             """,
-            (Json(answers), submitted_at, row['request_id']),
+            (
+                Json(answers),
+                shared_company,
+                shared_from_year,
+                shared_to_year,
+                submitted_at,
+                row['request_id'],
+            ),
         )
         updated = cur.fetchone()
 
@@ -738,6 +837,9 @@ def direct_submit_reference_feedback():
             Json(questions),
             Json(answers),
             submitted_at,
+            _clean_text(data.get('shared_company')),
+            _clean_year(data.get('shared_from_year')),
+            _clean_year(data.get('shared_to_year')),
         )
 
         if opportunity_id is None:
@@ -763,6 +865,11 @@ def direct_submit_reference_feedback():
                         candidate_name = %s,
                         questions = %s,
                         answers = %s,
+                        shared_company = %s,
+                        shared_from_year = %s,
+                        shared_to_year = %s,
+                        ai_analysis = NULL,
+                        ai_analyzed_at = NULL,
                         submitted_at = %s,
                         updated_at = NOW()
                     WHERE request_id IN (SELECT request_id FROM existing)
@@ -783,9 +890,12 @@ def direct_submit_reference_feedback():
                         questions,
                         answers,
                         submitted_at,
+                        shared_company,
+                        shared_from_year,
+                        shared_to_year,
                         updated_at
                     )
-                    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
                     WHERE NOT EXISTS (SELECT 1 FROM existing)
                     RETURNING *
                 )
@@ -806,6 +916,9 @@ def direct_submit_reference_feedback():
                     params[9],
                     params[10],
                     params[11],
+                    params[13],
+                    params[14],
+                    params[15],
                     params[12],
                     *params,
                 ),
@@ -827,9 +940,12 @@ def direct_submit_reference_feedback():
                     questions,
                     answers,
                     submitted_at,
+                    shared_company,
+                    shared_from_year,
+                    shared_to_year,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (candidate_id, opportunity_id, reference_number)
                 DO UPDATE SET
                     public_token = EXCLUDED.public_token,
@@ -841,6 +957,11 @@ def direct_submit_reference_feedback():
                     candidate_name = EXCLUDED.candidate_name,
                     questions = EXCLUDED.questions,
                     answers = EXCLUDED.answers,
+                    shared_company = EXCLUDED.shared_company,
+                    shared_from_year = EXCLUDED.shared_from_year,
+                    shared_to_year = EXCLUDED.shared_to_year,
+                    ai_analysis = NULL,
+                    ai_analyzed_at = NULL,
                     submitted_at = EXCLUDED.submitted_at,
                     updated_at = NOW()
                 RETURNING *

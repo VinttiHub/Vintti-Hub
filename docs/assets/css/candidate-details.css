@@ -2696,13 +2696,21 @@ html body .month-year .btn-clear:active{
   padding: 12px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98));
   min-width: 0;
-  overflow: hidden;
+  /* No `overflow: hidden` — it would clip the ··· dropdown. Long values are kept
+     in check by overflow-wrap on the body instead. */
+  position: relative;
+}
+
+.reference-overview-body {
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .reference-overview-item h4 {
   margin: 0 0 8px;
   font-size: 13px;
   color: #24324a;
+  padding-right: 36px; /* room for the ··· menu pinned top-right */
 }
 
 .reference-overview-body {
@@ -2731,10 +2739,129 @@ html body .month-year .btn-clear:active{
 
 .reference-overview-actions {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   margin-top: 12px;
   min-width: 0;
+}
+
+.reference-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The one thing to do next. Everything else is in the ··· menu. */
+.reference-primary-btn {
+  width: 100%;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .18s ease, opacity .12s ease;
+}
+
+.reference-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.24);
+}
+
+.reference-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+  transform: none;
+}
+
+.reference-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.reference-menu-toggle {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  color: #50607f;
+  border-radius: 10px;
+  width: 30px;
+  height: 26px;
+  line-height: 1;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reference-menu-toggle:hover {
+  background: #fff;
+  color: #1f2a44;
+}
+
+.reference-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  display: grid;
+  gap: 2px;
+}
+
+.reference-menu-list[hidden] {
+  display: none;
+}
+
+.reference-menu-list button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #40507c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reference-menu-list button:hover {
+  background: rgba(238, 242, 255, 0.9);
+}
+
+.reference-menu-list button.is-danger {
+  color: #b42318;
+}
+
+.reference-menu-list button.is-danger:hover {
+  background: rgba(255, 244, 244, 0.98);
+}
+
+.reference-menu-list hr {
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  margin: 4px 2px;
+}
+
+.reference-response-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.reference-status-badge.has-red-flags {
+  background: rgba(248, 113, 113, 0.14);
+  color: #a01111;
+  border-color: rgba(248, 113, 113, 0.3);
 }
 
 .reference-overview-action-btn {
@@ -2788,6 +2915,152 @@ html body .month-year .btn-clear:active{
   background: rgba(16, 185, 129, 0.12);
   color: #065f46;
   border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* ===== AI flagging of reference answers =====
+   Green is the brand lime (#c1ff72), which is far too light to read as text —
+   hence the dark ink on top. Every pill carries an emoji and a word as well as
+   a colour, so the verdict survives colour-blindness and greyscale printing. */
+
+.reference-overview-chip.is-ai-counts {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.22);
+  color: #40507c;
+  letter-spacing: 0.02em;
+}
+
+.reference-overview-action-btn.is-ai {
+  background: linear-gradient(135deg, rgba(193, 255, 114, 0.5), rgba(238, 242, 255, 0.95));
+  border-color: rgba(122, 162, 60, 0.32);
+  color: #3a6b00;
+}
+
+.reference-overview-action-btn.is-ai:disabled {
+  opacity: 0.65;
+  cursor: progress;
+  transform: none;
+}
+
+.reference-flag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+.reference-flag--green {
+  background: #c1ff72;
+  color: #3a6b00;
+  border: 1px solid rgba(122, 162, 60, 0.35);
+}
+
+.reference-flag--amber {
+  background: #ffe4a3;
+  color: #7a5200;
+  border: 1px solid rgba(191, 141, 0, 0.3);
+}
+
+.reference-flag--red {
+  background: #ffd9d9;
+  color: #a01111;
+  border: 1px solid rgba(220, 60, 60, 0.3);
+}
+
+.reference-flag--unknown {
+  background: #eceff5;
+  color: #50607f;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.reference-flag-concern {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #6d7c97;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* The verdict is the whole point of the feature, so it outranks the raw answer:
+   larger, heavier, and carrying the flag's own colour. */
+.reference-flag-reason {
+  margin-top: 14px;
+  padding: 12px 16px 13px 18px;
+  border-radius: 12px;
+  border-left: 5px solid var(--rf-accent);
+  background: var(--rf-bg);
+  color: var(--rf-ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.reference-flag-reason-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.reference-flag-reason--green {
+  --rf-accent: #7aa23c;
+  --rf-bg: rgba(193, 255, 114, 0.2);
+  --rf-ink: #33600a;
+}
+
+.reference-flag-reason--amber {
+  --rf-accent: #e0a300;
+  --rf-bg: rgba(255, 228, 163, 0.45);
+  --rf-ink: #6b4700;
+}
+
+.reference-flag-reason--red {
+  --rf-accent: #d84343;
+  --rf-bg: rgba(255, 217, 217, 0.55);
+  --rf-ink: #8f0f0f;
+  font-weight: 700;
+}
+
+.reference-flag-reason--unknown {
+  --rf-accent: #94a3b8;
+  --rf-bg: rgba(236, 239, 245, 0.85);
+  --rf-ink: #4b5872;
+}
+
+.reference-recency-banner {
+  padding: 16px 20px;
+  border-radius: 22px;
+  margin-bottom: 4px;
+  font-size: 14px;
+  line-height: 1.6;
+  display: grid;
+  gap: 4px;
+}
+
+.reference-recency-head {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.reference-recency-reason {
+  opacity: 0.92;
+}
+
+.reference-recency-note {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.78;
 }
 
 .reference-feedback-builder-meta {
