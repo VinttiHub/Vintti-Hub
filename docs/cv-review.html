@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV Review</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260813-badge" />
+  <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
+       Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260813-7" />
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <!-- Sólo sales leads + pgonzales. El gate real es del backend
+         (POST /cv_reviews/<id>/decision devuelve 403); esto evita que otros
+         tropiecen con una pantalla que no les sirve. -->
+    <div class="hirex-app cvr-app" id="cvrDenied" hidden>
+      <div class="hx-state">
+        <div class="hx-empty-mark"><i class="fa-solid fa-lock"></i></div>
+        <h3>Sales leads only</h3>
+        <p>This is where sales leads approve or reject the CVs recruiters build.</p>
+        <a class="hx-btn hx-btn-ghost" href="candidates.html">
+          <i class="fa-solid fa-arrow-left"></i> Back to candidates
+        </a>
+      </div>
+    </div>
+
+    <div class="hirex-app cvr-app" id="cvrApp" hidden>
+
+      <!-- ============ Topbar ============ -->
+      <header class="hx-topbar">
+        <div class="hx-brand">
+          <span class="hx-logo">CV Review</span>
+          <span class="hx-eyebrow">Sales sign-off</span>
+        </div>
+
+        <div class="hx-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="cvrSearch" type="search" autocomplete="off"
+                 placeholder="Search by candidate, position, client or recruiter" />
+        </div>
+
+        <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-ghost" id="cvrRefresh">
+            <i class="fa-solid fa-rotate"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <section class="hx-view">
+
+        <!-- ============ Toolbar ============ -->
+        <div class="hx-toolbar">
+          <div class="hx-filters">
+            <label class="hx-filter">
+              <span>Status</span>
+              <select id="cvrStatus">
+                <option value="pending">Waiting for review</option>
+                <option value="">All</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
+
+            <label class="hx-filter">
+              <span>Recruiter</span>
+              <select id="cvrRecruiter"><option value="">All recruiters</option></select>
+            </label>
+
+            <label class="hx-filter">
+              <span>From</span>
+              <input type="date" id="cvrFrom" />
+            </label>
+
+            <label class="hx-filter">
+              <span>To</span>
+              <input type="date" id="cvrTo" />
+            </label>
+
+            <label class="cvr-check">
+              <input type="checkbox" id="cvrMine" />
+              <span id="cvrMineLabel">Only mine</span>
+            </label>
+
+            <button class="hx-btn hx-btn-ghost" id="cvrApply">Apply</button>
+          </div>
+          <div class="hx-count" id="cvrCount">—</div>
+        </div>
+
+        <p class="cvr-scope" id="cvrScope"></p>
+
+        <!-- ============ Métricas por recruiter ============ -->
+        <div class="cvr-sec-head">
+          <h2>Per recruiter</h2>
+          <span class="cvr-window" id="cvrMetricsWindow"></span>
+          <details class="cvr-note">
+            <summary><i class="fa-regular fa-circle-question"></i> How these are counted</summary>
+            <div class="cvr-note-body">
+              A <b>profile</b> is one candidate for one vacancy, counted in the period it was
+              <b>first</b> sent. Rates are over profiles you already decided, so a backlog
+              doesn't flatter anyone. <b>CV quality</b> is the AI score of the <b>first</b>
+              round — later rounds are quality after your coaching — and only counts analyses
+              from the current rubric version. Rejection reasons are not exclusive, so their
+              percentages add up to more than 100.
+            </div>
+          </details>
+        </div>
+
+        <div id="cvrMetrics" class="cvr-metrics"></div>
+        <div class="hx-state cvr-state-sm" id="cvrMetricsEmpty" hidden>
+          <p>No profiles were sent to review in this period.</p>
+        </div>
+
+        <!-- ============ Cola ============ -->
+        <div class="cvr-sec-head">
+          <h2>Queue</h2>
+        </div>
+
+        <div class="hx-table-wrap" id="cvrQueueWrap" hidden>
+          <table class="hx-table cvr-table">
+            <thead>
+              <tr>
+                <th class="cvr-col-cand">Candidate</th>
+                <th>Position</th>
+                <th>Client</th>
+                <th>Recruiter</th>
+                <th class="cvr-col-round">Round</th>
+                <th class="cvr-col-score">Quality</th>
+                <th class="cvr-col-status">Status</th>
+                <th class="cvr-col-age">Age</th>
+              </tr>
+            </thead>
+            <tbody id="cvrQueue"></tbody>
+          </table>
+        </div>
+
+        <div class="hx-state" id="cvrQueueEmpty" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-check"></i></div>
+          <h3>Nothing to review</h3>
+          <p>When a recruiter sends a CV for sign-off, it lands here.</p>
+        </div>
+
+        <div class="hx-state" id="cvrQueueLoading">
+          <div class="hx-spinner"></div>
+          <p>Loading the queue…</p>
+        </div>
+      </section>
+
+      <!-- ============ Drawer de decisión ============ -->
+      <div class="hx-scrim" id="cvrScrim" hidden></div>
+      <aside class="hx-drawer cvr-drawer" id="cvrDrawer" role="dialog" aria-modal="true"
+             aria-labelledby="cvrDrawerTitle">
+        <header class="hx-drawer-head">
+          <div class="cvr-drawer-title">
+            <span class="hx-eyebrow" id="cvrDrawerEyebrow">Sales review</span>
+            <h2 id="cvrDrawerTitle">CV review</h2>
+            <p class="cvr-drawer-sub" id="cvrDrawerSub"></p>
+          </div>
+          <button class="hx-icon-btn" id="cvrClose" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+
+        <div class="hx-drawer-body">
+          <div class="cvr-warn" id="cvrDrift" hidden></div>
+
+          <details class="hx-section" open>
+            <summary>AI quality score</summary>
+            <div class="cvr-section-body">
+              <div id="cvrAi"></div>
+              <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="cvrReanalyze">
+                <i class="fa-solid fa-rotate"></i> Re-run the analysis
+              </button>
+            </div>
+          </details>
+
+          <details class="hx-section" open>
+            <summary>The CV</summary>
+            <div class="cvr-section-body">
+              <a id="cvrOpenCv" class="hx-btn hx-btn-soft cvr-open-cv" target="_blank" rel="noopener">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in a new tab
+              </a>
+              <iframe id="cvrFrame" class="cvr-frame" title="Candidate CV" loading="lazy"></iframe>
+            </div>
+          </details>
+
+          <details class="hx-section" id="cvrRoundsSection">
+            <summary>Previous rounds</summary>
+            <div class="cvr-section-body"><div id="cvrRounds" class="cvr-rounds"></div></div>
+          </details>
+
+          <div class="cvr-reject" id="cvrRejectForm" hidden>
+            <p class="cvr-field-label">Why is it going back? Pick every reason that applies.</p>
+            <div id="cvrReasons" class="cvr-reasons"></div>
+
+            <label class="hx-field" id="cvrReasonOtherWrap" hidden>
+              <span>Describe the other reason</span>
+              <input type="text" id="cvrReasonOther" placeholder="What else was wrong with it?" />
+            </label>
+
+            <label class="hx-field">
+              <span>Comment for the recruiter <em class="hx-hint">required</em></span>
+              <textarea id="cvrComment" rows="4"
+                placeholder="e.g. The About reads B1 at best and the JD asks for client-facing English. Ask her for a recording before re-sending."></textarea>
+            </label>
+          </div>
+
+          <p class="hx-err" id="cvrDrawerError"></p>
+        </div>
+
+        <!-- Aprobar y rechazar pesan LO MISMO en el flujo del sales lead, así que van
+             juntos y con el mismo peso visual. El rechazo pide razones, por eso son dos
+             pasos: Reject abre el formulario y el footer pasa a Cancel / Send it back. -->
+        <footer class="hx-drawer-foot" id="cvrDecisionFoot">
+          <span class="cvr-foot-hint" id="cvrFootHint"></span>
+          <div class="hx-foot-right">
+            <button type="button" class="hx-btn cvr-btn-reject" id="cvrRejectToggle">
+              <i class="fa-solid fa-xmark"></i> Reject
+            </button>
+            <button type="button" class="hx-btn hx-btn-primary" id="cvrApprove">
+              <i class="fa-solid fa-check"></i> Approve
+            </button>
+
+            <button type="button" class="hx-btn hx-btn-ghost" id="cvrRejectCancel" hidden>Cancel</button>
+            <button type="button" class="hx-btn hx-btn-danger" id="cvrRejectConfirm" hidden>
+              <i class="fa-solid fa-rotate-left"></i> Send it back
+            </button>
+          </div>
+        </footer>
+      </aside>
+
+    </div>
+  </main>
+
+  <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260813-8" defer></script>
+</body>
+</html>

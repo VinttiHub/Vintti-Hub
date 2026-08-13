@@ -10,6 +10,7 @@ from flask import Flask, request
 from flask_cors import CORS
 
 from admin_access import bootstrap_admin_user_access_table_async
+from cv_review_store import bootstrap_cv_review_tables_async
 from admin_routes import bp as admin_bp
 from ai_candidate_search_routes import bp_candidate_search
 from ai_routes import register_ai_routes
@@ -40,6 +41,7 @@ from routes.public_bonus_routes import bp as public_bonus_bp
 from routes.public_candidate_references_routes import bp as public_candidate_references_bp
 from routes.public_reference_feedback_routes import bp as public_reference_feedback_bp
 from routes.reference_feedback_ai_routes import bp as reference_feedback_ai_bp
+from routes.cv_review_routes import bp as cv_review_bp
 from routes.resume_tracking_routes import bp as resume_tracking_bp
 from routes.google_calendar_routes import bp as google_calendar_bp
 from routes.hubspot_routes import bp as hubspot_bp
@@ -70,6 +72,7 @@ def create_app() -> Flask:
     # Crea admin_user_access sin bloquear el arranque (App Runner paga este boot
     # en cada cold start). Ver admin_access.bootstrap_admin_user_access_table_async.
     bootstrap_admin_user_access_table_async()
+    bootstrap_cv_review_tables_async()
 
     @app.route("/health")
     def health():
@@ -121,6 +124,7 @@ def create_app() -> Flask:
     app.register_blueprint(public_candidate_references_bp)
     app.register_blueprint(public_reference_feedback_bp)
     app.register_blueprint(reference_feedback_ai_bp)
+    app.register_blueprint(cv_review_bp)
     app.register_blueprint(resume_tracking_bp)
     app.register_blueprint(dashboards_bp)
     app.register_blueprint(sales_snapshot_bp)

@@ -1,0 +1,435 @@
+/* =====================================================================
+   CV Review — extensión del design system de Hirex.
+   hirex.css aporta tokens, topbar, toolbar, tabla, drawer y estados; acá va
+   sólo lo que Hirex no tiene: tarjetas de métricas, panel del score AI,
+   formulario de rechazo y rondas.
+   Todo scopeado bajo .cvr-app y usando las variables --hx-*, así no hay un
+   segundo lenguaje visual dando vueltas.
+   ===================================================================== */
+
+.cvr-app [hidden] { display: none !important; }
+
+/* SIN ESPACIO, y esto no es un detalle: hirex.css tiene `.hirex-app [hidden]`, que es un
+   selector DESCENDENTE y sólo cubre a los hijos. El elemento raíz lleva `display:flex` de
+   `.hirex-app`, que le gana al [hidden] nativo del browser — así que las dos vistas raíz
+   (#cvrApp y #cvrDenied) se renderizaban siempre, y la de "sales leads only" tapaba la
+   página para todo el mundo. Hirex nunca lo necesitó porque su .hirex-app jamás se
+   esconde; acá hay dos y se alternan. */
+.hirex-app[hidden], .cvr-app[hidden] { display: none !important; }
+
+/* Checkbox suelto en la toolbar: NO usa .hx-field, porque ahí `input` es un
+   selector descendente que le mete width:100% y rompe la fila. */
+.cvr-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+  font-size: 13.5px;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cvr-check input { width: auto; margin: 0; accent-color: var(--hx-accent); }
+
+.cvr-app .hx-filter input[type="date"] {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--hx-ink);
+}
+.cvr-app .hx-filter input[type="date"]:focus {
+  outline: none;
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px var(--hx-accent-wash);
+}
+
+/* Deja explícito qué estás mirando: sin esto, un sales lead que sólo ve 2 filas no sabe
+   si es que hay 2 o si el filtro le está escondiendo el resto. */
+.cvr-scope {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--hx-muted);
+}
+.cvr-scope:empty { display: none; }
+
+/* ---------- Encabezados de sección ---------- */
+.cvr-sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 26px 0 12px;
+  flex-wrap: wrap;
+}
+.cvr-sec-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--hx-ink);
+}
+.cvr-window {
+  font-family: var(--hx-mono);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--hx-faint);
+}
+
+/* La explicación larga vive plegada: ocupaba media pantalla y se lee una vez. */
+.cvr-note { margin-left: auto; }
+.cvr-note > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--hx-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cvr-note > summary::-webkit-details-marker { display: none; }
+.cvr-note > summary:hover { color: var(--hx-ink); }
+.cvr-note-body {
+  margin-top: 8px;
+  padding: 12px 14px;
+  max-width: 74ch;
+  background: var(--hx-surface-2);
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--hx-ink-2);
+}
+
+/* ---------- Métricas por recruiter ---------- */
+.cvr-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+.cvr-mcard {
+  background: var(--hx-surface);
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-lg);
+  box-shadow: var(--hx-shadow);
+  padding: 16px 18px;
+}
+.cvr-mcard--total {
+  border-color: #d4dbff;
+  background: linear-gradient(180deg, var(--hx-accent-wash), var(--hx-surface) 62%);
+}
+.cvr-mcard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.cvr-mcard-head h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--hx-ink);
+}
+.cvr-mcard-sent { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-muted); }
+.cvr-mcard-sent b { color: var(--hx-ink); }
+
+.cvr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cvr-stat { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cvr-stat-v {
+  font-family: var(--hx-mono);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1;
+  color: var(--hx-ink);
+}
+.cvr-stat-l {
+  font-family: var(--hx-mono);
+  font-size: 9.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--hx-faint);
+}
+/* Semáforo del score. La lima de marca es muy clara para texto, así que va con
+   tinta oscura encima. */
+.cvr-q-good { color: var(--hx-lime-ink); }
+.cvr-q-mid  { color: var(--hx-amber-ink); }
+.cvr-q-low  { color: var(--hx-urgent); }
+.cvr-q-none { color: var(--hx-faint); }
+
+.cvr-reasons-list {
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--hx-line-2);
+  list-style: none;
+}
+.cvr-reasons-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12.5px;
+  color: var(--hx-ink-2);
+}
+.cvr-reasons-list b { font-family: var(--hx-mono); font-size: 11.5px; color: var(--hx-ink); }
+.cvr-mfoot {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--hx-faint);
+}
+
+/* ---------- Tabla de la cola ---------- */
+.cvr-table tbody tr:focus-visible { outline: 2px solid var(--hx-accent); outline-offset: -2px; }
+.cvr-col-cand { min-width: 190px; }
+.cvr-col-round, .cvr-col-score { width: 86px; text-align: center; }
+.cvr-col-status { width: 132px; }
+.cvr-col-age { width: 96px; }
+.cvr-cand { font-weight: 600; color: var(--hx-ink); }
+.cvr-oppid { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-faint); }
+.cvr-round, .cvr-score { font-family: var(--hx-mono); font-weight: 600; }
+.cvr-score-none { color: var(--hx-faint); font-family: var(--hx-mono); font-size: 12px; }
+.cvr-age { font-family: var(--hx-mono); font-size: 11.5px; color: var(--hx-muted); }
+.cvr-age--old { color: var(--hx-urgent); font-weight: 700; }
+
+/* Reusa .hx-status; sólo agrega los estados propios del review. */
+.cvr-st-pending   { background: var(--hx-amber); color: var(--hx-amber-ink); }
+.cvr-st-approved  { background: var(--hx-lime);  color: var(--hx-lime-ink); }
+.cvr-st-rejected  { background: #ffe0e7;         color: var(--hx-urgent); }
+.cvr-st-cancelled { background: var(--hx-slate); color: var(--hx-slate-ink); }
+
+.cvr-state-sm { padding: 28px 24px; }
+
+/* Rechazar tiene el mismo peso que aprobar: rojo legible, no un ghost gris perdido a la
+   izquierda. El rojo fuerte (hx-btn-danger) queda reservado para el paso de confirmación,
+   que es el que efectivamente devuelve el CV. */
+.cvr-btn-reject {
+  background: #fff0f3;
+  color: var(--hx-urgent);
+  border-color: #ffd4de;
+}
+.cvr-btn-reject:hover { background: #ffe3e9; border-color: #ffbccb; }
+.cvr-foot-hint {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--hx-muted);
+  max-width: 34ch;
+}
+
+/* ---------- Drawer ---------- */
+.cvr-drawer { width: min(680px, 96vw); }
+.cvr-drawer-title { min-width: 0; }
+.cvr-drawer-sub {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--hx-muted);
+}
+.cvr-section-body { padding: 2px 2px 18px; }
+
+.cvr-warn {
+  margin: 12px 0 4px;
+  padding: 11px 13px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.cvr-frame {
+  width: 100%;
+  height: 460px;
+  margin-top: 10px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r);
+  background: var(--hx-surface);
+}
+.cvr-open-cv, .cvr-rerun { margin-top: 10px; }
+
+/* ---------- Panel del score AI ---------- */
+.cvr-ai-none { margin: 0; font-size: 13px; line-height: 1.55; color: var(--hx-muted); }
+.cvr-ai-top { display: flex; gap: 16px; align-items: flex-start; }
+.cvr-ai-score {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: var(--hx-r);
+  background: var(--hx-surface-2);
+  border: 1px solid var(--hx-line);
+}
+.cvr-ai-score b {
+  font-family: var(--hx-mono);
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.cvr-ai-score span {
+  font-family: var(--hx-mono);
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  color: var(--hx-faint);
+  margin-top: 2px;
+}
+.cvr-ai-sum { flex: 1; min-width: 0; }
+.cvr-ai-sum p { margin: 7px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--hx-ink-2); }
+.cvr-verdict {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: var(--hx-slate);
+  color: var(--hx-slate-ink);
+}
+.cvr-verdict--ready { background: var(--hx-lime); color: var(--hx-lime-ink); }
+.cvr-verdict--needs_work { background: var(--hx-amber); color: var(--hx-amber-ink); }
+.cvr-verdict--not_sendable { background: #ffe0e7; color: var(--hx-urgent); }
+.cvr-ai-cap { font-size: 11.5px !important; color: var(--hx-amber-ink) !important; font-weight: 600; }
+
+/* Hallazgos: rojo = invención, ámbar = eco de la JD (advertencia, no puntúa). */
+.cvr-find { margin: 14px 0 0; padding: 11px 13px; border-radius: var(--hx-r-sm); }
+.cvr-find h5 { margin: 0 0 7px; font-size: 12px; font-weight: 700; }
+.cvr-find ul { margin: 0; padding-left: 16px; }
+.cvr-find li { font-size: 12.5px; line-height: 1.55; margin-bottom: 6px; }
+.cvr-find q { font-weight: 600; }
+.cvr-find--hard { background: #fff0f3; color: #8f0f2a; }
+.cvr-find--soft { background: var(--hx-surface-2); color: var(--hx-ink-2); }
+.cvr-find--echo { background: #fff8e8; color: var(--hx-amber-ink); }
+.cvr-echo-lead { margin: 0 0 8px; font-size: 11.5px; line-height: 1.5; opacity: .9; }
+.cvr-echo-jd {
+  margin: 3px 0 2px;
+  padding-left: 9px;
+  border-left: 2px solid currentColor;
+  font-size: 11.5px;
+  opacity: .75;
+}
+
+.cvr-note-block {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--hx-ink-2);
+}
+.cvr-fixes { margin: 14px 0 0; }
+.cvr-fixes h5 {
+  margin: 0 0 6px;
+  font-family: var(--hx-mono);
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--hx-faint);
+  font-weight: 600;
+}
+.cvr-fixes ul { margin: 0; padding-left: 16px; }
+.cvr-fixes li { font-size: 12.5px; line-height: 1.55; margin-bottom: 4px; color: var(--hx-ink-2); }
+
+/* Desglose de la rúbrica */
+.cvr-crits {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hx-line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cvr-crit-head { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.cvr-crit-head span:first-child { flex: 1; color: var(--hx-ink-2); }
+.cvr-crit-head b { font-family: var(--hx-mono); font-weight: 700; color: var(--hx-ink); }
+.cvr-crit-w { font-family: var(--hx-mono); font-size: 10px; color: var(--hx-faint); }
+.cvr-crit-calc { font-style: normal; font-size: 9.5px; color: var(--hx-faint); }
+.cvr-crit-bar { height: 4px; border-radius: 999px; background: var(--hx-line); overflow: hidden; margin-top: 5px; }
+.cvr-crit-bar span { display: block; height: 100%; background: var(--hx-accent); }
+.cvr-crit-note { margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--hx-muted); }
+.cvr-crit-ev { margin: 2px 0 0; font-size: 11.5px; color: var(--hx-faint); font-style: italic; }
+.cvr-ai-foot { margin: 12px 0 0; font-size: 11px; color: var(--hx-faint); }
+
+/* ---------- Rechazo ---------- */
+.cvr-reject {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r);
+  background: var(--hx-surface-2);
+}
+.cvr-field-label {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hx-ink-2);
+}
+.cvr-reasons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.cvr-reason {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+  font-size: 12.5px;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cvr-reason:hover { border-color: var(--hx-accent); }
+.cvr-reason:has(input:checked) {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-wash);
+  color: var(--hx-accent);
+  font-weight: 600;
+}
+/* width auto explícito: acá no aplica la regla de .hx-field, pero lo dejamos
+   fijado por si el marcado cambia. */
+.cvr-reason input { width: auto; flex: none; margin: 0; accent-color: var(--hx-accent); }
+.cvr-reject .hx-field { margin-bottom: 10px; }
+
+/* ---------- Rondas ---------- */
+.cvr-rounds { display: flex; flex-direction: column; gap: 8px; }
+.cvr-round {
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  padding: 10px 12px;
+  background: var(--hx-surface);
+}
+.cvr-round-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.cvr-round-n { font-family: var(--hx-mono); font-weight: 700; color: var(--hx-ink); }
+.cvr-round-date, .cvr-round-score { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-faint); }
+.cvr-round-line { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--hx-ink-2); }
+.cvr-round-comment {
+  margin: 7px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--hx-ink-2);
+}
+
+@media (max-width: 900px) {
+  .cvr-stats { grid-template-columns: repeat(2, 1fr); }
+  .cvr-note { margin-left: 0; width: 100%; }
+}

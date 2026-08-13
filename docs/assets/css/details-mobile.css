@@ -93,15 +93,22 @@
     padding: 0 0 12px;
   }
 
-  html[data-theme] .header-buttons-row .pill {
+  /* Los cuatro botones de acción, a ancho completo. Antes la lista nombraba sólo a dos,
+     así que Talent Drop y Send to Sales Review quedaban de otro ancho. */
+  html[data-theme] .header-buttons-row #client-version-btn,
+  html[data-theme] .header-buttons-row #talent-drop-btn,
+  html[data-theme] .header-buttons-row #ai-action-button,
+  html[data-theme] .header-buttons-row #send-to-review-btn {
     width: 100%;
     justify-content: center;
   }
 
-  html[data-theme] .header-buttons-row #client-version-btn,
-  html[data-theme] .header-buttons-row #ai-action-button {
-    width: 100%;
-    justify-content: center;
+  /* Los chips de estado NO se estiran: son estados, no botones, y a ancho completo
+     parecen otra acción más. Van centrados y a su tamaño. */
+  html[data-theme] .header-buttons-row #cv-review-chip,
+  html[data-theme] .header-buttons-row #client-view-indicator {
+    width: auto;
+    align-self: center;
   }
 
   html[data-theme] #resume .cv-container {

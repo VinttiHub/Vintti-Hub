@@ -1,3 +1,17 @@
+/* box-sizing global. Antes se declaraba regla por regla (unas 10 veces), así que todo lo
+   demás quedaba en content-box: cualquier `width: 100%` con padding lateral se pasaba del
+   contenedor por el ancho del padding — de ahí venía, por ejemplo, el hover del menú ⋯
+   derramándose fuera del panel.
+   Esta hoja la carga ÚNICAMENTE candidate-details.html, así que el `*` no toca ninguna
+   otra página. Con border-box, `width`/`height` pasan a incluir padding y borde: los
+   modales con padding quedan un poco más angostos y los inputs con `height` + padding
+   vertical, más bajos (que es como deberían haber estado siempre). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   --bg: #f9fafb;
   --text: #111827;
@@ -5528,34 +5542,173 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   margin: 18px 24px 0 24px; /* separación del menú y del contenido */
 }
 
-/* Reutiliza el estilo morado, pero ya no fijo */
+/* ===== Fila de acciones del Resume =====
+   Antes eran tres botones azules idénticos peleándose la atención, en una fuente
+   (Arial Rounded MT Bold) distinta a la de toda la página, y con scale(1.05) al hover que
+   los hacía sentir de juguete. Ahora hay jerarquía: UNA acción primaria (AI Assistant, la
+   que más se usa acá), el resto secundarias del mismo tamaño, y los estados como chips
+   visiblemente más livianos — porque un estado no es un botón y no debe parecerlo.
+   El orden se reacomoda por CSS (build -> review -> share) sin tocar el HTML ni el JS. */
 #client-version-btn,
 #talent-drop-btn,
-#ai-action-button {
+#ai-action-button,
+#send-to-review-btn {
+  /* position/width/z-index resetean el bloque legacy de #ai-action-button (L1947), que lo
+     dejaba fixed, de 170px de ancho y flotando sobre la página. */
   position: static;
-  background-color: #003BFF;
-  border: none;
-  border-radius: 12px;
-  color: white;
-  font-size: 15px;
-  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  width: auto;
+  min-width: 0;
+  z-index: auto;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-family: 'Onest', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
   text-decoration: none;
   cursor: pointer;
-  padding: 12px 20px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
+  white-space: nowrap;
+  box-shadow: none;
+  /* Los cuatro llevan class="pill", que trae margin-bottom:12px. En un flex con
+     align-items:center eso los sube 6px respecto de los chips y la fila queda torcida. */
+  margin-bottom: 0;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 
+/* Primaria: la única sólida y la única acción a la vista. */
+#ai-action-button {
+  order: 8;
+  background-color: #003BFF;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 59, 255, .28);
+}
+/* El scale(1.05) del hover legacy (L1975) se resetea acá para los cuatro: hacía que los
+   botones "saltaran" y empujaran a los de al lado. */
 #client-version-btn:hover,
 #talent-drop-btn:hover,
-#ai-action-button:hover {
-  background-color: #003BFF;
-  transform: scale(1.05);
+#ai-action-button:hover,
+#send-to-review-btn:hover { transform: none; }
+
+#ai-action-button:hover { background-color: #0031d6; }
+
+/* ===== Menú ⋯ de acciones secundarias =====
+   Cuatro botones del mismo peso en fila no son una jerarquía, son cuatro cosas. Queda a
+   la vista sólo la acción primaria; el resto vive acá adentro. */
+.hdr-more { order: 9; position: relative; display: inline-flex; }
+
+.hdr-more-btn {
+  height: 38px;
+  width: 38px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #dbe3f5;
+  background: #fff;
+  color: #40506d;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .16s ease, border-color .16s ease;
 }
+.hdr-more-btn:hover { background: #f4f7ff; border-color: #b9c8ee; }
+.hdr-more-btn[aria-expanded="true"] { background: #eef2ff; border-color: #b9c8ee; }
+
+.hdr-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 218px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e4ebfb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hdr-menu[hidden] { display: none; }
+
+/* Los tres ítems del menú. Pisan el bloque de botones de arriba (mismos IDs), así que
+   acá se resetea todo lo que allá los hacía botones sueltos. */
+.hdr-menu-item,
+.hdr-menu #client-version-btn,
+.hdr-menu #talent-drop-btn,
+.hdr-menu #send-to-review-btn {
+  order: 0;
+  /* NADA de width:100% acá. Esta página no tiene un box-sizing:border-box global (lo
+     aplica regla por regla), así que 100% + padding lateral hacía que el ítem midiera
+     20px más que el panel y el hover se derramara por el borde derecho. En un flex en
+     columna los hijos ya se estiran solos con align-items:stretch. */
+  box-sizing: border-box;
+  height: auto;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: #1c2b4a;
+  font-family: 'Onest', system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  justify-content: flex-start;
+  gap: 9px;
+  cursor: pointer;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.hdr-menu-item:hover,
+.hdr-menu #client-version-btn:hover,
+.hdr-menu #talent-drop-btn:hover,
+.hdr-menu #send-to-review-btn:hover {
+  background: #f4f7ff;
+  border-color: transparent;
+  transform: none;
+}
+.hdr-menu-ico { font-size: 14px; line-height: 1; width: 17px; text-align: center; }
+
+/* Estados, no acciones: más chicos, sin sombra, sin borde. La diferencia de altura
+   (38px vs 28px) es lo que le dice al ojo "esto no se aprieta para actuar". */
+#cv-review-chip,
+#client-view-indicator {
+  order: 1;
+  height: 28px;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  font-family: 'Onest', system-ui, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  margin-bottom: 0 !important;
+  box-shadow: none !important;
+  /* SIN !important en display, a propósito: con !important esta regla (especificidad de
+     ID) le ganaba a `.hidden { display:none !important }` (una clase), así que el chip no
+     se podía esconder nunca y quedaba un globo gris vacío cuando no había review.
+     Sin !important, el ID igual le gana a `.pill { display:inline-block }`, que es lo
+     único que hay que vencer. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* El chip de review sí se puede abrir, así que se le nota al pasar por encima. */
+#cv-review-chip { cursor: pointer; }
+#cv-review-chip:hover { filter: brightness(.97); }
 
 /* ===== Mantener el menú fijo al hacer scroll ===== */
 .header-row {
@@ -5950,4 +6103,169 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   .star-popup.star-chat { padding: 10px; }
   .star-chat-dialog { width: 100%; max-height: calc(100vh - 20px); }
   .star-chat-log { max-height: 40vh; }
+}
+
+/* ===================== CV Review (gate de sales lead) ===================== */
+/* El chip vive en .header-buttons-row junto a Client Version / Talent Drop.
+   Verde lima de marca (#c1ff72) para aprobado, con texto oscuro porque la lima
+   sola es demasiado clara para leerse. */
+/* Sólo los colores semánticos del chip. La forma, el tamaño y la jerarquía de toda la
+   fila viven arriba, en el bloque de .header-buttons-row — acá abajo sólo se pisaban. */
+.cv-review-chip--pending  { background: #ffeccc; color: #8a5a00; }
+.cv-review-chip--approved { background: #c1ff72; color: #3a6b00; }
+.cv-review-chip--rejected { background: #ffe0e7; color: #a4103a; }
+
+#cv-review-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  font-family: 'Onest', sans-serif;
+}
+#cv-review-popup.hidden { display: none; }
+
+.cv-review-dialog {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: min(90vh, 860px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background: #fff;
+  box-shadow: 0 40px 120px rgba(12, 5, 28, 0.32);
+}
+
+.cv-review-close { position: absolute; top: 16px; right: 20px; z-index: 2; }
+
+.cv-review-hero {
+  padding: 30px 34px 20px;
+  background: linear-gradient(135deg, rgba(108, 56, 255, 0.10), rgba(75, 169, 255, 0.10));
+  border-bottom: 1px solid #eef2ff;
+}
+.cv-review-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #6c38ff;
+  margin-bottom: 6px;
+}
+.cv-review-hero h3 { margin: 0 0 8px; font-size: 22px; color: #172036; }
+.cv-review-subtitle { margin: 0; color: #50607f; font-size: 14px; line-height: 1.5; }
+
+.cv-review-content {
+  padding: 22px 34px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cv-review-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 16px 18px;
+  background: #fbfcff;
+}
+.cv-review-card > label {
+  display: block;
+  font-weight: 700;
+  font-size: 14px;
+  color: #172036;
+  margin-bottom: 8px;
+}
+.cv-review-card select,
+.cv-review-card textarea {
+  width: 100%;
+  border: 1px solid #dbe6ff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.cv-review-card textarea { resize: vertical; }
+
+.cv-review-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cv-review-history { display: flex; flex-direction: column; gap: 10px; }
+.cv-review-hist-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #50607f;
+}
+.cv-review-hist-item {
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.cv-review-hist-head { font-size: 14px; color: #172036; margin-bottom: 6px; }
+.cv-review-hist-status {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.cv-review-hist-status--pending  { background: #ffe4a3; color: #7a5200; }
+.cv-review-hist-status--approved { background: #c1ff72; color: #3a6b00; }
+.cv-review-hist-status--rejected { background: #ffd9d9; color: #a01111; }
+.cv-review-hist-line { font-size: 13px; color: #42516a; margin-top: 3px; }
+.cv-review-hist-comment {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f4f6fb;
+  color: #172036;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cv-review-hist-drift {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7a5200;
+}
+
+.cv-review-footer {
+  padding: 18px 34px 24px;
+  border-top: 1px solid #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fbfcff;
+}
+.cv-review-error { margin: 0; color: #a01111; font-size: 13px; font-weight: 600; }
+.cv-review-footer .generate-btn { flex: 0 0 auto; }
+.cv-review-footer .generate-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  #cv-review-popup { padding: 10px; }
+  .cv-review-dialog { width: 100%; max-height: calc(100vh - 20px); }
+  .cv-review-hero, .cv-review-content, .cv-review-footer { padding-left: 18px; padding-right: 18px; }
+  .cv-review-footer { flex-direction: column; align-items: stretch; }
 }

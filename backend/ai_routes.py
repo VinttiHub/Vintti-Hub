@@ -1399,9 +1399,27 @@ TAILORING TO THE TARGET ROLE
   * Give more bullets (4-6) to roles whose work overlaps the target role; give fewer (1-3)
     to roles that do not.
   * Prefer source facts that match the job description's responsibilities, tools, industry
-    and seniority. Use the client's vocabulary ONLY when the candidate's own source contains
-    an equivalent fact. Renaming a candidate's experience to match the JD is fabrication.
-  * Never claim a JD requirement the candidate did not actually demonstrate. Gaps stay gaps.
+    and seniority. This is the whole point of tailoring: a CV that ignores the JD is a
+    worse CV. Align hard on SUBSTANCE.
+  * But NEVER align on WORDING. The job description tells you what to LOOK FOR in the
+    source material; it is never a source of content. Do not lift a sentence, a phrase or
+    a responsibility line out of the JD and conjugate it into the candidate's history.
+    Write every bullet in the candidate's own terms, from what the source actually says.
+  * THE TEST — apply it to every bullet you write: could this exact sentence be written
+    for ANY candidate applying to this job? If yes, it is the job description talking, not
+    this person. Rewrite it around the specific thing THIS candidate did, or drop it.
+    Illustration of the failure this rule exists to prevent. It is from a DIFFERENT,
+    unrelated opening — never reuse its wording:
+      JD says:  "Process vendor invoices and reconcile accounts payable in NetSuite."
+      CV said:  "Processes vendor invoices and reconciles accounts payable in NetSuite."
+      That is the JD line with the verbs conjugated. Three different candidates for that
+      opening were handed the same sentence, so the client read their own posting back
+      three times under three names. Never do this.
+  * Sharing a KEYWORD with the JD is good when the source proves it ("NetSuite" in both,
+    "influencer campaigns" in both). Sharing a whole CLAUSE is the failure. If more than a
+    few consecutive words match the JD, you are copying — rewrite it.
+  * Never claim a JD requirement the candidate did not actually demonstrate. Gaps stay
+    gaps. Renaming a candidate's experience to match the JD is fabrication.
 - Do NOT reorder the roles themselves. Work experience is always reverse-chronological
   (most recent first), and education is reverse-chronological too.
 
@@ -1453,6 +1471,16 @@ ABOUT
 - Name the real companies, degrees and institutions when the source gives them.
 - Then the two or three strengths most relevant to the target role, then the core
   tools/industries. Close with education or a differentiator only if it adds something.
+- THOSE STRENGTHS ARE SELECTED FROM THE SOURCE, NEVER IMPORTED FROM THE JOB DESCRIPTION.
+  The target role only decides WHICH of the candidate's real strengths to lead with. Never
+  name an industry, platform, channel or specialty in the About unless the source material
+  evidences it for this candidate. The About is the first thing the client reads, so a
+  borrowed phrase here is the most expensive kind.
+  Concrete failure this rule exists to stop: the opening was for a beauty/influencer social
+  media role, the candidate's source only showed SEO, paid media and analytics, and the
+  About still claimed "experienced in managing social media and influencer marketing
+  campaigns, particularly in the beauty industry". None of that was in the source. If the
+  candidate does not have what the role wants, the About says what they DO have.
 - Grounded and specific. These phrases are BANNED outright, even if the source CV uses them
   in its own summary: "passionate", "results-driven", "dynamic professional", "proven track
   record", "proven ability", "team player", "detail-oriented", "strong background",
@@ -1811,6 +1839,12 @@ Go back over your draft and verify each of these. Fix anything that fails.
 - Every company and institution name is the full version the source uses; no "Unnamed" or
   invented placeholders anywhere.
 - Every bullet can be pointed back to a specific line in the source material.
+- JD LEAK SWEEP — do this over the WHOLE draft, About included, not just the bullets. Take
+  every industry, platform, tool, channel and specialty you named anywhere in the CV and
+  ask: does the SOURCE MATERIAL show this candidate doing it? If it only appears in the job
+  description, delete it. Then re-read each sentence and ask whether it could have been
+  written for any other applicant to this same opening; if yes, it is the JD talking and it
+  has to go or be rewritten around what this person actually did.
 - No meta-commentary about the CV or the sources anywhere.
 - The About does not contain any banned filler phrase and does not start with "This
   candidate" or "A professional".

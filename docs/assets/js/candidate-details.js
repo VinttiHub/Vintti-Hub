@@ -607,6 +607,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // pills
     const onResume = tabId === 'resume';
+    // Se esconde la FILA entera, no sólo los pills de a uno. La fila vive en el flujo
+    // del documento entre #overview y #resume, así que cualquier hijo visible aparece
+    // flotando al fondo de la pestaña equivocada — le pasaba al badge "Seen by client",
+    // que loadClientViewStats() inyecta acá y nadie apagaba.
+    document.querySelector('.header-buttons-row')?.classList.toggle('hidden', !onResume);
     aiButton?.classList.toggle('hidden', !onResume);
     clientBtn?.classList.toggle('hidden', !onResume);
     talentDropBtn?.classList.toggle('hidden', !onResume);
@@ -4725,12 +4730,13 @@ if (clientBtn && candidateId) {
   const row = document.querySelector('.header-buttons-row');
   if (!row) return;
 
+  // Arranca escondido: un chip que dice "cargando" o "todavía nadie lo abrió" es ruido —
+  // ocupa lugar para informar que NO pasó nada. Sólo aparece cuando hay algo que contar.
   const badge = document.createElement('span');
   badge.id = 'client-view-indicator';
-  badge.className = 'pill';
+  badge.className = 'pill hidden';
   badge.style.cssText =
     'display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:default;';
-  badge.textContent = '👁️ …';
   row.appendChild(badge);
 
   const fmt = (iso) => {
@@ -4830,12 +4836,11 @@ if (clientBtn && candidateId) {
         badge.style.background = '#e6f7ed';
         badge.style.color = '#1a7a44';
         badge.style.cursor = 'pointer';
+        badge.classList.remove('hidden');
         badge.addEventListener('click', (e) => { e.stopPropagation(); openPopover(); });
-      } else {
-        badge.textContent = '👁️ Not opened by client yet';
-        badge.style.background = '#f0f0f3';
-        badge.style.color = '#888';
       }
+      // count === 0: se queda escondido. Que no haya chip ES la señal de que el cliente
+      // todavía no lo abrió; un chip gris diciéndolo ocupaba lugar para no aportar nada.
     })
     .catch(() => {
       badge.remove();
@@ -5128,4 +5133,333 @@ function _replaceDateText(node){
   run();
   const mo = new MutationObserver(run);
   mo.observe(hire, { childList:true, subtree:true });
+})();
+
+// ===========================================================================
+// CV Review — gate de sales lead antes de que el CV salga al cliente.
+//
+// Advisory a propósito: el pill "Client Version" sigue funcionando. Bloquearlo daría
+// falsa seguridad, porque resume-readonly.html?id=N no tiene token, el id es un entero
+// secuencial y cualquiera puede compartir el link o exportar el PDF antes de aprobar.
+// Lo que sí hacemos es mostrar el estado al lado, para que nadie mande a ciegas.
+//
+// El estado va scopeado a (candidato, oportunidad), no al candidato: la tabla `resume`
+// tiene UNA fila por candidato, así que el mismo CV se comparte entre vacantes.
+// ===========================================================================
+(function wireCvReview(){
+  const API = candidatesApiBase();
+  const cid = new URLSearchParams(location.search).get('id');
+  if (!cid) return;
+
+  const openBtn  = document.getElementById('send-to-review-btn');
+  const chip     = document.getElementById('cv-review-chip');
+  const popup    = document.getElementById('cv-review-popup');
+  const closeBtn = popup?.querySelector('.cv-review-close');
+  const sel      = document.getElementById('cv-review-opportunity');
+  const noteEl   = document.getElementById('cv-review-note');
+  const histEl   = document.getElementById('cv-review-history');
+  const errEl    = document.getElementById('cv-review-error');
+  const sendBtn  = document.getElementById('cv-review-submit');
+  if (!openBtn || !chip || !popup || !sel || !sendBtn) return;
+
+  const me = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase().trim();
+
+  let reviews = [];        // todas las rondas del candidato, cualquier oportunidad
+  let reasonLabels = {};   // code -> label, del backend
+
+  const headers = () => ({ 'Content-Type': 'application/json', 'X-User-Email': me });
+
+  // --- estado por oportunidad ---------------------------------------------
+  // La ronda más alta de esa oportunidad es la que manda.
+  function latestFor(oppId){
+    const id = Number(oppId);
+    if (!id) return null;
+    return reviews
+      .filter(r => Number(r.opportunity_id) === id && r.status !== 'cancelled')
+      .sort((a, b) => b.round - a.round)[0] || null;
+  }
+
+  const CHIP = {
+    pending:  { text: '⏳ In review',   cls: 'cv-review-chip--pending'  },
+    approved: { text: '✅ Approved',    cls: 'cv-review-chip--approved' },
+    rejected: { text: '❌ Rejected',    cls: 'cv-review-chip--rejected' },
+  };
+
+  function paintChip(){
+    // Sin ambigüedad = una sola oportunidad con review. Con varias, mostramos la más
+    // reciente y el detalle aclara de cuál se trata: es mejor que no mostrar nada.
+    const live = reviews.filter(r => r.status !== 'cancelled');
+    if (!live.length){ chip.classList.add('hidden'); return; }
+    const latest = live.slice().sort((a, b) =>
+      new Date(b.requested_at) - new Date(a.requested_at))[0];
+    const meta = CHIP[latest.status];
+    if (!meta){ chip.classList.add('hidden'); return; }
+
+    // La pestaña la gobierna setActiveTab() escondiendo la fila entera; acá sólo
+    // decidimos si el chip tiene algo que decir.
+    chip.className = `pill cv-review-chip ${meta.cls}`;
+    chip.textContent = meta.text + (latest.round > 1 ? ` · round ${latest.round}` : '');
+    chip.title = 'Open the review detail';
+    chip.dataset.reviewId = String(latest.review_id);
+  }
+
+  function reviewDetailHtml(r){
+    const bits = [];
+    bits.push(`<div class="cv-review-hist-head">
+        <b>Round ${r.round}</b> · ${escapeHtml(r.opp_position_name || 'Opportunity')}
+        ${r.client_name ? '· ' + escapeHtml(r.client_name) : ''}
+        <span class="cv-review-hist-status cv-review-hist-status--${r.status}">${r.status}</span>
+      </div>`);
+    if (r.ai_score !== null && r.ai_score !== undefined) {
+      bits.push(`<div class="cv-review-hist-line">CV quality: <b>${r.ai_score}/100</b></div>`);
+    } else if (r.ai_pending) {
+      bits.push('<div class="cv-review-hist-line">CV quality: scoring…</div>');
+    } else if (r.ai_error === 'no_jd') {
+      bits.push('<div class="cv-review-hist-line">CV quality: no job description on that opportunity.</div>');
+    } else if (r.ai_error) {
+      bits.push('<div class="cv-review-hist-line">CV quality: could not be scored.</div>');
+    }
+    if (r.reasons?.length) {
+      const labels = r.reasons.map(c => escapeHtml(reasonLabels[c] || c)).join(', ');
+      bits.push(`<div class="cv-review-hist-line"><b>Reasons:</b> ${labels}</div>`);
+    }
+    if (r.reject_other) {
+      bits.push(`<div class="cv-review-hist-line"><b>Other:</b> ${escapeHtml(r.reject_other)}</div>`);
+    }
+    if (r.reviewer_comment) {
+      bits.push(`<div class="cv-review-hist-comment">${escapeHtml(r.reviewer_comment)}</div>`);
+    }
+    if (r.resume_drift) {
+      bits.push('<div class="cv-review-hist-drift">⚠️ The CV changed after this round was submitted.</div>');
+    }
+    return `<article class="cv-review-hist-item">${bits.join('')}</article>`;
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+
+  function paintHistory(){
+    if (!histEl) return;
+    const oppId = Number(sel.value);
+    const list = reviews
+      .filter(r => !oppId || Number(r.opportunity_id) === oppId)
+      .sort((a, b) => b.round - a.round);
+    histEl.innerHTML = list.length
+      ? `<h4 class="cv-review-hist-title">Previous rounds</h4>${list.map(reviewDetailHtml).join('')}`
+      : '';
+  }
+
+  function paintSendButton(){
+    const current = latestFor(sel.value);
+    if (!sel.value) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Pick a vacancy first';
+    } else if (current?.status === 'pending') {
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Already waiting for review';
+    } else if (current?.status === 'rejected') {
+      sendBtn.disabled = false;
+      sendBtn.textContent = `Re-send · round ${current.round + 1}`;
+    } else if (current?.status === 'approved') {
+      sendBtn.disabled = false;
+      sendBtn.textContent = `Send again · round ${current.round + 1}`;
+    } else {
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send to review';
+    }
+  }
+
+  // --- carga --------------------------------------------------------------
+  function loadReasons(){
+    return fetch(`${API}/cv_review_reasons`, { headers: headers() })
+      .then(r => r.ok ? r.json() : { reasons: [] })
+      .then(d => { (d.reasons || []).forEach(x => { reasonLabels[x.code] = x.label; }); })
+      .catch(() => {});
+  }
+
+  function loadReviews(){
+    return fetch(`${API}/candidates/${cid}/cv_reviews`, { headers: headers() })
+      .then(r => r.ok ? r.json() : { reviews: [] })
+      .then(d => { reviews = Array.isArray(d.reviews) ? d.reviews : []; paintChip(); })
+      .catch(err => { console.warn('⚠️ CV review: could not load reviews', err); });
+  }
+
+  let oppsLoaded = false;
+  function populateOpportunities(){
+    if (oppsLoaded) return Promise.resolve();
+    return fetchCandidateOpportunities(cid)
+      .then(list => {
+        // fetchCandidateOpportunities ya deduplica: GET /candidates/<id>/opportunities
+        // devuelve el mismo opportunity_id varias veces por los joins de batch.
+        sel.innerHTML = '';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = list.length ? 'Pick a vacancy…' : 'No opportunities linked yet';
+        sel.appendChild(blank);
+        list.forEach(opp => {
+          const o = document.createElement('option');
+          o.value = String(opp.opportunity_id);
+          // El "#id" desambigua cuando el candidato está en dos procesos del mismo rol
+          // y cliente — pasa, y si no se ve se elige la vacante equivocada.
+          o.textContent = [
+            (opp.opp_position_name || 'Untitled position').trim(),
+            (opp.client_name || '').trim(),
+          ].filter(Boolean).join(' · ') + ` (#${opp.opportunity_id})`;
+          sel.appendChild(o);
+        });
+        // Preselección sólo cuando no hay ambigüedad, igual que el picker del AI Assistant.
+        if (list.length === 1) sel.value = String(list[0].opportunity_id);
+        oppsLoaded = true;
+      })
+      .catch(err => {
+        sel.innerHTML = '<option value="">Could not load opportunities</option>';
+        console.warn('⚠️ CV review: could not load opportunities', err);
+      });
+  }
+
+  // --- popup --------------------------------------------------------------
+  function openPopup(preselectOppId){
+    if (errEl) errEl.textContent = '';
+    popup.classList.remove('hidden');
+    Promise.all([populateOpportunities(), loadReviews()]).then(() => {
+      if (preselectOppId) sel.value = String(preselectOppId);
+      paintHistory();
+      paintSendButton();
+    });
+  }
+
+  openBtn.addEventListener('click', () => openPopup());
+  chip.addEventListener('click', () => {
+    const latest = reviews.find(r => String(r.review_id) === chip.dataset.reviewId);
+    openPopup(latest?.opportunity_id);
+  });
+  closeBtn?.addEventListener('click', () => popup.classList.add('hidden'));
+  popup.addEventListener('click', e => { if (e.target === popup) popup.classList.add('hidden'); });
+  sel.addEventListener('change', () => { paintHistory(); paintSendButton(); });
+
+  sendBtn.addEventListener('click', () => {
+    const oppId = Number(sel.value);
+    if (!oppId) return;
+    if (errEl) errEl.textContent = '';
+    sendBtn.disabled = true;
+    const label = sendBtn.textContent;
+    sendBtn.textContent = 'Sending…';
+
+    // Timeout explícito. Sin esto, cualquier atasco (backend caído, instancia de App
+    // Runner despertando, proxy que se come la respuesta) se ve como "Sending…" para
+    // siempre y sin un solo mensaje — que es exactamente lo que no hay que hacerle a
+    // quien está esperando.
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 90000);
+
+    fetch(`${API}/candidates/${cid}/cv_reviews`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ opportunity_id: oppId, note: (noteEl?.value || '').trim() }),
+      signal: ctl.signal,
+    })
+      .then(async r => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          // Un 404 acá casi siempre significa "el backend no tiene esta ruta todavía":
+          // o no se deployó, o el proceso local hay que reiniciarlo. Decirlo así ahorra
+          // media hora de mirar la pantalla.
+          const msg = r.status === 404
+            ? `${API} doesn't have this endpoint (404). The backend with CV Review `
+              + `isn't deployed there yet — or, if it's running locally, restart it.`
+            : (body.error || `HTTP ${r.status}`);
+          throw Object.assign(new Error(msg), { body });
+        }
+        return body;
+      })
+      .then(body => {
+        if (noteEl) noteEl.value = '';
+        if (errEl) errEl.textContent = '';
+        return loadReviews().then(() => {
+          paintHistory();
+          paintSendButton();
+          alert(`Sent to review (round ${body.review.round}). The sales lead has been `
+              + `notified. The AI quality score is still running — it shows up here and in `
+              + `their queue in a minute or so.`);
+          popup.classList.add('hidden');
+          // El score llega por atrás (hilo en el backend). Un refresh diferido para que
+          // el chip y el historial lo muestren sin que haya que recargar la página.
+          setTimeout(() => {
+            loadReviews().then(() => { paintHistory(); paintSendButton(); });
+          }, 45000);
+        });
+      })
+      .catch(err => {
+        // already_pending no es un error del usuario: es información. Refrescamos.
+        if (err.body?.code === 'already_pending') {
+          loadReviews().then(() => { paintHistory(); paintSendButton(); });
+        }
+        if (errEl) errEl.textContent = err.body?.error || err.message || 'Could not send it.';
+        sendBtn.disabled = false;
+        sendBtn.textContent = label;
+      });
+  });
+
+  // La visibilidad por pestaña la maneja setActiveTab(), que esconde
+  // .header-buttons-row completa. Acá NO hay que agregar otro listener de .tab: el mío
+  // leía `.tab.active`, que setActiveTab todavía no había actualizado, así que iba una
+  // pestaña atrasado y el botón aparecía en Opportunities.
+  openBtn.classList.remove('hidden');
+
+  Promise.all([loadReasons(), loadReviews()]).then(paintChip);
+})();
+
+// ===========================================================================
+// Menú ⋯ de la fila de acciones del Resume.
+//
+// Los tres ítems (Client Version, Talent Drop, Send to Sales Review) siguen siendo los
+// MISMOS elementos con los mismos IDs — sólo cambiaron de lugar en el DOM. Todo el
+// cableado que ya existía (hrefs que asigna el JS, listeners por getElementById) sigue
+// funcionando sin tocarse.
+// ===========================================================================
+(function wireHeaderMoreMenu(){
+  const btn  = document.getElementById('hdr-more-btn');
+  const menu = document.getElementById('hdr-menu');
+  if (!btn || !menu) return;
+
+  const isOpen = () => !menu.hidden;
+
+  function close(){
+    if (!isOpen()) return;
+    menu.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function open(){
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    // Al primer ítem VISIBLE: "Send to Sales Review" arranca oculto hasta que carga el
+    // estado del review, y enfocar algo escondido no mueve el foco a ningún lado.
+    menu.querySelector('.hdr-menu-item:not(.hidden)')?.focus();
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();   // que no lo cierre el listener de "click afuera" de abajo
+    isOpen() ? close() : open();
+  });
+
+  // Elegir una opción cierra el menú. Los dos <a> abren en otra pestaña, así que si no
+  // se cerrara quedaría abierto atrás para cuando volvés.
+  menu.addEventListener('click', (e) => {
+    if (e.target.closest('.hdr-menu-item')) close();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (isOpen() && !e.target.closest('.hdr-more')) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen()) { close(); btn.focus(); }
+  });
+
+  // Cambiar de pestaña esconde la fila entera; dejar el menú abierto haría que reaparezca
+  // desplegado al volver a Resume.
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', close));
 })();

@@ -132,6 +132,17 @@
       'valentina@vintti.com'
     ]).has(email));
 
+    // Gate del CV Review: sales leads + la supervisión (pgonzales y agostina). Se mantiene
+    // en sincronía a mano con OVERSIGHT_EMAILS + user_roles.role_type='sales_lead' del
+    // backend, que es quien decide de verdad (POST /cv_reviews/<id>/decision da 403).
+    const cvReviewOk = new Set([
+      'pgonzales@vintti.com','agostina@vintti.com',
+      'agustin@vintti.com','bahia@vintti.com','lara@vintti.com',
+      'mariano@vintti.com','mia@vintti.com'
+    ]).has(email);
+    setDisplay('cvReviewLink', cvReviewOk);
+    if (cvReviewOk) paintCvReviewBadge(email);
+
     setDisplay('equipmentsLink', new Set([
       'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
     ]).has(email));
@@ -144,6 +155,63 @@
       'justo@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
+  }
+
+  /* -------------------------
+     Burbuja de pendientes en CV Review
+  ------------------------- */
+  // La supervisión cuenta TODO; un sales lead, sólo sus oportunidades — igual que la cola
+  // y la métrica de la página. Espeja OVERSIGHT_EMAILS del backend.
+  const CVR_OVERSIGHT = new Set(['pgonzales@vintti.com', 'agostina@vintti.com']);
+  const CVR_CACHE_KEY = 'cvr_pending_cache';
+  const CVR_CACHE_MS  = 60000;
+
+  function paintCvReviewBadge(email) {
+    const link = document.getElementById('cvReviewLink');
+    if (!link) return;
+
+    const render = (n) => {
+      let b = link.querySelector('.menu-count');
+      if (!n) { b?.remove(); return; }
+      if (!b) {
+        b = document.createElement('span');
+        b.className = 'menu-count';
+        link.appendChild(b);
+      }
+      b.textContent = n > 99 ? '99+' : String(n);
+      b.title = `${n} CV${n === 1 ? '' : 's'} waiting for your review`;
+    };
+
+    // El sidebar se monta en las 16 páginas del Hub; sin caché esto sería un request por
+    // navegación. 60s es de sobra para un contador de una cola que se mueve a mano.
+    try {
+      const hit = JSON.parse(sessionStorage.getItem(CVR_CACHE_KEY) || 'null');
+      if (hit && hit.email === email && (Date.now() - hit.at) < CVR_CACHE_MS) {
+        render(hit.count);
+        return;
+      }
+    } catch {}
+
+    // apiBase apunta siempre a producción; acá hace falta la misma detección de localhost
+    // que usa cv-review.js, o corriendo local el contador le pegaría al backend deployado
+    // (que ni siquiera tiene esta ruta) y nunca aparecería la burbuja.
+    const base = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+      ? 'http://127.0.0.1:5000'
+      : apiBase;
+    const mine = CVR_OVERSIGHT.has(email) ? '' : '?mine=1';
+    fetch(`${base}/cv_reviews/pending_count${mine}`, {
+      headers: { 'X-User-Email': email },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        const n = Number(d.count) || 0;
+        try {
+          sessionStorage.setItem(CVR_CACHE_KEY, JSON.stringify({ email, count: n, at: Date.now() }));
+        } catch {}
+        render(n);
+      })
+      .catch(() => {});   // que un contador nunca rompa el sidebar
   }
 
   /* -------------------------
