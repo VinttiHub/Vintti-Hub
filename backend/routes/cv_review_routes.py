@@ -15,6 +15,12 @@ El score AI es informativo, nunca bloqueante: si OpenAI se cae o se queda sin cu
 review se crea igual con ai_score NULL y ai_error contando qué pasó. Un gate de proceso
 no puede depender del presupuesto de OpenAI.
 """
+# App Runner corre Python 3.8: `set[str]` y demás genéricos de builtins revientan ahí con
+# "TypeError: 'type' object is not subscriptable" al importar el módulo. Este future import
+# convierte TODAS las anotaciones en strings, así que nunca se evalúan. Mismo patrón que
+# cv_review_store.py, utils/cv_review_ai.py y dashboards/datasets/_periods.py.
+from __future__ import annotations
+
 import logging
 import threading
 import time
