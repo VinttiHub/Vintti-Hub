@@ -29,18 +29,24 @@
   const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
   let currentUserId = null;
   let miniCalendarCursor = null;
+  let eventTimePickers = null;
+  let eventAttendeePicker = null;
   const availabilityConfig = {
     dayStart: 8 * 60,
     dayEnd: 20 * 60,
-    minuteHeight: 1.12,
+    minuteHeight: 1,
+    columnMinWidth: 112,
+    gutterWidth: 62,
   };
   const availabilityPalette = [
-    { accent: '#0b3d91', bg: 'rgba(11, 61, 145, 0.18)', border: 'rgba(11, 61, 145, 0.32)' },
-    { accent: '#0f7a5c', bg: 'rgba(15, 122, 92, 0.18)', border: 'rgba(15, 122, 92, 0.32)' },
-    { accent: '#d16413', bg: 'rgba(209, 100, 19, 0.18)', border: 'rgba(209, 100, 19, 0.32)' },
-    { accent: '#b42318', bg: 'rgba(180, 35, 24, 0.18)', border: 'rgba(180, 35, 24, 0.32)' },
-    { accent: '#0f6da1', bg: 'rgba(15, 109, 161, 0.18)', border: 'rgba(15, 109, 161, 0.32)' },
-    { accent: '#5a6b7f', bg: 'rgba(90, 107, 127, 0.18)', border: 'rgba(90, 107, 127, 0.32)' },
+    { accent: '#0b3d91', bg: 'rgba(11, 61, 145, 0.14)', border: 'rgba(11, 61, 145, 0.28)' },
+    { accent: '#0f7a5c', bg: 'rgba(15, 122, 92, 0.14)', border: 'rgba(15, 122, 92, 0.28)' },
+    { accent: '#d16413', bg: 'rgba(209, 100, 19, 0.14)', border: 'rgba(209, 100, 19, 0.28)' },
+    { accent: '#b42318', bg: 'rgba(180, 35, 24, 0.14)', border: 'rgba(180, 35, 24, 0.28)' },
+    { accent: '#0f6da1', bg: 'rgba(15, 109, 161, 0.14)', border: 'rgba(15, 109, 161, 0.28)' },
+    { accent: '#7b3fbf', bg: 'rgba(123, 63, 191, 0.14)', border: 'rgba(123, 63, 191, 0.28)' },
+    { accent: '#a8127a', bg: 'rgba(168, 18, 122, 0.14)', border: 'rgba(168, 18, 122, 0.28)' },
+    { accent: '#5a6b7f', bg: 'rgba(90, 107, 127, 0.14)', border: 'rgba(90, 107, 127, 0.28)' },
   ];
 
   function escapeHtml(value) {
@@ -159,6 +165,7 @@
     if (formStatus) formStatus.textContent = '';
     eventModal.hidden = false;
     document.body.classList.add('modal-open');
+    eventTimePickers?.prefill();
     window.setTimeout(() => document.getElementById('eventTitle')?.focus(), 0);
   }
 
@@ -403,66 +410,143 @@
     return res.json();
   }
 
+  // Un evento de día completo (cumpleaños, OOO, feriados) llega con fecha sin hora
+  // y tapa TODOS los bloques ocupados del día si lo usamos para etiquetar.
+  function isAllDayEvent(event) {
+    if (event?.all_day === true) return true;
+    return !String(event?.start || '').includes('T') || !String(event?.end || '').includes('T');
+  }
+
   function getBusyLabel(events, slot) {
     if (!Array.isArray(events) || !events.length) return 'Ocupado';
     const busyStart = new Date(slot.start).getTime();
     const busyEnd = new Date(slot.end).getTime();
-    const match = events.find(event => {
+    if (!Number.isFinite(busyStart) || !Number.isFinite(busyEnd)) return 'Ocupado';
+
+    let best = null;
+    let allDayFallback = null;
+
+    events.forEach((event) => {
       const start = new Date(event.start).getTime();
       const end = new Date(event.end).getTime();
-      return start < busyEnd && end > busyStart;
-    });
-    return match?.summary || 'Ocupado';
-  }
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      const overlap = Math.min(end, busyEnd) - Math.max(start, busyStart);
+      if (overlap <= 0) return;
 
-  function collectAvailabilityEntries(emails, calendars, eventDetails) {
-    const entries = [];
-    emails.forEach((email, index) => {
-      const busy = calendars?.[email]?.busy || [];
-      const details = eventDetails?.[email] || [];
-      const palette = availabilityPalette[index % availabilityPalette.length];
-      busy.forEach((slot) => {
-        const startDate = new Date(slot.start);
-        const endDate = new Date(slot.end);
-        const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-        const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
-        entries.push({
-          email,
-          palette,
-          label: getBusyLabel(details, slot),
-          startMinutes,
-          endMinutes,
-        });
-      });
-    });
-
-    return entries
-      .filter((entry) => entry.endMinutes > entry.startMinutes)
-      .sort((a, b) => a.startMinutes - b.startMinutes || a.endMinutes - b.endMinutes);
-  }
-
-  function layoutAvailabilityEntries(entries) {
-    const active = [];
-    const positioned = [];
-    let maxColumn = 0;
-
-    entries.forEach((entry) => {
-      for (let i = active.length - 1; i >= 0; i -= 1) {
-        if (active[i].endMinutes <= entry.startMinutes) active.splice(i, 1);
+      if (isAllDayEvent(event)) {
+        if (!allDayFallback) allDayFallback = event.summary;
+        return;
       }
 
-      let column = 0;
-      while (active.some((item) => item.column === column)) column += 1;
-      active.push({ endMinutes: entry.endMinutes, column });
-      positioned.push({ ...entry, column });
-      if (column > maxColumn) maxColumn = column;
+      // Nos quedamos con el evento que mejor calza con el bloque ocupado, no con el primero.
+      const drift = Math.abs(start - busyStart) + Math.abs(end - busyEnd);
+      if (!best || overlap > best.overlap || (overlap === best.overlap && drift < best.drift)) {
+        best = { overlap, drift, summary: event.summary };
+      }
     });
 
-    const totalColumns = Math.max(maxColumn + 1, 1);
-    return positioned.map((entry) => ({
-      ...entry,
-      totalColumns,
-    }));
+    const blockDuration = busyEnd - busyStart;
+    if (best && best.overlap >= blockDuration * 0.5) return best.summary;
+    // Solo si el bloque ocupado es en sí de día completo tiene sentido el evento all-day.
+    if (allDayFallback && blockDuration >= 6 * 60 * 60 * 1000) return allDayFallback;
+    return best?.summary || 'Ocupado';
+  }
+
+  function formatMinutesLabel(minutes) {
+    const total = Math.max(0, Math.round(minutes));
+    const hour = String(Math.floor(total / 60) % 24).padStart(2, '0');
+    const min = String(total % 60).padStart(2, '0');
+    return `${hour}:${min}`;
+  }
+
+  // Ubicamos los bloques en la zona horaria del hub, no en la del navegador.
+  const availabilityTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: tz,
+  });
+
+  function toMinutesOfDay(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const [rawHour, rawMinute] = availabilityTimeFormatter.format(date).split(':').map(Number);
+    if (!Number.isFinite(rawHour) || !Number.isFinite(rawMinute)) return null;
+    return (rawHour % 24) * 60 + rawMinute;
+  }
+
+  // freebusy devuelve los huecos ocupados FUSIONADOS (dos reuniones pegadas = un bloque),
+  // así que preferimos la lista real de eventos y solo caemos a freebusy cuando no
+  // tenemos permiso para ver el detalle de ese calendario.
+  function collectPersonEntries(email, calendars, eventDetails) {
+    const details = Array.isArray(eventDetails?.[email]) ? eventDetails[email] : [];
+    const allDay = details.filter(isAllDayEvent).map(event => event.summary || 'Todo el día');
+    const timed = details.filter(event => !isAllDayEvent(event));
+
+    const source = timed.length
+      ? timed.map(event => ({ start: event.start, end: event.end, label: event.summary || 'Ocupado' }))
+      : (calendars?.[email]?.busy || []).map(slot => ({
+        start: slot.start,
+        end: slot.end,
+        label: getBusyLabel(details, slot),
+      }));
+
+    const entries = source
+      .map((item) => {
+        const startMinutes = toMinutesOfDay(item.start);
+        let endMinutes = toMinutesOfDay(item.end);
+        if (startMinutes === null || endMinutes === null) return null;
+        if (endMinutes <= startMinutes) {
+          // Termina a medianoche o cruza el día: lo cortamos al final de la grilla.
+          if (new Date(item.end).getTime() <= new Date(item.start).getTime()) return null;
+          endMinutes = 24 * 60;
+        }
+        return { label: item.label, startMinutes, endMinutes };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.startMinutes - b.startMinutes || b.endMinutes - a.endMinutes);
+
+    return { entries, allDay, merged: !timed.length && entries.length > 0 };
+  }
+
+  // Google Calendar-style packing: only the events that actually overlap each other
+  // share the width of the column, so a busy day doesn't shrink the whole timeline.
+  function layoutPersonEntries(entries) {
+    const positioned = [];
+    let cluster = [];
+    let clusterEnd = -Infinity;
+
+    const flushCluster = () => {
+      if (!cluster.length) return;
+      const columnEnds = [];
+      cluster.forEach((entry) => {
+        let column = columnEnds.findIndex(end => end <= entry.startMinutes);
+        if (column === -1) {
+          columnEnds.push(entry.endMinutes);
+          column = columnEnds.length - 1;
+        } else {
+          columnEnds[column] = entry.endMinutes;
+        }
+        entry.column = column;
+      });
+      cluster.forEach((entry) => {
+        positioned.push({ ...entry, totalColumns: columnEnds.length });
+      });
+      cluster = [];
+    };
+
+    entries.forEach((entry) => {
+      if (entry.startMinutes >= clusterEnd) {
+        flushCluster();
+        clusterEnd = entry.endMinutes;
+      } else {
+        clusterEnd = Math.max(clusterEnd, entry.endMinutes);
+      }
+      cluster.push({ ...entry });
+    });
+    flushCluster();
+
+    return positioned;
   }
 
   function buildAvailabilityMarkup(emails, calendars, eventDetails, hostEmail) {
@@ -475,82 +559,117 @@
       `;
     }
 
-    const { dayStart, dayEnd, minuteHeight } = availabilityConfig;
-    const totalMinutes = dayEnd - dayStart;
-    const slotHeight = 60 * minuteHeight;
-    const timelineHeight = totalMinutes * minuteHeight;
+    const { minuteHeight, gutterWidth } = availabilityConfig;
+    // Con muchas columnas achicamos el ancho mínimo para evitar scroll horizontal innecesario.
+    const columnMinWidth = emails.length >= 6
+      ? 94
+      : (emails.length >= 4 ? 104 : availabilityConfig.columnMinWidth);
     const proposed = getProposedRange();
-    const proposedBlock = proposed ? {
-      top: Math.max(proposed.startMinutes - dayStart, 0) * minuteHeight,
-      height: Math.min(proposed.endMinutes, dayEnd) * minuteHeight - Math.max(proposed.startMinutes, dayStart) * minuteHeight,
+
+    const people = emails.map((email, index) => {
+      const collected = collectPersonEntries(email, calendars, eventDetails);
+      return {
+        email,
+        label: getAvailabilityLabel(email, hostEmail),
+        palette: availabilityPalette[index % availabilityPalette.length],
+        entries: layoutPersonEntries(collected.entries),
+        allDay: collected.allDay,
+        merged: collected.merged,
+      };
+    });
+
+    // La grilla arranca en 08:00–20:00 pero se estira si alguien tiene algo fuera de esa
+    // franja: si no, las reuniones tempranas o tardías desaparecían de la vista.
+    let dayStart = availabilityConfig.dayStart;
+    let dayEnd = availabilityConfig.dayEnd;
+    const marks = [];
+    people.forEach(person => person.entries.forEach((entry) => {
+      marks.push(entry.startMinutes, entry.endMinutes);
+    }));
+    if (proposed) marks.push(proposed.startMinutes, proposed.endMinutes);
+    marks.forEach((minute) => {
+      if (minute < dayStart) dayStart = Math.max(0, Math.floor(minute / 60) * 60);
+      if (minute > dayEnd) dayEnd = Math.min(24 * 60, Math.ceil(minute / 60) * 60);
+    });
+
+    const slotHeight = 60 * minuteHeight;
+    const timelineHeight = (dayEnd - dayStart) * minuteHeight;
+    const proposedTop = Math.max(proposed ? proposed.startMinutes : 0, dayStart);
+    const proposedBottom = Math.min(proposed ? proposed.endMinutes : 0, dayEnd);
+    const proposedBlock = proposed && proposedBottom > proposedTop ? {
+      top: (proposedTop - dayStart) * minuteHeight,
+      height: (proposedBottom - proposedTop) * minuteHeight,
     } : null;
-    const legendItems = emails
-      .map((email, index) => {
-        const palette = availabilityPalette[index % availabilityPalette.length];
+
+    const hourSlots = [];
+    for (let minutes = dayStart; minutes < dayEnd; minutes += 60) {
+      hourSlots.push(`<div class="avail-hour">${formatMinutesLabel(minutes)}</div>`);
+    }
+
+    const headCells = people
+      .map((person) => {
+        const count = person.entries.length;
+        const summary = count
+          ? `${count} ${count === 1 ? 'reunión' : 'reuniones'}${person.merged ? ' (bloques)' : ''}`
+          : 'Libre';
+        const allDayNote = person.allDay.length
+          ? `<span class="avail-col-allday" title="${escapeHtml(person.allDay.join(' · '))}">${escapeHtml(person.allDay[0])}</span>`
+          : '';
         return `
-          <div class="availability-person">
-            <span>${escapeHtml(getAvailabilityLabel(email, hostEmail))}</span>
-            <span class="availability-swatch" style="--swatch-color:${palette.accent};"></span>
+          <div class="avail-col-head" style="--person-accent:${person.palette.accent};" title="${escapeHtml(person.email)}">
+            <span class="avail-col-name"><span class="avail-col-dot"></span>${escapeHtml(person.label)}</span>
+            <span class="avail-col-meta${count ? '' : ' is-free'}">${summary}</span>
+            ${allDayNote}
           </div>
         `;
       })
       .join('');
-    const hours = [];
-    for (let minutes = dayStart; minutes <= dayEnd; minutes += 60) {
-      const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
-      hours.push(`${hour}:00`);
-    }
 
-    const timeSlots = hours
-      .map(label => `<div class="availability-time-slot" style="--slot-height:${slotHeight}px;">${label}</div>`)
-      .join('');
-
-    const entries = layoutAvailabilityEntries(collectAvailabilityEntries(emails, calendars, eventDetails))
-      .map((entry) => {
-        const clampedStart = Math.max(entry.startMinutes, dayStart);
-        const clampedEnd = Math.min(entry.endMinutes, dayEnd);
-        if (clampedEnd <= dayStart || clampedStart >= dayEnd || clampedEnd <= clampedStart) return '';
-        const top = (clampedStart - dayStart) * minuteHeight;
-        const height = (clampedEnd - clampedStart) * minuteHeight;
-        const duration = clampedEnd - clampedStart;
-        const width = 100 / entry.totalColumns;
-        const left = width * entry.column;
-        const compactClass = duration <= 30 ? ' is-compact' : '';
-        const tinyClass = duration <= 15 ? ' is-tiny' : '';
-        const accessibleLabel = `${getAvailabilityLabel(entry.email, hostEmail)}: ${entry.label}`;
-        return `
-          <div
-            class="availability-busy availability-busy--overlay${compactClass}${tinyClass}"
-            style="top:${top}px;height:${height}px;left:calc(${left}% + 8px);width:calc(${width}% - 16px);--busy-bg:${entry.palette.bg};--busy-border:${entry.palette.border};--busy-text:${entry.palette.accent};"
-            title="${escapeHtml(accessibleLabel)}"
-          >
-            <span class="availability-busy-owner">${escapeHtml(getAvailabilityLabel(entry.email, hostEmail))}</span>
-            <span class="availability-busy-label">${escapeHtml(entry.label)}</span>
-          </div>
-        `;
+    const bodyCells = people
+      .map((person) => {
+        const blocks = person.entries
+          .map((entry) => {
+            const clampedStart = Math.max(entry.startMinutes, dayStart);
+            const clampedEnd = Math.min(entry.endMinutes, dayEnd);
+            if (clampedEnd <= clampedStart) return '';
+            const top = (clampedStart - dayStart) * minuteHeight;
+            const height = (clampedEnd - clampedStart) * minuteHeight;
+            const duration = clampedEnd - clampedStart;
+            const width = 100 / entry.totalColumns;
+            const left = width * entry.column;
+            const sizeClass = duration <= 20 ? ' is-tiny' : (duration <= 45 ? ' is-compact' : '');
+            const timeLabel = `${formatMinutesLabel(entry.startMinutes)} – ${formatMinutesLabel(entry.endMinutes)}`;
+            return `
+              <div
+                class="avail-event${sizeClass}"
+                style="top:${top}px;height:${height}px;left:calc(${left}% + 3px);width:calc(${width}% - 6px);"
+                title="${escapeHtml(`${person.label} · ${timeLabel} · ${entry.label}`)}"
+              >
+                <span class="avail-event-title">${escapeHtml(entry.label)}</span>
+                <span class="avail-event-time">${escapeHtml(timeLabel)}</span>
+              </div>
+            `;
+          })
+          .join('');
+        return `<div class="avail-col" style="--person-accent:${person.palette.accent};--person-bg:${person.palette.bg};--person-border:${person.palette.border};">${blocks}</div>`;
       })
       .join('');
 
     return `
-      <div class="availability-legend">
-        ${legendItems}
-      </div>
-      <div class="availability-layout availability-layout--overlay" style="--slot-height:${slotHeight}px;--timeline-height:${timelineHeight}px;">
-        <div class="availability-header availability-header--overlay">
-          <div>Hora</div>
-          <div>Agenda compartida</div>
+      <div class="avail-cal" style="--slot-height:${slotHeight}px;--timeline-height:${timelineHeight}px;--col-min:${columnMinWidth}px;--gutter-width:${gutterWidth}px;min-width:calc(${gutterWidth}px + ${people.length} * ${columnMinWidth}px);">
+        <div class="avail-head">
+          <div class="avail-head-gutter">Hora</div>
+          <div class="avail-head-cols">${headCells}</div>
         </div>
-        <div class="availability-body">
-          <div class="availability-time-column">${timeSlots}</div>
-          <div class="availability-overlay-column">
-            <div class="availability-timeline" style="--timeline-height:${timelineHeight}px;">
-              ${proposedBlock && proposedBlock.height > 0 ? `
-                <div class="availability-proposed" style="top:${proposedBlock.top}px;height:${proposedBlock.height}px;">
-                  Horario propuesto
-                </div>
-              ` : ''}
-              ${entries || '<div class="availability-free"></div>'}
-            </div>
+        <div class="avail-body">
+          <div class="avail-gutter">${hourSlots.join('')}</div>
+          <div class="avail-cols">
+            ${proposedBlock ? `
+              <div class="avail-proposed" style="top:${proposedBlock.top}px;height:${proposedBlock.height}px;">
+                <span>Horario propuesto</span>
+              </div>
+            ` : ''}
+            ${bodyCells}
           </div>
         </div>
       </div>
@@ -680,6 +799,7 @@
         }
       }
       eventForm?.reset();
+      eventAttendeePicker?.clear();
       const eventMeet = document.getElementById('eventMeet');
       if (eventMeet) eventMeet.checked = true;
       if (inviteToggle) inviteToggle.checked = true;
@@ -733,6 +853,544 @@
       setAvailabilityMessage('No pudimos consultar disponibilidad.');
       renderAvailabilityEmpty('No pudimos cargar la disponibilidad.');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selector de hora (dropdown estilo Google) e invitados con búsqueda
+  // ---------------------------------------------------------------------------
+
+  const TIME_STEP_MINUTES = 15;
+  const DEFAULT_DURATION_MINUTES = 30;
+
+  function minutesToTimeValue(minutes) {
+    const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(minutes)));
+    return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+  }
+
+  // Acepta "9", "930", "9:30", "9pm", "15:30"... y devuelve minutos desde medianoche.
+  function parseTimeText(raw) {
+    const text = String(raw || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!text) return null;
+    const meridiem = /(am|pm)$/.exec(text)?.[1] || '';
+    const digits = text.replace(/(a\.?m\.?|p\.?m\.?)$/, '').replace(/[.:]/g, '');
+    if (!/^\d{1,4}$/.test(digits)) return null;
+
+    let hours;
+    let minutes;
+    if (digits.length <= 2) {
+      hours = Number(digits);
+      minutes = 0;
+    } else if (digits.length === 3) {
+      hours = Number(digits.slice(0, 1));
+      minutes = Number(digits.slice(1));
+    } else {
+      hours = Number(digits.slice(0, 2));
+      minutes = Number(digits.slice(2));
+    }
+
+    if (meridiem === 'pm' && hours < 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  }
+
+  function formatDurationLabel(minutes) {
+    if (minutes <= 0) return '';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (!rest) return `${hours} h`;
+    return `${hours} h ${rest}`;
+  }
+
+  function fireInput(element) {
+    element?.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function setupTimePickers() {
+    const startInput = document.getElementById('eventStart');
+    const endInput = document.getElementById('eventEnd');
+    if (!startInput || !endInput) return null;
+
+    const pickers = [
+      { input: startInput, menu: document.getElementById('eventStartMenu'), isEnd: false },
+      { input: endInput, menu: document.getElementById('eventEndMenu'), isEnd: true },
+    ].filter(item => item.menu);
+
+    function buildOptions(picker) {
+      const base = picker.isEnd ? parseTimeText(startInput.value) : null;
+      const options = [];
+      for (let minutes = 0; minutes < 24 * 60; minutes += TIME_STEP_MINUTES) {
+        if (base !== null && minutes <= base) continue;
+        options.push({
+          minutes,
+          label: minutesToTimeValue(minutes),
+          hint: base !== null ? formatDurationLabel(minutes - base) : '',
+        });
+      }
+      return options;
+    }
+
+    function renderMenu(picker) {
+      const typed = String(picker.input.value || '').replace(/[^0-9]/g, '');
+      let options = buildOptions(picker);
+      if (typed) {
+        const filtered = options.filter(option => option.label.replace(':', '').startsWith(typed));
+        if (filtered.length) options = filtered;
+      }
+      picker.options = options;
+      if (picker.activeIndex >= options.length) picker.activeIndex = options.length - 1;
+
+      picker.menu.innerHTML = options.length
+        ? options
+          .map((option, index) => `
+            <button
+              type="button"
+              class="time-option${index === picker.activeIndex ? ' is-active' : ''}${option.label === picker.input.value ? ' is-selected' : ''}"
+              role="option"
+              data-minutes="${option.minutes}"
+            >
+              <span>${option.label}</span>
+              ${option.hint ? `<span class="time-option-hint">${escapeHtml(option.hint)}</span>` : ''}
+            </button>
+          `)
+          .join('')
+        : '<div class="time-empty">Sin coincidencias</div>';
+
+      const active = picker.menu.querySelector('.time-option.is-active') || picker.menu.querySelector('.time-option.is-selected');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    function openMenu(picker) {
+      const current = parseTimeText(picker.input.value);
+      picker.activeIndex = -1;
+      picker.menu.hidden = false;
+      renderMenu(picker);
+      if (current !== null) {
+        const match = Array.from(picker.menu.querySelectorAll('.time-option'))
+          .find(node => Number(node.dataset.minutes) >= current);
+        (match || picker.menu.querySelector('.time-option'))?.scrollIntoView({ block: 'center' });
+      }
+    }
+
+    function closeMenu(picker) {
+      picker.menu.hidden = true;
+      picker.activeIndex = -1;
+    }
+
+    function closeAll() {
+      pickers.forEach(closeMenu);
+    }
+
+    function applyValue(picker, minutes) {
+      const previousStart = parseTimeText(startInput.value);
+      const previousEnd = parseTimeText(endInput.value);
+      picker.input.value = minutesToTimeValue(minutes);
+
+      if (!picker.isEnd) {
+        // Como Google: al mover el inicio se mantiene la duración de la reunión.
+        const duration = previousStart !== null && previousEnd !== null && previousEnd > previousStart
+          ? previousEnd - previousStart
+          : DEFAULT_DURATION_MINUTES;
+        endInput.value = minutesToTimeValue(Math.min(minutes + duration, 24 * 60 - TIME_STEP_MINUTES));
+        fireInput(endInput);
+      } else if (previousStart !== null && minutes <= previousStart) {
+        // Si el fin queda antes del inicio, corremos el inicio conservando la duración.
+        const duration = previousEnd !== null && previousEnd > previousStart
+          ? previousEnd - previousStart
+          : DEFAULT_DURATION_MINUTES;
+        startInput.value = minutesToTimeValue(Math.max(minutes - duration, 0));
+        fireInput(startInput);
+      }
+
+      fireInput(picker.input);
+    }
+
+    function commit(picker) {
+      const parsed = parseTimeText(picker.input.value);
+      if (parsed === null) {
+        if (picker.input.value) {
+          picker.input.value = '';
+          fireInput(picker.input);
+        }
+        return;
+      }
+      applyValue(picker, parsed);
+    }
+
+    pickers.forEach((picker) => {
+      picker.activeIndex = -1;
+      picker.options = [];
+
+      const field = picker.input.closest('.time-field');
+      field?.addEventListener('mousedown', (event) => {
+        if (event.target.closest('.time-menu')) return;
+        const wasOpen = !picker.menu.hidden;
+        const onInput = event.target === picker.input;
+        if (!onInput) {
+          event.preventDefault();
+          picker.input.focus();
+        }
+        if (wasOpen && !onInput) closeMenu(picker);
+        else if (!wasOpen) openMenu(picker);
+      });
+
+      picker.input.addEventListener('focus', () => {
+        pickers.filter(item => item !== picker).forEach(closeMenu);
+        openMenu(picker);
+      });
+
+      picker.input.addEventListener('input', () => {
+        if (picker.menu.hidden) picker.menu.hidden = false;
+        picker.activeIndex = -1;
+        renderMenu(picker);
+      });
+
+      picker.input.addEventListener('blur', () => {
+        window.setTimeout(() => {
+          if (picker.menu.contains(document.activeElement)) return;
+          closeMenu(picker);
+          commit(picker);
+        }, 120);
+      });
+
+      picker.menu.addEventListener('mousedown', (event) => {
+        const option = event.target.closest('.time-option');
+        if (!option) return;
+        event.preventDefault();
+        applyValue(picker, Number(option.dataset.minutes));
+        closeMenu(picker);
+      });
+
+      picker.input.addEventListener('keydown', (event) => {
+        const isOpen = !picker.menu.hidden;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (!isOpen) {
+            openMenu(picker);
+            return;
+          }
+          const total = picker.options.length;
+          if (!total) return;
+          const delta = event.key === 'ArrowDown' ? 1 : -1;
+          picker.activeIndex = picker.activeIndex < 0
+            ? (delta > 0 ? 0 : total - 1)
+            : Math.max(0, Math.min(total - 1, picker.activeIndex + delta));
+          renderMenu(picker);
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (isOpen && picker.activeIndex >= 0 && picker.options[picker.activeIndex]) {
+            applyValue(picker, picker.options[picker.activeIndex].minutes);
+          } else {
+            commit(picker);
+          }
+          closeMenu(picker);
+          return;
+        }
+        if (event.key === 'Escape' && isOpen) {
+          // Sin esto el Escape cerraría todo el modal.
+          event.stopPropagation();
+          closeMenu(picker);
+          return;
+        }
+        if (event.key === 'Tab') {
+          closeMenu(picker);
+          commit(picker);
+        }
+      });
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      if (!event.target.closest?.('.time-field')) closeAll();
+    });
+
+    return {
+      commitAll() {
+        pickers.forEach(commit);
+      },
+      prefill() {
+        if (startInput.value) return;
+        const now = new Date();
+        const next = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30;
+        const start = Math.min(next, 23 * 60);
+        startInput.value = minutesToTimeValue(start);
+        endInput.value = minutesToTimeValue(Math.min(start + DEFAULT_DURATION_MINUTES, 24 * 60 - TIME_STEP_MINUTES));
+        fireInput(startInput);
+      },
+    };
+  }
+
+  let directoryPromise = null;
+
+  function loadDirectory() {
+    if (!directoryPromise) {
+      directoryPromise = fetch(`${API_BASE}/users`, { credentials: 'include' })
+        .then(res => (res.ok ? res.json() : []))
+        .then((rows) => {
+          const people = new Map();
+          (Array.isArray(rows) ? rows : []).forEach((row) => {
+            const email = String(row.email_vintti || '').trim().toLowerCase();
+            if (!email.includes('@')) return;
+            const person = {
+              email,
+              name: String(row.nickname || row.user_name || '').trim() || displayNameFromEmail(email),
+              role: String(row.role || row.team || '').trim(),
+              // avatar_url casi nunca está cargado: caemos al mapa de avatares del hub.
+              avatar: (typeof window.resolveUserAvatar === 'function'
+                ? window.resolveUserAvatar({ avatar_url: row.avatar_url, email_vintti: email, user_id: row.user_id })
+                : row.avatar_url) || '',
+            };
+            // Si el mismo email viene repetido, nos quedamos con la ficha que tenga foto.
+            const existing = people.get(email);
+            if (!existing || (!existing.avatar && person.avatar)) people.set(email, person);
+          });
+          return Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        })
+        .catch(() => []);
+    }
+    return directoryPromise;
+  }
+
+  function isEmailLike(value) {
+    return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(String(value || '').trim());
+  }
+
+  function initialsFor(person) {
+    const source = person.name || person.email || '?';
+    return source.trim().charAt(0).toUpperCase() || '?';
+  }
+
+  // Monograma siempre presente + foto encima; si la imagen falla se ve el monograma.
+  function avatarMarkup(person, className) {
+    const initial = person.external ? '@' : initialsFor(person);
+    const image = person.avatar
+      ? `<img src="${escapeHtml(person.avatar)}" alt="" loading="lazy" onerror="this.style.display='none';" />`
+      : '';
+    return `<span class="${className}"><span class="avatar-initial">${escapeHtml(initial)}</span>${image}</span>`;
+  }
+
+  function setupAttendeePicker() {
+    const picker = document.getElementById('attendeePicker');
+    const tokens = document.getElementById('attendeeTokens');
+    const search = document.getElementById('attendeeSearch');
+    const menu = document.getElementById('attendeeMenu');
+    const hidden = document.getElementById('eventAttendees');
+    if (!picker || !tokens || !search || !menu || !hidden) return null;
+
+    const selected = [];
+    let directory = [];
+    let activeIndex = 0;
+
+    function sync() {
+      hidden.value = selected.map(person => person.email).join(', ');
+      fireInput(hidden);
+    }
+
+    function renderTokens() {
+      tokens.querySelectorAll('.attendee-token').forEach(node => node.remove());
+      selected.forEach((person, index) => {
+        const chip = document.createElement('span');
+        chip.className = 'attendee-token';
+        chip.title = person.email;
+        chip.innerHTML = `
+          ${avatarMarkup(person, 'attendee-token-avatar')}
+          <span class="attendee-token-name">${escapeHtml(person.name)}</span>
+          <button type="button" class="attendee-token-remove" data-index="${index}" aria-label="Quitar ${escapeHtml(person.name)}">&times;</button>
+        `;
+        tokens.insertBefore(chip, search);
+      });
+      search.placeholder = selected.length ? 'Agregar otro…' : 'Buscá a alguien de Vintti o escribí un email';
+    }
+
+    function candidates() {
+      const query = search.value.trim().toLowerCase();
+      const chosen = new Set(selected.map(person => person.email));
+      const hostEmail = getStoredEmail();
+      let list = directory.filter(person => !chosen.has(person.email) && person.email !== hostEmail);
+      if (query) {
+        list = list.filter(person => person.name.toLowerCase().includes(query) || person.email.includes(query));
+      }
+      list = list.slice(0, 40);
+
+      if (query && isEmailLike(query) && !chosen.has(query) && !list.some(person => person.email === query)) {
+        list.unshift({ email: query, name: query, role: 'Invitado externo', avatar: '', external: true });
+      }
+      return list;
+    }
+
+    function renderMenu() {
+      const list = candidates();
+      if (activeIndex >= list.length) activeIndex = Math.max(0, list.length - 1);
+
+      menu.innerHTML = list.length
+        ? list
+          .map((person, index) => `
+            <button type="button" class="attendee-option${index === activeIndex ? ' is-active' : ''}" role="option" data-email="${escapeHtml(person.email)}">
+              ${avatarMarkup(person, 'attendee-option-avatar')}
+              <span class="attendee-option-text">
+                <span class="attendee-option-name">${escapeHtml(person.external ? `Invitar a ${person.email}` : person.name)}</span>
+                <span class="attendee-option-email">${escapeHtml(person.external ? 'Invitado externo' : person.email)}</span>
+              </span>
+            </button>
+          `)
+          .join('')
+        : '<div class="attendee-empty">Sin resultados</div>';
+
+      menu.querySelector('.attendee-option.is-active')?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function openMenu() {
+      menu.hidden = false;
+      picker.classList.add('is-open');
+      renderMenu();
+    }
+
+    function closeMenu() {
+      menu.hidden = true;
+      picker.classList.remove('is-open');
+    }
+
+    function addEmail(email, fallbackName) {
+      const clean = String(email || '').trim().toLowerCase();
+      if (!isEmailLike(clean)) return false;
+      if (selected.some(person => person.email === clean)) return true;
+      const known = directory.find(person => person.email === clean);
+      selected.push(known || { email: clean, name: fallbackName || displayNameFromEmail(clean), avatar: '' });
+      renderTokens();
+      sync();
+      return true;
+    }
+
+    function removeAt(index) {
+      if (index < 0 || index >= selected.length) return;
+      selected.splice(index, 1);
+      renderTokens();
+      sync();
+      renderMenu();
+    }
+
+    tokens.addEventListener('mousedown', (event) => {
+      const remove = event.target.closest('.attendee-token-remove');
+      if (remove) {
+        event.preventDefault();
+        removeAt(Number(remove.dataset.index));
+        return;
+      }
+      if (event.target === search) return;
+      event.preventDefault();
+      search.focus();
+      openMenu();
+    });
+
+    search.addEventListener('focus', () => {
+      activeIndex = 0;
+      openMenu();
+    });
+
+    search.addEventListener('input', () => {
+      const value = search.value;
+      // Escribir una coma confirma el email tipeado (para invitados externos).
+      if (value.includes(',')) {
+        const parts = value.split(',');
+        const rest = parts.pop();
+        parts.forEach(part => addEmail(part));
+        search.value = rest.trim();
+      }
+      activeIndex = 0;
+      openMenu();
+    });
+
+    search.addEventListener('paste', (event) => {
+      const text = event.clipboardData?.getData('text') || '';
+      if (!text.includes(',') && !/\s/.test(text.trim())) return;
+      event.preventDefault();
+      text.split(/[,;\s]+/).forEach(part => addEmail(part));
+      search.value = '';
+      renderMenu();
+    });
+
+    search.addEventListener('keydown', (event) => {
+      const options = Array.from(menu.querySelectorAll('.attendee-option'));
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (menu.hidden) {
+          openMenu();
+          return;
+        }
+        if (!options.length) return;
+        activeIndex = event.key === 'ArrowDown'
+          ? Math.min(options.length - 1, activeIndex + 1)
+          : Math.max(0, activeIndex - 1);
+        renderMenu();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const option = options[activeIndex];
+        if (option) {
+          addEmail(option.dataset.email);
+          search.value = '';
+          renderMenu();
+        } else if (addEmail(search.value)) {
+          search.value = '';
+          renderMenu();
+        }
+        return;
+      }
+      if (event.key === 'Backspace' && !search.value && selected.length) {
+        event.preventDefault();
+        removeAt(selected.length - 1);
+        return;
+      }
+      if (event.key === 'Escape' && !menu.hidden) {
+        event.stopPropagation();
+        closeMenu();
+      }
+    });
+
+    search.addEventListener('blur', () => {
+      window.setTimeout(() => {
+        if (picker.contains(document.activeElement)) return;
+        if (search.value.trim()) {
+          addEmail(search.value);
+          search.value = '';
+        }
+        closeMenu();
+      }, 140);
+    });
+
+    menu.addEventListener('mousedown', (event) => {
+      const option = event.target.closest('.attendee-option');
+      if (!option) return;
+      event.preventDefault();
+      addEmail(option.dataset.email);
+      search.value = '';
+      search.focus();
+      renderMenu();
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      if (!picker.contains(event.target)) closeMenu();
+    });
+
+    loadDirectory().then((people) => {
+      directory = people;
+      if (!menu.hidden) renderMenu();
+    });
+
+    renderTokens();
+
+    return {
+      clear() {
+        selected.length = 0;
+        search.value = '';
+        renderTokens();
+        sync();
+        closeMenu();
+      },
+    };
   }
 
   async function init() {
@@ -800,6 +1458,9 @@
       fetchEvents(userId);
     });
 
+    eventTimePickers = setupTimePickers();
+    eventAttendeePicker = setupAttendeePicker();
+
     const attendeeInput = document.getElementById('eventAttendees');
     const eventDateInput = document.getElementById('eventDate');
     const eventStartInput = document.getElementById('eventStart');
@@ -841,6 +1502,8 @@
             renderEmptyState('Inicia sesión para conectar tu calendario.');
             return;
           }
+          // Normaliza lo tipeado a mano ("930" -> "09:30") antes de armar el payload.
+          eventTimePickers?.commitAll();
           const date = document.getElementById('eventDate')?.value || today;
           const start = document.getElementById('eventStart')?.value || '';
           const end = document.getElementById('eventEnd')?.value || '';

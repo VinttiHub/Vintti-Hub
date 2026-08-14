@@ -413,11 +413,20 @@ def google_calendar_freebusy():
             end = (event.get("end") or {}).get("dateTime") or (event.get("end") or {}).get("date")
             if not start or not end:
                 continue
+            # Los eventos "libres" (cumpleanos, recordatorios) nunca generan un bloque
+            # ocupado en freebusy, asi que tampoco deben servir para etiquetarlo.
+            if event.get("transparency") == "transparent":
+                continue
+            # Idem para los eventos que la persona rechazo.
+            attendees = event.get("attendees") or []
+            if any(a.get("self") and a.get("responseStatus") == "declined" for a in attendees):
+                continue
             details.append(
                 {
                     "start": start,
                     "end": end,
                     "summary": event.get("summary") or "Ocupado",
+                    "all_day": not (event.get("start") or {}).get("dateTime"),
                 }
             )
 
