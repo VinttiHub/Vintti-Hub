@@ -22,7 +22,19 @@ from utils.storage_utils import (
     set_candidate_tests_documents,
     set_cv_keys,
 )
+from utils.account_status import derive_account_status
+from utils.client_inactive_alert import (
+    TRIGGER_LAST_EMPLOYEE_OUT,
+    became_inactive_from_hire_change,
+    build_client_inactive_email,
+    send_client_inactive_email,
+)
 from utils.credit_loop import remove_unused_credits_for_inactive_source_hires
+from utils.transactional_email import (
+    email_detail_table,
+    email_shell,
+    post_transactional_email,
+)
 from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.types import to_bool
 
@@ -41,6 +53,16 @@ CHURN_EMAIL_RECIPIENTS = [
     'agustin@vintti.com',
     'lara@vintti.com',
     'agostina@vintti.com',
+    'pgonzales@vintti.com',
+]
+# Se dispara cuando la baja de un contractor deja a la cuenta SIN ningún activo.
+# Lista distinta (y a propósito) de CHURN_EMAIL_RECIPIENTS: perder al cliente
+# entero se escala más arriba que perder un contractor.
+CLIENT_INACTIVE_EMAIL_RECIPIENTS = [
+    'mia@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'jazmin@vintti.com',
     'pgonzales@vintti.com',
 ]
 _REFERENCE_CANDIDATE_FIELDS = [
@@ -102,7 +124,8 @@ def _build_structured_reference_notes(reference_values):
     return f'<div data-structured-references="true">{"".join(sections)}</div>'
 
 
-def _send_hire_churn_email(cur, candidate_id, opportunity_id):
+def _build_hire_churn_email(cur, candidate_id, opportunity_id):
+    """Arma {subject, body}. Se llama dentro de la transacción; el POST va después."""
     cur.execute(
         """
         SELECT
@@ -134,43 +157,11 @@ def _send_hire_churn_email(cur, candidate_id, opportunity_id):
         ('Vintti process error', 'Yes' if row.get('inactive_vinttierror') else 'No'),
         ('Opportunity ID', opportunity_id),
     ]
-    detail_html = ''.join(
-        f"""
-        <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;font-weight:600;color:#111927;width:180px;">{html.escape(str(label))}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;color:#243B53;">{html.escape(str(value))}</td>
-        </tr>
-        """
-        for label, value in detail_rows
-        if value not in (None, '')
-    )
-    body = f"""
-    <div style="font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#243B53;">
-      <p style="margin:0 0 18px;font-size:16px;">Hi team,</p>
-      <p style="margin:0 0 18px;">
-        A churn was just logged for <strong>{html.escape(candidate_name)}</strong>.
-      </p>
-      <table style="border-collapse:collapse;width:100%;max-width:680px;background:#f8fafc;border-radius:14px;overflow:hidden;margin:0 0 20px;">
-        <tbody>{detail_html}</tbody>
-      </table>
-      <p style="margin:0;font-size:14px;color:#52606d;">
-        Thanks,<br/>
-        <strong>Vintti Hub</strong>
-      </p>
-    </div>
-    """.strip()
-    response = requests.post(
-        'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email',
-        json={
-            'to': CHURN_EMAIL_RECIPIENTS,
-            'subject': f'Churn alert - {candidate_name}',
-            'body': body,
-        },
-        timeout=30,
-    )
-    if not response.ok:
-        logging.error('Churn email failed: %s %s', response.status_code, response.text)
-    return {'sent': response.ok, 'status_code': response.status_code}
+    intro = f'A churn was just logged for <strong>{html.escape(candidate_name)}</strong>.'
+    return {
+        'subject': f'Churn alert - {candidate_name}',
+        'body': email_shell(intro, email_detail_table(detail_rows)),
+    }
 
 
 def _merge_structured_reference_notes(existing_notes, reference_values):
@@ -1812,6 +1803,13 @@ def handle_candidate_hire_data(candidate_id):
         opp_model  = opp.get('opp_model')
         account_id = opp.get('account_id')
 
+        # Estado CRM de la cuenta ANTES de tocar nada. Tiene que salir de acá
+        # arriba: el bloque de abajo ya mueve candidato_contratado, limpia hires
+        # viejos e inserta la fila, y cualquiera de esas tres cosas cambia el
+        # estado derivado. Al final comparamos contra el estado nuevo y, si la
+        # cuenta cayó a 'Inactive Client', avisamos por mail.
+        account_status_before = derive_account_status(cur, account_id)
+
         # 2) be robust: ensure this opportunity actually points to this candidate
         if opp.get('candidato_contratado') != candidate_id:
             # if frontend called /opportunities/<id>/fields first, this should already be set,
@@ -2088,21 +2086,52 @@ def handle_candidate_hire_data(candidate_id):
             and _clean_date(data.get('end_date')) is not None
         )
 
+        # Aviso de cliente inactivo: se dispara con la MISMA definición que el CRM
+        # (utils/account_status.py), no con un conteo propio de hires. Si el cliente
+        # tiene un reemplazo abierto, la cuenta queda 'Lead in Process' y acá NO sale
+        # mail; el aviso lo manda accounts_routes cuando ese reemplazo se pierde.
+        account_status_after = derive_account_status(cur, account_id)
+        client_inactive_payload = (
+            build_client_inactive_email(cur, account_id, TRIGGER_LAST_EMPLOYEE_OUT)
+            if became_inactive_from_hire_change(account_status_before, account_status_after)
+            else None
+        )
+        # El churn se arma también antes del commit, por el mismo motivo: mandar el
+        # POST HTTP con la transacción abierta deja la conexión tomada de más.
+        churn_payload = (
+            _build_hire_churn_email(cur, candidate_id, opportunity_id)
+            if should_send_churn_email
+            else None
+        )
+
         conn.commit()
         churn_email_notice = None
-        if should_send_churn_email:
+        if churn_payload:
             try:
-                churn_email_notice = _send_hire_churn_email(cur, candidate_id, opportunity_id)
+                churn_email_notice = post_transactional_email(
+                    CHURN_EMAIL_RECIPIENTS,
+                    churn_payload['subject'],
+                    churn_payload['body'],
+                    'Churn',
+                )
             except Exception as email_error:
                 logging.exception('Failed to send churn email')
                 churn_email_notice = {'sent': False, 'error': str(email_error)}
+        client_inactive_email_notice = None
+        if client_inactive_payload:
+            try:
+                client_inactive_email_notice = send_client_inactive_email(client_inactive_payload)
+            except Exception as email_error:
+                logging.exception('Failed to send client inactive email')
+                client_inactive_email_notice = {'sent': False, 'error': str(email_error)}
         return jsonify({
             'success': True,
             'created': created,
             'updated': updated,
             'ignored_fields': ignored_fields,
             'credit_loop_removed': credit_loop_removed,
-            'churn_email_notice': churn_email_notice
+            'churn_email_notice': churn_email_notice,
+            'client_inactive_email_notice': client_inactive_email_notice
         })
 
     except Exception as e:

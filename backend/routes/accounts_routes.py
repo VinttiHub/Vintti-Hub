@@ -11,6 +11,13 @@ from psycopg2.extras import RealDictCursor, execute_values
 
 from db import get_connection
 from utils import services
+from utils.account_status import derive_account_status
+from utils.client_inactive_alert import (
+    TRIGGER_OPPORTUNITY_LOST,
+    became_inactive_from_stage_change,
+    build_client_inactive_email,
+    send_client_inactive_email,
+)
 from utils.credit_loop import (
     backfill_all_credits,
     create_credit_for_close_win,
@@ -1149,6 +1156,7 @@ def update_opportunity_stage(opportunity_id):
         conn = get_connection()
         credit_notice = None
         credit_created = None
+        client_inactive_payload = None
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
@@ -1165,6 +1173,13 @@ def update_opportunity_stage(opportunity_id):
                 previous_stage = row.get("opp_stage")
                 account_id = row.get("account_id")
                 stage_changed = (previous_stage or "").strip() != (new_stage or "").strip()
+
+                # Estado CRM ANTES de mover el stage. Caso que esto cubre: al cliente
+                # se le fue el último contractor pero quedó un REEMPLAZO abierto, así
+                # que la cuenta estaba en 'Lead in Process' y candidates_routes no
+                # avisó. Si ese reemplazo se marca Closed Lost, recién ahí la cuenta
+                # queda 'Inactive Client' y el mail sale desde acá.
+                account_status_before = derive_account_status(cursor, account_id)
 
                 _ensure_opportunity_stage_date_columns(cursor)
 
@@ -1209,10 +1224,28 @@ def update_opportunity_stage(opportunity_id):
                     credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
                     credit_created = create_credit_for_close_win(cursor, opportunity_id)
 
+                if stage_changed:
+                    account_status_after = derive_account_status(cursor, account_id)
+                    if became_inactive_from_stage_change(account_status_before, account_status_after):
+                        client_inactive_payload = build_client_inactive_email(
+                            cursor, account_id, TRIGGER_OPPORTUNITY_LOST
+                        )
+
+        # Fuera del `with conn`: la transacción ya commiteó, así que el POST del mail
+        # no deja la conexión tomada, y si falla el stage igual quedó guardado.
+        client_inactive_notice = None
+        if client_inactive_payload:
+            try:
+                client_inactive_notice = send_client_inactive_email(client_inactive_payload)
+            except Exception as email_error:
+                logging.exception('Failed to send client inactive email')
+                client_inactive_notice = {'sent': False, 'error': str(email_error)}
+
         return jsonify({
             'success': True,
             'credit_loop_notice': credit_notice,
             'credit_loop_created': credit_created,
+            'client_inactive_email_notice': client_inactive_notice,
         }), 200
 
     except Exception as e:
