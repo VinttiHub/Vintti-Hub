@@ -287,7 +287,14 @@ def google_calendar_events():
         tzinfo = timezone.utc
 
     day_start = _parse_date(payload.get("date"), tzinfo)
-    day_end = day_start + timedelta(days=1)
+
+    # ?days=N trae varios días de una (mini calendario + "lo que viene").
+    try:
+        range_days = int(payload.get("days") or 1)
+    except (TypeError, ValueError):
+        range_days = 1
+    range_days = max(1, min(range_days, 62))
+    day_end = day_start + timedelta(days=range_days)
 
     events = (
         service.events()
@@ -297,6 +304,7 @@ def google_calendar_events():
             timeMax=day_end.isoformat(),
             singleEvents=True,
             orderBy="startTime",
+            maxResults=2500,
         )
         .execute()
     )
@@ -314,10 +322,20 @@ def google_calendar_events():
                 "htmlLink": item.get("htmlLink"),
                 "hangoutLink": item.get("hangoutLink"),
                 "conferenceData": item.get("conferenceData"),
+                # El front usa estos dos para descartar los "working location"
+                # (Home / Oficina) y los eventos cancelados.
+                "eventType": item.get("eventType"),
+                "status": item.get("status"),
             },
         )
 
-    return jsonify({"date": day_start.date().isoformat(), "events": items})
+    return jsonify(
+        {
+            "date": day_start.date().isoformat(),
+            "range_days": range_days,
+            "events": items,
+        }
+    )
 
 
 @bp.route("/google-calendar/freebusy", methods=["POST"])
@@ -400,7 +418,7 @@ def google_calendar_freebusy():
                     timeMax=time_max.isoformat(),
                     singleEvents=True,
                     orderBy="startTime",
-                    maxResults=50,
+                    maxResults=2500,
                 )
                 .execute()
             )

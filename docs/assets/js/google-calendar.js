@@ -9,6 +9,7 @@
   const eventsContainer = document.getElementById('eventsContainer');
   const upcomingEventsContainer = document.getElementById('upcomingEventsContainer');
   const upcomingSubtitle = document.getElementById('upcomingSubtitle');
+  const agendaSummary = document.getElementById('agendaSummary');
   const calendarDate = document.getElementById('calendarDate');
   const refreshBtn = document.getElementById('refreshBtn');
   const openEventModalBtn = document.getElementById('openEventModalBtn');
@@ -24,13 +25,21 @@
   const miniCalendarGrid = document.getElementById('miniCalendarGrid');
   const miniCalendarPrev = document.getElementById('miniCalendarPrev');
   const miniCalendarNext = document.getElementById('miniCalendarNext');
+  const miniCalendarToday = document.getElementById('miniCalendarToday');
+  const nextMeetingCard = document.getElementById('nextMeetingCard');
+  const allDayStrip = document.getElementById('allDayStrip');
+  const dayHeadNumber = document.getElementById('dayHeadNumber');
+  const dayHeadWeekday = document.getElementById('dayHeadWeekday');
+  const dayHeadMonth = document.getElementById('dayHeadMonth');
 
   const tz = 'America/Argentina/Buenos_Aires';
-  const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
   let currentUserId = null;
   let miniCalendarCursor = null;
   let eventTimePickers = null;
   let eventAttendeePicker = null;
+  let monthEventCounts = new Map();
+  // Se apaga solo si el backend deployado todavía no entiende ?days=N.
+  let rangeApiSupported = true;
   const availabilityConfig = {
     dayStart: 8 * 60,
     dayEnd: 20 * 60,
@@ -61,22 +70,22 @@
   function setRefreshing(isRefreshing) {
     if (!refreshBtn) return;
     refreshBtn.disabled = Boolean(isRefreshing);
-    refreshBtn.textContent = isRefreshing ? 'Refreshing…' : (refreshDefaultLabel || 'Refresh');
+    refreshBtn.classList.toggle('is-loading', Boolean(isRefreshing));
   }
 
   function setStatus({ connected, message }) {
     if (connected) {
-      connectionBadge.textContent = 'Connected';
+      connectionBadge.textContent = 'Conectado';
       connectionBadge.classList.add('is-connected');
       disconnectBtn.hidden = false;
       connectBtn.hidden = true;
-      calendarStatus.textContent = message || 'Tus reuniones de Google Calendar están listas.';
+      calendarStatus.textContent = message || 'Tu Google Calendar está sincronizado.';
     } else {
-      connectionBadge.textContent = 'Not connected';
+      connectionBadge.textContent = 'Sin conectar';
       connectionBadge.classList.remove('is-connected');
       disconnectBtn.hidden = true;
       connectBtn.hidden = false;
-      calendarStatus.textContent = message || 'Connect your Google Calendar to see today’s meetings.';
+      calendarStatus.textContent = message || 'Conectá tu Google Calendar para ver tu agenda.';
     }
   }
 
@@ -124,12 +133,7 @@
   }
 
   function renderEmptyState(message) {
-    eventsContainer.innerHTML = `
-      <div class="empty-state">
-        <img src="./assets/img/calendar.png" alt="" />
-        <p>${message}</p>
-      </div>
-    `;
+    eventsContainer.innerHTML = `<p class="day-placeholder">${escapeHtml(message)}</p>`;
   }
 
   function renderAvailabilityEmpty(message) {
@@ -147,12 +151,7 @@
 
   function renderUpcomingEmpty(message) {
     if (!upcomingEventsContainer) return;
-    upcomingEventsContainer.innerHTML = `
-      <div class="empty-state">
-        <img src="./assets/img/calendar.png" alt="" />
-        <p>${escapeHtml(message)}</p>
-      </div>
-    `;
+    upcomingEventsContainer.innerHTML = `<p class="side-empty">${escapeHtml(message)}</p>`;
   }
 
   function setAvailabilityMessage(message) {
@@ -180,59 +179,76 @@
     return calendarDate?.value || new Date().toISOString().slice(0, 10);
   }
 
+  const isoDateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  function todayIso() {
+    return isoDateFormatter.format(new Date());
+  }
+
+  function currentMinutesOfDay() {
+    return toMinutesOfDay(new Date().toISOString());
+  }
+
   function shiftIsoDate(isoDate, amount) {
     const base = new Date(`${isoDate}T12:00:00`);
     base.setDate(base.getDate() + amount);
     return base.toISOString().slice(0, 10);
   }
 
-  function formatCalendarLongDate(isoDate, locale = 'en-US') {
-    const date = new Date(`${isoDate}T12:00:00`);
-    return new Intl.DateTimeFormat(locale, {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(date);
+  function localIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Primera celda del mes en la grilla (la semana arranca lunes).
+  function miniCalendarGridStart() {
+    const monthStart = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), 1);
+    const offset = (monthStart.getDay() + 6) % 7;
+    monthStart.setDate(monthStart.getDate() - offset);
+    return monthStart;
   }
 
   function renderMiniCalendar() {
     if (!miniCalendarGrid || !miniCalendarTitle || !calendarDate) return;
-    const selected = new Date(`${getSelectedDate()}T12:00:00`);
+    const selected = isoToDate(getSelectedDate());
     const current = miniCalendarCursor || new Date(selected.getFullYear(), selected.getMonth(), 1);
     miniCalendarCursor = new Date(current.getFullYear(), current.getMonth(), 1);
 
-    miniCalendarTitle.textContent = new Intl.DateTimeFormat('en-US', {
-      month: 'long',
-      year: 'numeric',
-    }).format(miniCalendarCursor);
+    miniCalendarTitle.textContent = capitalizeFirst(formatMonthYear(miniCalendarCursor));
 
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthStart = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), 1);
+    const weekdays = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
     const monthEnd = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth() + 1, 0);
-    const firstWeekday = monthStart.getDay();
+    const firstWeekday = (new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), 1).getDay() + 6) % 7;
     const daysInMonth = monthEnd.getDate();
-    const cells = [];
-
-    weekdays.forEach((day) => {
-      cells.push(`<div class="mini-calendar-weekday">${day}</div>`);
-    });
+    const cells = weekdays.map(day => `<div class="mini-calendar-weekday">${day}</div>`);
 
     for (let i = 0; i < firstWeekday; i += 1) {
       cells.push('<div class="mini-calendar-day is-muted" aria-hidden="true"></div>');
     }
 
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
     const selectedIso = getSelectedDate();
 
     for (let day = 1; day <= daysInMonth; day += 1) {
-      const cellDate = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), day);
-      const iso = cellDate.toISOString().slice(0, 10);
+      const iso = localIsoDate(new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), day));
       const classes = ['mini-calendar-day'];
       if (iso === selectedIso) classes.push('is-selected');
-      if (iso === todayIso) classes.push('is-today');
+      if (iso === today) classes.push('is-today');
+      const count = monthEventCounts.get(iso) || 0;
+      const dots = count
+        ? `<span class="mini-dots">${Array.from({ length: Math.min(count, 3) }, () => '<span class="mini-dot"></span>').join('')}</span>`
+        : '';
       cells.push(`
-        <button class="${classes.join(' ')}" type="button" data-calendar-day="${iso}">
-          ${day}
+        <button class="${classes.join(' ')}" type="button" data-calendar-day="${iso}" aria-label="${iso}${count ? ` · ${count} eventos` : ''}">
+          <span class="mini-calendar-number">${day}</span>
+          ${dots}
         </button>
       `);
     }
@@ -278,57 +294,380 @@
   function formatEventTime(event) {
     const start = event.start?.dateTime || event.start?.date;
     const end = event.end?.dateTime || event.end?.date;
-    if (!start || !end) return 'All day';
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const fmt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: tz });
-    return `${fmt.format(startDate)} - ${fmt.format(endDate)}`;
+    if (!start || !end) return 'Todo el día';
+    if (isAllDayCalendarEvent(event)) return 'Todo el día';
+    const startMinutes = toMinutesOfDay(start);
+    const endMinutes = toMinutesOfDay(end);
+    if (startMinutes === null || endMinutes === null) return 'Todo el día';
+    return `${formatMinutesLabel(startMinutes)} – ${formatMinutesLabel(endMinutes)}`;
   }
 
-  function renderEvents(events) {
-    if (!events.length) {
-      renderEmptyState('No hay reuniones para este día.');
+  function isAllDayCalendarEvent(event) {
+    return Boolean(event?.start?.date && !event?.start?.dateTime);
+  }
+
+  function eventDurationMinutes(event) {
+    const start = new Date(event?.start?.dateTime || event?.start?.date || '').getTime();
+    const end = new Date(event?.end?.dateTime || event?.end?.date || '').getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+    return Math.round((end - start) / 60000);
+  }
+
+  // Limpia lo que Google devuelve antes de pintarlo:
+  // - los "working location" (Home / Oficina) no son reuniones,
+  // - el fin de un evento de día completo es exclusivo (el cumpleaños del 14 aparecía el 15),
+  // - y a veces llegan repetidos (mismo título y horario).
+  function prepareDayEvents(events, targetDate) {
+    const seen = new Set();
+    return (Array.isArray(events) ? events : [])
+      .filter((event) => {
+        if (!event || event.status === 'cancelled') return false;
+        if (event.eventType === 'workingLocation') return false;
+
+        if (isAllDayCalendarEvent(event)) {
+          const startDate = event.start?.date || '';
+          const endDate = event.end?.date || startDate;
+          if (targetDate && startDate && !(startDate <= targetDate && targetDate < endDate)) return false;
+        }
+
+        const key = [
+          (event.summary || '').trim().toLowerCase(),
+          event.start?.dateTime || event.start?.date || '',
+          event.end?.dateTime || event.end?.date || '',
+        ].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => {
+        const allDayDiff = Number(isAllDayCalendarEvent(b)) - Number(isAllDayCalendarEvent(a));
+        if (allDayDiff) return allDayDiff;
+        const startA = new Date(a.start?.dateTime || a.start?.date || 0).getTime();
+        const startB = new Date(b.start?.dateTime || b.start?.date || 0).getTime();
+        return startA - startB;
+      });
+  }
+
+  // La magenta de marca queda reservada para la línea de "ahora": es lo único
+  // que se mueve en la pantalla y no compite con ningún evento.
+  const eventPalette = [
+    { accent: '#0b3d91', tint: 'rgba(11, 61, 145, 0.10)', text: '#0b3d91' },
+    { accent: '#6c38ff', tint: 'rgba(108, 56, 255, 0.10)', text: '#5227d1' },
+    { accent: '#4ba9ff', tint: 'rgba(75, 169, 255, 0.16)', text: '#0f6da1' },
+    { accent: '#c1ff72', tint: 'rgba(193, 255, 114, 0.34)', text: '#3a6b00' },
+    { accent: '#003bff', tint: 'rgba(0, 59, 255, 0.10)', text: '#003bff' },
+  ];
+
+  // Mismo título, mismo color todos los días: los eventos recurrentes se
+  // vuelven reconocibles de un vistazo.
+  function paletteForEvent(summary) {
+    const text = String(summary || '').trim().toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    return eventPalette[hash % eventPalette.length];
+  }
+
+  const dayHeadFormatter = new Intl.DateTimeFormat('es-AR', { weekday: 'long', timeZone: tz });
+  // Armamos "agosto 2026" a mano: el formato largo en español mete un "de"
+  // que con capitalize quedaba como "Agosto De 2026".
+  const monthNameFormatter = new Intl.DateTimeFormat('es-AR', { month: 'long', timeZone: tz });
+  const shortDayFormatter = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric', timeZone: tz });
+
+  function capitalizeFirst(value) {
+    const text = String(value || '');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function formatMonthYear(date) {
+    return `${monthNameFormatter.format(date)} ${date.getFullYear()}`;
+  }
+
+  function isoToDate(isoDate) {
+    return new Date(`${isoDate}T12:00:00`);
+  }
+
+  function updateDayHeading(targetDate) {
+    if (!targetDate) return;
+    const date = isoToDate(targetDate);
+    if (dayHeadNumber) dayHeadNumber.textContent = String(date.getDate());
+    if (dayHeadWeekday) dayHeadWeekday.textContent = capitalizeFirst(dayHeadFormatter.format(date));
+    if (dayHeadMonth) dayHeadMonth.textContent = capitalizeFirst(formatMonthYear(date));
+  }
+
+  function formatCountdown(minutes) {
+    if (minutes <= 0) return 'en curso';
+    if (minutes < 60) return `en ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `en ${hours} h ${rest}` : `en ${hours} h`;
+  }
+
+  function renderNextMeeting(timed, targetDate) {
+    if (!nextMeetingCard) return;
+    const isToday = targetDate === todayIso();
+    const nowMinutes = currentMinutesOfDay();
+
+    let event = null;
+    let state = 'next';
+    if (isToday) {
+      event = timed.find((item) => {
+        const end = toMinutesOfDay(item.end?.dateTime);
+        return end !== null && end > nowMinutes;
+      }) || null;
+    } else {
+      event = timed[0] || null;
+      state = 'first';
+    }
+
+    if (!event) {
+      nextMeetingCard.hidden = false;
+      nextMeetingCard.innerHTML = `
+        <div class="next-card-body">
+          <span class="next-card-eyebrow">Agenda libre</span>
+          <h3 class="next-card-title">${isToday ? 'No queda nada por delante hoy' : 'Ese día no tenés reuniones'}</h3>
+          <p class="next-card-line">Usá el botón + para agendar una y validar horarios con el equipo.</p>
+        </div>
+      `;
       return;
     }
 
-    eventsContainer.innerHTML = events
-      .map(event => {
-        const meetLink = event.hangoutLink || event.conferenceData?.entryPoints?.[0]?.uri;
+    const start = toMinutesOfDay(event.start?.dateTime);
+    const end = toMinutesOfDay(event.end?.dateTime);
+    const running = isToday && start !== null && nowMinutes >= start;
+    const eyebrow = running
+      ? 'Ahora'
+      : (state === 'next' ? formatCountdown(Math.max(0, (start ?? 0) - nowMinutes)) : 'Primera del día');
+    const meetLink = event.hangoutLink || event.conferenceData?.entryPoints?.[0]?.uri;
+    const duration = eventDurationMinutes(event);
+
+    nextMeetingCard.hidden = false;
+    nextMeetingCard.className = `next-card${running ? ' is-running' : ''}`;
+    nextMeetingCard.innerHTML = `
+      <div class="next-card-body">
+        <span class="next-card-eyebrow">${running ? '<span class="next-card-live"></span>' : ''}${escapeHtml(eyebrow)}</span>
+        <h3 class="next-card-title">${escapeHtml(event.summary || 'Sin título')}</h3>
+        <p class="next-card-line">
+          ${start === null ? '' : escapeHtml(`${formatMinutesLabel(start)} – ${formatMinutesLabel(end ?? start)}`)}
+          ${duration ? `<span class="next-card-dot">·</span>${escapeHtml(formatDurationLabel(duration))}` : ''}
+          ${event.location ? `<span class="next-card-dot">·</span>${escapeHtml(event.location)}` : ''}
+        </p>
+      </div>
+      <div class="next-card-actions">
+        ${meetLink ? `<a class="next-join" href="${escapeHtml(meetLink)}" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i>Unirse</a>` : ''}
+        ${event.htmlLink ? `<a class="next-open" href="${escapeHtml(event.htmlLink)}" target="_blank" rel="noopener">Ver en Google</a>` : ''}
+      </div>
+    `;
+  }
+
+  function renderAllDayStrip(allDay) {
+    if (!allDayStrip) return;
+    if (!allDay.length) {
+      allDayStrip.hidden = true;
+      allDayStrip.innerHTML = '';
+      return;
+    }
+    allDayStrip.hidden = false;
+    allDayStrip.innerHTML = `
+      <span class="day-allday-label">Todo el día</span>
+      <span class="day-allday-chips">
+        ${allDay.map((event) => {
+          const palette = paletteForEvent(event.summary);
+          return `<span class="day-allday-chip" style="--chip-accent:${palette.accent};--chip-tint:${palette.tint};--chip-text:${palette.text};">${escapeHtml(event.summary || 'Sin título')}</span>`;
+        }).join('')}
+      </span>
+    `;
+  }
+
+  let nowLineTimer = null;
+
+  function updateNowLine() {
+    const line = eventsContainer?.querySelector('.day-now');
+    if (!line) return;
+    const grid = line.closest('.day-grid');
+    if (!grid) return;
+    const dayStart = Number(grid.dataset.dayStart);
+    const dayEnd = Number(grid.dataset.dayEnd);
+    const minuteHeight = Number(grid.dataset.minuteHeight);
+    const now = currentMinutesOfDay();
+    if (now === null || now < dayStart || now > dayEnd) {
+      line.hidden = true;
+      return;
+    }
+    line.hidden = false;
+    line.style.top = `${(now - dayStart) * minuteHeight}px`;
+    const label = line.querySelector('.day-now-label');
+    if (label) label.textContent = formatMinutesLabel(now);
+  }
+
+  function renderDayGrid(timed, targetDate) {
+    if (!eventsContainer) return;
+    const minuteHeight = 1;
+    const isToday = targetDate === todayIso();
+    const nowMinutes = currentMinutesOfDay();
+
+    const entries = layoutPersonEntries(
+      timed
+        .map((event) => {
+          const startMinutes = toMinutesOfDay(event.start?.dateTime);
+          let endMinutes = toMinutesOfDay(event.end?.dateTime);
+          if (startMinutes === null || endMinutes === null) return null;
+          if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + 30, 24 * 60);
+          return {
+            startMinutes,
+            endMinutes,
+            label: event.summary || 'Sin título',
+            location: event.location || '',
+            meetLink: event.hangoutLink || event.conferenceData?.entryPoints?.[0]?.uri || '',
+            htmlLink: event.htmlLink || '',
+            palette: paletteForEvent(event.summary),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.startMinutes - b.startMinutes || b.endMinutes - a.endMinutes),
+    );
+
+    let dayStart = 8 * 60;
+    let dayEnd = 20 * 60;
+    entries.forEach((entry) => {
+      if (entry.startMinutes < dayStart) dayStart = Math.max(0, Math.floor(entry.startMinutes / 60) * 60);
+      if (entry.endMinutes > dayEnd) dayEnd = Math.min(24 * 60, Math.ceil(entry.endMinutes / 60) * 60);
+    });
+    if (isToday && nowMinutes !== null) {
+      if (nowMinutes < dayStart) dayStart = Math.max(0, Math.floor(nowMinutes / 60) * 60);
+      if (nowMinutes > dayEnd) dayEnd = Math.min(24 * 60, Math.ceil(nowMinutes / 60) * 60);
+    }
+
+    const slotHeight = 60 * minuteHeight;
+    const gridHeight = (dayEnd - dayStart) * minuteHeight;
+
+    const hours = [];
+    for (let minutes = dayStart; minutes < dayEnd; minutes += 60) {
+      hours.push(`<div class="day-hour"><span>${formatMinutesLabel(minutes)}</span></div>`);
+    }
+
+    const blocks = entries
+      .map((entry) => {
+        const top = (entry.startMinutes - dayStart) * minuteHeight;
+        const height = Math.max((entry.endMinutes - entry.startMinutes) * minuteHeight, 22);
+        const duration = entry.endMinutes - entry.startMinutes;
+        const width = 100 / entry.totalColumns;
+        const left = width * entry.column;
+        // El layout depende del alto real del bloque, no de la duración: cada
+        // línea que agregamos necesita su lugar o el texto queda cortado.
+        // <32: todo en una línea · <52: título + hora en línea · <90: apilado
+        // a una línea de título · >=90: dos líneas de título y botón de Meet.
+        let sizeClass = '';
+        if (height < 32) sizeClass = ' is-tiny';
+        else if (height < 52) sizeClass = ' is-compact';
+        else if (height >= 90) sizeClass = ' is-roomy';
+        const pastClass = isToday && nowMinutes !== null && nowMinutes >= entry.endMinutes ? ' is-past' : '';
+        const liveClass = isToday && nowMinutes !== null && nowMinutes >= entry.startMinutes && nowMinutes < entry.endMinutes ? ' is-live' : '';
+        const timeLabel = `${formatMinutesLabel(entry.startMinutes)} – ${formatMinutesLabel(entry.endMinutes)}`;
         return `
-          <div class="event-item">
-            <div class="event-time">${formatEventTime(event)}</div>
-            <div class="event-details">
-              <h4>${event.summary || 'Sin título'}</h4>
-              <p>${event.location || 'Ubicación por confirmar'}</p>
-            </div>
-            <div class="event-actions">
-              ${meetLink ? `<a href="${meetLink}" target="_blank" rel="noopener">Open Meet</a>` : ''}
-              ${event.htmlLink ? `<a href="${event.htmlLink}" target="_blank" rel="noopener">Open in Calendar</a>` : ''}
-            </div>
+          <div
+            class="day-event${sizeClass}${pastClass}${liveClass}"
+            style="top:${top}px;height:${height}px;left:calc(${left}% + 4px);width:calc(${width}% - 8px);--ev-accent:${entry.palette.accent};--ev-tint:${entry.palette.tint};--ev-text:${entry.palette.text};"
+            title="${escapeHtml(`${timeLabel} · ${entry.label}`)}"
+          >
+            <span class="day-event-title">${escapeHtml(entry.label)}</span>
+            <span class="day-event-time">${escapeHtml(timeLabel)}${entry.location ? ` · ${escapeHtml(entry.location)}` : ''}</span>
+            ${entry.meetLink && height >= 90 ? `<a class="day-event-meet" href="${escapeHtml(entry.meetLink)}" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i>Meet</a>` : ''}
           </div>
         `;
       })
       .join('');
+
+    eventsContainer.innerHTML = `
+      <div
+        class="day-grid"
+        data-day-start="${dayStart}"
+        data-day-end="${dayEnd}"
+        data-minute-height="${minuteHeight}"
+        style="--slot-height:${slotHeight}px;--grid-height:${gridHeight}px;"
+      >
+        <div class="day-gutter">${hours.join('')}</div>
+        <div class="day-canvas">
+          ${blocks || '<p class="day-free">Día libre. Un buen momento para trabajo profundo.</p>'}
+          ${isToday ? '<div class="day-now" hidden><span class="day-now-label">--:--</span></div>' : ''}
+        </div>
+      </div>
+    `;
+
+    updateNowLine();
+
+    if (nowLineTimer) window.clearInterval(nowLineTimer);
+    if (isToday) nowLineTimer = window.setInterval(updateNowLine, 60000);
+
+    // Arrancamos la vista donde está la acción, no a las 08:00.
+    const anchor = isToday && nowMinutes !== null ? nowMinutes : (entries[0]?.startMinutes ?? dayStart);
+    const grid = eventsContainer.querySelector('.day-grid');
+    if (grid) {
+      window.requestAnimationFrame(() => {
+        eventsContainer.scrollTop = Math.max(0, (anchor - dayStart - 60) * minuteHeight);
+      });
+    }
   }
 
-  function renderUpcomingEvents(events, baseDate) {
-    if (upcomingSubtitle) {
-      upcomingSubtitle.textContent = `Eventos de ${formatCalendarLongDate(baseDate)}.`;
+  function renderEvents(events, targetDate) {
+    const clean = prepareDayEvents(events, targetDate);
+    const timed = clean.filter(event => !isAllDayCalendarEvent(event));
+    const allDay = clean.filter(isAllDayCalendarEvent);
+
+    if (agendaSummary) {
+      const totalMinutes = timed.reduce((acc, event) => acc + (eventDurationMinutes(event) || 0), 0);
+      agendaSummary.textContent = timed.length
+        ? `${timed.length} ${timed.length === 1 ? 'reunión' : 'reuniones'} · ${formatDurationLabel(totalMinutes) || '0 min'} en calendario`
+        : 'Sin reuniones agendadas.';
     }
-    if (!events.length) {
-      renderUpcomingEmpty('No hay eventos para el siguiente día.');
+
+    updateDayHeading(targetDate);
+    renderAllDayStrip(allDay);
+    renderNextMeeting(timed, targetDate);
+    renderDayGrid(timed, targetDate);
+  }
+
+  // Agrupa los próximos días en una sola lista: día, y debajo sus reuniones.
+  function renderUpcomingDays(eventsByDay, fromDate) {
+    if (!upcomingEventsContainer) return;
+
+    const days = Object.keys(eventsByDay)
+      .filter(iso => iso > fromDate)
+      .sort()
+      .map(iso => ({ iso, events: prepareDayEvents(eventsByDay[iso], iso) }))
+      .filter(day => day.events.length)
+      .slice(0, 3);
+
+    if (!days.length) {
+      upcomingEventsContainer.innerHTML = '<p class="side-empty">No hay nada agendado en los próximos días.</p>';
+      if (upcomingSubtitle) upcomingSubtitle.textContent = 'Próximos días';
       return;
     }
 
-    upcomingEventsContainer.innerHTML = events
-      .slice(0, 4)
-      .map((event) => `
-        <article class="upcoming-item">
-          <div class="upcoming-time">${escapeHtml(formatEventTime(event))}</div>
-          <h4>${escapeHtml(event.summary || 'Sin título')}</h4>
-          <p>${escapeHtml(event.location || 'Ubicación por confirmar')}</p>
-        </article>
-      `)
+    if (upcomingSubtitle) upcomingSubtitle.textContent = `${days.length} día${days.length === 1 ? '' : 's'} con agenda`;
+
+    upcomingEventsContainer.innerHTML = days
+      .map((day) => {
+        const visible = day.events.slice(0, 3);
+        const rest = day.events.length - visible.length;
+        return `
+          <section class="upcoming-day">
+            <h3 class="upcoming-day-label">${escapeHtml(capitalizeFirst(shortDayFormatter.format(isoToDate(day.iso))))}</h3>
+            ${visible
+              .map((event) => {
+                const palette = paletteForEvent(event.summary);
+                const allDay = isAllDayCalendarEvent(event);
+                return `
+                  <button class="upcoming-item" type="button" data-calendar-day="${day.iso}" style="--item-accent:${palette.text};">
+                    <span class="upcoming-time">${escapeHtml(allDay ? 'Todo el día' : formatMinutesLabel(toMinutesOfDay(event.start?.dateTime) ?? 0))}</span>
+                    <span class="upcoming-name">${escapeHtml(event.summary || 'Sin título')}</span>
+                  </button>
+                `;
+              })
+              .join('')}
+            ${rest > 0 ? `<p class="upcoming-more">+${rest} más</p>` : ''}
+          </section>
+        `;
+      })
       .join('');
   }
 
@@ -695,41 +1034,172 @@
     return res.json();
   }
 
+  async function fetchRangeEvents(userId, startDate, days) {
+    const res = await fetch(
+      `${API_BASE}/google-calendar/events?user_id=${encodeURIComponent(userId)}&date=${encodeURIComponent(startDate)}&days=${days}&timezone=${encodeURIComponent(tz)}`,
+      { credentials: 'include' },
+    );
+    if (!res.ok) throw res;
+    return res.json();
+  }
+
+  // Plan B para el rango: /google-calendar/freebusy acepta time_min/time_max
+  // y ya está deployado. Devuelve los eventos con el mismo shape que la API
+  // de eventos, o null si tampoco se puede.
+  async function fetchRangeViaFreebusy(userId, startIso, days) {
+    const email = getStoredEmail();
+    if (!email) return null;
+    // La versión deployada corta en 50 eventos por pedido, así que partimos
+    // el rango en ventanas de dos semanas.
+    const windowDays = 14;
+    const chunks = [];
+    for (let offset = 0; offset < days; offset += windowDays) {
+      chunks.push([shiftIsoDate(startIso, offset), Math.min(windowDays, days - offset)]);
+    }
+    const results = await Promise.all(
+      chunks.map(([chunkStart, chunkDays]) => fetchFreebusyWindow(userId, email, chunkStart, chunkDays)),
+    );
+    const merged = results.filter(Boolean).flat();
+    return merged.length ? merged : null;
+  }
+
+  async function fetchFreebusyWindow(userId, email, startIso, days) {
+    try {
+      const res = await fetch(`${API_BASE}/google-calendar/freebusy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          emails: [email],
+          // Con offset explícito: el backend interpreta las fechas sin zona
+          // usando la hora del servidor, que está en UTC.
+          time_min: `${startIso}T00:00:00-03:00`,
+          time_max: `${shiftIsoDate(startIso, days)}T00:00:00-03:00`,
+          timezone: tz,
+        }),
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+
+      const details = data.events?.[email];
+      if (Array.isArray(details) && details.length) {
+        return details.map(item => ({
+          summary: item.summary,
+          start: String(item.start).includes('T') ? { dateTime: item.start } : { date: item.start },
+          end: String(item.end).includes('T') ? { dateTime: item.end } : { date: item.end },
+        }));
+      }
+
+      const busy = data.calendars?.[email]?.busy;
+      if (!Array.isArray(busy) || !busy.length) return null;
+      return busy.map(slot => ({
+        summary: 'Ocupado',
+        start: { dateTime: slot.start },
+        end: { dateTime: slot.end },
+      }));
+    } catch {
+      return null;
+    }
+  }
+
+  function daysBetween(fromIso, toIso) {
+    const from = isoToDate(fromIso).getTime();
+    const to = isoToDate(toIso).getTime();
+    return Math.max(1, Math.round((to - from) / 86400000));
+  }
+
+  function groupEventsByDay(events) {
+    const byDay = {};
+    (Array.isArray(events) ? events : []).forEach((event) => {
+      if (isAllDayCalendarEvent(event)) {
+        // Los de varios días marcan cada uno de sus días.
+        let cursor = event.start?.date || '';
+        const end = event.end?.date || cursor;
+        let guard = 0;
+        while (cursor && cursor < end && guard < 40) {
+          (byDay[cursor] = byDay[cursor] || []).push(event);
+          cursor = shiftIsoDate(cursor, 1);
+          guard += 1;
+        }
+        return;
+      }
+      const start = event.start?.dateTime;
+      if (!start) return;
+      const iso = isoDateFormatter.format(new Date(start));
+      (byDay[iso] = byDay[iso] || []).push(event);
+    });
+    return byDay;
+  }
+
+  function applyMonthCounts(byDay) {
+    monthEventCounts = new Map();
+    Object.keys(byDay).forEach((iso) => {
+      const count = prepareDayEvents(byDay[iso], iso).length;
+      if (count) monthEventCounts.set(iso, count);
+    });
+  }
+
   async function fetchEvents(userId) {
     const date = getSelectedDate();
-    const nextDate = shiftIsoDate(date, 1);
     calendarDate.value = date;
     renderMiniCalendar();
+    updateDayHeading(date);
+
+    // Un solo pedido cubre la grilla del mes y los próximos días.
+    const gridStart = localIsoDate(miniCalendarGridStart());
+    const rangeStart = gridStart < date ? gridStart : date;
+    const rangeEnd = shiftIsoDate(date, 15);
+    const gridEnd = shiftIsoDate(gridStart, 42);
+    const rangeDays = daysBetween(rangeStart, rangeEnd > gridEnd ? rangeEnd : gridEnd);
 
     try {
       setRefreshing(true);
-      const [todayRes, nextRes] = await Promise.allSettled([
+      const [dayRes, rangeRes] = await Promise.allSettled([
         fetchDayEvents(userId, date),
-        fetchDayEvents(userId, nextDate),
+        rangeApiSupported ? fetchRangeEvents(userId, rangeStart, rangeDays) : Promise.resolve(null),
       ]);
 
-      if (todayRes.status === 'rejected') {
-        const res = todayRes.reason;
+      if (dayRes.status === 'rejected') {
+        const res = dayRes.reason;
         if (res?.status === 404) {
-          setStatus({ connected: false, message: 'Necesitas conectar tu Google Calendar.' });
-          renderEmptyState('Conecta tu Google Calendar para ver las reuniones del día.');
-          renderUpcomingEmpty('Conecta tu Google Calendar para ver próximos eventos.');
+          setStatus({ connected: false, message: 'Conectá tu Google Calendar para ver tu agenda.' });
+          renderEmptyState('Conectá tu Google Calendar para ver las reuniones del día.');
+          renderUpcomingEmpty('Conectá tu calendario para ver lo que viene.');
+          if (nextMeetingCard) nextMeetingCard.hidden = true;
           return;
         }
         throw res;
       }
 
-      renderEvents(todayRes.value.events || []);
+      renderEvents(dayRes.value.events || [], dayRes.value.date || date);
 
-      if (nextRes.status === 'fulfilled') {
-        renderUpcomingEvents(nextRes.value.events || [], nextDate);
+      const rangeData = rangeRes.status === 'fulfilled' ? rangeRes.value : null;
+      if (rangeApiSupported && rangeData && !Number.isFinite(rangeData.range_days)) rangeApiSupported = false;
+      let rangeEvents = rangeData && Number.isFinite(rangeData.range_days) ? (rangeData.events || []) : null;
+
+      // Mientras el backend con ?days=N no esté deployado, sacamos el rango de
+      // freebusy, que sí acepta time_min/time_max y ya está en producción.
+      if (!rangeEvents) rangeEvents = await fetchRangeViaFreebusy(userId, rangeStart, rangeDays);
+
+      if (rangeEvents) {
+        const byDay = groupEventsByDay(rangeEvents);
+        applyMonthCounts(byDay);
+        renderMiniCalendar();
+        renderUpcomingDays(byDay, date);
       } else {
-        renderUpcomingEmpty('No pudimos cargar los eventos del siguiente día.');
+        const nextDate = shiftIsoDate(date, 1);
+        try {
+          const next = await fetchDayEvents(userId, nextDate);
+          renderUpcomingDays({ [nextDate]: next.events || [] }, date);
+        } catch {
+          renderUpcomingEmpty('No pudimos cargar lo que viene.');
+        }
       }
     } catch (error) {
       console.error(error);
-      renderEmptyState('No pudimos cargar tus reuniones. Intenta de nuevo.');
-      renderUpcomingEmpty('No pudimos cargar los eventos del siguiente día.');
+      renderEmptyState('No pudimos cargar tus reuniones. Probá de nuevo.');
+      renderUpcomingEmpty('No pudimos cargar lo que viene.');
     } finally {
       setRefreshing(false);
     }
@@ -1443,7 +1913,17 @@
       miniCalendarCursor = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth() + 1, 1);
       renderMiniCalendar();
     });
-    miniCalendarGrid?.addEventListener('click', async (event) => {
+    miniCalendarToday?.addEventListener('click', async () => {
+      if (!calendarDate) return;
+      calendarDate.value = todayIso();
+      miniCalendarCursor = isoToDate(calendarDate.value);
+      renderMiniCalendar();
+      const userId = await ensureUserIdOrNotify();
+      if (!userId) return;
+      fetchEvents(userId);
+    });
+
+    const pickDayFromClick = async (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
       const btn = target.closest('[data-calendar-day]');
@@ -1451,12 +1931,15 @@
       const nextDate = btn.dataset.calendarDay;
       if (!nextDate || !calendarDate) return;
       calendarDate.value = nextDate;
-      miniCalendarCursor = new Date(`${nextDate}T12:00:00`);
+      miniCalendarCursor = isoToDate(nextDate);
       renderMiniCalendar();
       const userId = await ensureUserIdOrNotify();
       if (!userId) return;
       fetchEvents(userId);
-    });
+    };
+
+    miniCalendarGrid?.addEventListener('click', pickDayFromClick);
+    upcomingEventsContainer?.addEventListener('click', pickDayFromClick);
 
     eventTimePickers = setupTimePickers();
     eventAttendeePicker = setupAttendeePicker();
