@@ -2697,6 +2697,59 @@ def get_interviewed_count(opportunity_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/opportunities/counts', methods=['GET'])
+def get_opportunities_counts():
+    """Los dos counts de la tabla de Opportunities, para TODAS las opps, en un request.
+
+    La tabla pedía /candidates_count y /interviewed_count fila por fila: con ~700
+    opportunities eran ~1.400 requests, cada uno abriendo su propia conexión a RDS
+    (max_connections = 81). Mismo criterio que /opportunities/batch-sourcing-dates.
+
+    Las opps sin batches no aparecen en la respuesta; el front las toma como 0,
+    igual que devolvían los endpoints de a uno.
+
+    Las dos cuentas tienen que dar EXACTAMENTE lo mismo que get_candidates_count y
+    get_interviewed_count: si se toca el criterio de una, hay que tocar la otra.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                b.opportunity_id,
+                COUNT(DISTINCT cb.candidate_id) AS candidates_count,
+                COUNT(DISTINCT cb.candidate_id) FILTER (
+                    WHERE cb.status IS NULL
+                       OR LOWER(TRIM(cb.status)) = 'client interviewing/testing'
+                       OR LOWER(TRIM(cb.status)) = 'client rejected after interviewing'
+                       OR LOWER(TRIM(cb.status)) = 'client rejected after interview'
+                       OR LOWER(TRIM(cb.status)) = 'null'
+                ) AS interviewed_count
+            FROM batch b
+            JOIN candidates_batches cb
+              ON cb.batch_id = b.batch_id
+            GROUP BY b.opportunity_id
+        """)
+
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify([
+            {
+                "opportunity_id": row[0],
+                "candidates_count": int(row[1] or 0),
+                "interviewed_count": int(row[2] or 0),
+            }
+            for row in rows
+        ])
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/opportunities/<opportunity_id>/alex/interviewed_count', methods=['GET'])
 def get_alex_interviewed_count(opportunity_id):
     """Conteo de candidatos entrevistados en Alex AI para esta opportunity.

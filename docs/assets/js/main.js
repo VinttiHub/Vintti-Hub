@@ -1,3 +1,77 @@
+// =========================================================
+// Busy overlay
+// Crear una opportunity y mover de stage disparan varios requests contra App
+// Runner y pueden tardar segundos. Sin feedback la UI parece colgada y la gente
+// vuelve a apretar. Mismo criterio que #opp-loading-overlay en opportunity-detail:
+// se tapa la pantalla con un spinner hasta que termina el request.
+//
+// El contador (__oppBusyDepth) existe porque los flujos se anidan: el save de un
+// popup ya muestra el overlay y adentro llama a patchOpportunityStage, que lo
+// muestra otra vez. Sin contador, el hide de adentro lo apagaría a mitad de camino.
+// =========================================================
+let __oppBusyDepth = 0;
+
+function getOppBusyOverlay() {
+  let el = document.getElementById('opp-busy-overlay');
+  if (el) return el;
+
+  el = document.createElement('div');
+  el.id = 'opp-busy-overlay';
+  el.className = 'opp-busy-overlay is-hidden';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.innerHTML = `
+    <div class="opp-busy-card">
+      <div class="opp-busy-spinner" aria-hidden="true"></div>
+      <p class="opp-busy-title"></p>
+      <p class="opp-busy-sub"></p>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+function setOppBusyText(title, sub = '') {
+  const el = document.getElementById('opp-busy-overlay');
+  if (!el) return;
+  const titleEl = el.querySelector('.opp-busy-title');
+  const subEl = el.querySelector('.opp-busy-sub');
+  if (titleEl) titleEl.textContent = title || '';
+  if (subEl) {
+    subEl.textContent = sub || '';
+    subEl.style.display = sub ? '' : 'none';
+  }
+}
+
+function showOppBusy(title = 'Working…', sub = '') {
+  getOppBusyOverlay();
+  setOppBusyText(title, sub);
+  __oppBusyDepth += 1;
+  // Se pinta en el mismo frame del click: es todo el punto del overlay.
+  document.getElementById('opp-busy-overlay').classList.remove('is-hidden');
+}
+
+function hideOppBusy({ force = false } = {}) {
+  __oppBusyDepth = force ? 0 : Math.max(0, __oppBusyDepth - 1);
+  if (__oppBusyDepth > 0) return;
+  const el = document.getElementById('opp-busy-overlay');
+  if (el) el.classList.add('is-hidden');
+}
+
+// Deja el botón deshabilitado con spinner inline y devuelve el restore.
+function setBtnBusy(btn, busyText) {
+  if (!btn) return () => {};
+  const prevText = btn.textContent;
+  const prevDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  if (busyText) btn.textContent = busyText;
+  return () => {
+    btn.disabled = prevDisabled;
+    btn.classList.remove('is-busy');
+    if (busyText) btn.textContent = prevText;
+  };
+}
+
 // =========================
 // Interviewing popup
 // =========================
@@ -44,10 +118,10 @@ function openInterviewingPopup(opportunityId, dropdownElement) {
       return;
     }
 
-    try {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
+    const restoreSaveBtn = setBtnBusy(saveBtn, 'Saving...');
+    showOppBusy('Moving to Interviewing…', 'Saving the start date and the new stage.');
 
+    try {
       // 1) Insert en tabla interviewing
       const res = await fetch(`${API_BASE}/interviewing`, {
         method: 'POST',
@@ -76,8 +150,8 @@ function openInterviewingPopup(opportunityId, dropdownElement) {
       console.error('❌ Interviewing save error:', err);
       alert('Network error. Please try again.');
     } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save';
+      hideOppBusy();
+      restoreSaveBtn();
     }
   };
 }
@@ -823,19 +897,64 @@ const interviewedCountCache = new Map();
 //   return batchCountCache.get(opportunityId);
 // }
 
+// Los dos counts de TODAS las filas en un solo request.
+// Antes cada fila pedía los suyos por separado: con la tabla llena eran ~1.400
+// requests, cada uno abriendo su propia conexión a RDS (max_connections = 81).
+// Mismo patrón que /opportunities/batch-sourcing-dates.
+let countsBulkPromise = null;
+
+function loadCountsBulk() {
+  if (countsBulkPromise) return countsBulkPromise;
+
+  countsBulkPromise = fetch(`${API_BASE}/opportunities/counts`, { credentials: 'include' })
+    .then(res => {
+      if (!res.ok) throw new Error(`GET /opportunities/counts ${res.status}`);
+      return res.json();
+    })
+    .then(rows => {
+      const map = new Map();
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        map.set(String(row.opportunity_id), {
+          candidates_count: Number(row.candidates_count || 0),
+          interviewed_count: Number(row.interviewed_count || 0)
+        });
+      });
+      return map;
+    })
+    .catch(err => {
+      // Backend sin el endpoint todavía (o caído): cada celda vuelve a pedir lo
+      // suyo. Es el comportamiento viejo, lento pero funcional.
+      console.warn('Bulk counts no disponible, volviendo a pedir de a uno:', err);
+      return null;
+    });
+
+  return countsBulkPromise;
+}
+
+// Las opps sin batches no vienen en el bulk: son 0, igual que devolvía el
+// endpoint de a uno.
+function countFromBulk(map, opportunityId, field) {
+  const row = map.get(String(opportunityId));
+  return row ? row[field] : 0;
+}
+
+function fetchSingleCount(opportunityId, path, field) {
+  return fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/${path}`)
+    .then(res => res.ok ? res.json() : {})
+    .then(data => Number(data[field] || 0))
+    .catch(err => {
+      console.error(`Error fetching ${field}`, err);
+      return 0;
+    });
+}
+
 function requestCandidatesCount(opportunityId) {
   if (!opportunityId) return Promise.resolve(0);
 
   if (!candidatesCountCache.has(opportunityId)) {
-    const promise = fetch(
-      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/candidates_count`
-    )
-      .then(res => res.ok ? res.json() : { candidates_count: 0 })
-      .then(data => Number(data.candidates_count || 0))
-      .catch(err => {
-        console.error('Error fetching candidates count', err);
-        return 0;
-      });
+    const promise = loadCountsBulk().then(map => map
+      ? countFromBulk(map, opportunityId, 'candidates_count')
+      : fetchSingleCount(opportunityId, 'candidates_count', 'candidates_count'));
 
     candidatesCountCache.set(opportunityId, promise);
   }
@@ -847,15 +966,9 @@ function requestInterviewedCount(opportunityId) {
   if (!opportunityId) return Promise.resolve(0);
 
   if (!interviewedCountCache.has(opportunityId)) {
-    const promise = fetch(
-      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/interviewed_count`
-    )
-      .then(res => res.ok ? res.json() : { interviewed_count: 0 })
-      .then(data => Number(data.interviewed_count || 0))
-      .catch(err => {
-        console.error('Error fetching interviewed count', err);
-        return 0;
-      });
+    const promise = loadCountsBulk().then(map => map
+      ? countFromBulk(map, opportunityId, 'interviewed_count')
+      : fetchSingleCount(opportunityId, 'interviewed_count', 'interviewed_count'));
 
     interviewedCountCache.set(opportunityId, promise);
   }
@@ -2563,6 +2676,7 @@ async function dispatchStageChange(opportunityId, newStage, previousStage, dropd
       return;
     }
     if (newStage === 'Stop') {
+      showOppBusy('Updating stage…', 'Clearing the start date.');
       try {
         await patchOppFields(opportunityId, { nda_signature_or_start_date: null });
       } catch (err) {
@@ -2570,6 +2684,8 @@ async function dispatchStageChange(opportunityId, newStage, previousStage, dropd
         dropdownElement.value = previousStage;
         updateStageDropdownStyle(dropdownElement, previousStage);
         return;
+      } finally {
+        hideOppBusy();
       }
     }
     if (requiresStageConfirm(newStage) && !skipConfirm) {
@@ -3235,6 +3351,10 @@ if (createOpportunityForm && createButton) {
 
   // Habilitar/deshabilitar botón según campos
   createOpportunityForm.addEventListener('input', () => {
+    // Mientras se está creando, el botón queda tomado: tipear en el form no
+    // puede volver a habilitarlo (el overlay tapa el mouse, no el teclado).
+    if (createButton.classList.contains('is-busy')) return;
+
     const clientName   = createOpportunityForm.client_name.value.trim();
     const oppModel     = createOpportunityForm.opp_model.value;
     const positionName = createOpportunityForm.position_name.value.trim();
@@ -3284,26 +3404,46 @@ if (createOpportunityForm && createButton) {
       formData.replacement_end_date = endEl.value;
     }
 
+    // El POST puede tardar unos segundos: feedback ya, y el form bloqueado para
+    // que no se dispare dos veces la misma opportunity.
+    const restoreCreateBtn = setBtnBusy(createButton, 'Creating…');
+    showOppBusy('Creating opportunity…', 'Saving it on the server, one moment.');
+    let busyOwned = true;
+    const releaseBusy = () => {
+      if (!busyOwned) return;
+      busyOwned = false;
+      hideOppBusy();
+      restoreCreateBtn();
+    };
+
     try {
       const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
 
       if (response.ok) {
-        alert('Opportunity created successfully!');
+        // El overlay se queda puesto hasta que la recarga pinte la tabla nueva:
+        // apagarlo antes deja medio segundo de tabla vieja que parece un error.
+        busyOwned = false;
+        setOppBusyText('Opportunity created ✨', 'Refreshing the list…');
         logOpportunityTrack('createOpportunityBtn');
         closePopup();
         location.reload();
-      } else {
-        console.log("🔴 Backend error:", result.error);
-        alert('Error: ' + (result.error || 'Unexpected error'));
+        return;
       }
+
+      releaseBusy();
+      console.log("🔴 Backend error:", result.error);
+      alert('Error: ' + (result.error || 'Unexpected error'));
     } catch (err) {
+      releaseBusy();
       console.error('Error creating opportunity:', err);
       alert('Connection error. Please try again.');
+    } finally {
+      releaseBusy();
     }
   });
 }
@@ -3517,8 +3657,15 @@ function colorizeSourcingCell(cell, days) {
 
 
 function openSourcingPopup(opportunityId, dropdownElement) {
+  // Este GET decide QUÉ popup abrir, así que hasta que vuelve no pasa nada
+  // visible después de elegir "Sourcing": overlay mientras tanto.
+  showOppBusy('Loading opportunity…', 'Checking the current start date.');
+
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`)
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error(`GET /opportunities ${res.status}`);
+      return res.json();
+    })
     .then(opportunity => {
       const hasStartDate = opportunity.nda_signature_or_start_date;
 
@@ -3532,15 +3679,27 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           const date = document.getElementById('sourcingDate').value;
           if (!date) return alert('Please select a date.');
 
-          await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nda_signature_or_start_date: date })
-          });
+          const restoreSaveBtn = setBtnBusy(saveBtn, 'Saving…');
+          showOppBusy('Moving to Sourcing…', 'Saving the start date and the new stage.');
 
-          await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
-          logOpportunityTrack('saveSourcingDate');
-          closeSourcingPopup();
+          try {
+            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nda_signature_or_start_date: date })
+            });
+            if (!res.ok) throw new Error(`fields PATCH ${res.status}`);
+
+            await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+            logOpportunityTrack('saveSourcingDate');
+            closeSourcingPopup();
+          } catch (err) {
+            console.error('❌ Sourcing save failed:', err);
+            alert('Error saving the sourcing date. Please try again.');
+          } finally {
+            hideOppBusy();
+            restoreSaveBtn();
+          }
         };
       } else {
         // 🔁 Ya tiene start_date: abrir nueva popup
@@ -3555,22 +3714,45 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           const hr_lead = opportunity.opp_hr_lead;
           if (!hr_lead) return alert('HR Lead is missing.');
 
-          await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/sourcing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              opportunity_id: opportunityId,
-              user_id: hr_lead,
-              since_sourcing: date
-            })
-          });
+          const restoreSaveBtn = setBtnBusy(saveNewBtn, 'Saving…');
+          showOppBusy('Moving to Sourcing…', 'Saving the new sourcing round.');
 
-          await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
-          logOpportunityTrack('saveNewSourcing');
-          closeNewSourcingPopup();
+          try {
+            const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/sourcing', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                opportunity_id: opportunityId,
+                user_id: hr_lead,
+                since_sourcing: date
+              })
+            });
+            if (!res.ok) throw new Error(`POST /sourcing ${res.status}`);
+
+            await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+            logOpportunityTrack('saveNewSourcing');
+            closeNewSourcingPopup();
+          } catch (err) {
+            console.error('❌ New sourcing save failed:', err);
+            alert('Error saving the sourcing date. Please try again.');
+          } finally {
+            hideOppBusy();
+            restoreSaveBtn();
+          }
         };
       }
-    });
+    })
+    .catch(err => {
+      // Antes fallaba en silencio: el dropdown quedaba en Sourcing sin popup.
+      console.error('❌ Could not open the sourcing popup:', err);
+      alert('Could not load this opportunity. Please try again.');
+      const previousStage = dropdownElement?.getAttribute('data-current-stage') || '';
+      if (dropdownElement && previousStage) {
+        dropdownElement.value = previousStage;
+        updateStageDropdownStyle(dropdownElement, previousStage);
+      }
+    })
+    .finally(() => hideOppBusy());
 }
 // —— Close Win: autocomplete rápido ——
 const CW_CACHE = new Map(); // término -> resultados [{id,name}]
@@ -3710,7 +3892,16 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
   // para cargar salary/fee, sin mail de Close Win y con el crédito del Credit
   // Loop en $0. El único aviso era un alert al final, fácil de saltear.
   // Cuando falta, este popup también pide el candidato antes de dejar cerrar.
-  const missingHire = !isSignedMode && !(await getHiredCandidateIdFromOpportunity(opportunityId));
+  let existingHireId = null;
+  if (!isSignedMode) {
+    showOppBusy('Loading opportunity…', 'Checking the hired candidate.');
+    try {
+      existingHireId = await getHiredCandidateIdFromOpportunity(opportunityId);
+    } finally {
+      hideOppBusy();
+    }
+  }
+  const missingHire = !isSignedMode && !existingHireId;
   const showHire = isSignedMode || missingHire;
 
   popup.classList.toggle('signed-mode', isSignedMode);
@@ -3741,14 +3932,40 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
   saveBtn.onclick = async () => {
     const date = document.getElementById('closeWinDate').value;
 
+    // Validaciones primero: recién después se toma el overlay.
+    if (isSignedMode && !cwSelectedId) {
+      alert('Please select a hire.');
+      return;
+    }
+    if (!isSignedMode) {
+      if (!date) {
+        alert('Please select a close date.');
+        return;
+      }
+      if (missingHire && !cwSelectedId) {
+        alert('Please select the hired candidate.');
+        return;
+      }
+    }
+
+    // Este flujo son 3-4 requests encadenados: es el más lento de todos.
+    const restoreSaveBtn = setBtnBusy(saveBtn, 'Saving…');
+    showOppBusy(
+      isSignedMode ? 'Marking as Signed…' : 'Saving Close Win…',
+      'Linking the hire and updating the stage.'
+    );
+    let busyOwned = true;
+    const releaseBusy = () => {
+      if (!busyOwned) return;
+      busyOwned = false;
+      hideOppBusy();
+      restoreSaveBtn();
+    };
+
     try {
       if (isSignedMode) {
         // ✅ tomamos el ID “real” (no split de texto)
         const candidateId = cwSelectedId;
-        if (!candidateId) {
-          alert('Please select a hire.');
-          return;
-        }
 
         // 1) Guardar contratado en opportunity (sin close date en Signed)
         await patchOppFields(opportunityId, {
@@ -3767,19 +3984,12 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
         await patchOpportunityStage(opportunityId, 'Signed', dropdownElement);
         logOpportunityTrack('saveSigned');
 
-        // 4) Cerrar y redirigir
+        // 4) Cerrar y redirigir (el overlay queda hasta que carga la otra página)
         popup.style.display = 'none';
+        busyOwned = false;
+        setOppBusyText('Opening the hire…', 'Taking you to the candidate page.');
         localStorage.setItem('fromCloseWin', 'true');
         window.location.href = `candidate-details.html?id=${candidateId}#hire`;
-        return;
-      }
-
-      if (!date) {
-        alert('Please select a close date.');
-        return;
-      }
-      if (missingHire && !cwSelectedId) {
-        alert('Please select the hired candidate.');
         return;
       }
 
@@ -3806,14 +4016,21 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
 
       const hiredCandidateId = await getHiredCandidateIdFromOpportunity(opportunityId);
       if (hiredCandidateId) {
+        busyOwned = false;
+        setOppBusyText('Opening the hire…', 'Taking you to the candidate page.');
         localStorage.setItem('fromCloseWin', 'true');
         window.location.href = `candidate-details.html?id=${hiredCandidateId}#hire`;
-      } else {
-        alert('Close Win saved, but no hired candidate is linked yet.');
+        return;
       }
+
+      releaseBusy();
+      alert('Close Win saved, but no hired candidate is linked yet.');
     } catch (err) {
+      releaseBusy();
       console.error(`❌ ${isSignedMode ? 'Signed' : 'Close Win'} flow failed:`, err);
       alert(`${isSignedMode ? 'Signed' : 'Close Win'} failed:\n${err.message}`);
+    } finally {
+      releaseBusy();
     }
   };
 }
@@ -3857,6 +4074,12 @@ function closeCloseWinPopup() {
   document.getElementById('closeWinPopup').style.display = 'none';
 }
 async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
+  // Único camino por el que pasan TODOS los cambios de stage (directos y desde
+  // los popups), así que el overlay vive acá. Los alerts salen después del
+  // finally para no quedar encima del spinner.
+  showOppBusy('Updating stage…', `Moving this opportunity to "${newStage}".`);
+  let errorMessage = null;
+
   try {
     const response = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
       method: 'PATCH',
@@ -3864,7 +4087,7 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
       body: JSON.stringify({ opp_stage: newStage })
     });
 
-    const result = await response.json();
+    const result = await response.json().catch(() => ({}));
 
     if (response.ok) {
       if (dropdownElement) {
@@ -3885,17 +4108,25 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
       setTimeout(() => {
         toast.style.display = 'none';
       }, 3000);
-      return true;
     } else {
       console.error('❌ Error updating stage:', result.error || result);
-      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
-      return false;
+      errorMessage = 'Error updating stage: ' + (result.error || 'Unexpected error');
     }
   } catch (err) {
     console.error('❌ Network error updating stage:', err);
-    alert('Network error. Please try again.');
+    errorMessage = 'Network error. Please try again.';
+  } finally {
+    hideOppBusy();
+  }
+
+  if (errorMessage) {
+    // force: si falla, el overlay se cae entero aunque el flujo de afuera
+    // (popup de sourcing/close win) todavía lo tuviera tomado.
+    hideOppBusy({ force: true });
+    alert(errorMessage);
     return false;
   }
+  return true;
 }
 function openCloseLostPopup(opportunityId, dropdownElement) {
   const popup = document.getElementById('closeLostPopup');
@@ -3923,16 +4154,28 @@ function openCloseLostPopup(opportunityId, dropdownElement) {
       payload.details_close_lost = details;
     }
 
-    // Guardar en DB
-    await fetch(`${API_BASE}/opportunities/${opportunityId}/fields`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const restoreSaveBtn = setBtnBusy(saveBtn, 'Saving…');
+    showOppBusy('Closing this opportunity…', 'Saving the close date and the reason.');
 
-    await patchOpportunityStage(opportunityId, 'Closed Lost', dropdownElement);
-    logOpportunityTrack('saveCloseLost');
-    closeCloseLostPopup();
+    try {
+      // Guardar en DB
+      const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/fields`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`fields PATCH ${res.status}`);
+
+      await patchOpportunityStage(opportunityId, 'Closed Lost', dropdownElement);
+      logOpportunityTrack('saveCloseLost');
+      closeCloseLostPopup();
+    } catch (err) {
+      console.error('❌ Closed Lost save failed:', err);
+      alert('Error saving the Closed Lost details. Please try again.');
+    } finally {
+      hideOppBusy();
+      restoreSaveBtn();
+    }
   };
 }
 
@@ -4469,20 +4712,32 @@ async function triggerSignedResigRefReminder(opportunityId){
  */
 const _origPatchOpportunityStage = patchOpportunityStage;
 patchOpportunityStage = async function(opportunityId, newStage, dropdownElement){
-  const ok = await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
-  if (!ok) return ok;
+  // El overlay también se toma acá: estos mails / sync del Credit Loop son
+  // requests extra después del PATCH y sin esto la pantalla se destapa mientras
+  // todavía están corriendo.
+  showOppBusy('Updating stage…', `Moving this opportunity to "${newStage}".`);
 
-  if (String(newStage) === 'Signed') {
-    await triggerSignedResigRefReminder(opportunityId);
+  try {
+    const ok = await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
+    if (!ok) return ok;
+
+    if (String(newStage) === 'Signed') {
+      setOppBusyText('Almost there…', 'Sending the HR Lead reminder.');
+      await triggerSignedResigRefReminder(opportunityId);
+    }
+    if (String(newStage) === 'Close Win') {
+      setOppBusyText('Almost there…', 'Syncing Credit Loop and sending the email.');
+      await syncCloseWinCreditLoop(opportunityId);
+      await sendCloseWinStageEmail(opportunityId);
+    }
+    if (String(newStage) === 'Closed Lost') {
+      setOppBusyText('Almost there…', 'Sending the Closed Lost email.');
+      await sendClosedLostStageEmail(opportunityId);
+    }
+    return ok;
+  } finally {
+    hideOppBusy();
   }
-  if (String(newStage) === 'Close Win') {
-    await syncCloseWinCreditLoop(opportunityId);
-    await sendCloseWinStageEmail(opportunityId);
-  }
-  if (String(newStage) === 'Closed Lost') {
-    await sendClosedLostStageEmail(opportunityId);
-  }
-  return ok;
 };
 if (typeof window !== 'undefined') {
   window.patchOpportunityStage = patchOpportunityStage;

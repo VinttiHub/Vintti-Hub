@@ -21,4 +21,9 @@ def get_connection():
         database=os.environ.get("RDS_DB", "postgres"),
         user=os.environ.get("RDS_USER", "adminuser"),
         password=password,
+        # Sin esto, un problema de red hacia RDS deja la request colgada hasta que
+        # se rinde el navegador (~30-60s): el front muestra spinner eterno y no hay
+        # error en los logs. Los statement_timeout/lock_timeout de las rutas no
+        # cubren este caso porque corren DESPUÉS de tener la conexión.
+        connect_timeout=int(os.environ.get("RDS_CONNECT_TIMEOUT", "10")),
     )
