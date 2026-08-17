@@ -44,6 +44,9 @@ REJECT_REASONS: List[Tuple[str, str]] = [
     ("english_level", "English level"),
     ("years_experience", "Doesn't meet years of experience"),
     ("missing_tools", "Doesn't meet required tools"),
+    ("job_hopping", "Job hopping"),
+    # "other" va último a propósito: es el que abre el campo de texto en la UI y la lista se
+    # pinta en este orden.
     ("other", "Other"),
 ]
 REJECT_REASON_CODES = {code for code, _ in REJECT_REASONS}
