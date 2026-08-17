@@ -22,6 +22,7 @@ no puede depender del presupuesto de OpenAI.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -228,6 +229,140 @@ def list_reject_reasons():
 
 
 # --- submit -----------------------------------------------------------------
+#
+# El núcleo por-candidato vive en _prepare_review + _insert_review porque lo usan DOS
+# caminos: el botón individual de candidate-details y el "Send for Approval" de un batch
+# entero en opportunity-detail. Los dos tienen que aplicar exactamente las mismas
+# validaciones y armar el mismo snapshot, o el mismo CV mediría distinto según por dónde
+# entró.
+
+# Motivos por los que un candidato puede quedar afuera. El texto es el que ve la recruiter.
+SKIP_REASONS = {
+    "not_found": "Candidate not found",
+    "not_linked": "Not linked to this opportunity",
+    "empty_resume": "No CV generated yet",
+    "no_jd": "The opportunity has no job description",
+    "already_pending": "Already waiting for a sales review",
+    "failed": "Could not be prepared",
+}
+
+
+def _prepare_review(cur, candidate_id, opportunity_id):
+    """Valida y arma todo lo que necesita un review. Devuelve (ctx, error_code)."""
+    cur.execute(
+        """
+        SELECT c.name AS candidate_name,
+               c.cv_pdf_scrapper, c.affinda_scrapper,
+               c.linkedin_scrapper, c.coresignal_scrapper
+        FROM candidates c WHERE c.candidate_id = %s LIMIT 1
+        """,
+        (candidate_id,),
+    )
+    candidate = cur.fetchone()
+    if not candidate:
+        return None, "not_found"
+
+    cur.execute(
+        """
+        SELECT o.opp_position_name, o.opp_sales_lead, o.opp_hr_lead,
+               COALESCE(a.client_name, '') AS client_name,
+               EXISTS (SELECT 1 FROM opportunity_candidates oc
+                        WHERE oc.opportunity_id = o.opportunity_id
+                          AND oc.candidate_id = %s) AS linked
+        FROM opportunity o
+        LEFT JOIN account a ON a.account_id = o.account_id
+        WHERE o.opportunity_id = %s LIMIT 1
+        """,
+        (candidate_id, opportunity_id),
+    )
+    opp = cur.fetchone()
+    if not opp:
+        return None, "opp_not_found"
+    if not opp["linked"]:
+        return None, "not_linked"
+
+    cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (candidate_id,))
+    snapshot = cv_review_ai.resume_snapshot(cur.fetchone() or {})
+    if cv_review_ai.snapshot_is_empty(snapshot):
+        return None, "empty_resume"
+
+    # La JD la trae el mismo helper que usa el generador, así el juez ve exactamente la JD
+    # que vio el generador (misma precedencia hr_jd → career_desc → career_reqs y el mismo
+    # RESUME_JD_LIMIT).
+    from ai_routes import _build_resume_target_role_block, _build_opportunity_context
+    from ai_routes import RESUME_JD_LIMIT, _truncate_preserving_edges
+    jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
+    jd_block = _build_resume_target_role_block({
+        "client_name": opp["client_name"],
+        "position": opp_ctx.get("position", "") or (opp["opp_position_name"] or ""),
+        "career_country": opp_ctx.get("career_country", ""),
+        "years_experience": str(opp_ctx.get("years_experience") or ""),
+        "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
+    })
+
+    return {
+        "candidate_id": candidate_id,
+        "opportunity_id": opportunity_id,
+        "candidate_name": candidate["candidate_name"],
+        "snapshot": snapshot,
+        "resume_hash": cv_review_ai.snapshot_hash(snapshot),
+        "source_text": cv_review_ai.build_source_text(candidate),
+        "jd_block": jd_block,
+        # Sin JD el review se crea igual (el gate es de proceso, no de datos) pero el score
+        # queda marcado como no aplicable.
+        "has_jd": bool((jd_plain or "").strip()),
+        "sales_lead": (opp["opp_sales_lead"] or "").strip().lower() or None,
+        "hr_lead": (opp["opp_hr_lead"] or "").strip().lower() or None,
+    }, None
+
+
+def _insert_review(conn, cur, ctx, actor, note):
+    """Inserta la ronda N+1. Devuelve (row, error_code).
+
+    La fila va ANTES del score a propósito: si scoreáramos primero, el usuario miraría un
+    spinner de 20-60s y un doble click crearía dos rondas.
+    """
+    cid, oid = ctx["candidate_id"], ctx["opportunity_id"]
+    for attempt in (1, 2):  # el índice parcial puede rechazar una carrera; un retry
+        try:
+            cur.execute(
+                """
+                INSERT INTO cv_reviews (
+                    candidate_id, opportunity_id, round, recruiter_email,
+                    hr_lead_email, sales_lead_email, recruiter_note,
+                    resume_snapshot, resume_hash
+                )
+                SELECT %s, %s,
+                       COALESCE(MAX(round), 0) + 1,
+                       %s, %s, %s, %s, %s, %s
+                FROM cv_reviews
+                WHERE candidate_id = %s AND opportunity_id = %s
+                RETURNING """ + _SELECT_COLS.replace("r.", ""),
+                (cid, oid, actor, ctx["hr_lead"], ctx["sales_lead"], note,
+                 Json(ctx["snapshot"]), ctx["resume_hash"], cid, oid),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row, None
+        except pg_errors.UniqueViolation:
+            conn.rollback()
+            # Ya hay un review abierto para este perfil (índice parcial
+            # cv_reviews_one_pending_uq) → devolvemos el que hay y la UI pinta el chip.
+            cur.execute(
+                "SELECT " + _SELECT_COLS + """
+                FROM cv_reviews r
+                WHERE r.candidate_id = %s AND r.opportunity_id = %s AND r.status = 'pending'
+                LIMIT 1
+                """,
+                (cid, oid),
+            )
+            existing = cur.fetchone()
+            if existing:
+                return existing, "already_pending"
+            if attempt == 2:
+                raise  # choque de round contra round: ya reintentamos una vez
+    return None, "failed"
+
 
 @bp.route("/candidates/<int:candidate_id>/cv_reviews", methods=["POST", "OPTIONS"])
 def submit_cv_review(candidate_id):
@@ -248,121 +383,28 @@ def submit_cv_review(candidate_id):
 
     ensure_cv_review_tables()
 
-    # --- 1. cargar contexto, armar el snapshot, y soltar la conexión ---------
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute(
-            """
-            SELECT c.name AS candidate_name,
-                   c.cv_pdf_scrapper, c.affinda_scrapper,
-                   c.linkedin_scrapper, c.coresignal_scrapper
-            FROM candidates c WHERE c.candidate_id = %s LIMIT 1
-            """,
-            (candidate_id,),
-        )
-        candidate = cur.fetchone()
-        if not candidate:
+        ctx, err = _prepare_review(cur, candidate_id, opportunity_id)
+        if err == "not_found":
             return jsonify({"error": "candidate not found"}), 404
-
-        cur.execute(
-            """
-            SELECT o.opp_position_name, o.opp_sales_lead, o.opp_hr_lead,
-                   COALESCE(a.client_name, '') AS client_name,
-                   EXISTS (SELECT 1 FROM opportunity_candidates oc
-                            WHERE oc.opportunity_id = o.opportunity_id
-                              AND oc.candidate_id = %s) AS linked
-            FROM opportunity o
-            LEFT JOIN account a ON a.account_id = o.account_id
-            WHERE o.opportunity_id = %s LIMIT 1
-            """,
-            (candidate_id, opportunity_id),
-        )
-        opp = cur.fetchone()
-        if not opp:
+        if err == "opp_not_found":
             return jsonify({"error": "opportunity not found"}), 404
-        if not opp["linked"]:
+        if err == "not_linked":
+            return jsonify({"error": "That candidate is not linked to that opportunity.",
+                            "code": "not_linked"}), 409
+        if err == "empty_resume":
+            return jsonify({"error": "Generate the CV before sending it to review.",
+                            "code": "empty_resume"}), 422
+
+        inserted, ins_err = _insert_review(conn, cur, ctx, actor, note)
+        if ins_err == "already_pending":
             return jsonify({
-                "error": "That candidate is not linked to that opportunity.",
-                "code": "not_linked",
+                "error": "This CV is already waiting for a sales review.",
+                "code": "already_pending",
+                "review": _serialize(inserted),
             }), 409
-
-        cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (candidate_id,))
-        resume_row = cur.fetchone() or {}
-        snapshot = cv_review_ai.resume_snapshot(resume_row)
-        if cv_review_ai.snapshot_is_empty(snapshot):
-            return jsonify({
-                "error": "Generate the CV before sending it to review.",
-                "code": "empty_resume",
-            }), 422
-
-        source_text = cv_review_ai.build_source_text(candidate)
-        # La JD la trae el mismo helper que usa el generador, así el juez ve exactamente
-        # la JD que vio el generador (misma precedencia hr_jd → career_desc → career_reqs
-        # y el mismo RESUME_JD_LIMIT).
-        from ai_routes import _build_resume_target_role_block, _build_opportunity_context
-        from ai_routes import RESUME_JD_LIMIT, _truncate_preserving_edges
-        jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
-        has_jd = bool((jd_plain or "").strip())
-        jd_block = _build_resume_target_role_block({
-            "client_name": opp["client_name"],
-            "position": opp_ctx.get("position", "") or (opp["opp_position_name"] or ""),
-            "career_country": opp_ctx.get("career_country", ""),
-            "years_experience": str(opp_ctx.get("years_experience") or ""),
-            "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
-        })
-
-        resume_hash = cv_review_ai.snapshot_hash(snapshot)
-        sales_lead = (opp["opp_sales_lead"] or "").strip().lower() or None
-        hr_lead = (opp["opp_hr_lead"] or "").strip().lower() or None
-
-        # --- 2. insertar la ronda ------------------------------------------
-        # La fila va ANTES del score a propósito: si scoreáramos primero, el usuario
-        # miraría un spinner de 20s y un doble click crearía dos rondas. El costo es que
-        # un reviewer que abra la cola en esos segundos ve "scoring…".
-        inserted = None
-        for attempt in (1, 2):  # el índice parcial puede rechazar una carrera; un retry
-            try:
-                cur.execute(
-                    """
-                    INSERT INTO cv_reviews (
-                        candidate_id, opportunity_id, round, recruiter_email,
-                        hr_lead_email, sales_lead_email, recruiter_note,
-                        resume_snapshot, resume_hash
-                    )
-                    SELECT %s, %s,
-                           COALESCE(MAX(round), 0) + 1,
-                           %s, %s, %s, %s, %s, %s
-                    FROM cv_reviews
-                    WHERE candidate_id = %s AND opportunity_id = %s
-                    RETURNING """ + _SELECT_COLS.replace("r.", ""),
-                    (candidate_id, opportunity_id, actor, hr_lead, sales_lead, note,
-                     Json(snapshot), resume_hash, candidate_id, opportunity_id),
-                )
-                inserted = cur.fetchone()
-                conn.commit()
-                break
-            except pg_errors.UniqueViolation:
-                conn.rollback()
-                # Ya hay un review abierto para este perfil (índice parcial
-                # cv_reviews_one_pending_uq) → devolvemos el que hay y la UI pinta el chip.
-                cur.execute(
-                    "SELECT " + _SELECT_COLS + """
-                    FROM cv_reviews r
-                    WHERE r.candidate_id = %s AND r.opportunity_id = %s AND r.status = 'pending'
-                    LIMIT 1
-                    """,
-                    (candidate_id, opportunity_id),
-                )
-                existing = cur.fetchone()
-                if existing:
-                    return jsonify({
-                        "error": "This CV is already waiting for a sales review.",
-                        "code": "already_pending",
-                        "review": _serialize(existing),
-                    }), 409
-                if attempt == 2:
-                    raise  # choque de round contra round: ya reintentamos una vez
     except Exception:
         # Exception y no psycopg2.Error: este bloque también arma el snapshot e importa
         # ai_routes, así que un fallo no-SQL acá tiene que devolver un error limpio en vez
@@ -376,28 +418,20 @@ def submit_cv_review(candidate_id):
 
     if not inserted:  # defensivo: no debería pasar, pero mejor 500 que AttributeError
         return jsonify({"error": "Could not create the review."}), 500
-    review_id = inserted["review_id"]
 
-    # --- 3. score AI + mail, EN BACKGROUND --------------------------------
-    # Antes esto corría dentro del request y la recruiter se quedaba mirando "Sending…":
-    # gpt-4o con este prompt tarda entre 20 y 60 s, y encima _send_email hace un POST con
-    # timeout=30. Sumados pasan cualquier paciencia razonable y el timeout del proxy.
-    #
-    # Lo que importa para el gate es que la FILA exista, y ya existe y está commiteada.
-    # El score y el mail son enriquecimiento: se hacen en un hilo daemon y la UI muestra
-    # "scoring…" mientras (ai_pending) hasta que la fila se actualiza.
+    # Score AI + mail EN BACKGROUND: gpt-4o tarda 20-60s y _send_email hace un POST con
+    # timeout=30. Lo que importa para el gate es que la fila exista, y ya está commiteada.
     _spawn_scoring(
-        review_id=review_id,
-        has_jd=has_jd,
-        snapshot=snapshot,
-        jd_block=jd_block,
-        source_text=source_text,
-        resume_hash=resume_hash,
+        review_id=inserted["review_id"],
+        has_jd=ctx["has_jd"],
+        snapshot=ctx["snapshot"],
+        jd_block=ctx["jd_block"],
+        source_text=ctx["source_text"],
+        resume_hash=ctx["resume_hash"],
     )
 
-    payload = _serialize(inserted)
     return jsonify({
-        "review": payload,
+        "review": _serialize(inserted),
         "ai_pending": True,
         # El mail sale del hilo, así que en este punto todavía no se sabe. La UI no debe
         # afirmar que se mandó.
@@ -405,8 +439,189 @@ def submit_cv_review(candidate_id):
     }), 201
 
 
-def _score_and_notify(*, review_id, has_jd, snapshot, jd_block, source_text, resume_hash):
-    """Scorea y avisa. Corre fuera del request: nada de `request` ni de Flask acá."""
+@bp.route("/cv_reviews/reviewers", methods=["GET"])
+def cv_review_reviewers():
+    """Quién puede revisar un CV. Lo usa el popup de batch para detectar el modo.
+
+    MISMA fuente que la autorización (_require_reviewer), a propósito. Es tentador usar
+    GET /users/sales-leads, pero eso sale de DISTINCT account.account_manager — los dueños
+    de cuentas del CRM — y NO de user_roles. Son conjuntos distintos, y usar el equivocado
+    lleva al peor caso: el popup dice "modo review" y después el backend le devuelve 403 a
+    esa persona cuando intenta decidir.
+    """
+    denied = _require_active_user()
+    if denied:
+        return denied
+    emails = sorted(set(_sales_lead_emails()) | set(OVERSIGHT_EMAILS))
+    return jsonify({"emails": emails})
+
+
+@bp.route("/batches/<int:batch_id>/cv_reviews", methods=["POST", "OPTIONS"])
+def submit_batch_cv_reviews(batch_id):
+    """Manda TODOS los CVs de un batch a review de una sola vez.
+
+    Lo dispara el "Send for Approval" de opportunity-detail cuando detecta un sales lead
+    entre los destinatarios. Hace lo mismo que el botón individual por cada candidato, pero
+    manda UN solo mail con los N CVs en vez de N mails.
+
+    Devuelve 200 con el parcial: los que entraron y los que quedaron afuera con el motivo.
+    Frenar el batch entero porque a uno le falta el CV sería peor — la recruiter arregla ese
+    y re-manda, y el índice parcial evita duplicar los que ya estaban.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    denied = _require_actor()
+    if denied:
+        return denied
+    actor = _user_email()
+
+    data = request.get_json(silent=True) or {}
+    note = (data.get("note") or "").strip() or None
+    extra_to = [str(e).strip().lower() for e in (data.get("recipients") or []) if str(e).strip()]
+    extra_cc = [str(e).strip().lower() for e in (data.get("cc") or []) if str(e).strip()]
+
+    ensure_cv_review_tables()
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    created, skipped = [], []
+    batch_number = None
+    try:
+        cur.execute(
+            "SELECT batch_number, opportunity_id FROM batch WHERE batch_id = %s LIMIT 1",
+            (batch_id,),
+        )
+        batch = cur.fetchone()
+        if not batch:
+            return jsonify({"error": "batch not found"}), 404
+        batch_number = batch["batch_number"]
+        opportunity_id = batch["opportunity_id"]
+
+        # Sin `c.*`: ese es el SELECT de /batches/<id>/candidates y arrastra los blobs de
+        # los scrapers (49 KB por candidato en un caso real). Acá sólo hace falta el nombre.
+        cur.execute(
+            """
+            SELECT cb.candidate_id, COALESCE(c.name, '') AS name
+            FROM candidates_batches cb
+            JOIN candidates c ON c.candidate_id = cb.candidate_id
+            WHERE cb.batch_id = %s
+            ORDER BY c.name
+            """,
+            (batch_id,),
+        )
+        members = cur.fetchall()
+        if not members:
+            return jsonify({"error": "That batch has no candidates.",
+                            "code": "empty_batch"}), 422
+
+        for m in members:
+            cid, name = m["candidate_id"], m["name"]
+            try:
+                ctx, err = _prepare_review(cur, cid, opportunity_id)
+                if err:
+                    skipped.append({"candidate_id": cid, "name": name, "code": err,
+                                    "reason": SKIP_REASONS.get(err, err)})
+                    continue
+                row, ins_err = _insert_review(conn, cur, ctx, actor, note)
+                if ins_err:
+                    skipped.append({"candidate_id": cid, "name": name, "code": ins_err,
+                                    "reason": SKIP_REASONS.get(ins_err, ins_err)})
+                    continue
+                created.append({
+                    "candidate_id": cid, "name": name,
+                    "review_id": row["review_id"], "round": row["round"],
+                    "_ctx": ctx,
+                })
+            except Exception:
+                # Un candidato roto no puede tumbar el batch entero.
+                conn.rollback()
+                logging.exception("cv_review batch: candidate %s failed", cid)
+                skipped.append({"candidate_id": cid, "name": name, "code": "failed",
+                                "reason": SKIP_REASONS["failed"]})
+    except Exception:
+        conn.rollback()
+        logging.exception("cv_review batch submit failed")
+        return jsonify({"error": "Could not create the reviews."}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    if not created:
+        return jsonify({
+            "error": "None of the candidates in this batch could be sent to review.",
+            "code": "none_eligible",
+            "batch_number": batch_number,
+            "created": [], "skipped": skipped,
+        }), 422
+
+    # UN hilo para todo el batch: scorea los N y después manda UN mail con los N scores.
+    _spawn_batch_scoring(
+        items=[{k: v for k, v in c.items()} for c in created],
+        batch_id=batch_id,
+        batch_number=batch_number,
+        note=note,
+        extra_to=extra_to,
+        extra_cc=extra_cc,
+    )
+
+    return jsonify({
+        "batch_number": batch_number,
+        "created": [{k: v for k, v in c.items() if k != "_ctx"} for c in created],
+        "skipped": skipped,
+        "ai_pending": True,
+        "email_queued": True,
+    }), 200
+
+
+def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, extra_cc):
+    """Scorea los N CVs del batch y después manda UN solo mail. Fuera del request."""
+    for it in items:
+        ctx = it.get("_ctx") or {}
+        try:
+            _score_and_notify(
+                review_id=it["review_id"],
+                has_jd=ctx.get("has_jd", False),
+                snapshot=ctx.get("snapshot") or {},
+                jd_block=ctx.get("jd_block") or "",
+                source_text=ctx.get("source_text") or "",
+                resume_hash=ctx.get("resume_hash") or "",
+                notify=False,   # el mail del batch va uno solo, al final
+            )
+        except Exception:
+            logging.exception("cv_review batch: scoring review %s failed", it.get("review_id"))
+
+    try:
+        _notify_batch_submitted(
+            review_ids=[it["review_id"] for it in items],
+            batch_number=batch_number,
+            note=note,
+            extra_to=extra_to,
+            extra_cc=extra_cc,
+        )
+    except Exception:
+        logging.exception("cv_review batch: notification failed")
+
+
+def _spawn_batch_scoring(**kwargs):
+    def _run():
+        try:
+            _score_batch_and_notify(**kwargs)
+        except Exception:
+            logging.exception("cv_review: background batch scoring failed")
+
+    threading.Thread(
+        target=_run, name=f"cv-review-batch-{kwargs.get('batch_id')}", daemon=True
+    ).start()
+
+
+def _score_and_notify(*, review_id, has_jd, snapshot, jd_block, source_text, resume_hash,
+                      notify=True):
+    """Scorea y avisa. Corre fuera del request: nada de `request` ni de Flask acá.
+
+    `notify=False` lo usa el camino de batch, que manda un único mail al final en vez de uno
+    por candidato.
+    """
     if has_jd:
         fingerprint = cv_review_ai.input_hash({
             "s": resume_hash, "j": jd_block, "src": cv_review_ai.input_hash(source_text),
@@ -425,7 +640,8 @@ def _score_and_notify(*, review_id, has_jd, snapshot, jd_block, source_text, res
 
     # El mail va DESPUÉS del score para que lleve el número adentro, pero se manda pase lo
     # que pase: avisarle al sales lead importa más que el score.
-    _notify_submitted(review_id)
+    if notify:
+        _notify_submitted(review_id)
 
 
 def _spawn_scoring(**kwargs):
@@ -1190,6 +1406,39 @@ def _review_email_context(review_id):
     return row, reasons
 
 
+def _review_email_contexts(review_ids):
+    """Lo mismo que _review_email_context pero para varios, en UNA sola conexión.
+
+    Llamar al singular en un loop abría una conexión a RDS por candidato. Con
+    max_connections=81 y sin pool, N conexiones seguidas desde un hilo de fondo es
+    exactamente el tipo de presión que ya tumbó la base una vez.
+    Devuelve las filas en el mismo orden que review_ids.
+    """
+    if not review_ids:
+        return []
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT " + _SELECT_COLS + """,
+                   r.ai_analysis,
+                   c.name AS candidate_name,
+                   o.opp_position_name, COALESCE(a.client_name, 'Client') AS client_name
+            FROM cv_reviews r
+            LEFT JOIN candidates c  ON c.candidate_id   = r.candidate_id
+            LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id
+            LEFT JOIN account a     ON a.account_id     = o.account_id
+            WHERE r.review_id = ANY(%s)
+            """,
+            (list(review_ids),),
+        )
+        by_id = {r["review_id"]: r for r in cur.fetchall()}
+    finally:
+        cur.close()
+        conn.close()
+    return [by_id[rid] for rid in review_ids if rid in by_id]
+
+
 def _review_cta_block(review_id, title, body):
     """profile_cta_block apunta al perfil del candidato; el reviewer necesita la cola."""
     from routes.public_reference_feedback_routes import _escape_html
@@ -1222,28 +1471,54 @@ def _score_pill(score):
             f'CV quality {score}/100</span>')
 
 
+# Chequeo deliberadamente laxo: sólo queremos descartar lo que NO es una dirección, no
+# validar RFC 5322. Alcanza con exigir algo@algo.tld sin espacios.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+
+
+def _as_email(value):
+    """Devuelve el mail normalizado, o None si eso no es una dirección.
+
+    `opportunity.opp_sales_lead` es texto libre y a veces guarda el placeholder del
+    desplegable ("select sales lead"). SendGrid rechaza el mensaje COMPLETO si un solo
+    destinatario es inválido, así que una opp con ese campo mal escrito hacía que NADIE
+    recibiera el mail — ni el sales lead ni la supervisión, en silencio.
+    """
+    v = str(value or "").strip().lower()
+    if not v:
+        return None
+    if not _EMAIL_RE.match(v):
+        logging.warning("cv_review: %r no es una dirección de mail; se descarta", v)
+        return None
+    return v
+
+
+def clean_emails(values):
+    """Normaliza, descarta lo que no es mail y deduplica conservando el orden."""
+    return list(dict.fromkeys(e for e in (_as_email(v) for v in values) if e))
+
+
 def submitted_recipients(row):
     """Quién se entera de que hay un CV para revisar.
 
     Cada sales lead recibe SÓLO los CVs de sus oportunidades; el par de supervisión
     (OVERSIGHT_EMAILS) recibe TODOS.
 
-    `opp_sales_lead` es texto libre y a veces está vacío. Si de ahí saliera una lista
-    vacía el review sería invisible y el gate no serviría de nada, así que la supervisión
-    va SIEMPRE, y con la opp sin sales lead se suma el hr_lead para que al menos alguien
-    del proceso lo vea.
+    `opp_sales_lead` es texto libre: puede estar vacío o tener basura. Si de ahí saliera una
+    lista vacía el review sería invisible y el gate no serviría de nada, así que la
+    supervisión va SIEMPRE, y sin un sales lead usable se suma el hr_lead para que al menos
+    alguien del proceso lo vea.
     """
     recipients = []
-    sales_lead = str(row.get("sales_lead_email") or "").strip().lower()
-    hr_lead = str(row.get("hr_lead_email") or "").strip().lower()
+    sales_lead = _as_email(row.get("sales_lead_email"))
+    hr_lead = _as_email(row.get("hr_lead_email"))
     if sales_lead:
         recipients.append(sales_lead)
     elif hr_lead:
         recipients.append(hr_lead)
     recipients.extend(OVERSIGHT_EMAILS)
-    # _send_email deduplica y filtra vacíos, pero no le pasamos basura igual. dict.fromkeys
-    # en vez de set() para no perder el orden: el sales lead va primero en el "To".
-    return list(dict.fromkeys(r for r in recipients if r))
+    # dict.fromkeys en vez de set() para no perder el orden: el sales lead va primero.
+    return clean_emails(recipients)
 
 
 def _notify_submitted(review_id):
@@ -1253,11 +1528,12 @@ def _notify_submitted(review_id):
         return False
 
     recipients = submitted_recipients(row)
-    orphan = not str(row.get("sales_lead_email") or "").strip()
+    # Vacío o con basura da igual: en los dos casos no hay a quién rutear.
+    orphan = not _as_email(row.get("sales_lead_email"))
     orphan_note = ('<p style="padding:12px 16px;background:#fff4dc;border-left:5px solid '
                    '#e0a300;border-radius:12px;color:#6b4700;font-weight:700;">'
-                   '⚠️ This opportunity has no sales lead assigned, so there was nobody to '
-                   'route this to. Assign one on the opportunity, or review it yourself.</p>'
+                   '⚠️ This opportunity has no usable sales lead on file, so there was nobody '
+                   'to route this to. Assign one on the opportunity, or review it yourself.</p>'
                    ) if orphan else ''
 
     analysis = row.get("ai_analysis") or {}
@@ -1305,6 +1581,114 @@ def _notify_submitted(review_id):
     return _send_email(subject, html, recipients)
 
 
+def _batch_cta_block(opportunity_id, title, body):
+    """Como _review_cta_block pero apunta a la cola filtrada por oportunidad, porque un
+    batch son N reviews y no tiene sentido abrir uno solo."""
+    from routes.public_reference_feedback_routes import _escape_html
+    url = f"https://vinttihub.vintti.com/cv-review.html?opportunity_id={opportunity_id}"
+    return f"""
+    <div style="margin:0 0 20px;padding:18px 20px;border-radius:16px;
+                background:#eef2ff;border:1px solid #c7d2fe;">
+      <div style="font-size:16px;font-weight:800;color:#312e81;margin-bottom:6px;">
+        {_escape_html(title)}
+      </div>
+      <div style="color:#3730a3;margin-bottom:14px;">{_escape_html(body)}</div>
+      <a href="{url}" style="display:inline-block;padding:11px 20px;border-radius:12px;
+         background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;">
+        Review these CVs →
+      </a>
+    </div>
+    """
+
+
+def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_cc):
+    """UN mail con los N CVs de un batch.
+
+    N mails separados para un batch de cinco es exactamente lo que hace que la gente deje
+    de leerlos, así que acá va uno con la tabla completa.
+    """
+    from routes.public_reference_feedback_routes import _escape_html, _send_email
+    if not review_ids:
+        return False
+
+    rows = _review_email_contexts(review_ids)
+    if not rows:
+        return False
+
+    first = rows[0]
+    # Política de destinatarios compartida con el mail individual, más los que la recruiter
+    # eligió en el popup. La supervisión va siempre (está dentro de submitted_recipients).
+    recipients = clean_emails(list(extra_to) + submitted_recipients(first))
+    cc = [c for c in clean_emails(extra_cc) if c not in recipients]
+
+    flagged, echoed, blocks = 0, 0, []
+    for r in rows:
+        a = r.get("ai_analysis") or {}
+        if any(c.get("severity") == "hard" for c in (a.get("unsupported_claims") or [])):
+            flagged += 1
+        if a.get("jd_echo"):
+            echoed += 1
+        url = f"https://vinttihub.vintti.com/resume-readonly.html?id={r['candidate_id']}"
+        blocks.append(f"""
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
+            <b>{_escape_html(r['candidate_name'] or 'Candidate')}</b>
+            <div style="font-size:12px;color:#50607f;">Round {r['round']}</div>
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
+            {_score_pill(r.get('ai_score'))}
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
+            <a href="{url}" style="color:#0028ff;">Open CV</a>
+          </td>
+        </tr>""")
+
+    warn = ""
+    if flagged:
+        warn += (f'<p style="padding:12px 16px;background:#ffeaea;border-left:5px solid '
+                 f'#d84343;border-radius:12px;color:#8f0f0f;font-weight:700;">'
+                 f'⚠️ {flagged} of these CVs claim things the source material does not '
+                 f'support. Check those before any of this goes to the client.</p>')
+    if echoed:
+        warn += (f'<p style="padding:12px 16px;background:#fff4dc;border-left:5px solid '
+                 f'#e0a300;border-radius:12px;color:#6b4700;font-weight:700;">'
+                 f'📋 {echoed} of these CVs reuse the job description almost word for word, '
+                 f'so the client would read their own posting back as experience.</p>')
+
+    # No basta con "está vacío": si el campo tiene basura ("select sales lead") tampoco hay
+    # a quién rutear, y hay que decirlo igual.
+    orphan = not _as_email(first.get("sales_lead_email"))
+    orphan_note = ('<p style="padding:12px 16px;background:#fff4dc;border-left:5px solid '
+                   '#e0a300;border-radius:12px;color:#6b4700;font-weight:700;">'
+                   '⚠️ This opportunity has no usable sales lead on file. Assign one on the '
+                   'opportunity, or review these yourself.</p>') if orphan else ''
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
+      <h2 style="margin:0 0 12px;">{len(rows)} CV{'s' if len(rows) != 1 else ''} ready for your review</h2>
+      <p style="margin:0 0 6px;"><b>Batch:</b> #{batch_number}</p>
+      <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(first['opp_position_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(first['client_name'] or '—')}</p>
+      <p style="margin:0 0 16px;"><b>Recruiter:</b> {_escape_html(first['recruiter_email'] or '—')}</p>
+      {orphan_note}
+      {warn}
+      {f'<p style="margin:0 0 12px;"><b>Note from the recruiter:</b> {_escape_html(note)}</p>' if note else ''}
+      <table style="width:100%;border-collapse:collapse;margin:0 0 18px;
+                    border:1px solid #e4ebfb;border-radius:12px;overflow:hidden;">
+        {''.join(blocks)}
+      </table>
+      {_batch_cta_block(first['opportunity_id'],
+                        '✅ Approve or reject each CV',
+                        'The scores are a hint, not a verdict — read each CV, then approve '
+                        'it or send it back with the reason so the recruiter knows what to fix.')}
+    </div>
+    """
+    subject = (f"{len(rows)} CVs to review – Batch#{batch_number} • "
+               f"{first['opp_position_name'] or 'Opportunity'} • "
+               f"{first['client_name'] or 'Client'}")
+    return _send_email(subject, html, recipients + cc)
+
+
 def _notify_decided(review_id):
     from routes.public_reference_feedback_routes import _escape_html, _send_email
     row, reasons = _review_email_context(review_id)
@@ -1341,8 +1725,8 @@ def _notify_decided(review_id):
     subject = ("CV approved" if approved else "CV rejected") + \
         f" – {row['candidate_name'] or 'Candidate'} • {row['opp_position_name'] or 'Opportunity'}"
     # La recruiter que lo mandó es la destinataria; la supervisión ve cerrarse el circuito.
-    recipients = [row.get("recruiter_email")]
-    if row.get("hr_lead_email"):
-        recipients.append(row["hr_lead_email"])
-    recipients.extend(OVERSIGHT_EMAILS)
-    return _send_email(subject, html, list(dict.fromkeys(r for r in recipients if r)))
+    # clean_emails: un solo destinatario inválido hace que SendGrid descarte TODO el mensaje.
+    recipients = clean_emails([
+        row.get("recruiter_email"), row.get("hr_lead_email"), *OVERSIGHT_EMAILS,
+    ])
+    return _send_email(subject, html, recipients)

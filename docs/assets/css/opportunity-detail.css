@@ -5496,3 +5496,220 @@ input:checked + .slider::before {
   .opp-loading-spinner { animation-duration: 2s; }
   .opp-loading-overlay { transition: none; }
 }
+
+/* ===== "Send for Approval": banner de modo =====
+   El mismo botón manda al sales lead (review interno) o al cliente. El banner dice cuál de
+   las dos va a pasar ANTES de apretar Send, porque equivocarse manda una carta de cliente a
+   un sales lead, o un mail interno con botón de revisión al cliente. */
+.approval-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-family: 'Onest', system-ui, sans-serif;
+  line-height: 1.45;
+}
+.approval-mode:empty { display: none; }
+.approval-mode-head { font-size: 13px; font-weight: 800; letter-spacing: .2px; width: 100%; }
+.approval-mode-body { font-size: 12.5px; flex: 1; min-width: 220px; }
+.approval-mode-body em { opacity: .75; font-style: normal; }
+
+/* Review interno = violeta (la acción interna). Cliente = ámbar (sale de Vintti, mirá bien). */
+.approval-mode--review { background: #eef2ff; border-color: #c7d2fe; color: #312e81; }
+.approval-mode--client { background: #fff4dc; border-color: #f0d79a; color: #6b4700; }
+
+.approval-mode-switch {
+  flex: none;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, .7);
+  color: inherit;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.approval-mode-switch:hover { background: #fff; }
+
+.approval-optional {
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  opacity: .6;
+}
+#approval-note {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.approval-review-hint {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+/* =====================================================================
+   "Send Candidates for Approval" — layout compacto
+   Todo scopeado a #approvalEmailPopup para no tocar los otros popups que comparten
+   .email-popup-content (signOffPopup, emailPopup).
+
+   El original acumulaba ~60px de aire por campo: gap:1rem del flex de .popup-content, más
+   margin-top:10px del label, más margin-top:6px y margin-bottom:12px del input. Con eso el
+   botón Send quedaba abajo del scroll y había que bajar para mandar.
+   ===================================================================== */
+#approvalEmailPopup .popup-content {
+  width: 680px;
+  max-width: 94vw;
+  padding: 22px 26px 20px;
+  gap: 0;                      /* el espaciado lo maneja cada bloque */
+  max-height: 88vh;
+}
+#approvalEmailPopup .popup-content h2 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+}
+
+/* Etiquetas chicas en mayúsculas: dejan de competir con el título y ganan altura. */
+#approvalEmailPopup label {
+  display: block;
+  margin: 0 0 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+#approvalEmailPopup input,
+#approvalEmailPopup textarea,
+#approvalEmailPopup select,
+#approvalEmailPopup .choices,
+#approvalEmailPopup .choices__inner {
+  margin: 0;                   /* mata los margin-top/bottom heredados */
+}
+#approvalEmailPopup .choices { margin-bottom: 0; }
+
+/* .email-popup-content le pone `height: 36px` fijo al .choices__inner: con un destinatario
+   entra, con tres los chips se recortan. min-height lo deja crecer. */
+#approvalEmailPopup .choices__inner {
+  height: auto;
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
+/* La etiqueta ya es chica y en mayúsculas, así que "optional" sólo necesita pesar menos. */
+#approvalEmailPopup .approval-optional {
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: inherit;
+  opacity: .55;
+}
+
+/* To y CC van al lado: son cortos y así se ahorra una fila entera de scroll. */
+#approvalEmailPopup .approval-recipients {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  margin-bottom: 14px;
+}
+#approvalEmailPopup .approval-field { min-width: 0; }
+
+#approvalEmailPopup #approval-client-fields > label,
+#approvalEmailPopup #approval-review-fields > label { margin-top: 2px; }
+#approvalEmailPopup #approval-subject { margin-bottom: 12px; }
+#approvalEmailPopup #approval-message {
+  height: 230px !important;
+  border-radius: 10px !important;
+  border-color: #e2e8f0 !important;
+  font-size: 13.5px;
+}
+#approvalEmailPopup #approval-note {
+  display: block;
+  width: 100%;
+  min-height: 74px;
+  border-radius: 10px;
+  border-color: #e2e8f0;
+  font-size: 13.5px;
+}
+#approvalEmailPopup .approval-review-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8a94a6;
+}
+
+/* El botón Send: pegado abajo y visible, no al final de un scroll. */
+#approvalEmailPopup #sendApprovalEmailBtn {
+  margin: 16px 0 0;
+  align-self: flex-end;
+  min-width: 132px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+/* ---- El banner de modo, compacto ---- */
+#approvalEmailPopup .approval-mode {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: 10px;
+}
+#approvalEmailPopup .approval-mode-head {
+  width: auto;
+  grid-column: 1;
+  font-size: 11px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+#approvalEmailPopup .approval-mode-body {
+  grid-column: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
+/* El switch NO puede parecer la acción principal: en el diseño anterior era un botón azul
+   grande que competía con Send. Acá es un botón de texto discreto. */
+#approvalEmailPopup .approval-mode-switch {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: .75;
+  white-space: nowrap;
+}
+#approvalEmailPopup .approval-mode-switch:hover { opacity: 1; background: rgba(255,255,255,.6); }
+#approvalEmailPopup .approval-mode-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  opacity: .7;
+}
+
+/* El desplegable sólo trae al equipo de Vintti; para un cliente hay que escribir la
+   dirección. Sin este cartel nadie lo descubre. */
+#approvalEmailPopup .approval-recipients-hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #8a94a6;
+}

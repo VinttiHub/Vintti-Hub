@@ -75,6 +75,13 @@
   let currentReview = null;
   let queueRows = [];
 
+  // Deep-link desde los mails. Los CTA ya se mandaban con estos parámetros pero nadie los
+  // leía, así que el botón "Open the CV review" del mail no hacía nada: caía en la cola sin
+  // filtrar y sin abrir nada.
+  const DEEP = new URLSearchParams(location.search);
+  const deepReviewId = Number(DEEP.get('review_id')) || null;
+  const deepOppId = Number(DEEP.get('opportunity_id')) || null;
+
   /* ---------------------------------------------------------------- métricas */
 
   function renderMetrics(data) {
@@ -167,9 +174,11 @@
 
   function renderQueue() {
     const term = ($('cvrSearch').value || '').toLowerCase().trim();
-    const list = !term ? queueRows : queueRows.filter(r =>
+    let list = !term ? queueRows : queueRows.filter(r =>
       [r.candidate_name, r.opp_position_name, r.client_name, r.recruiter_email]
         .some(v => String(v || '').toLowerCase().includes(term)));
+    // El CTA de un batch apunta a una oportunidad: son N reviews, no uno.
+    if (deepOppId) list = list.filter(r => Number(r.opportunity_id) === deepOppId);
 
     const body = $('cvrQueue');
     $('cvrCount').innerHTML = `<b>${list.length}</b> of ${queueRows.length}`;
@@ -551,6 +560,13 @@
     const isOversight = OVERSIGHT.has(me);
     $('cvrMine').checked = !isOversight;
     $('cvrMineLabel').textContent = isOversight ? 'Only mine' : 'Only my opportunities';
+
+    // Un deep-link desde un mail es una instrucción explícita: mostrame ESTO. Los defaults
+    // (status="pending", "sólo mis oportunidades") lo esconderían si el review ya se decidió
+    // o si es de otro sales lead, y el botón del mail parecería roto.
+    if (deepReviewId || deepOppId) $('cvrStatus').value = '';
+    if (deepOppId) $('cvrMine').checked = false;
+
     updateScopeHint(isOversight);
     $('cvrMine').addEventListener('change', () => updateScopeHint(isOversight));
 
@@ -597,6 +613,10 @@
       if (e.key === 'Escape' && $('cvrDrawer').classList.contains('is-open')) closeDrawer();
     });
 
-    Promise.all([loadReasons(), loadRecruiters()]).then(refresh);
+    Promise.all([loadReasons(), loadRecruiters()]).then(() => {
+      refresh();
+      // openDrawer se trae el review por su id, así que no espera a la cola.
+      if (deepReviewId) openDrawer(deepReviewId);
+    });
   });
 })();

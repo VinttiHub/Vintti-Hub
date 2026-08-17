@@ -2439,32 +2439,87 @@ document.getElementById('closeApprovalEmailPopup').addEventListener('click', () 
 });
 
 document.getElementById('sendApprovalEmailBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('sendApprovalEmailBtn');
   const to = approvalToChoices.getValue().map(o => o.value);
   const cc = approvalCcChoices.getValue().map(o => o.value);
   const subject = document.getElementById('approval-subject').value;
   const body = document.getElementById('approval-message').innerHTML;
+  const ctx = window.__approvalCtx || {};
 
-  if (!to.length || !subject || !body) {
-    alert('❌ Please fill all required fields');
+  if (!to.length) {
+    alert('❌ Pick at least one recipient');
     return;
   }
 
-  try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, cc, subject, body })
-    });
+  // Antes el botón no se deshabilitaba y sólo usaba alert(): doble click = doble envío.
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = 'Sending…';
+  // El mensaje se muestra recién al final, con el botón ya restablecido.
+  let outcome = '';
 
-    if (res.ok) {
-      alert('✅ Email sent!');
-      document.getElementById('approvalEmailPopup').classList.add('hidden');
+  try {
+    if (approvalMode() === 'review') {
+      // Modo review: el backend crea los N reviews del batch, corre la AI y manda UN mail.
+      // Va a API_BASE (no a prod) porque los reviews se crean donde corre el backend; el
+      // mail lo manda el backend, que ya relaya a prod por su cuenta.
+      if (!ctx.batchId) {
+        outcome = '❌ Could not tell which batch this is. Reopen the popup.';
+      } else {
+        const note = (document.getElementById('approval-note')?.value || '').trim();
+        const res = await fetch(`${API_BASE}/batches/${ctx.batchId}/cv_reviews`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-Email': currentUserEmail() },
+          body: JSON.stringify({ recipients: to, cc, note }),
+        });
+        const out = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          // 422 none_eligible trae la lista de motivos: mostrarla es lo único útil acá.
+          const why = (out.skipped || []).map(s => `• ${s.name}: ${s.reason}`).join('\n');
+          outcome = `❌ ${out.error || 'Could not send for review'}${why ? '\n\n' + why : ''}`;
+        } else {
+          const n = (out.created || []).length;
+          const skipped = out.skipped || [];
+          outcome = `✅ ${n} CV${n === 1 ? '' : 's'} sent for review.\n`
+                  + `The AI is scoring them now; the email lands in a minute or two.`;
+          if (skipped.length) {
+            outcome += `\n\n⚠️ ${skipped.length} left out:\n`
+                     + skipped.map(s => `• ${s.name}: ${s.reason}`).join('\n');
+          }
+          document.getElementById('approvalEmailPopup').classList.add('hidden');
+        }
+      }
+    } else if (!subject || !body) {
+      outcome = '❌ Please fill all required fields';
     } else {
-      alert('❌ Error sending email');
+      // A PRODUCCIÓN a propósito, no a API_BASE. /send_email es un relay puro a SendGrid,
+      // sin auth y sin base, y el backend corriendo local NO puede alcanzar SendGrid: el
+      // interceptor TLS de la máquina lo corta con CERTIFICATE_VERIFY_FAILED. El propio
+      // backend hace lo mismo — public_reference_feedback_routes._send_email postea a esta
+      // misma URL fija — así que los mails siempre salen por prod.
+      const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, cc, subject, body })
+      });
+      if (res.ok) {
+        outcome = '✅ Email sent!';
+        document.getElementById('approvalEmailPopup').classList.add('hidden');
+      } else {
+        const detail = await res.json().catch(() => ({}));
+        outcome = `❌ Error sending email${detail.detail ? '\n\n' + detail.detail : ''}`;
+      }
     }
   } catch (err) {
-    alert('❌ Failed to send email');
+    outcome = `❌ Failed to send email\n\n${err.message || err}`;
+  } finally {
+    // El botón se restablece ANTES del alert: si no, el diálogo queda arriba con el botón
+    // congelado en "Sending…" y parece que todavía está mandando.
+    btn.disabled = false;
+    btn.textContent = label;
   }
+  if (outcome) alert(outcome);
 });
 let presentationTableRequestId = 0;
 async function loadPresentationTable(opportunityId) {
@@ -4340,6 +4395,162 @@ async function removeCandidateFromBatch(candidateId, batchId) {
   }
 }
 
+/* ===========================================================================
+   "Send for Approval" — dos usos en un botón
+   ===========================================================================
+   El mismo botón se usa para mandarle los CVs al sales lead (que los aprueba) y para
+   mandárselos al cliente. Se distinguen por los destinatarios: si entre ellos hay alguien
+   que puede revisar, es review interno; si no, es para el cliente.
+
+   La detección NO es silenciosa a propósito: el banner dice qué va a pasar y se puede
+   forzar el otro modo. Si se equivocara sin avisar, o el cliente recibe un mail interno con
+   botón de revisión, o el sales lead recibe la carta de cliente y no se crea ningún review.
+   =========================================================================== */
+
+let approvalReviewers = null;   // Set<email> | null si todavía no cargó
+
+function currentUserEmail() {
+  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase().trim();
+}
+
+async function loadApprovalReviewers() {
+  if (approvalReviewers) return approvalReviewers;
+  try {
+    const r = await fetch(`${API_BASE}/cv_reviews/reviewers`, {
+      headers: { 'X-User-Email': currentUserEmail() },
+    });
+    const d = r.ok ? await r.json() : { emails: [] };
+    approvalReviewers = new Set((d.emails || []).map(e => String(e).toLowerCase()));
+  } catch {
+    // Sin la lista no se puede afirmar que hay un sales lead: se cae a modo cliente, que es
+    // el comportamiento de siempre. Fallar hacia "no crear reviews" es lo seguro.
+    approvalReviewers = new Set();
+  }
+  return approvalReviewers;
+}
+
+function approvalRecipients() {
+  const val = (ch) => (ch ? ch.getValue().map(o => String(o.value || '').toLowerCase()) : []);
+  return [...val(window.approvalToChoices), ...val(window.approvalCcChoices)].filter(Boolean);
+}
+
+function approvalDetectedLeads() {
+  if (!approvalReviewers) return [];
+  return approvalRecipients().filter(e => approvalReviewers.has(e));
+}
+
+function approvalMode() {
+  const ctx = window.__approvalCtx || {};
+  if (ctx.modeOverride) return ctx.modeOverride;
+  return approvalDetectedLeads().length ? 'review' : 'client';
+}
+
+function renderApprovalMode() {
+  const ctx = window.__approvalCtx || {};
+  const banner = document.getElementById('approval-mode-banner');
+  if (!banner) return;
+  const mode = approvalMode();
+  const leads = approvalDetectedLeads();
+  const n = ctx.candidateCount || 0;
+
+  // El aviso de override va en su propia línea, no metido entre paréntesis en el medio de la
+  // oración, que era ilegible.
+  const manual = ctx.modeOverride
+    ? '<span class="approval-mode-note">You set this manually — detection said the opposite.</span>'
+    : '';
+  banner.className = `approval-mode approval-mode--${mode}`;
+  banner.innerHTML = mode === 'review'
+    ? `<div class="approval-mode-head">Internal review</div>
+       <div class="approval-mode-body">
+         Creates <b>${n} review${n === 1 ? '' : 's'}</b> and scores each CV with AI.
+         ${leads.length ? `Going to <b>${leads.map(escapeHtmlLite).join(', ')}</b>.` : ''}
+         ${manual}
+       </div>
+       <button type="button" class="approval-mode-switch" id="approval-mode-switch">
+         Send to client instead
+       </button>`
+    : `<div class="approval-mode-head">To the client</div>
+       <div class="approval-mode-body">
+         Only the email goes out — no reviews, no AI score.
+         ${leads.length ? '' : 'No sales lead among the recipients.'}
+         ${manual}
+       </div>
+       <button type="button" class="approval-mode-switch" id="approval-mode-switch">
+         Send for review instead
+       </button>`;
+
+  document.getElementById('approval-mode-switch').addEventListener('click', () => {
+    ctx.modeOverride = approvalMode() === 'review' ? 'client' : 'review';
+    renderApprovalMode();
+  });
+
+  // El cuerpo del mail cambia según el modo. Mandarle a un sales lead una carta que arranca
+  // con "Hi XXX, hope you're doing great" no tiene sentido; y peor es poder editarla y
+  // mandarla así. En modo review el backend arma el mail (lista, scores y CTA) y acá sólo
+  // queda una nota opcional.
+  const clientWrap = document.getElementById('approval-client-fields');
+  const reviewWrap = document.getElementById('approval-review-fields');
+  if (clientWrap) clientWrap.hidden = (mode === 'review');
+  if (reviewWrap) reviewWrap.hidden = (mode !== 'review');
+
+  if (mode === 'client' && ctx.clientBody) {
+    const msg = document.getElementById('approval-message');
+    if (msg && !msg.innerHTML.trim()) msg.innerHTML = ctx.clientBody;
+  }
+}
+
+function escapeHtmlLite(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Mismo criterio laxo que el backend: algo@algo.tld, sin espacios. No validamos RFC 5322,
+// sólo descartamos lo que claramente no es una dirección.
+const APPROVAL_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/;
+
+/* Permite escribir direcciones que NO están en el desplegable.
+   El select se llena sólo con usuarios de Vintti (GET /users), y Choices.js sobre un
+   <select multiple> no acepta valores libres: hasta ahora el mail "al cliente" sólo podía
+   dirigirse a gente de Vintti, así que nunca pudo llegarle a un cliente de verdad.
+   Acá se engancha el Enter: si lo tipeado es un mail y no está en la lista, se agrega como
+   opción al vuelo y se selecciona. */
+function allowCustomEmails(choices) {
+  const input = choices?.input?.element;
+  if (!input || input.__customEmailsWired) return;
+  input.__customEmailsWired = true;
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ',' && e.key !== 'Tab') return;
+    const typed = (input.value || '').trim().toLowerCase().replace(/,$/, '');
+    if (!typed) return;
+
+    // Si ya coincide con una opción del desplegable, dejamos que Choices haga lo suyo.
+    const known = (choices.config?.choices || [])
+      .concat(choices._store?.choices || [])
+      .some(c => String(c.value || '').toLowerCase() === typed);
+    if (known) return;
+
+    if (!APPROVAL_EMAIL_RE.test(typed)) return;   // no es un mail: no inventamos nada
+
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      choices.setChoices([{ value: typed, label: typed, selected: true }],
+                         'value', 'label', false);
+    } catch {
+      // Algunas versiones no aceptan selected en setChoices: seleccionamos aparte.
+      try {
+        choices.setChoices([{ value: typed, label: typed }], 'value', 'label', false);
+        choices.setChoiceByValue(typed);
+      } catch { return; }
+    }
+    choices.clearInput();
+    // El modo depende de los destinatarios, así que hay que recalcularlo.
+    renderApprovalMode();
+  });
+}
+
 async function openApprovalPopup(batchId) {
   const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
 // Obtener info completa de la oportunidad, incluyendo client_name
@@ -4361,55 +4572,91 @@ const [usersRes, batchCandidatesRes] = await Promise.all([
 const users = await usersRes.json();
 const batchCandidates = await batchCandidatesRes.json();
 
+// Quién puede revisar de verdad. MISMA fuente que la autorización del backend
+// (user_roles.role_type='sales_lead' + la supervisión), NO /users/sales-leads, que sale de
+// account.account_manager y es otro conjunto: usar el equivocado llevaría a que el popup
+// diga "modo review" y después el backend le devuelva 403 a esa persona.
+await loadApprovalReviewers();
 
   const toSelect = document.getElementById('approval-to');
   const ccSelect = document.getElementById('approval-cc');
   toSelect.innerHTML = '';
   ccSelect.innerHTML = '';
 
+  const salesLead = (opportunityInfo.opp_sales_lead || '').trim().toLowerCase();
+
   users.forEach(user => {
     const option = document.createElement('option');
     option.value = user.email_vintti;
     option.textContent = user.user_name;
+    // El sales lead de la opp ya venía en el payload y el popup lo ignoraba: había que
+    // elegir cada destinatario a mano, todas las veces.
+    if (salesLead && (user.email_vintti || '').toLowerCase() === salesLead) {
+      option.selected = true;
+    }
     toSelect.appendChild(option);
 
     const optionCc = option.cloneNode(true);
+    optionCc.selected = false;
     ccSelect.appendChild(optionCc);
   });
 
   if (window.approvalToChoices) approvalToChoices.destroy();
   if (window.approvalCcChoices) approvalCcChoices.destroy();
 
-  window.approvalToChoices = new Choices(toSelect, { removeItemButton: true });
-  window.approvalCcChoices = new Choices(ccSelect, { removeItemButton: true });
+  // noResultsText: sin esto Choices dice "No results found" a secas y nada sugiere que se
+  // pueda escribir una dirección de afuera.
+  const choicesOpts = {
+    removeItemButton: true,
+    noResultsText: 'Not on the team — press Enter to use this address',
+    placeholderValue: 'Pick someone, or type any email',
+  };
+  window.approvalToChoices = new Choices(toSelect, choicesOpts);
+  window.approvalCcChoices = new Choices(ccSelect, choicesOpts);
+  allowCustomEmails(window.approvalToChoices);
+  allowCustomEmails(window.approvalCcChoices);
+
+  // El handler de #sendApprovalEmailBtn está registrado una sola vez a nivel de módulo y no
+  // captura nada, así que sin esto no hay forma de saber de qué batch se trata.
+  window.__approvalCtx = {
+    batchId,
+    opportunityId,
+    batchNumber: batchInfo.batch_number,
+    candidateCount: batchCandidates.length,
+    salesLead,
+    modeOverride: null,   // null = lo decide la detección
+  };
+
+  // Recalcular el modo cada vez que cambian los destinatarios. Nadie escuchaba eventos de
+  // Choices.js en el repo todavía.
+  ['addItem', 'removeItem', 'change'].forEach(ev => {
+    toSelect.addEventListener(ev, renderApprovalMode);
+    ccSelect.addEventListener(ev, renderApprovalMode);
+  });
 
   const yourName = localStorage.getItem('nickname') || 'The Vintti Team';
 
 let candidateBlocks = '';
 
 for (let c of batchCandidates) {
-  try {
-    const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}`;
-    const aboutRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${c.candidate_id}`);
-    const aboutData = await aboutRes.json();
-
-    candidateBlocks += `
+  const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}`;
+  // Acá había un fetch a /resumes/<id> cuyo resultado no se usaba nunca: un round-trip
+  // serie y bloqueante por candidato, parte de por qué el popup tardaba en abrir.
+  candidateBlocks += `
       <li style="margin-bottom: 10px;">
         <strong>Name:</strong> ${c.name}<br>
         <strong>Monthly Cost:</strong> $${c.salary_range || '—'}<br>
         <strong>Resume:</strong> <em><a href="${resumeUrl}" target="_blank">${resumeUrl}</a></em><br>
       </li>
     `;
-  } catch (error) {
-    console.error(`❌ Error procesando candidato ID ${c.candidate_id}:`, error);
-  }
 }
 
-const body = `
+// La plantilla de cliente se guarda tal cual para poder volver a ella con el override.
+window.__approvalCtx.clientBody = `
   <p>Hi XXX,</p>
   <p>Hope you're doing great!</p>
   <p>
-    XXX has handpicked a shortlist of candidates who align with everything you outlined — from experience to budget. 
+    XXX has handpicked a shortlist of candidates who align with everything you outlined — from experience to budget.
     We’re confident you’ll find strong potential here.
   </p>
   <p>Please let us know your availability, and XXX will take care of scheduling the first round of interviews.</p>
@@ -4420,11 +4667,15 @@ const body = `
   </p>
   <p>Best,<br>${yourName}</p>
 `;
+window.__approvalCtx.clientSubject = subject;
 
-document.getElementById('approval-message').innerHTML = body;
-
-
+// Se repinta en cada apertura, igual que antes: si no, quedaría el cuerpo editado del batch
+// anterior.
+document.getElementById('approval-message').innerHTML = window.__approvalCtx.clientBody;
 document.getElementById('approval-subject').value = subject;
+const noteEl = document.getElementById('approval-note');
+if (noteEl) noteEl.value = '';
+renderApprovalMode();
 
 document.getElementById('approvalEmailPopup').classList.remove('hidden');
 

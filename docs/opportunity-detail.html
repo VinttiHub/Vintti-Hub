@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260810-loading" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260817-custom-emails" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -824,17 +824,46 @@ the Vintti team</textarea>
       <span class="close-btn" id="closeApprovalEmailPopup">&times;</span>
       <h2>Send Candidates for Approval</h2>
 
-      <label>To</label>
-      <select id="approval-to" multiple></select>
+      <!-- Este botón sirve para dos cosas: mandarle los CVs al sales lead para que los
+           apruebe, o mandárselos al cliente. El banner dice cuál de las dos va a pasar
+           según los destinatarios, y deja forzar la otra. Lo pinta renderApprovalMode(). -->
+      <div id="approval-mode-banner" class="approval-mode"></div>
 
-      <label>CC</label>
-      <select id="approval-cc" multiple></select>
+      <!-- To y CC en una fila: son cortos, y apilados costaban una pantalla de scroll -->
+      <div class="approval-recipients">
+        <div class="approval-field">
+          <label for="approval-to">To</label>
+          <select id="approval-to" multiple></select>
+        </div>
+        <div class="approval-field">
+          <label for="approval-cc">CC</label>
+          <select id="approval-cc" multiple></select>
+        </div>
+        <p class="approval-recipients-hint">
+          The list is the Vintti team. For a client, type their email and press Enter.
+        </p>
+      </div>
 
-      <label>Subject</label>
-      <input type="text" id="approval-subject" placeholder="Subject..." />
+      <!-- Modo cliente: el mail que se manda es este, tal cual -->
+      <div id="approval-client-fields">
+        <label for="approval-subject">Subject</label>
+        <input type="text" id="approval-subject" placeholder="Subject..." />
 
-      <label>Message</label>
-      <div id="approval-message" contenteditable="true" style="height: 300px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; overflow-y: auto;"></div>
+        <label for="approval-message">Message</label>
+        <div id="approval-message" contenteditable="true" style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; overflow-y: auto;"></div>
+      </div>
+
+      <!-- Modo review: el mail lo arma el backend (lista de candidatos, scores y el botón
+           que lleva a la revisión). Acá sólo va una nota opcional. -->
+      <div id="approval-review-fields" hidden>
+        <label for="approval-note">Note for the sales lead <span class="approval-optional">· optional</span></label>
+        <textarea id="approval-note" rows="3"
+          placeholder="e.g. Ana is above the range but her NetSuite depth is exactly what they asked for."></textarea>
+        <p class="approval-review-hint">
+          The email is built for you: every CV in this batch with its AI quality score, the
+          flags worth checking, and a button that opens the review queue.
+        </p>
+      </div>
 
       <button id="sendApprovalEmailBtn">Send</button>
     </div>
@@ -1071,7 +1100,7 @@ the Vintti team</textarea>
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
   <script src="./assets/js/pipeline.js?v=20260723a-alex" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260810-perf" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260817-custom-emails" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->
