@@ -2470,7 +2470,17 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
         const res = await fetch(`${API_BASE}/batches/${ctx.batchId}/cv_reviews`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-User-Email': currentUserEmail() },
-          body: JSON.stringify({ recipients: to, cc, note }),
+          // El borrador al cliente viaja adjunto: el sales lead lo copia y lo pega para
+          // mandárselo al cliente cuando aprueba. Los campos están ocultos en modo review
+          // pero conservan lo que se pintó al abrir el popup, así que `body` ya lo tiene;
+          // el fallback cubre el caso de que alguien los haya vaciado.
+          body: JSON.stringify({
+            recipients: to,
+            cc,
+            note,
+            client_subject: subject || ctx.clientSubject || '',
+            client_body: body && body.trim() ? body : (ctx.clientBody || ''),
+          }),
         });
         const out = await res.json().catch(() => ({}));
 
@@ -4435,6 +4445,23 @@ function approvalRecipients() {
   return [...val(window.approvalToChoices), ...val(window.approvalCcChoices)].filter(Boolean);
 }
 
+// Mismo criterio que el backend (_is_internal): vale el dominio O estar en la lista del
+// equipo, porque hay gente de la casa con casilla propia. `approvalTeamEmails` se llena al
+// abrir el popup con los mismos usuarios que pueblan los dos selects.
+let approvalTeamEmails = new Set();
+
+function approvalIsInternal(email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e) return false;
+  return e.endsWith('@vintti.com') || approvalTeamEmails.has(e);
+}
+
+// A quién NO se le puede mandar el mail interno. El backend los descarta igual; esto es
+// para enterarse antes de apretar Send, no después.
+function approvalExternalRecipients() {
+  return approvalRecipients().filter(e => !approvalIsInternal(e));
+}
+
 function approvalDetectedLeads() {
   if (!approvalReviewers) return [];
   return approvalRecipients().filter(e => approvalReviewers.has(e));
@@ -4452,6 +4479,7 @@ function renderApprovalMode() {
   if (!banner) return;
   const mode = approvalMode();
   const leads = approvalDetectedLeads();
+  const outsiders = mode === 'review' ? approvalExternalRecipients() : [];
   const n = ctx.candidateCount || 0;
 
   // El aviso de override va en su propia línea, no metido entre paréntesis en el medio de la
@@ -4465,6 +4493,13 @@ function renderApprovalMode() {
        <div class="approval-mode-body">
          Creates <b>${n} review${n === 1 ? '' : 's'}</b> and scores each CV with AI.
          ${leads.length ? `Going to <b>${leads.map(escapeHtmlLite).join(', ')}</b>.` : ''}
+         <span class="approval-mode-note">The client-ready email goes attached, so they can
+         forward it once they approve.</span>
+         ${outsiders.length ? `<span class="approval-mode-warn">
+           ⚠️ This email carries AI scores and internal warnings, so it only goes to the team.
+           <b>${outsiders.map(escapeHtmlLite).join(', ')}</b> will not receive it —
+           send to the client separately.
+         </span>` : ''}
          ${manual}
        </div>
        <button type="button" class="approval-mode-switch" id="approval-mode-switch">
@@ -4584,6 +4619,10 @@ await loadApprovalReviewers();
   ccSelect.innerHTML = '';
 
   const salesLead = (opportunityInfo.opp_sales_lead || '').trim().toLowerCase();
+
+  approvalTeamEmails = new Set(
+    users.map(u => String(u.email_vintti || '').trim().toLowerCase()).filter(Boolean)
+  );
 
   users.forEach(user => {
     const option = document.createElement('option');

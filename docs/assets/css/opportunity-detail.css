@@ -5704,6 +5704,22 @@ input:checked + .slider::before {
   opacity: .7;
 }
 
+/* No es un matiz del aviso de al lado: dice que alguien NO va a recibir el correo. Va con
+   fondo propio y sin opacidad para que no se lea como letra chica. */
+#approvalEmailPopup .approval-mode-warn {
+  display: block;
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e6b800;
+  background: #fff8e1;
+  color: #6b4700;
+  font-size: 11.5px;
+  line-height: 1.45;
+  opacity: 1;
+}
+#approvalEmailPopup .approval-mode-warn b { word-break: break-all; }
+
 /* El desplegable sólo trae al equipo de Vintti; para un cliente hay que escribir la
    dirección. Sin este cartel nadie lo descubre. */
 #approvalEmailPopup .approval-recipients-hint {

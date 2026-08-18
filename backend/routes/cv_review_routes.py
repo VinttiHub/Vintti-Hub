@@ -57,6 +57,14 @@ _SALES_LEADS_TS: float = 0.0
 _SALES_LEADS_LOCK = Lock()
 _SALES_LEADS_TTL = 300
 
+# Gente de la casa. El mail de review lleva scores de la AI y avisos de CVs que exageran:
+# eso no puede salir de Vintti ni por error.
+_TEAM_EMAILS: set[str] = set()
+_TEAM_TS: float = 0.0
+_TEAM_LOCK = Lock()
+_TEAM_TTL = 300
+_INTERNAL_DOMAINS = ("vintti.com",)
+
 # Cuánto tiempo se le concede al hilo de scoring antes de dejar de decir "scoring…".
 # Holgado: gpt-4o con este prompt puede tardar un minuto, y call_openai_with_retry
 # duerme 10 s entre reintentos de rate limit.
@@ -107,6 +115,52 @@ def _sales_lead_emails() -> set[str]:
     with _SALES_LEADS_LOCK:
         _SALES_LEADS = emails
         _SALES_LEADS_TS = now
+    return emails
+
+
+def _is_internal(email):
+    """¿Esta dirección es del equipo?
+
+    El dominio no alcanza como única regla: hay gente del equipo con casilla propia
+    (hoy una en gmail). Así que vale @vintti.com O estar en la tabla de usuarios.
+    """
+    e = _as_email(email)
+    if not e:
+        return False
+    if e.rsplit("@", 1)[-1] in _INTERNAL_DOMAINS:
+        return True
+    return e in _team_emails()
+
+
+def _team_emails() -> set[str]:
+    """Todas las casillas cargadas en users, cacheadas 300s como la lista de sales leads."""
+    global _TEAM_EMAILS, _TEAM_TS
+    now = time.time()
+    with _TEAM_LOCK:
+        if _TEAM_EMAILS and (now - _TEAM_TS) < _TEAM_TTL:
+            return _TEAM_EMAILS
+    emails: set[str] = set()
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT LOWER(TRIM(email_vintti)) FROM users "
+            "WHERE NULLIF(TRIM(email_vintti), '') IS NOT NULL"
+        )
+        emails = {r[0] for r in cur.fetchall() if r and r[0]}
+        cur.close()
+    except Exception:
+        # Falla cerrado: sin lista, sólo pasa el dominio. Preferimos no mandarle el mail
+        # interno a alguien de afuera antes que asegurar que le llegue a todo el equipo.
+        logging.exception("cv_review: no se pudo cargar la lista del equipo")
+        return _TEAM_EMAILS
+    finally:
+        if conn:
+            conn.close()
+    with _TEAM_LOCK:
+        _TEAM_EMAILS = emails
+        _TEAM_TS = now
     return emails
 
 
@@ -480,6 +534,11 @@ def submit_batch_cv_reviews(batch_id):
     note = (data.get("note") or "").strip() or None
     extra_to = [str(e).strip().lower() for e in (data.get("recipients") or []) if str(e).strip()]
     extra_cc = [str(e).strip().lower() for e in (data.get("cc") or []) if str(e).strip()]
+    # El borrador al cliente viaja con el review: el sales lead lo copia y lo pega para
+    # mandárselo al cliente una vez que aprueba. Si no lo adjuntáramos, tendría que volver
+    # a la oportunidad a generarlo de nuevo.
+    client_subject = (data.get("client_subject") or "").strip() or None
+    client_body = _sanitize_client_draft(data.get("client_body"))
 
     ensure_cv_review_tables()
 
@@ -563,6 +622,8 @@ def submit_batch_cv_reviews(batch_id):
         note=note,
         extra_to=extra_to,
         extra_cc=extra_cc,
+        client_subject=client_subject,
+        client_body=client_body,
     )
 
     return jsonify({
@@ -574,7 +635,8 @@ def submit_batch_cv_reviews(batch_id):
     }), 200
 
 
-def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, extra_cc):
+def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, extra_cc,
+                            client_subject=None, client_body=None):
     """Scorea los N CVs del batch y después manda UN solo mail. Fuera del request."""
     for it in items:
         ctx = it.get("_ctx") or {}
@@ -598,6 +660,8 @@ def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, ex
             note=note,
             extra_to=extra_to,
             extra_cc=extra_cc,
+            client_subject=client_subject,
+            client_body=client_body,
         )
     except Exception:
         logging.exception("cv_review batch: notification failed")
@@ -1601,7 +1665,66 @@ def _batch_cta_block(opportunity_id, title, body):
     """
 
 
-def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_cc):
+# El borrador al cliente sale de un contenteditable, así que se limpia antes de reenviarlo
+# adentro de otro mail. No es desconfianza del equipo: un <style> o un <script> pegados sin
+# querer desde Word o Google Docs rompen el render en varios clientes de correo.
+_DRAFT_LIMIT = 20000
+_DRAFT_PAIRED = re.compile(
+    r"<\s*(script|style|iframe|object|embed|title)\b[^>]*>.*?<\s*/\s*\1\s*>",
+    re.I | re.S,
+)
+_DRAFT_LONE = re.compile(
+    r"<\s*/?\s*(script|style|iframe|object|embed|link|meta|base|form|input|title)\b[^>]*>",
+    re.I,
+)
+_DRAFT_ON_ATTR = re.compile(r"""\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)""", re.I)
+_DRAFT_JS_URL = re.compile(r"""\b(href|src)\s*=\s*("|')?\s*javascript:[^"'>\s]*("|')?""", re.I)
+
+
+def _sanitize_client_draft(html):
+    """Deja el borrador listo para viajar adentro del mail de review."""
+    raw = str(html or "").strip()
+    if not raw:
+        return ""
+    clean = _DRAFT_PAIRED.sub("", raw)
+    clean = _DRAFT_LONE.sub("", clean)
+    clean = _DRAFT_ON_ATTR.sub("", clean)
+    clean = _DRAFT_JS_URL.sub("", clean)
+    return clean.strip()[:_DRAFT_LIMIT]
+
+
+def _client_draft_block(subject, body):
+    """El mail listo para reenviar al cliente, adentro del mail de review.
+
+    Va enmarcado y al final a propósito: primero se decide, después se reenvía. Y va
+    entero, con los XXX incluidos, porque quien lo reenvía es quien los completa.
+    """
+    from routes.public_reference_feedback_routes import _escape_html
+    body = _sanitize_client_draft(body)
+    if not body:
+        return ""
+    subj = _escape_html(str(subject or "").strip())
+    subject_row = (
+        f'<div style="padding:10px 16px;border-bottom:1px solid #e4ebfb;font-size:13px;'
+        f'color:#50607f;background:#fbfcff;"><b>Subject:</b> {subj}</div>'
+    ) if subj else ""
+    return f"""
+      <div style="margin:24px 0 0;border:1px solid #d7e0f5;border-radius:14px;overflow:hidden;">
+        <div style="padding:12px 16px;background:#f2f6ff;border-bottom:1px solid #d7e0f5;">
+          <div style="font-weight:800;color:#172036;">📤 Email ready to forward to the client</div>
+          <div style="font-size:12px;color:#50607f;margin-top:3px;">
+            Once you approve these CVs, copy everything below and send it to the client.
+            Replace <b>XXX</b> with the client's name and yours.
+          </div>
+        </div>
+        {subject_row}
+        <div style="padding:16px;background:#ffffff;">{body}</div>
+      </div>
+    """
+
+
+def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_cc,
+                            client_subject=None, client_body=None):
     """UN mail con los N CVs de un batch.
 
     N mails separados para un batch de cinco es exactamente lo que hace que la gente deje
@@ -1618,8 +1741,25 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
     first = rows[0]
     # Política de destinatarios compartida con el mail individual, más los que la recruiter
     # eligió en el popup. La supervisión va siempre (está dentro de submitted_recipients).
-    recipients = clean_emails(list(extra_to) + submitted_recipients(first))
-    cc = [c for c in clean_emails(extra_cc) if c not in recipients]
+    # El popup acepta direcciones de afuera (para mandarle al cliente), pero ESTE mail es
+    # interno: lleva los scores de la AI y los avisos de CVs que exageran. Si alguien deja
+    # puesto al cliente y encima elige a un sales lead, el modo sigue siendo review y el
+    # cliente terminaría leyendo la evaluación de sus propios candidatos. Se descartan acá,
+    # en el backend, porque el aviso del popup se puede ignorar.
+    wanted = clean_emails(list(extra_to) + submitted_recipients(first))
+    recipients = [e for e in wanted if _is_internal(e)]
+    dropped = [e for e in wanted if e not in recipients]
+    cc_wanted = [c for c in clean_emails(extra_cc) if c not in recipients]
+    cc = [c for c in cc_wanted if _is_internal(c)]
+    dropped += [c for c in cc_wanted if c not in cc]
+    if dropped:
+        logging.warning(
+            "cv_review batch: %s quedaron fuera del mail de review por ser externas: %s",
+            len(dropped), ", ".join(dropped),
+        )
+    if not recipients:
+        logging.error("cv_review batch: no quedó ningún destinatario interno; no se manda")
+        return False
 
     flagged, echoed, blocks = 0, 0, []
     for r in rows:
@@ -1681,6 +1821,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
                         '✅ Approve or reject each CV',
                         'The scores are a hint, not a verdict — read each CV, then approve '
                         'it or send it back with the reason so the recruiter knows what to fix.')}
+      {_client_draft_block(client_subject, client_body)}
     </div>
     """
     subject = (f"{len(rows)} CVs to review – Batch#{batch_number} • "
