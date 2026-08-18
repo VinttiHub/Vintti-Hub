@@ -235,6 +235,13 @@ def _serialize(row, *, reasons=None, analysis=None, live_hash=None):
         "ai_error": row.get("ai_error"),
         "reasons": list(reasons or []),
     }
+    # La cobertura de la JD también le sirve a la recruiter: es lo que tiene que arreglar.
+    # Va sólo esa parte y no el ai_analysis entero, que pesa varios KB por ronda y el
+    # historial trae todas las rondas.
+    blob = row.get("ai_analysis")
+    if isinstance(blob, dict):
+        out["jd_requirements"] = blob.get("jd_requirements") or []
+        out["requirements_summary"] = blob.get("_requirements_summary") or {}
     # "Todavía scoreando": la fila se crea antes que el score a propósito (ver el submit).
     # Con ventana de tiempo: el score corre en un hilo daemon, así que si App Runner
     # recicla el worker a mitad de camino nadie lo vuelve a tocar. Sin este corte la UI
@@ -775,6 +782,7 @@ def list_candidate_cv_reviews(candidate_id):
                 return jsonify({"error": "opportunity_id must be an integer"}), 400
         cur.execute(
             "SELECT " + _SELECT_COLS + """,
+                   r.ai_analysis,
                    o.opp_position_name, COALESCE(a.client_name, '') AS client_name
             FROM cv_reviews r
             LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id

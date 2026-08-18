@@ -25,13 +25,16 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 MODEL = "gpt-4o"
+# v6: devuelve la cobertura requisito por requisito (jd_requirements) en vez de sólo la
+# lista de faltantes: el reviewer no entendía qué se estaba calificando. Distingue el
+# requisito DESCRITO en la experiencia del que sólo figura en la lista de tools.
 # v5: los ejemplos del prompt pasan a un dominio ajeno (contabilidad) + filtro duro: el
 # modelo copiaba textual el few-shot y reportaba huecos inexistentes.
 # v4: detecta el eco de JD (el CV copiando la redacción de la vacante) como advertencia.
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
-ANALYSIS_VERSION = 5
+ANALYSIS_VERSION = 6
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -81,6 +84,9 @@ MIN_SOURCE_CHARS_FOR_FABRICATION_CHECK = 500
 
 ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these keys and shapes:
 {
+  "jd_requirements_verbatim": string[], // FIRST, before anything else: copy every bullet of
+                                        // the JD's requirements list, VERBATIM and in order.
+                                        // Just transcription — no judgement yet. See below.
   "summary": string,                    // 2-3 sentences on the DOCUMENT's quality
   "verdict": "ready" | "needs_work" | "not_sendable",
   "verdict_reason": string,
@@ -93,7 +99,11 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
       "verdict": string                 // one short line
     }
   ],
-  "fixes": [ { "section": string, "problem": string, "fix": string } ],   // 3-6, highest impact first
+  "fixes": [ { "section": string, "problem": string, "fix": string } ],   // 0-6, highest impact first
+                                        // ONLY things the recruiter can actually do with the
+                                        // source material at hand. Never "add X" when the
+                                        // source has no X — that is asking them to invent.
+                                        // Return [] when the document has no real defect.
   "unsupported_claims": [
     {
       "cv_quote": string,               // SHORT verbatim quote from THE VINTTI CV
@@ -109,7 +119,17 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
       "why": string                     // one line: what the candidate's own version should say
     }
   ],
-  "jd_requirements_missed": string[],   // see BE CONCRETE
+  "jd_requirements": [                  // see REQUIREMENTS COVERAGE — the reviewer reads this first
+    {
+      "requirement": string,            // the requirement in the JD's OWN words, trimmed to its essence
+      "kind": "technical" | "soft",
+      "status": "described" | "listed_only" | "missing",
+      "in_source": "yes" | "no" | "unclear",   // does the SOURCE MATERIAL show it? see below
+      "evidence": string,               // VERBATIM quote from THE VINTTI CV, or "" when missing
+      "note": string                    // one line, see below
+    }
+  ],                                    // EXACTLY as many entries as "jd_requirements_verbatim",
+                                        // same order, one per bullet
   "fit_note": string                    // see WHAT YOU ARE JUDGING — reported, never scored
 }
 
@@ -134,28 +154,120 @@ JD ECHO — the CV borrowing the job description's WORDING instead of its substa
 - Return [] when the CV is written in the candidate's own words. That is the normal, good
   answer.
 
-BE CONCRETE — this is the difference between a useful review and a useless one, and it is
-the part reviewers actually read:
-- "jd_requirements_missed" is the most valuable field you produce. METHOD, follow it:
-  read the job description's Requirements and Responsibilities top to bottom, and for each
-  one ask "does the CV show evidence of this?". List every one where the answer is no,
-  in the JD's own words. Work through them all before you answer.
+REQUIREMENTS COVERAGE — "jd_requirements" is the most valuable field you produce, and the
+part the reviewer reads first. It is a checklist: every requirement in the job description,
+and where the CV does or does not deliver it.
+
+METHOD, follow it. Read the job description's Requirements and Responsibilities top to
+bottom. For each one, produce one entry. Work through them ALL before you answer — do not
+stop at the first few.
+
+WHICH REQUIREMENTS — completeness is the whole point of this field, and it is where you
+are most likely to fail:
+- Find the job description's list of requirements. It may be headed "Requirements",
+  "Qualifications", "Must have", "What you'll need", "Requisitos" or nothing at all.
+- Return ONE ENTRY FOR EVERY ITEM IN THAT LIST. Every one. If the list has seven bullets,
+  "jd_requirements" has seven entries, in the JD's order. Do not stop early, do not merge
+  two bullets into one, and do not drop the last ones.
+- NEVER drop an item because it reads as a soft skill. "Excellent written communication"
+  and "Automation-first mindset" are listed requirements: they get an entry, marked
+  "kind": "soft". Dropping them is the single most common way this field comes back wrong,
+  and the reviewer counts the bullets against the JD, so a missing one is visible.
+- "kind": "technical" for tools, systems, platforms, languages, certifications, domain or
+  industry knowledge, years of experience, and concrete processes the role owns.
+  "kind": "soft" for EVERYTHING ELSE that the JD lists as a requirement: mindsets,
+  communication, collaboration, and also the logistical ones — time-zone overlap,
+  availability, working hours, reliable internet, own equipment, location, willingness to
+  travel. Those are real listed requirements and they are the ones you are most likely to
+  drop because they fit neither box. There is no third option and there is no "skip":
+  every bullet is either "technical" or "soft".
+  Both kinds get listed; only the technical ones drive the summary and the score.
+- What you do NOT list: a separate "Nice to have" / "Bonus" / "Preferred" section. Those
+  are not requirements. Only the required list.
+- Do not invent requirements the JD never states just to make the list longer.
+
+DO IT IN TWO PASSES, and this is not optional:
+  PASS 1 — fill "jd_requirements_verbatim": walk the JD's requirements list top to bottom
+  and transcribe each bullet, word for word, in order. No judgement, no merging, no
+  skipping, no rewriting. This is copying, and copying is easy — a list of 9 bullets gives
+  9 strings. Do this before you look at the CV at all.
+  PASS 2 — fill "jd_requirements": one entry per string from pass 1, in the same order,
+  now with kind/status/in_source/evidence/note. Same count, always.
+
+The two arrays MUST have the same length. If yours do not, you dropped a requirement in
+pass 2 — go back and add it. The reviewer reads this checklist against the job posting
+bullet by bullet, so a missing line is immediately visible and makes the whole review
+untrustworthy.
+
+STATUS — this distinction is the whole point of the field:
+- "described": a work-experience bullet shows the candidate actually doing it. "evidence"
+  is a VERBATIM quote from that bullet. A tools list does NOT earn "described".
+- "listed_only": the requirement appears in the CV — the Tools/Skills list, the About, a
+  job title — but NO work-experience bullet describes the candidate using it. This is the
+  most useful thing you can tell the reviewer: a client reads "Salesforce" in a skills
+  list very differently from "Managed a 2,000-record Salesforce pipeline". Put the quote
+  you did find in "evidence".
+- "missing": nowhere in the CV at all. "evidence" is "".
+
+"in_source" — answer this SEPARATELY from "status", and think about it independently. It
+asks about THE SOURCE MATERIAL (the candidate's own CV, LinkedIn, transcripts), NOT about
+the Vintti CV:
+- "yes": the source shows this person has it, whether or not the Vintti CV surfaced it.
+- "no": the source shows nothing supporting it. The person appears not to have it.
+- "unclear": the source is ambiguous or too thin to tell.
+
+This single field is what separates the two completely different problems below, and
+getting it right matters more than any score you produce:
+- status "missing" or "listed_only" WITH in_source "yes" is a DEFECT OF THE CV. The
+  recruiter had the material and did not put it in. This is what "jd_alignment" measures,
+  and it is what should lower the score.
+- status "missing" WITH in_source "no" is NOT a defect of the CV at all. The candidate
+  simply does not have it. A CV cannot show experience the person never had, and inventing
+  it is the worst thing the recruiter could do. This belongs in "fit_note". It must NOT
+  lower "jd_alignment" and it must NOT produce a "fixes" entry — telling a recruiter to
+  "add influencer campaign examples" when the source has none is telling them to make
+  something up.
+
+So: if every requirement the source DOES support is already surfaced in the CV, the CV did
+its job and "jd_alignment" should be high, even when most of the checklist is "missing".
+A short honest CV for a candidate who is not a fit is a GOOD CV.
+
+THE "note", one line, and make it actionable:
+- "listed_only" is the important case. Say whether THE SOURCE MATERIAL shows this person
+  using it: if it does, name the role where it belongs so the recruiter can describe it
+  honestly ("the source shows this in the Accenture role — the bullet should say so"). If
+  the source shows nothing, say so plainly ("the source never mentions it; the tools list
+  may be overstating"). NEVER suggest inventing the experience.
+- "missing" with in_source "yes": this is the costly one. Name where in the source it
+  sits, so the recruiter can add it.
+- "missing" with in_source "no": say plainly that the source has nothing either, so the
+  reviewer reads it as a fit fact and not as something the recruiter should fix.
+- "described": leave "" or one short line. Do not pad.
+
+HONESTY: "described" requires a real quote from the CV's work experience. If you cannot
+quote it, it is not "described". Never mark something covered to be generous, and never
+invent a quote.
+
+The requirements you list must be QUOTED from the job description you were given, trimmed
+to their essence — never your description of them.
   The examples below come from a COMPLETELY DIFFERENT job (a bookkeeping role) and exist
-  only to show the SHAPE of a good answer. They are NOT about the opening you are
-  reviewing. Never copy them into your output — every entry you return must be derived
+  only to show the SHAPE of a good "requirement" value. They are NOT about the opening you
+  are reviewing. Never copy them into your output — every entry you return must be derived
   from the job description you were actually given, and must be checkable against it.
-  RIGHT shape: ["Month-end close for multi-entity consolidations",
-                "Hands-on QuickBooks Online and Xero",
-                "US GAAP revenue recognition",
-                "Supervising two staff accountants"]
+  RIGHT shape: "Month-end close for multi-entity consolidations"
+               "Hands-on QuickBooks Online and Xero"
+               "US GAAP revenue recognition"
+               "Supervising two staff accountants"
   FORBIDDEN — these describe the JD instead of quoting it, and are discarded:
-          ["Specific tools or methodologies mentioned in the JD",
-           "Any unique industry experience required by the JD",
-           "Certain skills listed in the job description"]
-- Return [] ONLY when the CV genuinely evidences every single requirement in the JD. That
-  is rare. If you scored "jd_alignment" below 70 you have ALREADY decided requirements are
-  missing, so an empty list there contradicts your own score — go back and name them.
-- Same rule for "fit_note" and every "verdict": name the actual thing, never the shape of
+               "Specific tools or methodologies mentioned in the JD"
+               "Any unique industry experience required by the JD"
+               "Certain skills listed in the job description"
+- Never return an empty "jd_requirements" when a job description was supplied: a JD always
+  states requirements, so an empty checklist means you did not do the work. Return [] only
+  when there is no job description at all.
+- Your "jd_alignment" score must agree with this checklist. Mostly "described" cannot sit
+  next to a 40, and a wall of "missing" cannot sit next to a 90.
+- Same rule for "note", "fit_note" and every "verdict": name the actual thing, never the shape of
   the problem. Write "no influencer or community-management work anywhere in the source,
   and no beauty-brand clients", NOT "does not fully align with the specific requirements".
   A sentence that would read identically for a different candidate and a different job is
@@ -502,6 +614,189 @@ def _clean_gaps(raw: Any) -> List[str]:
     return out
 
 
+_REQ_STATUSES = ("described", "listed_only", "missing")
+
+# Técnico vs soft lo decidimos NOSOTROS, no el modelo: le preguntábamos y contestaba
+# distinto entre corridas ("Strong eye for dashboard design" salía técnico una vez y soft
+# la siguiente), y eso movía los contadores del encabezado sin que cambiara nada.
+#
+# La regla detecta lo SOFT y todo lo demás queda técnico. Es al revés de lo intuitivo y es
+# a propósito: las soft skills se escriben siempre igual y son un puñado de fórmulas, pero
+# lo técnico es infinito y depende del rubro. Un catálogo de herramientas sería una lista
+# que hay que mantener para siempre y que igual se queda corta con la primera vacante de
+# un rubro nuevo. Además, ante la duda conviene marcar técnico: es el lado que puntúa.
+
+# Estos ganan aunque la frase también tenga palabras blandas: "3+ years of experience
+# communicating with clients" es un requisito de experiencia, no una soft skill.
+_REQ_TECHNICAL_OVERRIDE = re.compile(r"""
+    \b\d+\s*(?:[-–—+]|\s+to\s+)?\s*\d*\s*\+?\s*(?:years?|yrs?)\b   # "3 years", "2–3+ years"
+  | \b(?:bachelor|master|mba|degree|diploma|certified|certification|licen[cs]e|cpa|cfa)\b
+  | \b(?:fluent|native|bilingual|proficien\w*|advanced|intermediate)\s+\w*\s*
+        (?:english|spanish|portuguese|french)\b
+  | \b(?:english|spanish|portuguese)\s+(?:level|proficiency|fluency)\b
+""", re.I | re.X)
+
+# Fórmulas blandas y logísticas. Lo logístico (horario, equipo, zona horaria) va acá porque
+# tampoco es una capacidad técnica del candidato, pero SÍ se muestra: la owner lo pidió.
+_REQ_SOFT = re.compile(r"""
+    \b(?:communicat\w+|interpersonal|written\s+and\s+(?:verbal|oral|spoken))\b
+  | \bteam\s*(?:work|player|-?oriented)\b | \bcollaborat\w+\b
+  | \battention\s+to\s+detail\b | \bdetail[-\s]oriented\b
+  | \borganiz\w*\s+skills?\b | \b(?:strong|excellent|good)\s+organiz\w+\b
+  | \btime\s+management\b | \bprioriti\w+\b
+  | \bself[-\s](?:starter|motivated|driven|directed)\b | \bwork\s+independently\b
+  | \bproactiv\w+\b | \bautonom\w+\b
+  | \bcritical\s+thinking\b | \bproblem[-\s]solv\w+\b
+  | \bmindset\b | \battitude\b | \bpassion\w*\b | \benthusias\w+\b
+  | \beager\s+to\s+learn\b | \bcurious\w*\b | \bwork\s+ethic\b
+  | \badaptab\w+\b | \bflexib\w+\b | \bfast[-\s]paced\b
+  | \breliable\s+internet\b | \binternet\s+connection\b
+  | \bown\s+(?:computer|equipment|laptop|setup)\b | \bquiet\s+(?:space|workspace)\b
+  | \bavailab\w+\b | \bbusiness\s+hours\b | \bworking\s+hours\b
+  | \btime\s*zone\b | \boverlap\b | \b(?:est|cst|pst|gmt)\s+(?:overlap|time)\b
+  | \bwilling\s+to\s+travel\b | \brelocat\w+\b
+  | \bremote\s+(?:environment|setting|work\s+experience)\b
+""", re.I | re.X)
+
+
+def classify_requirement(text: str) -> str:
+    """técnico o soft, por reglas nuestras. Mismo texto -> misma respuesta, siempre."""
+    t = str(text or "")
+    if _REQ_TECHNICAL_OVERRIDE.search(t):
+        return "technical"
+    if _REQ_SOFT.search(t):
+        return "soft"
+    return "technical"
+
+
+def _clean_requirements(raw: Any) -> List[Dict[str, Any]]:
+    """Cobertura requisito por requisito. Es el campo que el reviewer lee primero.
+
+    Los técnicos van antes que los soft porque son los que decide el reviewer; dentro de
+    cada grupo se respeta el orden de la JD, así la lista se puede leer contra la vacante
+    de arriba a abajo. Se le aplican los mismos filtros que a la lista de faltantes: un
+    requisito que describe la JD en vez de citarla ("las tools mencionadas en la JD") no le
+    sirve a nadie, y el ejemplo del prompt copiado textual es una falla conocida.
+    """
+    out: List[Dict[str, Any]] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("requirement") or "").strip()
+        if not text:
+            continue
+        low = text.lower()
+        if any(marker in low for marker in _VAGUE_GAP_MARKERS):
+            continue
+        if low.strip(" .") in _EXAMPLE_GAP_STRINGS:
+            logging.warning("cv_review: el modelo copió el ejemplo del prompt: %r", text)
+            continue
+        status = str(item.get("status") or "").strip().lower()
+        if status not in _REQ_STATUSES:
+            status = "missing"
+        evidence = str(item.get("evidence") or "").strip()
+        # "described" sin cita no es described: la cita ES la evidencia, y sin ella no hay
+        # forma de que el reviewer verifique que el bullet existe.
+        if status == "described" and not evidence:
+            status = "listed_only"
+        if status == "missing":
+            evidence = ""
+        kind_model = str(item.get("kind") or "").strip().lower()
+        in_source = str(item.get("in_source") or "").strip().lower()
+        if in_source not in ("yes", "no", "unclear"):
+            in_source = "unclear"
+        out.append({
+            "requirement": text,
+            "kind": classify_requirement(text),
+            # Lo que dijo el modelo, sólo para poder auditar la regla contra su criterio.
+            "kind_model": "soft" if kind_model == "soft" else "technical",
+            "status": status,
+            "in_source": in_source,
+            "evidence": evidence,
+            "note": str(item.get("note") or "").strip(),
+        })
+
+    # dedupe conservando el orden: el modelo a veces repite el mismo requisito
+    seen, deduped = set(), []
+    for r in out:
+        key = r["requirement"].lower().strip(" .")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(r)
+
+    deduped.sort(key=lambda r: 0 if r["kind"] == "technical" else 1)
+    return deduped
+
+
+def _requirements_summary(reqs: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Contadores para el encabezado. Sólo técnicos: son los que se deciden."""
+    tech = [r for r in reqs if r["kind"] == "technical"]
+    gaps = [r for r in tech if r["status"] != "described"]
+    return {
+        "technical": len(tech),
+        "described": sum(1 for r in tech if r["status"] == "described"),
+        "listed_only": sum(1 for r in tech if r["status"] == "listed_only"),
+        "missing": sum(1 for r in tech if r["status"] == "missing"),
+        "soft": len(reqs) - len(tech),
+        # El corte que importa: el hueco que la recruiter PUEDE cerrar (la fuente lo tiene y
+        # el CV no lo muestra) contra el que no depende de ella (el candidato no lo tiene).
+        "fixable_gaps": sum(1 for r in gaps if r["in_source"] in ("yes", "unclear")),
+        "fit_gaps": sum(1 for r in gaps if r["in_source"] == "no"),
+    }
+
+
+# Cuando el CV ya sacó a la superficie TODO lo que la fuente respalda, lo que queda son
+# huecos del candidato, no del documento. La rúbrica lo dice desde v1 ("el fit no es un
+# defecto del CV") pero el modelo igual bajaba jd_alignment al ver la lista llena de
+# "missing", así que dejó de ser una instrucción y pasó a ser aritmética nuestra.
+ALIGNMENT_FIT_FLOOR = 70
+# …pero sólo si el CV ya cubre buena parte de lo que la vacante pide. Sin esta condición el
+# piso se disparaba SIEMPRE con un candidato del perfil equivocado: si no da el perfil en
+# nada, todos los huecos son de fit y "la recruiter no dejó nada afuera" se vuelve una
+# verdad vacía — no había nada que sacar a la superficie. Un CV de analista de datos para
+# una vacante de Community Manager sacaba 70 de alineación y le ganaba a uno que sí
+# apuntaba. Medio es el corte: por debajo, el documento no está apuntado a esta vacante y
+# el score tiene que decirlo.
+ALIGNMENT_FLOOR_MIN_COVERAGE = 0.5
+
+
+def alignment_floor(criteria: List[Dict[str, Any]],
+                    summary: Dict[str, int]) -> Optional[str]:
+    """Sube jd_alignment cuando los huecos son de fit. Muta `criteria`. Devuelve el motivo.
+
+    Conservador a propósito: sólo dispara si NINGÚN hueco es cerrable. Un solo requisito
+    que la fuente respalda y el CV no muestra ya es un defecto real del documento, y ahí
+    el score tiene que bajar.
+    """
+    if summary.get("fixable_gaps") or not summary.get("fit_gaps"):
+        return None
+    technical = summary.get("technical") or 0
+    described = summary.get("described") or 0
+    if not technical or described < technical * ALIGNMENT_FLOOR_MIN_COVERAGE:
+        # El candidato no es el perfil. No es culpa de la recruiter, pero tampoco es un CV
+        # alineado con ESTA vacante, y el número no puede decir que sí.
+        return None
+    for c in criteria:
+        if c["key"] != "jd_alignment" or c.get("not_applicable"):
+            continue
+        score = c.get("score")
+        if score is None or score >= ALIGNMENT_FIT_FLOOR:
+            return None
+        c["score"] = ALIGNMENT_FIT_FLOOR
+        n = summary["fit_gaps"]
+        reason = (f"{n} JD requirement{'s' if n != 1 else ''} the source material does not "
+                  f"support either — a fit gap, not a CV defect. JD alignment raised from "
+                  f"{score} to {ALIGNMENT_FIT_FLOOR}.")
+        # El verdict del modelo describía el score viejo. Dejarlo produce una ficha que se
+        # contradice: "70" arriba de "No alignment with the JD".
+        c["verdict"] = (f"{described} of {technical} technical requirements described; the "
+                        f"rest is not in the source either.")
+        c["floor_applied"] = True
+        return reason
+    return None
+
+
 def _clean_echo(raw: Any) -> List[Dict[str, Any]]:
     """Eco de JD: el CV copiando la REDACCIÓN de la vacante en vez de su sustancia.
 
@@ -592,6 +887,22 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         # Sin fuente no se puede acusar de inventar nada.
         unsupported = []
 
+    requirements = _clean_requirements(parsed.get("jd_requirements"))
+    req_summary = _requirements_summary(requirements)
+    # La lista transcrita es el control: si el modelo copió 8 bullets y anotó 6, dropeó dos.
+    # No los inventamos — se avisa, porque una checklist incompleta que parece completa es
+    # peor que uno que dice "faltan dos".
+    verbatim = [str(x).strip() for x in (parsed.get("jd_requirements_verbatim") or [])
+                if str(x).strip()]
+    req_summary["expected"] = len(verbatim)
+    req_summary["listed"] = len(requirements)
+    req_summary["incomplete"] = bool(verbatim) and len(requirements) < len(verbatim)
+    if req_summary["incomplete"]:
+        logging.warning("cv_review: la JD tenía %s requisitos y el modelo anotó %s",
+                        len(verbatim), len(requirements))
+    # Antes del composite: el piso corrige el criterio, no el total.
+    floor_reason = alignment_floor(criteria, req_summary)
+
     composite = weighted_score(criteria, RUBRIC_WEIGHTS)
     uncapped, cap_reason = composite, None
     hard = [c for c in unsupported if c["severity"] == "hard"]
@@ -613,7 +924,16 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         "unsupported_claims": unsupported,
         # Advertencia pura: NO entra en el composite ni en el tope por invención.
         "jd_echo": _clean_echo(parsed.get("jd_echo")),
-        "jd_requirements_missed": _clean_gaps(parsed.get("jd_requirements_missed")),
+        "jd_requirements": requirements,
+        "_requirements_summary": req_summary,
+        "_alignment_floor_reason": floor_reason,
+        # Se deriva de la matriz en vez de pedírsela aparte al modelo: dos campos que
+        # tienen que coincidir es un campo que se contradice. Si el modelo no devolvió
+        # matriz (o quedó un análisis viejo en vuelo) cae al campo suelto de v5.
+        "jd_requirements_missed": _clean_gaps(
+            [r["requirement"] for r in requirements if r["status"] == "missing"]
+            or parsed.get("jd_requirements_missed")
+        ),
         "fit_note": str(parsed.get("fit_note") or "").strip(),
         "_composite_score": composite,
         "_uncapped_score": uncapped,

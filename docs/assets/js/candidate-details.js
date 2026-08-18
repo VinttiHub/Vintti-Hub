@@ -5204,7 +5204,52 @@ function _replaceDateText(node){
     chip.dataset.reviewId = String(latest.review_id);
   }
 
-  function reviewDetailHtml(r){
+  // Cobertura de la JD, del lado de la recruiter. Es lo mismo que ve el sales lead, pero
+  // acá importa por otro motivo: le dice qué puede arreglar de verdad. Lo que el material
+  // fuente no respalda NO es un arreglo pendiente — es el candidato, y "arreglarlo" sería
+  // inventar experiencia.
+  function reqFace(r){
+    if (r.status === 'described') return { cls:'described', label:'Described in the experience' };
+    if (r.in_source === 'no')     return { cls:'fit',       label:"Not in the CV — not in the source either" };
+    if (r.status === 'listed_only') {
+      return { cls:'listed_only',
+               label: r.in_source === 'yes' ? 'Only listed — the source backs it up'
+                                            : 'Only listed — no role describes it' };
+    }
+    return { cls:'missing',
+             label: r.in_source === 'yes' ? 'Missing — but the source has it'
+                                          : 'Not in the CV' };
+  }
+
+  function requirementsHtml(reqs, summary, open){
+    if (!reqs || !reqs.length) return '';
+    const s = summary || {};
+    const rows = reqs.map(r => {
+      const f = reqFace(r);
+      return `<li class="cvr-req cvr-req--${f.cls}">
+        <div class="cvr-req-main">
+          <b>${escapeHtml(r.requirement)}</b>
+          ${r.kind === 'soft' ? '<i class="cvr-req-soft">soft skill</i>' : ''}
+          <span class="cvr-req-status">${escapeHtml(f.label)}</span>
+        </div>
+        ${r.evidence ? `<p class="cvr-req-ev">\u201c${escapeHtml(r.evidence)}\u201d</p>` : ''}
+        ${r.note ? `<p class="cvr-req-note">${escapeHtml(r.note)}</p>` : ''}
+      </li>`;
+    }).join('');
+    return `<details class="cvr-reqs cv-review-reqs"${open ? ' open' : ''}>
+      <summary>What the JD asked for${s.technical
+        ? ` <span class="cvr-reqs-count">${s.described || 0} described ·
+            ${s.fixable_gaps || 0} you can fix ·
+            ${s.fit_gaps || 0} the candidate doesn't have</span>` : ''}</summary>
+      ${s.incomplete ? `<p class="cvr-reqs-warn">⚠️ The job posting lists ${s.expected}
+        requirements and only ${s.listed} could be checked.</p>` : ''}
+      <p class="cvr-reqs-lead">Only the ones the source material backs up are on you. The
+        rest is the candidate not being a fit — don't write experience they don't have.</p>
+      <ul>${rows}</ul>
+    </details>`;
+  }
+
+  function reviewDetailHtml(r, isLatest){
     const bits = [];
     bits.push(`<div class="cv-review-hist-head">
         <b>Round ${r.round}</b> · ${escapeHtml(r.opp_position_name || 'Opportunity')}
@@ -5233,6 +5278,8 @@ function _replaceDateText(node){
     if (r.resume_drift) {
       bits.push('<div class="cv-review-hist-drift">⚠️ The CV changed after this round was submitted.</div>');
     }
+    const reqs = requirementsHtml(r.jd_requirements, r.requirements_summary, isLatest);
+    if (reqs) bits.push(reqs);
     return `<article class="cv-review-hist-item">${bits.join('')}</article>`;
   }
 
@@ -5248,7 +5295,8 @@ function _replaceDateText(node){
       .filter(r => !oppId || Number(r.opportunity_id) === oppId)
       .sort((a, b) => b.round - a.round);
     histEl.innerHTML = list.length
-      ? `<h4 class="cv-review-hist-title">Previous rounds</h4>${list.map(reviewDetailHtml).join('')}`
+      ? `<h4 class="cv-review-hist-title">Previous rounds</h4>${
+          list.map((r, i) => reviewDetailHtml(r, i === 0)).join('')}`
       : '';
   }
 

@@ -311,6 +311,122 @@
 .cvr-find--hard { background: #fff0f3; color: #8f0f2a; }
 .cvr-find--soft { background: var(--hx-surface-2); color: var(--hx-ink-2); }
 .cvr-find--echo { background: #fff8e8; color: var(--hx-amber-ink); }
+
+/* --- cobertura de la JD --------------------------------------------------- */
+/* Lo primero que lee el reviewer: qué pedía la vacante y si el CV lo muestra. La barra
+   de color a la izquierda es el estado, así se recorre la lista sin leer las etiquetas. */
+.cvr-reqs {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+}
+.cvr-reqs h5 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--hx-ink);
+}
+.cvr-reqs-count {
+  font-family: var(--hx-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hx-ink-2);
+}
+.cvr-reqs-lead {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--hx-ink-2);
+}
+.cvr-reqs ul { margin: 0; padding: 0; list-style: none; }
+
+.cvr-req {
+  padding: 8px 10px 8px 12px;
+  margin-bottom: 6px;
+  border-left: 3px solid var(--hx-line);
+  border-radius: 0 var(--hx-r-sm) var(--hx-r-sm) 0;
+  background: var(--hx-surface-2);
+}
+.cvr-req:last-child { margin-bottom: 0; }
+.cvr-req-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--hx-ink);
+}
+.cvr-req-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.cvr-req-soft {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--hx-ink-2);
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  padding: 0 5px;
+}
+.cvr-req-ev {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--hx-ink-2);
+}
+.cvr-req-note {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--hx-ink-2);
+}
+
+/* El verde de marca es lima y es demasiado claro para texto: el número y la etiqueta van
+   en --hx-lime-ink. */
+.cvr-req--described   { border-left-color: var(--hx-lime); }
+.cvr-req--described .cvr-req-status { background: var(--hx-lime); color: var(--hx-lime-ink); }
+.cvr-req--listed_only { border-left-color: #e6b800; background: #fffdf5; }
+.cvr-req--listed_only .cvr-req-status { background: var(--hx-amber); color: var(--hx-amber-ink); }
+.cvr-req--missing     { border-left-color: #d84343; background: #fff7f8; }
+.cvr-req--missing .cvr-req-status { background: #ffe0e5; color: #8f0f2a; }
+
+/* Fit del candidato, no defecto del CV: gris, nunca rojo. Pintarlo como un error haría que
+   la recruiter intente "arreglar" algo que sólo se arregla inventando. */
+.cvr-req--fit {
+  border-left-color: var(--hx-line);
+  background: var(--hx-surface-2);
+  opacity: .82;
+}
+.cvr-req--fit .cvr-req-status {
+  background: var(--hx-surface);
+  color: var(--hx-ink-2);
+  border: 1px solid var(--hx-line);
+}
+
+/* El motivo por el que se subió jd_alignment. Va con el score, no escondido abajo. */
+.cvr-ai-floor {
+  margin: 6px 0 0;
+  padding: 6px 9px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+  border-left: 3px solid var(--hx-lime);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--hx-ink-2);
+}
+
+/* Los fixes agrupados por sección anidan una lista. */
+.cvr-fixes ul ul { margin: 4px 0 0; padding-left: 16px; }
+.cvr-fixes ul ul li { margin-bottom: 2px; }
 .cvr-echo-lead { margin: 0 0 8px; font-size: 11.5px; line-height: 1.5; opacity: .9; }
 .cvr-echo-jd {
   margin: 3px 0 2px;
@@ -432,4 +548,15 @@
 @media (max-width: 900px) {
   .cvr-stats { grid-template-columns: repeat(2, 1fr); }
   .cvr-note { margin-left: 0; width: 100%; }
+}
+
+.cvr-reqs-warn {
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #fff4dc;
+  border-left: 3px solid #e0a300;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6b4700;
 }

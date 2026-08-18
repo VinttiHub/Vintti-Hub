@@ -6269,3 +6269,99 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   .cv-review-hero, .cv-review-content, .cv-review-footer { padding-left: 18px; padding-right: 18px; }
   .cv-review-footer { flex-direction: column; align-items: stretch; }
 }
+
+
+/* --- cobertura de la JD en el historial de review ------------------------- */
+/* Los mismos nombres de clase que cv-review.css, pero esa hoja no se carga acá y esta
+   página no tiene los tokens de hirex, así que los colores van literales. El verde es la
+   lima de marca (#c1ff72): demasiado clara para texto, por eso la tipografía va oscura. */
+.cv-review-reqs { margin-top: 8px; }
+.cv-review-reqs > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #172036;
+  list-style: none;
+}
+.cv-review-reqs > summary::-webkit-details-marker { display: none; }
+.cv-review-reqs > summary::before { content: '▸ '; color: #7a869c; }
+.cv-review-reqs[open] > summary::before { content: '▾ '; }
+.cv-review-reqs .cvr-reqs-count {
+  font-weight: 500;
+  font-size: 11px;
+  color: #50607f;
+}
+.cv-review-reqs .cvr-reqs-lead {
+  margin: 6px 0 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #50607f;
+}
+.cv-review-reqs ul { margin: 0; padding: 0; list-style: none; }
+.cv-review-reqs .cvr-req {
+  padding: 7px 9px 7px 11px;
+  margin-bottom: 5px;
+  border-left: 3px solid #e4ebfb;
+  border-radius: 0 8px 8px 0;
+  background: #fafbfc;
+}
+.cv-review-reqs .cvr-req-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #172036;
+}
+.cv-review-reqs .cvr-req-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.cv-review-reqs .cvr-req-soft {
+  font-style: normal;
+  font-size: 10px;
+  color: #50607f;
+  border: 1px solid #e4ebfb;
+  border-radius: 999px;
+  padding: 0 5px;
+}
+.cv-review-reqs .cvr-req-ev {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: #50607f;
+}
+.cv-review-reqs .cvr-req-note {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #50607f;
+}
+.cv-review-reqs .cvr-req--described { border-left-color: #c1ff72; }
+.cv-review-reqs .cvr-req--described .cvr-req-status { background: #c1ff72; color: #3a6b00; }
+.cv-review-reqs .cvr-req--listed_only { border-left-color: #e6b800; background: #fffdf5; }
+.cv-review-reqs .cvr-req--listed_only .cvr-req-status { background: #ffe9b8; color: #8a5a00; }
+.cv-review-reqs .cvr-req--missing { border-left-color: #d84343; background: #fff7f8; }
+.cv-review-reqs .cvr-req--missing .cvr-req-status { background: #ffe0e5; color: #8f0f2a; }
+/* Fit del candidato: gris. No es un pendiente de la recruiter. */
+.cv-review-reqs .cvr-req--fit { border-left-color: #e4ebfb; opacity: .82; }
+.cv-review-reqs .cvr-req--fit .cvr-req-status {
+  background: #fff;
+  color: #50607f;
+  border: 1px solid #e4ebfb;
+}
+
+.cv-review-reqs .cvr-reqs-warn {
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #fff4dc;
+  border-left: 3px solid #e0a300;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6b4700;
+}

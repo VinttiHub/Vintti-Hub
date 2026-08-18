@@ -1029,6 +1029,15 @@ def _build_opportunity_context(cursor, opportunity_id: Optional[int]):
     row = cursor.fetchone()
     if not row:
         return "", {}
+    # Este helper lo llaman cursores de los dos tipos. Desempaquetar un RealDictRow
+    # devuelve las CLAVES, no los valores, así que la JD que salía era la palabra
+    # "hr_job_description" y el modelo puntuaba contra eso sin que nada fallara. Pasó de
+    # verdad en el review de CVs: falla silenciosa, así que se normaliza acá y no en cada
+    # llamada.
+    if isinstance(row, dict):
+        row = (row.get("opp_position_name"), row.get("career_country"),
+               row.get("years_experience"), row.get("hr_job_description"),
+               row.get("career_description"), row.get("career_requirements"))
     position, career_country, years_experience, hr_jd, career_desc, career_reqs = row
     raw_jd = hr_jd or career_desc or career_reqs or ""
     jd_plain = _strip_html_text(raw_jd)

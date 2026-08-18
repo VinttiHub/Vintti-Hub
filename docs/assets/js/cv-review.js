@@ -289,8 +289,70 @@
           </li>`).join('')}</ul>
       </div>` : '';
 
-    const fixes = (a.fixes || []).map(f =>
-      `<li><b>${esc(f.section || '')}</b>: ${esc(f.fix || '')}</li>`).join('');
+    // Cobertura de la JD. Va arriba porque es lo primero que el reviewer necesita: qué
+    // pedía la vacante y si el CV lo muestra. La distinción que importa no es
+    // "aparece / no aparece" sino "está DESCRITO en la experiencia" vs "sólo figura en la
+    // lista de tools", que es lo que un cliente lee distinto.
+    // El estado visual no es sólo el status: un requisito que falta porque el candidato no
+    // lo tiene NO es un defecto del CV y no se pinta en rojo como si la recruiter hubiera
+    // hecho algo mal. Lo que decide es el cruce con in_source.
+    const reqFace = r => {
+      if (r.status === 'described') return { cls: 'described', label: 'Described in the experience' };
+      if (r.in_source === 'no')     return { cls: 'fit',       label: "Not in the CV — not in the source either" };
+      if (r.status === 'listed_only') {
+        return { cls: 'listed_only',
+                 label: r.in_source === 'yes' ? 'Only listed — the source backs it up'
+                                              : 'Only listed — no role describes it' };
+      }
+      return { cls: 'missing',
+               label: r.in_source === 'yes' ? 'Missing — but the source has it'
+                                            : 'Not in the CV' };
+    };
+    const reqs = a.jd_requirements || [];
+    const rs = a._requirements_summary || {};
+    const reqRow = r => {
+      const f = reqFace(r);
+      return `
+      <li class="cvr-req cvr-req--${f.cls}">
+        <div class="cvr-req-main">
+          <b>${esc(r.requirement)}</b>
+          ${r.kind === 'soft' ? '<i class="cvr-req-soft">soft skill</i>' : ''}
+          <span class="cvr-req-status">${esc(f.label)}</span>
+        </div>
+        ${r.evidence ? `<p class="cvr-req-ev">“${esc(r.evidence)}”</p>` : ''}
+        ${r.note ? `<p class="cvr-req-note">${esc(r.note)}</p>` : ''}
+      </li>`;
+    };
+    const reqsHtml = reqs.length ? `
+      <div class="cvr-reqs">
+        <h5>What the JD asked for
+          ${rs.technical ? `<span class="cvr-reqs-count">${rs.described || 0} described ·
+            ${rs.fixable_gaps || 0} the recruiter can fix ·
+            ${rs.fit_gaps || 0} the candidate doesn't have</span>` : ''}
+        </h5>
+        ${rs.incomplete ? `<p class="cvr-reqs-warn">⚠️ The job posting lists
+          ${rs.expected} requirements and only ${rs.listed} could be checked. Read the
+          posting for the rest.</p>` : ''}
+        <p class="cvr-reqs-lead">A tool in the skills list is not the same as a role that
+          describes using it. What counts against the CV is only what the source material
+          <b>does</b> support and the CV still doesn't show — the rest is the candidate not
+          being a fit, which is not something the recruiter can or should fix.</p>
+        <ul>${reqs.map(reqRow).join('')}</ul>
+      </div>` : '';
+
+    // Agrupadas por sección: el modelo devuelve una entrada por arreglo, y tres seguidas
+    // que dicen "Work Experience" se leen como si la lista estuviera repetida.
+    const bySection = [];
+    (a.fixes || []).forEach(f => {
+      const name = String(f.section || 'The document').trim();
+      const g = bySection.find(x => x.name.toLowerCase() === name.toLowerCase());
+      (g || bySection[bySection.push({ name, items: [] }) - 1]).items.push(f.fix || '');
+    });
+    const fixes = bySection.map(g => `<li><b>${esc(g.name)}</b>${
+      g.items.length === 1
+        ? `: ${esc(g.items[0])}`
+        : `<ul>${g.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+    }</li>`).join('');
 
     return `
       <div class="cvr-ai-top">
@@ -302,14 +364,18 @@
           ${a.verdict ? `<span class="cvr-verdict cvr-verdict--${esc(a.verdict)}">${esc(a.verdict.replace('_', ' '))}</span>` : ''}
           <p>${esc(a.summary || '')}</p>
           ${a._cap_reason ? `<p class="cvr-ai-cap">Capped: ${esc(a._cap_reason)} (would have been ${a._uncapped_score}).</p>` : ''}
+          ${a._alignment_floor_reason ? `<p class="cvr-ai-floor">${esc(a._alignment_floor_reason)}</p>` : ''}
           ${a._partial ? '<p class="cvr-ai-cap">Partial: no job description, so JD alignment (30 of the weight) was skipped. Excluded from the recruiter average.</p>' : ''}
         </div>
       </div>
+      ${reqsHtml}
       ${claims(hard, 'hard', 'Claims the source material does not support')}
       ${echoHtml}
       ${claims(soft, 'soft', 'Softer wording to double-check')}
       ${a.fit_note ? `<p class="cvr-note-block"><b>On the candidate's fit (not scored):</b> ${esc(a.fit_note)}</p>` : ''}
-      ${(a.jd_requirements_missed || []).length ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>` : ''}
+      ${!reqs.length && (a.jd_requirements_missed || []).length
+        ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>`
+        : ''}
       ${fixes ? `<div class="cvr-fixes"><h5>What would make it better</h5><ul>${fixes}</ul></div>` : ''}
       <div class="cvr-crits">${bars}</div>
       <p class="cvr-ai-foot">The score is a hint, not a verdict. Read the CV before you decide.</p>`;
