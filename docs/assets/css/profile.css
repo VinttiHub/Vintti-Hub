@@ -2678,6 +2678,32 @@ input:focus, select:focus, textarea:focus{
   box-shadow: 0 1px 0 rgba(2,6,23,.05) inset;
 }
 
+/* Bloque derecho del header: link a la policy + leyenda */
+.requests-head-right{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:flex-end;
+}
+.requests-head .policy-link{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:7px 13px;
+  border-radius:999px;
+  border:1px solid rgba(2,6,23,.10);
+  background:#fff;
+  color:#0f172a;
+  font-size:12.5px; font-weight:700; text-decoration:none;
+  white-space:nowrap;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05);
+  transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.requests-head .policy-link:hover,
+.requests-head .policy-link:focus-visible{
+  background: color-mix(in oklab, #C1FF72 26%, #fff);
+  border-color: color-mix(in oklab, #C1FF72 60%, #fff);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15,23,42,.08);
+}
+.requests-head .policy-link__icon{ font-size:13px; line-height:1; }
+.requests-head .policy-link__ext{ opacity:.5; flex:none; }
+
 /* === DESTACAR TOTALES CON ESTRELLA ⭐ === */
 
 /* Lista de KPIs importantes */
@@ -5138,3 +5164,11 @@ input:focus, select:focus, textarea:focus{
   margin-top:6px; padding-top:16px; border-top:1px solid #f1f5f9;
 }
 .offb-status{ font-size:12px; color:#64748b; margin-right:auto; letter-spacing:normal; text-transform:none; }
+
+/* Header de My Requests apilado en pantallas chicas */
+@media (max-width: 1100px){
+  .requests-head-right{
+    justify-content:flex-start;
+    gap:10px;
+  }
+}
