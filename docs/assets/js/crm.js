@@ -728,6 +728,50 @@ function normalizeCrmExportCandidate(detail, candidate, buyout) {
   };
 }
 
+// Un "reemplazo" es una opportunity cuyo replacement_of apunta al candidate_id
+// que se fue. Indexamos por ese id para poder encadenar reemplazo del reemplazo.
+function buildCrmReplacementIndex(detailCandidates = []) {
+  const index = new Map();
+  (Array.isArray(detailCandidates) ? detailCandidates : []).forEach(candidate => {
+    const replacedId = Number(candidate?.replacement_of);
+    const newId = Number(candidate?.candidate_id);
+    if (!replacedId || !newId) return;
+    // Solo cuentan los reemplazos que efectivamente se contrataron.
+    const status = (candidate?.status || '').toString().trim().toLowerCase();
+    if (status !== 'active' && status !== 'inactive') return;
+    if (!index.has(replacedId)) index.set(replacedId, []);
+    index.get(replacedId).push(candidate);
+  });
+  index.forEach(list => {
+    list.sort((a, b) => String(a?.start_date || '').localeCompare(String(b?.start_date || '')));
+  });
+  return index;
+}
+
+function buildCrmReplacementChain(candidate = {}, index = new Map(), seen = new Set()) {
+  const chain = [];
+  let currentId = Number(candidate?.candidate_id);
+  if (currentId) seen.add(currentId);
+
+  while (currentId) {
+    const nexts = index.get(currentId) || [];
+    const next = nexts.find(item => !seen.has(Number(item?.candidate_id)));
+    if (!next) break;
+    const nextId = Number(next.candidate_id);
+    seen.add(nextId);
+    chain.push({
+      candidate_id: nextId,
+      name: next.name,
+      status: next.status,
+      start_date: next.start_date,
+      end_date: next.end_date
+    });
+    currentId = nextId;
+  }
+
+  return chain;
+}
+
 async function fetchCrmExportCandidateSheets(accountId) {
   if (!accountId) return { active: [], inactive: [] };
   try {
@@ -804,13 +848,18 @@ async function fetchCrmExportCandidateSheets(accountId) {
       return normalizeCrmExportCandidate(detail, candidate, buyout);
     }).filter(candidate => activeIds.has(Number(candidate.candidate_id)));
 
+    const replacementIndex = buildCrmReplacementIndex(detailCandidates);
+
     const inactive = detailCandidates
       .filter(candidate => {
         const id = Number(candidate?.candidate_id);
         if (!id || activeIds.has(id)) return false;
         return (candidate?.status || '').toString().trim().toLowerCase() === 'inactive';
       })
-      .map(candidate => normalizeCrmExportCandidate(candidate, candidate, null));
+      .map(candidate => ({
+        ...normalizeCrmExportCandidate(candidate, candidate, null),
+        replacement_chain: buildCrmReplacementChain(candidate, replacementIndex, new Set())
+      }));
 
     return { active, inactive };
   } catch (err) {
@@ -969,7 +1018,32 @@ function crmCandidateValues(candidate = {}) {
   ];
 }
 
-function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmptyAccountRow = false } = {}) {
+// El CSV de inactivos agrega, a la derecha, una terna de columnas por cada
+// reemplazo encadenado (Reemplazo 1 -> Reemplazo 2 -> ...).
+const CRM_REPLACEMENT_COLUMNS_PER_LEVEL = 3;
+
+function crmReplacementHeaders(levels = 0) {
+  const headers = [];
+  for (let i = 1; i <= levels; i += 1) {
+    headers.push(`Replacement ${i} Name`, `Replacement ${i} Start Date`, `Replacement ${i} End Date`);
+  }
+  return headers;
+}
+
+function crmReplacementValues(candidate = {}) {
+  const chain = Array.isArray(candidate.replacement_chain) ? candidate.replacement_chain : [];
+  const values = [];
+  chain.forEach(link => {
+    values.push(
+      csvTextValue(link?.name),
+      csvNullableTextValue(link?.start_date),
+      csvNullableTextValue(link?.end_date)
+    );
+  });
+  return values;
+}
+
+function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmptyAccountRow = false, includeReplacements = false } = {}) {
   const candidateList = Array.isArray(candidates) ? candidates : [];
   if (!candidateList.length) {
     if (!includeEmptyAccountRow) return [];
@@ -981,7 +1055,8 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
 
   return candidateList.map((candidate = {}) => [
     ...crmAccountRowValues(accountRow),
-    ...crmCandidateValues(candidate)
+    ...crmCandidateValues(candidate),
+    ...(includeReplacements ? crmReplacementValues(candidate) : [])
   ]);
 }
 
@@ -1032,7 +1107,7 @@ async function downloadCrmCsv() {
       const shouldIncludeEmptyActiveRow = !contractFilterCode || contractFilterCode === 'mix';
       buildCrmCandidateExportRows(row, filteredActive, { includeEmptyAccountRow: shouldIncludeEmptyActiveRow })
         .forEach(values => activeRows.push(values));
-      buildCrmCandidateExportRows(row, filteredInactive, { includeEmptyAccountRow: false })
+      buildCrmCandidateExportRows(row, filteredInactive, { includeEmptyAccountRow: false, includeReplacements: true })
         .forEach(values => inactiveRows.push(values));
       doneCount += 1;
       updateCrmLoadingProgress(doneCount, orderedIds.length);
@@ -1052,10 +1127,22 @@ async function downloadCrmCsv() {
       filename: `crm_active_${date}.csv`
     });
     if (inactiveRows.length) {
+      // Cada fila trae tantas ternas como reemplazos tenga; emparejamos todas a
+      // la cadena más larga para que el CSV quede rectangular.
+      const baseWidth = headers.length;
+      const maxReplacementLevels = inactiveRows.reduce((max, values) => {
+        const extra = Math.max(0, values.length - baseWidth);
+        return Math.max(max, Math.ceil(extra / CRM_REPLACEMENT_COLUMNS_PER_LEVEL));
+      }, 0);
+      const inactiveHeaders = [...headers, ...crmReplacementHeaders(maxReplacementLevels)];
+      const paddedInactiveRows = inactiveRows.map(values => {
+        const missing = inactiveHeaders.length - values.length;
+        return missing > 0 ? [...values, ...Array(missing).fill('')] : values;
+      });
       setTimeout(() => {
         downloadCrmCsvFile({
-          headers,
-          rows: inactiveRows,
+          headers: inactiveHeaders,
+          rows: paddedInactiveRows,
           filename: `crm_inactive_${date}.csv`
         });
       }, 150);
