@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260819-no-highlight" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260819-hl5" />
 </head>
 
 <body class="light-mode">
@@ -186,10 +186,29 @@
           <section class="cvr-col cvr-col-cv">
             <div class="cvr-cv-head">
               <h3>The CV <span class="cvr-cv-sub" id="cvrCvSub">as it was sent</span></h3>
-              <a id="cvrOpenCv" class="hx-btn hx-btn-soft cvr-open-cv" target="_blank" rel="noopener">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> New tab
-              </a>
+              <div class="cvr-cv-tools">
+                <label class="cvr-hl-switch" title="Paint every phrase the analysis cites, right on the CV">
+                  <input type="checkbox" id="cvrHlSwitch" checked />
+                  <span>Highlight findings</span>
+                </label>
+                <a id="cvrOpenCv" class="hx-btn hx-btn-soft cvr-open-cv" target="_blank" rel="noopener">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> New tab
+                </a>
+              </div>
             </div>
+
+            <!-- Leyenda de colores. Cada chip además recorre, una por una, las frases de
+                 su color dentro del CV: es la forma rápida de ver "todo lo rojo". Al final
+                 va la clave, que explica qué significa cada color — sin eso hay que
+                 adivinar, y adivinando el rojo parece culpa de la recruiter. -->
+            <div class="cvr-hl-bar">
+              <details class="cvr-hl-key">
+                <summary><i class="fa-regular fa-circle-question"></i> What the colours mean</summary>
+                <div class="cvr-hl-key-body" id="cvrHlKeyBody"></div>
+              </details>
+              <div class="cvr-hl-legend" id="cvrHlLegend" hidden></div>
+            </div>
+
             <iframe id="cvrFrame" class="cvr-frame" title="Candidate CV"></iframe>
           </section>
 
@@ -256,6 +275,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260819-no-highlight" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260819-hl5" defer></script>
 </body>
 </html>

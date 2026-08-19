@@ -227,7 +227,17 @@
 /* ---------- Drawer ---------- */
 /* Ancho de verdad: adentro entran el CV y el análisis lado a lado. Con 680px había que
    leer la métrica, memorizar la frase y bajar a buscarla al iframe. */
-.cvr-drawer { width: min(1400px, 97vw); }
+/* Pantalla completa, sin franja. Se ancla `left: 0` en vez de dar un `width: 100vw`
+   porque 100vw incluye el ancho de la barra de scroll: con la cola scrolleada detrás,
+   el drawer se pasaría unos pixels y aparecería scroll horizontal. Anclando los cuatro
+   lados el tamaño es exacto siempre.
+   El `translateX(100%)` de la animación de entrada sigue funcionando: es relativo al
+   ancho del propio elemento. */
+.cvr-drawer {
+  left: 0;
+  width: auto;
+  border-left: none;
+}
 .cvr-drawer-title { min-width: 0; }
 .cvr-drawer-sub {
   margin: 6px 0 0;
@@ -263,7 +273,10 @@
    así se puede tener el CV quieto mientras se recorre el análisis. */
 .cvr-drawer .hx-drawer-body.cvr-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 480px);
+  /* El ancho de más no se lo lleva entero el CV: el CV se dibuja centrado y con su propio
+     max-width, así que ensancharlo sólo agrega margen blanco. El análisis, que es texto
+     largo, sí gana con más ancho. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(440px, 30vw, 640px));
   gap: 18px;
   overflow: hidden;
   padding: 12px 20px 20px;
@@ -294,6 +307,195 @@
   font-size: 11.5px;
   color: var(--hx-ink-2);
 }
+.cvr-cv-tools { display: flex; align-items: center; gap: 10px; flex: none; }
+
+/* ---------- Resaltado del CV ---------- */
+/* El interruptor y la leyenda viven arriba del iframe. El pintado en sí lo hace la CSS
+   Custom Highlight API DENTRO del iframe (ver hlInjectStyle en cv-review.js): no se
+   envuelve el texto en <mark>, así el "Download PDF" del CV sigue exportando limpio. */
+.cvr-hl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.cvr-hl-switch input {
+  width: auto;
+  margin: 0;
+  accent-color: #003bff;
+  cursor: pointer;
+}
+
+/* Fila: los chips de las categorías presentes y, al final, la clave de colores. */
+.cvr-hl-bar {
+  position: relative;   /* el ancla del popover de la clave */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.cvr-hl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* La clave abre como popover sobre el iframe y no empuja el CV hacia abajo: es material
+   de consulta, no algo que haya que tener en pantalla todo el tiempo. */
+/* El popover cuelga de la barra entera, no del summary: el summary se mueve con el
+   wrap de los chips y el panel terminaría saliéndose de la columna. */
+.cvr-hl-key { position: static; }
+.cvr-hl-key > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  list-style: none;
+  padding: 3px 9px;
+  border: 1px dashed var(--hx-line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cvr-hl-key > summary::-webkit-details-marker { display: none; }
+.cvr-hl-key > summary:hover { border-color: var(--hx-ink-2); color: var(--hx-ink); }
+.cvr-hl-key[open] > summary {
+  border-style: solid;
+  border-color: var(--hx-ink-2);
+  color: var(--hx-ink);
+  background: var(--hx-surface-2);
+}
+
+.cvr-hl-key-body {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(440px, 100%);
+  padding: 12px 14px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r);
+  background: var(--hx-surface);
+  box-shadow: 0 12px 30px rgba(16, 24, 40, .16);
+}
+.cvr-hl-key-lead,
+.cvr-hl-key-foot {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hx-ink-2);
+}
+.cvr-hl-key-foot { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--hx-line); }
+.cvr-hl-key-body ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.cvr-hl-key-body li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--hx-ink-2);
+}
+.cvr-hl-key-body li b { color: var(--hx-ink); font-weight: 700; }
+.cvr-hl-key-sw {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  border: 1px solid var(--hx-line);
+  border-radius: 4px;
+}
+.cvr-hl-legend.is-off { opacity: .4; }
+.cvr-hl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  background: var(--hx-surface);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+}
+.cvr-hl-chip:hover { border-color: var(--hx-ink-2); color: var(--hx-ink); }
+.cvr-hl-chip b { color: var(--hx-ink); }
+.cvr-hl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--cvr-hl-c, var(--hx-line));
+  flex: none;
+}
+.cvr-hl-miss { font-size: 10.5px; color: var(--hx-muted); }
+
+/* Una cita que SÍ se pudo ubicar en el CV se comporta como botón: el punto de color dice
+   con qué color quedó pintada allá, y al tocarla el CV salta hasta ella. Las que no se
+   encontraron se quedan como texto plano — prometer un salto que no pasa es peor. */
+.cvr-hl-item {
+  --cvr-hl-c: var(--hx-line);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+  transition: background-color .12s ease, box-shadow .12s ease;
+}
+.cvr-hl-item::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 5px;
+  background: var(--cvr-hl-c);
+}
+.cvr-hl-item:hover { background: rgba(0, 59, 255, .07); }
+.cvr-hl-item:focus-visible { outline: 2px solid #003bff; outline-offset: 1px; }
+.cvr-hl-item.is-active {
+  background: rgba(0, 59, 255, .1);
+  box-shadow: inset 0 0 0 1px rgba(0, 59, 255, .4);
+}
+.cvr-hl-item.is-active::before { background: #003bff; }
+
+/* El aterrizaje: la métrica late una vez, al mismo tiempo que la frase destella en el CV.
+   Es lo que une las dos mitades de la pantalla — sin esto el CV se mueve solo y no queda
+   claro cuál de las métricas lo movió. */
+.cvr-hl-item.is-flash { animation: cvrItemFlash 1s ease-out 1; }
+@keyframes cvrItemFlash {
+  0%   { background: rgba(0, 59, 255, .34); box-shadow: 0 0 0 0 rgba(0, 59, 255, .5); }
+  60%  { background: rgba(0, 59, 255, .12); box-shadow: 0 0 0 7px rgba(0, 59, 255, 0); }
+  100% { background: rgba(0, 59, 255, .1);  box-shadow: 0 0 0 0 rgba(0, 59, 255, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cvr-hl-item.is-flash { animation: none; }
+}
+
+.cvr-hl-item[data-hl-kind="described"] { --cvr-hl-c: #a9e05a; }
+.cvr-hl-item[data-hl-kind="listed"]    { --cvr-hl-c: #f0c14b; }
+.cvr-hl-item[data-hl-kind="hard"]      { --cvr-hl-c: #e8637f; }
+.cvr-hl-item[data-hl-kind="soft"]      { --cvr-hl-c: #f0a45a; }
+.cvr-hl-item[data-hl-kind="echo"]      { --cvr-hl-c: #a48bff; }
+.cvr-hl-item[data-hl-kind="crit"]      { --cvr-hl-c: #6fa8ff; }
+
+/* <q> es inline: el punto tiene que quedar pegado a la primera línea, no flotando. */
+q.cvr-hl-item { display: inline; }
+q.cvr-hl-item::before { vertical-align: 1px; }
 
 /* Angosto: se vuelve a apilar, que es exactamente el comportamiento anterior. */
 @media (max-width: 1100px) {

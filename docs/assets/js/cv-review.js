@@ -227,10 +227,531 @@
     });
   }
 
+
+  /* ------------------------------------------------- resaltar el CV en el iframe
+   *
+   * El panel de la derecha cita frases del CV: la evidencia de cada requisito de la JD,
+   * las afirmaciones que la fuente no respalda, el eco de la JD, la evidencia de cada
+   * criterio. Antes había que leer el CV entero para encontrar dónde estaba cada una.
+   * Ahora cada cita se pinta DENTRO del iframe con el color de su categoría y, al tocarla
+   * en el panel, el CV salta a ella.
+   *
+   * Se usa la CSS Custom Highlight API (CSS.highlights + ::highlight()) a propósito y no
+   * <mark>: no toca el DOM del CV. El "Download PDF" del iframe rasteriza con html2canvas,
+   * así que envolver texto en <mark> se llevaría los colores del review adentro del PDF
+   * que ve el cliente. Un highlight no existe para html2canvas.
+   *
+   * Si el navegador no soporta la API, las citas siguen siendo clickeables y el CV igual
+   * hace scroll hasta la frase: se pierde el color, no la navegación.
+   */
+
+  // `help` es lo que se lee en la clave de colores. Un color sin explicación obliga a
+  // adivinar, y adivinando el rojo parece "la recruiter hizo algo mal" cuando puede ser
+  // simplemente que el candidato no encaja.
+  const HL_KINDS = [
+    { key: 'described', label: 'Backs a JD requirement',      bg: '#dcffab', ink: '#2f5c00', dot: '#a9e05a',
+      help: 'A role in the experience actually describes doing what the JD asked for — not just a tool sitting in a list.' },
+    { key: 'listed',    label: 'Only listed, not described',  bg: '#ffeeb8', ink: '#6b4a00', dot: '#f0c14b',
+      help: 'The requirement shows up somewhere in the CV, but no role tells the story of using it. A client reads these two very differently.' },
+    { key: 'hard',      label: 'Source does not support it',  bg: '#ffcdd8', ink: '#7a0c22', dot: '#e8637f',
+      help: 'The CV says something the source material (the original CV, LinkedIn) does not back up. This is the one to send back.' },
+    { key: 'soft',      label: 'Worth double-checking',       bg: '#ffe2c6', ink: '#7a3a00', dot: '#f0a45a',
+      help: 'Wording that may be stretching what the source says. Not necessarily wrong — worth a second look before it goes out.' },
+    { key: 'echo',      label: 'Copied from the JD',          bg: '#e3d8ff', ink: '#3b1e8f', dot: '#a48bff',
+      help: 'Sentences lifted from the job posting. Aligning with the JD is good; reusing its wording means the client reads their own posting back as experience.' },
+    { key: 'crit',      label: 'Cited by the score',          bg: '#d3e6ff', ink: '#0a3a7a', dot: '#6fa8ff',
+      help: 'The phrase the AI used as evidence when scoring one of the rubric criteria below.' },
+  ];
+  const HL_NAME = (key) => `cvrhl-${key}`;
+
+  // Lo que el modelo devuelve cuando NO tiene una cita: no es texto del CV y no se busca.
+  const HL_NOT_A_QUOTE = /^(not found in the cv|computed from the cv)/i;
+
+  const hlState = {
+    list: [],          // [{ id, kind, text, ranges, located }]
+    byId: new Map(),
+    seq: 0,
+    idx: null,         // índice de texto del CV renderizado
+    token: 0,          // corta los polls de un CV que ya no está en pantalla
+    on: true,
+    active: null,
+    cursor: {},        // por categoría, para el "siguiente" de la leyenda
+    flashWait: null,   // espera a que termine el scroll
+    flashClear: null,  // limpieza de la capa del destello
+  };
+
+  // Un caracter del CV y uno de la cita tienen que compararse igual: comillas curvas,
+  // guiones largos y espacios raros vienen de fuentes distintas. El mapeo es 1:1 a
+  // propósito — el índice guarda un nodo por caracter emitido.
+  const HL_CHAR_MAP = {
+    '\u2018': "'", '\u2019': "'", '\u02bc': "'", '\u201b': "'",
+    '\u201c': '"', '\u201d': '"', '\u201e': '"',
+    '\u2010': '-', '\u2011': '-', '\u2012': '-', '\u2013': '-', '\u2014': '-', '\u2212': '-',
+    '\u00a0': ' ', '\u2007': ' ', '\u2009': ' ', '\u200a': ' ', '\u202f': ' ',
+    '\u200b': ' ', '\u200c': ' ', '\u200d': ' ', '\ufeff': ' ',
+  };
+  function hlNormChar(ch) {
+    const mapped = HL_CHAR_MAP[ch];
+    if (mapped !== undefined) return mapped;
+    if (ch === '\n' || ch === '\r' || ch === '\t' || ch === ' ') return ' ';
+    const lower = ch.toLowerCase();
+    return lower.length === 1 ? lower : ch;
+  }
+
+  function hlNormalize(str) {
+    let out = '';
+    let lastSpace = true;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) {
+      const ch = hlNormChar(s[i]);
+      if (ch === ' ') { if (lastSpace) continue; lastSpace = true; } else { lastSpace = false; }
+      out += ch;
+    }
+    return out;
+  }
+
+  // Las citas llegan con comillas y puntuación de cierre que el CV no tiene pegada.
+  const hlTrimQuote = (q) => q.replace(/^["'\s]+/, '').replace(/["'\s]+$/, '').replace(/[.,;:!?]+$/, '').trim();
+
+  /* --- el índice: texto plano del CV + a qué nodo pertenece cada caracter ---------- */
+  /* Sin esto sólo se podrían encontrar frases que caen enteras dentro de un mismo nodo
+     de texto, y en el CV el rol, la empresa y las fechas son elementos distintos. */
+  function hlBuildIndex(doc) {
+    const root = doc.querySelector('.cv-container') || doc.body;
+    if (!root) return null;
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        // El panel de rating y el botón de descarga son chrome, no el CV.
+        if (p.closest('script, style, #resume-rating, .resume-download-button')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    let text = '';
+    const owner = [];
+    let lastSpace = true;
+    let node;
+    while ((node = walker.nextNode())) {
+      const raw = node.nodeValue;
+      for (let i = 0; i < raw.length; i++) {
+        const ch = hlNormChar(raw[i]);
+        if (ch === ' ') { if (lastSpace) continue; lastSpace = true; } else { lastSpace = false; }
+        text += ch;
+        owner.push({ node, i });
+      }
+      // Corte entre nodos: sin este espacio, "English" y "Fluent" de dos <span> vecinos
+      // se leerían como una sola palabra. Nunca cae en el borde de un match porque las
+      // citas se buscan ya trimmeadas.
+      if (!lastSpace && raw.length) {
+        text += ' ';
+        owner.push({ node, i: raw.length - 1 });
+        lastSpace = true;
+      }
+    }
+    return { doc, text, owner };
+  }
+
+  function hlRange(idx, start, end) {
+    const a = idx.owner[start];
+    const b = idx.owner[end - 1];
+    if (!a || !b) return null;
+    try {
+      const r = idx.doc.createRange();
+      r.setStart(a.node, a.i);
+      r.setEnd(b.node, b.i + 1);
+      return r;
+    } catch (_) { return null; }
+  }
+
+  function hlFindAll(idx, needle, cap) {
+    const out = [];
+    if (!needle || needle.length < 10) return out;
+    const limit = cap || 3;
+    let from = 0;
+    while (out.length < limit) {
+      const at = idx.text.indexOf(needle, from);
+      if (at < 0) break;
+      const r = hlRange(idx, at, at + needle.length);
+      if (r) out.push(r);
+      from = at + needle.length;
+    }
+    return out;
+  }
+
+  // Ubicar una cita, con dos degradés. El modelo lee el CV serializado como texto
+  // ("Título — Empresa [2021-01-15 → Present]"), que no es lo que la pantalla muestra:
+  // la pantalla dice "Jan 2025 – Dec 2025" y parte el rol y la empresa en dos elementos.
+  // Por eso, si la frase entera no aparece, se resaltan los trozos que sí existen.
+  function hlLocate(idx, rawQuote) {
+    const q = hlTrimQuote(hlNormalize(rawQuote));
+    if (q.length < 10) return [];
+
+    const exact = hlFindAll(idx, q);
+    if (exact.length) return exact;
+
+    let hits = [];
+    const segments = q.split(/\s*[[\]()|·•;]\s*|\s+-\s+|\s*→\s*/)
+      .map(hlTrimQuote)
+      .filter(s => s.length >= 12 && s.indexOf(' ') > 0);
+    if (segments.length > 1) {
+      segments.forEach(s => { hits = hits.concat(hlFindAll(idx, s, 2)); });
+      if (hits.length) return hits;
+    }
+
+    // Última chance: la ventana de palabras más larga que sí aparece. Cubre las
+    // diferencias de borde (un punto, un artículo de más) sin inventar coincidencias:
+    // se exige al menos la mitad de la cita.
+    const words = q.split(' ');
+    const floor = Math.max(4, Math.ceil(words.length * 0.5));
+    for (let len = words.length - 1; len >= floor; len--) {
+      for (let s = 0; s + len <= words.length; s++) {
+        const win = words.slice(s, s + len).join(' ');
+        if (win.length < 14) continue;
+        const found = hlFindAll(idx, win, 1);
+        if (found.length) return found;
+      }
+    }
+    return [];
+  }
+
+  /* --- registro de citas: lo llama aiPanelHtml mientras arma el panel -------------- */
+
+  function hlResetQuotes() {
+    hlState.list = [];
+    hlState.byId = new Map();
+    hlState.seq = 0;
+    hlState.active = null;
+    hlState.cursor = {};
+  }
+
+  function hlResetFrame() {
+    hlState.idx = null;
+    hlState.token += 1;
+    hlRenderLegend();
+  }
+
+  // Devuelve el atributo listo para pegar en el HTML, o '' si la cita no es citable:
+  // así el panel no queda con anzuelos muertos que no llevan a ninguna parte.
+  function hlRegister(kind, text) {
+    const t = String(text || '').trim();
+    if (t.length < 10 || HL_NOT_A_QUOTE.test(t)) return '';
+    const id = `q${++hlState.seq}`;
+    const entry = { id, kind, text: t, ranges: [], located: false };
+    hlState.list.push(entry);
+    hlState.byId.set(id, entry);
+    return ` data-hl="${id}"`;
+  }
+
+  /* --- pintar ---------------------------------------------------------------------- */
+
+  const HL_STYLE_ID = 'cvr-hl-style';
+  function hlInjectStyle(doc) {
+    if (doc.getElementById(HL_STYLE_ID)) return;
+    // ::highlight() no admite animaciones, así que el destello del aterrizaje es una capa
+    // aparte, absoluta y sin pointer-events, encima de la frase.
+    const css = HL_KINDS
+      .map(k => `::highlight(${HL_NAME(k.key)}){background-color:${k.bg};color:${k.ink};}`)
+      .join('\n')
+      + '\n::highlight(cvrhl-active){background-color:#003bff;color:#fff;}'
+      + `
+.cvr-hl-flash{
+  position:absolute;
+  pointer-events:none;
+  border-radius:5px;
+  background:rgba(0,59,255,.16);
+  box-shadow:0 0 0 2px rgba(0,59,255,.95), 0 0 20px 7px rgba(0,59,255,.45);
+  animation:cvrHlFlash 1.05s ease-out 2 both;
+}
+@keyframes cvrHlFlash{
+  0%{opacity:0;transform:scale(1.09)}
+  18%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1)}
+}
+@media (prefers-reduced-motion: reduce){
+  .cvr-hl-flash{animation:none;opacity:.85}
+}`;
+    const style = doc.createElement('style');
+    style.id = HL_STYLE_ID;
+    style.textContent = css;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+
+  function hlFrameWin() {
+    try { return $('cvrFrame').contentWindow; } catch (_) { return null; }
+  }
+
+  // El destello del aterrizaje: dos pulsos azules encima de la frase a la que se saltó.
+  // Sin esto el scroll deja el CV en el lugar correcto pero el ojo no sabe dónde mirar,
+  // sobre todo cuando la cita es corta y cae en el medio de un párrafo.
+  const HL_FLASH_ID = 'cvr-hl-flash-layer';
+  function hlFlash(win, ranges) {
+    const doc = win.document;
+    const old = doc.getElementById(HL_FLASH_ID);
+    if (old) old.remove();
+    if (hlState.flashClear) clearTimeout(hlState.flashClear);
+
+    const layer = doc.createElement('div');
+    layer.id = HL_FLASH_ID;
+    // html2canvas saltea lo que lleve este atributo: si alguien toca "Download PDF"
+    // justo durante el destello, el destello no se mete en el PDF del cliente.
+    layer.setAttribute('data-html2canvas-ignore', 'true');
+    layer.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;'
+      + 'z-index:2147483000;pointer-events:none;';
+    doc.body.appendChild(layer);
+
+    // El origen se mide, no se asume: el body puede tener margen o ser el contenedor
+    // relativo, y ahí las coordenadas de documento no coincidirían.
+    const origin = layer.getBoundingClientRect();
+    let boxes = 0;
+    ranges.forEach(r => {
+      // getClientRects y no getBoundingClientRect: una frase que corta en dos líneas
+      // necesita dos cajas, no una que se coma el margen entero.
+      Array.from(r.getClientRects()).forEach(rect => {
+        if (!rect.width || !rect.height) return;
+        const box = doc.createElement('div');
+        box.className = 'cvr-hl-flash';
+        box.style.left = `${rect.left - origin.left - 3}px`;
+        box.style.top = `${rect.top - origin.top - 2}px`;
+        box.style.width = `${rect.width + 6}px`;
+        box.style.height = `${rect.height + 4}px`;
+        layer.appendChild(box);
+        boxes += 1;
+      });
+    });
+    if (!boxes) { layer.remove(); return; }
+    hlState.flashClear = setTimeout(() => { if (layer.parentNode) layer.remove(); }, 2400);
+  }
+
+  function hlApply() {
+    const win = hlFrameWin();
+    if (!win || !win.CSS || !win.CSS.highlights || !win.Highlight) return;
+    win.CSS.highlights.clear();
+    if (!hlState.on) return;
+
+    const groups = {};
+    hlState.list.forEach(e => {
+      if (!e.ranges.length || e.id === hlState.active) return;
+      (groups[e.kind] = groups[e.kind] || []).push(...e.ranges);
+    });
+    HL_KINDS.forEach((k, i) => {
+      const ranges = groups[k.key];
+      if (!ranges || !ranges.length) return;
+      const h = new win.Highlight(...ranges);
+      h.priority = i + 1;
+      win.CSS.highlights.set(HL_NAME(k.key), h);
+    });
+
+    // La cita seleccionada va en su propio highlight y con prioridad máxima: es la única
+    // manera de que se distinga cuando cae encima de otra.
+    const act = hlState.active && hlState.byId.get(hlState.active);
+    if (act && act.ranges.length) {
+      const h = new win.Highlight(...act.ranges);
+      h.priority = 100;
+      win.CSS.highlights.set('cvrhl-active', h);
+    }
+  }
+
+  // Marca en el panel qué citas se pudieron ubicar. Sólo esas se comportan como botón.
+  function hlMarkPanel() {
+    $('cvrAi').querySelectorAll('[data-hl]').forEach(el => {
+      const e = hlState.byId.get(el.getAttribute('data-hl'));
+      const ok = !!(e && e.ranges.length);
+      el.classList.toggle('cvr-hl-item', ok);
+      el.classList.toggle('is-active', ok && hlState.active === e.id);
+      if (ok) {
+        el.dataset.hlKind = e.kind;
+        el.setAttribute('role', 'button');
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('title', 'Show this phrase in the CV');
+      } else {
+        el.removeAttribute('role');
+        el.removeAttribute('tabindex');
+        el.removeAttribute('title');
+      }
+    });
+  }
+
+  // La clave de colores. Se dibuja desde HL_KINDS, no a mano: si algún día se cambia un
+  // color o una categoría, la explicación se mueve con él en vez de quedar mintiendo.
+  function hlRenderKey() {
+    const box = $('cvrHlKeyBody');
+    if (!box || box.dataset.done) return;
+    box.dataset.done = '1';
+    box.innerHTML = `
+      <p class="cvr-hl-key-lead">Every phrase the analysis quotes is painted on the CV with
+        the colour of what it found. Click any quote in the panel — or a chip above — to
+        jump straight to it.</p>
+      <ul>
+        ${HL_KINDS.map(k => `
+          <li>
+            <i class="cvr-hl-key-sw" style="background:${k.bg};border-color:${k.dot}"></i>
+            <span><b>${esc(k.label)}</b> — ${esc(k.help)}</span>
+          </li>`).join('')}
+        <li>
+          <i class="cvr-hl-key-sw" style="background:#003bff;border-color:#003bff"></i>
+          <span><b>Solid blue</b> — the phrase you just jumped to. It goes back to its own
+            colour as soon as you pick another one.</span>
+        </li>
+      </ul>
+      <p class="cvr-hl-key-foot">A quote the analysis makes but that is nowhere in this CV
+        gets no colour and no jump — the counter at the end of the row says how many.</p>`;
+  }
+
+  function hlRenderLegend() {
+    const box = $('cvrHlLegend');
+    if (!box) return;
+    const counts = {};
+    let missing = 0;
+    hlState.list.forEach(e => {
+      if (e.ranges.length) counts[e.kind] = (counts[e.kind] || 0) + 1;
+      else if (e.located) missing += 1;
+    });
+    const chips = HL_KINDS.filter(k => counts[k.key]).map(k => `
+      <button type="button" class="cvr-hl-chip" data-hl-kind="${k.key}"
+              style="--cvr-hl-c:${k.dot}" title="Jump to the next one in the CV">
+        <i class="cvr-hl-dot"></i>${esc(k.label)} <b>${counts[k.key]}</b>
+      </button>`).join('');
+    // Decirlo importa: si una cita no está en el CV que se ve, o el modelo la inventó o
+    // la recruiter editó el CV después. Callarlo haría creer que ya está todo pintado.
+    const miss = missing
+      ? `<span class="cvr-hl-miss" title="These quotes could not be matched against the CV shown here.">${missing} quote${missing > 1 ? 's' : ''} not found in this CV</span>`
+      : '';
+    box.innerHTML = chips + miss;
+    box.classList.toggle('is-off', !hlState.on);
+    show(box, !!(chips || miss));
+  }
+
+  // Localiza lo que falte y repinta. Es idempotente: la llaman tanto el render del panel
+  // como el load del iframe, y cualquiera de los dos puede llegar primero.
+  function hlSync() {
+    if (!hlState.idx) { hlRenderLegend(); return; }
+    hlState.list.forEach(e => {
+      if (e.located) return;
+      e.ranges = hlLocate(hlState.idx, e.text);
+      e.located = true;
+    });
+    hlApply();
+    hlMarkPanel();
+    hlRenderLegend();
+  }
+
+  // El iframe pide el CV por fetch y lo dibuja DESPUÉS del load, así que "load" no
+  // alcanza. Y esperar sólo a que el texto se estabilice tampoco: el HTML trae un
+  // esqueleto con placeholders ("Candidate Name", el About de ejemplo) que ya mide lo
+  // suficiente como para parecer un CV cargado. Se espera a que el nombre real esté
+  // puesto y recién ahí a que el texto deje de crecer.
+  const HL_PLACEHOLDERS = ['candidate name', 'click here to edit your about section.'];
+  function hlFrameRendered(doc) {
+    const name = (doc.getElementById('candidateNameTitle')?.textContent || '').trim().toLowerCase();
+    if (!name || HL_PLACEHOLDERS.includes(name)) return false;
+    const about = (doc.getElementById('aboutField')?.textContent || '').trim().toLowerCase();
+    return !HL_PLACEHOLDERS.includes(about);
+  }
+
+  function hlAttach() {
+    const token = hlState.token;
+    let tries = 0;
+    let lastLen = -1;
+    (function tick() {
+      if (token !== hlState.token) return;   // se cerró el drawer o se abrió otro CV
+      let doc = null;
+      try { doc = $('cvrFrame').contentDocument; } catch (_) { doc = null; }
+      const len = doc && doc.body && hlFrameRendered(doc)
+        ? (doc.body.textContent || '').replace(/\s+/g, ' ').trim().length
+        : -1;
+      if (len < 0 || len !== lastLen) {
+        lastLen = len;
+        if (++tries < 75) setTimeout(tick, 200);
+        return;
+      }
+      hlInjectStyle(doc);
+      hlState.idx = hlBuildIndex(doc);
+      hlState.list.forEach(e => { e.located = false; e.ranges = []; });
+      hlSync();
+    })();
+  }
+
+  function hlGoTo(id) {
+    const e = hlState.byId.get(id);
+    if (!e || !e.ranges.length) return;
+    hlState.active = id;
+    // Tocar una cita con el resaltado apagado lo vuelve a prender: es lo que se pidió.
+    if (!hlState.on) {
+      hlState.on = true;
+      const sw = $('cvrHlSwitch');
+      if (sw) sw.checked = true;
+    }
+    hlApply();
+    hlMarkPanel();
+    hlRenderLegend();
+
+    // La métrica también se enciende: al volver la vista al panel tiene que quedar claro
+    // cuál de todas es la que está pintada de azul en el CV.
+    const item = $('cvrAi').querySelector(`[data-hl="${id}"]`);
+    if (item) {
+      item.classList.remove('is-flash');
+      void item.offsetWidth;   // reinicia la animación si se vuelve a tocar la misma cita
+      item.classList.add('is-flash');
+      setTimeout(() => item.classList.remove('is-flash'), 1100);
+    }
+
+    const win = hlFrameWin();
+    if (!win) return;
+    // Una cita puede caer en más de un lugar (el About repite lo que dice la experiencia).
+    // Se va a la primera del documento, no a la primera que encontró el buscador.
+    const rects = e.ranges.map(r => r.getBoundingClientRect()).filter(r => r.height);
+    if (!rects.length) return;
+    const rect = rects.reduce((a, b) => (b.top < a.top ? b : a));
+    const raw = rect.top + win.scrollY - (win.innerHeight / 2) + (rect.height / 2);
+    const maxTop = Math.max(0, win.document.documentElement.scrollHeight - win.innerHeight);
+    const target = Math.max(0, Math.min(raw, maxTop));
+    win.scrollTo({ top: target, behavior: 'smooth' });
+
+    // El destello va DESPUÉS del scroll: durante la animación las coordenadas cambian y
+    // las cajas quedarían dibujadas donde la frase ya no está.
+    if (hlState.flashWait) clearTimeout(hlState.flashWait);
+    const token = hlState.token;
+    let fired = false;
+    const fire = () => {
+      if (fired || token !== hlState.token) return;
+      fired = true;
+      hlFlash(win, e.ranges);
+    };
+    if (Math.abs(win.scrollY - target) < 4) {
+      // Ya estaba a la vista: no hay scroll que esperar y esperar se notaría como lag.
+      // setTimeout y no requestAnimationFrame: rAF no corre con la pestaña en segundo
+      // plano, y ahí el destello no llegaría nunca.
+      hlState.flashWait = setTimeout(fire, 40);
+    } else {
+      if ('onscrollend' in win) win.addEventListener('scrollend', fire, { once: true });
+      // Red de seguridad: scrollend no existe en todos lados y un scroll interrumpido
+      // por la rueda del mouse tampoco lo dispara.
+      hlState.flashWait = setTimeout(fire, 750);
+    }
+  }
+
+  // La leyenda no es sólo leyenda: cada chip recorre una a una las citas de su color.
+  function hlNextOfKind(kind) {
+    const items = hlState.list.filter(e => e.kind === kind && e.ranges.length);
+    if (!items.length) return;
+    const n = (hlState.cursor[kind] || 0) % items.length;
+    hlState.cursor[kind] = n + 1;
+    hlGoTo(items[n].id);
+    const el = $('cvrAi').querySelector(`[data-hl="${items[n].id}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   /* ---------------------------------------------------------------- el panel */
 
 
   function aiPanelHtml(review) {
+    // El panel se rearma entero, así que las citas registradas se rearman con él.
+    hlResetQuotes();
     const a = review.ai_analysis;
     if (!a) {
       if (review.ai_error === 'no_jd') {
@@ -262,14 +783,14 @@
         </div>
         <div class="cvr-crit-bar"><span style="width:${na ? 0 : Math.max(0, Math.min(100, c.score))}%"></span></div>
         ${c.verdict ? `<p class="cvr-crit-note">${esc(c.verdict)}</p>` : ''}
-        ${c.evidence ? `<p class="cvr-crit-ev">“${esc(c.evidence)}”</p>` : ''}
+        ${c.evidence ? `<p class="cvr-crit-ev"${hlRegister('crit', c.evidence)}>“${esc(c.evidence)}”</p>` : ''}
       </div>`;
     }).join('');
 
     const claims = (list, kind, title) => list.length ? `
       <div class="cvr-find cvr-find--${kind}">
         <h5>${title}</h5>
-        <ul>${list.map(c => `<li><q>${esc(c.cv_quote)}</q> ${esc(c.why || '')}</li>`).join('')}</ul>
+        <ul>${list.map(c => `<li><q${hlRegister(kind === 'hard' ? 'hard' : 'soft', c.cv_quote)}>${esc(c.cv_quote)}</q> ${esc(c.why || '')}</li>`).join('')}</ul>
       </div>` : '';
 
     const hard = (a.unsupported_claims || []).filter(c => c.severity === 'hard');
@@ -284,7 +805,7 @@
         <p class="cvr-echo-lead">Aligning with the JD is good — reusing its sentences is not.
           The client ends up reading their own posting back as this candidate's experience.</p>
         <ul>${echo.map(e => `<li>
-            <q>${esc(e.cv_quote)}</q>
+            <q${hlRegister('echo', e.cv_quote)}>${esc(e.cv_quote)}</q>
             ${e.jd_quote ? `<div class="cvr-echo-jd">JD: “${esc(e.jd_quote)}”</div>` : ''}
             ${e.why ? esc(e.why) : ''}
           </li>`).join('')}</ul>
@@ -313,6 +834,9 @@
     const rs = a._requirements_summary || {};
     const reqRow = r => {
       const f = reqFace(r);
+      // "described" pinta verde en el CV; "only listed" ambar. Es la misma distincion que
+      // hace el badge, dicha sobre el texto del CV en vez de sobre la fila del panel.
+      const evKind = f.cls === 'described' ? 'described' : 'listed';
       return `
       <li class="cvr-req cvr-req--${f.cls}">
         <div class="cvr-req-main">
@@ -320,7 +844,7 @@
           ${r.kind === 'soft' ? '<i class="cvr-req-soft">soft skill</i>' : ''}
           <span class="cvr-req-status">${esc(f.label)}</span>
         </div>
-        ${r.evidence ? `<p class="cvr-req-ev">“${esc(r.evidence)}”</p>` : ''}
+        ${r.evidence ? `<p class="cvr-req-ev"${hlRegister(evKind, r.evidence)}>“${esc(r.evidence)}”</p>` : ''}
         ${r.note ? `<p class="cvr-req-note">${esc(r.note)}</p>` : ''}
       </li>`;
     };
@@ -424,6 +948,8 @@
     setRejectMode(false);
     $('cvrAi').innerHTML = '<p class="cvr-ai-none">Loading…</p>';
     $('cvrRounds').innerHTML = '';
+    hlResetQuotes();
+    hlResetFrame();
     show($('cvrScrim'), true);
     requestAnimationFrame(() => {
       $('cvrScrim').classList.add('is-open');
@@ -446,7 +972,10 @@
         // así las frases que cita el análisis existen seguro en lo que se está viendo.
         // resume-readonly.js lo pide a /cv_reviews/<id>/resume cuando ve review_id.
         const url = `resume-readonly.html?id=${r.candidate_id}&review_id=${r.review_id}`;
-        $('cvrFrame').src = url;
+        // El onload va ANTES del src: es el que dispara la búsqueda de las citas.
+        const frame = $('cvrFrame');
+        frame.onload = () => { if (currentReview) hlAttach(); };
+        frame.src = url;
         $('cvrOpenCv').href = url;
 
         const drift = $('cvrDrift');
@@ -459,6 +988,7 @@
         }
 
         $('cvrAi').innerHTML = aiPanelHtml(r);
+        hlSync();
 
         show($('cvrDecisionFoot'), r.status === 'pending');
 
@@ -476,7 +1006,14 @@
   function closeDrawer() {
     $('cvrDrawer').classList.remove('is-open');
     $('cvrScrim').classList.remove('is-open');
-    setTimeout(() => { show($('cvrScrim'), false); $('cvrFrame').src = 'about:blank'; }, 220);
+    hlResetQuotes();
+    hlResetFrame();
+    setTimeout(() => {
+      show($('cvrScrim'), false);
+      // onload a null primero: si no, el about:blank dispara un poll que no lleva a nada.
+      $('cvrFrame').onload = null;
+      $('cvrFrame').src = 'about:blank';
+    }, 220);
     currentReview = null;
   }
 
@@ -669,16 +1206,52 @@
           currentReview.ai_score = out.ai_score;
           currentReview.ai_error = null;
           $('cvrAi').innerHTML = aiPanelHtml(currentReview);
+          hlSync();
           refresh();
         })
         .catch(err => { $('cvrDrawerError').textContent = err.message; })
         .finally(() => { btn.disabled = false; btn.innerHTML = label; });
     });
 
+    // --- resaltado: del panel al CV y de vuelta ---
+    // Cada cita ubicable es un botón: lleva el CV hasta la frase y la pinta de azul.
+    $('cvrAi').addEventListener('click', ev => {
+      const el = ev.target.closest('[data-hl].cvr-hl-item');
+      if (el) hlGoTo(el.getAttribute('data-hl'));
+    });
+    $('cvrAi').addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const el = ev.target.closest('[data-hl].cvr-hl-item');
+      if (!el) return;
+      ev.preventDefault();
+      hlGoTo(el.getAttribute('data-hl'));
+    });
+    $('cvrHlLegend').addEventListener('click', ev => {
+      const chip = ev.target.closest('[data-hl-kind]');
+      if (chip) hlNextOfKind(chip.getAttribute('data-hl-kind'));
+    });
+    hlRenderKey();
+    // La clave tapa el CV mientras está abierta, así que se cierra tocando cualquier
+    // otro lado — no hay que acordarse de volver al chip.
+    document.addEventListener('click', ev => {
+      const key = document.querySelector('.cvr-hl-key');
+      if (key && key.open && !key.contains(ev.target)) key.open = false;
+    });
+    $('cvrHlSwitch').addEventListener('change', () => {
+      hlState.on = $('cvrHlSwitch').checked;
+      hlApply();
+      hlRenderLegend();
+    });
+
     $('cvrClose').addEventListener('click', closeDrawer);
     $('cvrScrim').addEventListener('click', closeDrawer);
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && $('cvrDrawer').classList.contains('is-open')) closeDrawer();
+      if (e.key !== 'Escape') return;
+      // Escape cierra primero la clave: cerrar el review entero por querer cerrar un
+      // popover haría perder el lugar en la cola.
+      const key = document.querySelector('.cvr-hl-key');
+      if (key && key.open) { key.open = false; return; }
+      if ($('cvrDrawer').classList.contains('is-open')) closeDrawer();
     });
 
     Promise.all([loadReasons(), loadRecruiters()]).then(() => {
