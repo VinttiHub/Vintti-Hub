@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260818-jd-full" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260819-no-highlight" />
 </head>
 
 <body class="light-mode">
@@ -178,33 +178,38 @@
           </button>
         </header>
 
-        <div class="hx-drawer-body">
-          <div class="cvr-warn" id="cvrDrift" hidden></div>
+        <!-- Dos columnas: el CV a la izquierda y el análisis a la derecha, cada uno con su
+             propio scroll. Antes iban apilados y había que leer la métrica, memorizar la
+             frase y bajar a buscarla al iframe. Por debajo de 1100px vuelven a apilarse. -->
+        <div class="hx-drawer-body cvr-cols">
 
-          <details class="hx-section" open>
-            <summary>AI quality score</summary>
-            <div class="cvr-section-body">
-              <div id="cvrAi"></div>
-              <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="cvrReanalyze">
-                <i class="fa-solid fa-rotate"></i> Re-run the analysis
-              </button>
-            </div>
-          </details>
-
-          <details class="hx-section" open>
-            <summary>The CV</summary>
-            <div class="cvr-section-body">
+          <section class="cvr-col cvr-col-cv">
+            <div class="cvr-cv-head">
+              <h3>The CV <span class="cvr-cv-sub" id="cvrCvSub">as it was sent</span></h3>
               <a id="cvrOpenCv" class="hx-btn hx-btn-soft cvr-open-cv" target="_blank" rel="noopener">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in a new tab
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> New tab
               </a>
-              <iframe id="cvrFrame" class="cvr-frame" title="Candidate CV" loading="lazy"></iframe>
             </div>
-          </details>
+            <iframe id="cvrFrame" class="cvr-frame" title="Candidate CV"></iframe>
+          </section>
 
-          <details class="hx-section" id="cvrRoundsSection">
-            <summary>Previous rounds</summary>
-            <div class="cvr-section-body"><div id="cvrRounds" class="cvr-rounds"></div></div>
-          </details>
+          <section class="cvr-col cvr-col-analysis">
+            <div class="cvr-warn" id="cvrDrift" hidden></div>
+
+            <details class="hx-section" open>
+              <summary>AI quality score</summary>
+              <div class="cvr-section-body">
+                <div id="cvrAi"></div>
+                <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="cvrReanalyze">
+                  <i class="fa-solid fa-rotate"></i> Re-run the analysis
+                </button>
+              </div>
+            </details>
+
+            <details class="hx-section" id="cvrRoundsSection">
+              <summary>Previous rounds</summary>
+              <div class="cvr-section-body"><div id="cvrRounds" class="cvr-rounds"></div></div>
+            </details>
 
           <div class="cvr-reject" id="cvrRejectForm" hidden>
             <p class="cvr-field-label">Why is it going back? Pick every reason that applies.</p>
@@ -222,7 +227,8 @@
             </label>
           </div>
 
-          <p class="hx-err" id="cvrDrawerError"></p>
+            <p class="hx-err" id="cvrDrawerError"></p>
+          </section>
         </div>
 
         <!-- Aprobar y rechazar pesan LO MISMO en el flujo del sales lead, así que van
@@ -250,6 +256,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260818-jd-full" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260819-no-highlight" defer></script>
 </body>
 </html>

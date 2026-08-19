@@ -182,8 +182,12 @@ are most likely to fail:
   drop because they fit neither box. There is no third option and there is no "skip":
   every bullet is either "technical" or "soft".
   Both kinds get listed; only the technical ones drive the summary and the score.
-- What you do NOT list: a separate "Nice to have" / "Bonus" / "Preferred" section. Those
-  are not requirements. Only the required list.
+- What you do NOT list: anything under a heading that marks it as optional —
+  "Nice to have", "Non-mandatory skills", "Not mandatory", "Bonus", "Preferred
+  qualifications", "Desirable", "Optional", "Good to have", "Deseable", "Opcional",
+  "No excluyente", "Valorable". Those are wishes, not requirements. The client never
+  demanded them, and listing them makes the reviewer mark a CV down for something nobody
+  asked for. Stop transcribing when you reach that heading. Only the required list.
 - Do not invent requirements the JD never states just to make the list longer.
 
 DO IT IN TWO PASSES, and this is not optional:
@@ -616,6 +620,72 @@ def _clean_gaps(raw: Any) -> List[str]:
 
 _REQ_STATUSES = ("described", "listed_only", "missing")
 
+# Casi toda JD tiene, después de los requisitos, una sección de deseables. El modelo las
+# mezclaba: en una vacante con 5 requisitos y 4 "Non-mandatory skills" devolvía los 9, y el
+# reviewer terminaba marcando en rojo cosas que el cliente nunca exigió. Decírselo en el
+# prompt no alcanza — hay que poder confiar en esto, así que se corta por código.
+#
+# "plus" a secas NO está en la lista a propósito: "Previous experience in QA is a plus"
+# aparece DENTRO de un bullet, y usarlo como encabezado cortaría la JD en el lugar
+# equivocado. Sólo van fórmulas que de verdad titulan una sección.
+_OPTIONAL_SECTION = re.compile(r"""
+    \bnon[-\s]?mandatory\b | \bnot\s+mandatory\b
+  | \bnice[-\s]to[-\s]haves?\b | \bgood\s+to\s+have\b
+  | \bbonus\s+(?:points|skills|qualifications|experience)\b
+  | \bpreferred\s+(?:qualifications|skills|experience|but\s+not\s+required)\b
+  | \bdesirable\b | \bdesired\s+(?:skills|qualifications)\b
+  | \boptional\s+(?:skills|qualifications|requirements)\b
+  | \bplus(?:es)?\s*: | \bwould\s+be\s+a\s+plus\s*:
+  | \bdeseable(?:s)?\b | \bopcional(?:es)?\b | \bno\s+excluyente\b
+  | \bvalorable(?:s)?\b | \bse\s+valorar\w*\b
+""", re.I | re.X)
+
+
+def optional_section_start(jd_text):
+    """Dónde empieza lo que la vacante NO exige. None si no hay sección opcional."""
+    m = _OPTIONAL_SECTION.search(str(jd_text or ""))
+    return m.start() if m else None
+
+
+def _norm_for_match(text):
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+def _all_positions(haystack, needle):
+    out, start = [], 0
+    while True:
+        pos = haystack.find(needle, start)
+        if pos < 0:
+            return out
+        out.append(pos)
+        start = pos + 1
+
+
+def _is_after_cut(requirement, jd_norm, cut):
+    """¿Este requisito sale de la parte opcional de la JD?
+
+    Se descarta sólo si TODAS sus apariciones están después del corte. Un requisito corto
+    como "Kubernetes" puede aparecer una sola vez, abajo, y ahí es deseable; pero "SQL"
+    puede figurar arriba como requisito y de nuevo abajo como deseable, y en ese caso se
+    conserva. Sin esta regla haría falta un largo mínimo, y todo lo más corto que ese
+    umbral se colaba.
+
+    Ante la duda decimos que NO: si no logramos ubicarlo en la JD, se conserva. Perder un
+    requisito real en silencio es peor que dejar pasar uno deseable, porque la checklist se
+    lee contra la vacante y un faltante se nota.
+    """
+    full = _norm_for_match(requirement)
+    if len(full) < 4:
+        return False
+    # Del más específico al más laxo: el modelo a veces recorta o reformula el final.
+    for needle in (full[:60], full[:25], full[:12]):
+        if len(needle) < 4:
+            continue
+        positions = _all_positions(jd_norm, needle)
+        if positions:
+            return all(pos >= cut for pos in positions)
+    return False
+
 # Técnico vs soft lo decidimos NOSOTROS, no el modelo: le preguntábamos y contestaba
 # distinto entre corridas ("Strong eye for dashboard design" salía técnico una vez y soft
 # la siguiente), y eso movía los contadores del encabezado sin que cambiara nada.
@@ -628,12 +698,16 @@ _REQ_STATUSES = ("described", "listed_only", "missing")
 
 # Estos ganan aunque la frase también tenga palabras blandas: "3+ years of experience
 # communicating with clients" es un requisito de experiencia, no una soft skill.
+#
+# Nombrar un idioma alcanza para que sea técnico, sin importar cómo esté redactado. Acá el
+# idioma es un requisito duro —"English level" es una de las razones de rechazo del
+# review— y las JDs lo escriben de mil formas: "Fluent English", "Fluency in English with
+# exceptional communication skills", "Advanced English proficiency". Pedir una fórmula
+# exacta dejaba afuera la mitad, y la que dice "communication" se iba derecho a soft.
 _REQ_TECHNICAL_OVERRIDE = re.compile(r"""
     \b\d+\s*(?:[-–—+]|\s+to\s+)?\s*\d*\s*\+?\s*(?:years?|yrs?)\b   # "3 years", "2–3+ years"
   | \b(?:bachelor|master|mba|degree|diploma|certified|certification|licen[cs]e|cpa|cfa)\b
-  | \b(?:fluent|native|bilingual|proficien\w*|advanced|intermediate)\s+\w*\s*
-        (?:english|spanish|portuguese|french)\b
-  | \b(?:english|spanish|portuguese)\s+(?:level|proficiency|fluency)\b
+  | \b(?:english|spanish|portuguese|french|ingl[eé]s|espa[nñ]ol|portugu[eé]s)\b
 """, re.I | re.X)
 
 # Fórmulas blandas y logísticas. Lo logístico (horario, equipo, zona horaria) va acá porque
@@ -669,7 +743,7 @@ def classify_requirement(text: str) -> str:
     return "technical"
 
 
-def _clean_requirements(raw: Any) -> List[Dict[str, Any]]:
+def _clean_requirements(raw: Any, jd_text: Any = None) -> List[Dict[str, Any]]:
     """Cobertura requisito por requisito. Es el campo que el reviewer lee primero.
 
     Los técnicos van antes que los soft porque son los que decide el reviewer; dentro de
@@ -678,12 +752,21 @@ def _clean_requirements(raw: Any) -> List[Dict[str, Any]]:
     requisito que describe la JD en vez de citarla ("las tools mencionadas en la JD") no le
     sirve a nadie, y el ejemplo del prompt copiado textual es una falla conocida.
     """
+    # Recorte de la sección opcional. Se calcula sobre el mismo texto normalizado con el
+    # que después se buscan los requisitos, para que las posiciones sean comparables.
+    jd_norm = _norm_for_match(jd_text)
+    cut = optional_section_start(jd_norm) if jd_norm else None
+
     out: List[Dict[str, Any]] = []
+    dropped = 0
     for item in raw or []:
         if not isinstance(item, dict):
             continue
         text = str(item.get("requirement") or "").strip()
         if not text:
+            continue
+        if cut is not None and _is_after_cut(text, jd_norm, cut):
+            dropped += 1
             continue
         low = text.lower()
         if any(marker in low for marker in _VAGUE_GAP_MARKERS):
@@ -725,6 +808,8 @@ def _clean_requirements(raw: Any) -> List[Dict[str, Any]]:
         seen.add(key)
         deduped.append(r)
 
+    if dropped:
+        logging.info("cv_review: %s deseables descartados (no son requisitos)", dropped)
     deduped.sort(key=lambda r: 0 if r["kind"] == "technical" else 1)
     return deduped
 
@@ -867,7 +952,7 @@ supported, and (b) whether JD-relevant facts were available and left out.
 
 
 def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
-             fingerprint: str) -> Dict[str, Any]:
+             fingerprint: str, jd_text: Any = None) -> Dict[str, Any]:
     """Inyecta el criterio calculado, saca el composite, aplica el tope y estampa la
     metadata que hace auditable el número."""
     criteria = _align_criteria(parsed.get("criteria"))
@@ -887,13 +972,19 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         # Sin fuente no se puede acusar de inventar nada.
         unsupported = []
 
-    requirements = _clean_requirements(parsed.get("jd_requirements"))
+    requirements = _clean_requirements(parsed.get("jd_requirements"), jd_text)
     req_summary = _requirements_summary(requirements)
     # La lista transcrita es el control: si el modelo copió 8 bullets y anotó 6, dropeó dos.
     # No los inventamos — se avisa, porque una checklist incompleta que parece completa es
     # peor que uno que dice "faltan dos".
     verbatim = [str(x).strip() for x in (parsed.get("jd_requirements_verbatim") or [])
                 if str(x).strip()]
+    # La transcripción también incluye los deseables si el modelo los copió: se recorta con
+    # el mismo criterio, o el control de paridad avisaría de faltantes que no faltan.
+    _jd_norm = _norm_for_match(jd_text)
+    _cut = optional_section_start(_jd_norm) if _jd_norm else None
+    if _cut is not None:
+        verbatim = [v for v in verbatim if not _is_after_cut(v, _jd_norm, _cut)]
     req_summary["expected"] = len(verbatim)
     req_summary["listed"] = len(requirements)
     req_summary["incomplete"] = bool(verbatim) and len(requirements) < len(verbatim)
@@ -990,5 +1081,6 @@ def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
     if not isinstance(parsed, dict):
         return None, None, "unparseable"
 
-    analysis = finalize(parsed, snapshot, len(source_text or ""), fingerprint)
+    analysis = finalize(parsed, snapshot, len(source_text or ""), fingerprint,
+                        jd_text=jd_block)
     return analysis["_composite_score"], analysis, None

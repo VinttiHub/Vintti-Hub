@@ -3,7 +3,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const candidateId = urlParams.get("id");
   const isPdfExport = urlParams.has("pdf_export");
   const isTalentDrop = urlParams.get("view") === "talent-drop";
-  const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+  // Con review_id se renderiza el CV TAL COMO SE ENVIÓ a revisión, no el actual. El sales
+  // lead juzga lo que la recruiter mandó, y además así las frases que cita el análisis
+  // existen seguro en lo que está viendo.
+  const reviewId = urlParams.get("review_id");
+  // Detección de local, igual que candidatesApiBase() en candidate-details.js: sin esto,
+  // corriendo el sitio en local se le pediría el snapshot a producción, que todavía no
+  // tiene ese endpoint.
+  const API_BASE = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:5000"
+    : "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
   // Track that this CV link was opened. Skipped for internal PDF generation.
   // Opens by a logged-in Hub user (team previewing) are flagged internal — same origin,
@@ -385,7 +394,21 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/resumes/${candidateId}`);
+    // El snapshot vive detrás del chequeo de usuario activo, así que va con X-User-Email.
+    // Si falla por lo que sea, se cae al CV actual: mejor mostrar algo levemente
+    // desactualizado que dejar el iframe en blanco.
+    let res = null;
+    if (reviewId) {
+      const me = localStorage.getItem("user_email") || sessionStorage.getItem("user_email") || "";
+      res = await fetch(`${API_BASE}/cv_reviews/${reviewId}/resume`, {
+        headers: { "X-User-Email": me },
+      });
+      if (!res.ok) {
+        console.warn(`No se pudo traer el CV enviado (HTTP ${res.status}); se muestra el actual.`);
+        res = null;
+      }
+    }
+    if (!res) res = await fetch(`${API_BASE}/resumes/${candidateId}`);
     const data = await res.json();
     console.log("📦 Resume completo recibido:", data);
 

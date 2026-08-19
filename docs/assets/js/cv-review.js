@@ -229,6 +229,7 @@
 
   /* ---------------------------------------------------------------- el panel */
 
+
   function aiPanelHtml(review) {
     const a = review.ai_analysis;
     if (!a) {
@@ -441,10 +442,10 @@
           [r.opp_position_name, r.client_name, `sent by ${r.recruiter_email}`]
             .filter(Boolean).join(' · ');
 
-        // El CV como está HOY. El snapshot de lo que se envió vive en la base
-        // (resume_snapshot) y se sirve por /cv_reviews/<id>/resume; renderizarlo en el
-        // iframe es una fase aparte.
-        const url = `resume-readonly.html?id=${r.candidate_id}`;
+        // El CV TAL COMO SE ENVIÓ, no el actual: se juzga lo que la recruiter mandó, y
+        // así las frases que cita el análisis existen seguro en lo que se está viendo.
+        // resume-readonly.js lo pide a /cv_reviews/<id>/resume cuando ve review_id.
+        const url = `resume-readonly.html?id=${r.candidate_id}&review_id=${r.review_id}`;
         $('cvrFrame').src = url;
         $('cvrOpenCv').href = url;
 
@@ -458,6 +459,7 @@
         }
 
         $('cvrAi').innerHTML = aiPanelHtml(r);
+
         show($('cvrDecisionFoot'), r.status === 'pending');
 
         return fetch(`${API}/candidates/${r.candidate_id}/cv_reviews?opportunity_id=${r.opportunity_id}`,
