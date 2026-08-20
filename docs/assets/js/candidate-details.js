@@ -5208,17 +5208,19 @@ function _replaceDateText(node){
   // acá importa por otro motivo: le dice qué puede arreglar de verdad. Lo que el material
   // fuente no respalda NO es un arreglo pendiente — es el candidato, y "arreglarlo" sería
   // inventar experiencia.
+  // Espejo de reqFace() en assets/js/cv-review.js — docs/ no tiene bundler, así que son dos
+  // copias a mano. Si tocás una, tocá la otra: estuvieron desincronizadas y esta vista
+  // mostraba etiquetas que la otra ya había reemplazado.
   function reqFace(r){
-    if (r.status === 'described') return { cls:'described', label:'Described in the experience' };
-    if (r.in_source === 'no')     return { cls:'fit',       label:"Not in the CV — not in the source either" };
-    if (r.status === 'listed_only') {
-      return { cls:'listed_only',
-               label: r.in_source === 'yes' ? 'Only listed — the source backs it up'
-                                            : 'Only listed — no role describes it' };
+    if (!r.counts) {
+      return r.assumed
+        ? { cls:'nocount', label:"Doesn't count — taken for granted", tag:'taken for granted' }
+        : { cls:'nocount', label:"Doesn't count — soft skill",        tag:'soft skill' };
     }
+    if (r.status === 'described')  return { cls:'described',   label:'Described in the experience' };
+    if (r.status === 'listed_only') return { cls:'listed_only', label:'Only listed — no role describes it' };
     return { cls:'missing',
-             label: r.in_source === 'yes' ? 'Missing — but the source has it'
-                                          : 'Not in the CV' };
+             label: r.in_source === 'yes' ? 'Missing — you can add it' : 'Not in the CV' };
   }
 
   function requirementsHtml(reqs, summary, open){
@@ -5229,7 +5231,7 @@ function _replaceDateText(node){
       return `<li class="cvr-req cvr-req--${f.cls}">
         <div class="cvr-req-main">
           <b>${escapeHtml(r.requirement)}</b>
-          ${r.kind === 'soft' ? '<i class="cvr-req-soft">soft skill</i>' : ''}
+          ${f.tag ? `<i class="cvr-req-tag">${escapeHtml(f.tag)}</i>` : ''}
           <span class="cvr-req-status">${escapeHtml(f.label)}</span>
         </div>
         ${r.evidence ? `<p class="cvr-req-ev">\u201c${escapeHtml(r.evidence)}\u201d</p>` : ''}
@@ -5237,14 +5239,15 @@ function _replaceDateText(node){
       </li>`;
     }).join('');
     return `<details class="cvr-reqs cv-review-reqs"${open ? ' open' : ''}>
-      <summary>What the JD asked for${s.technical
-        ? ` <span class="cvr-reqs-count">${s.described || 0} described ·
-            ${s.fixable_gaps || 0} you can fix ·
-            ${s.fit_gaps || 0} the candidate doesn't have</span>` : ''}</summary>
+      <summary>What the JD asked for${s.scorable
+        ? ` <span class="cvr-reqs-count">${s.described || 0} of ${s.scorable} shown ·
+            ${s.fixable_gaps || 0} you can close</span>`
+        : (s.technical ? ` <span class="cvr-reqs-count">${s.described || 0} described</span>` : '')}</summary>
       ${s.incomplete ? `<p class="cvr-reqs-warn">⚠️ The job posting lists ${s.expected}
         requirements and only ${s.listed} could be checked.</p>` : ''}
-      <p class="cvr-reqs-lead">Only the ones the source material backs up are on you. The
-        rest is the candidate not being a fit — don't write experience they don't have.</p>
+      <p class="cvr-reqs-lead">Every technical requirement this CV shows is a share of the
+        score. Only the gaps your originals back up are on you — the rest is the candidate
+        not being a fit, and writing experience they don't have is worse than a low number.</p>
       <ul>${rows}</ul>
     </details>`;
   }
@@ -5257,13 +5260,15 @@ function _replaceDateText(node){
         <span class="cv-review-hist-status cv-review-hist-status--${r.status}">${r.status}</span>
       </div>`);
     if (r.ai_score !== null && r.ai_score !== undefined) {
-      bits.push(`<div class="cv-review-hist-line">CV quality: <b>${r.ai_score}/100</b></div>`);
+      const rs = r.requirements_summary || {};
+      bits.push(`<div class="cv-review-hist-line">JD coverage: ${rs.scorable
+        ? `<b>${rs.described || 0} of ${rs.scorable}</b> shown · ` : ''}<b>${r.ai_score}</b>/100</div>`);
     } else if (r.ai_pending) {
-      bits.push('<div class="cv-review-hist-line">CV quality: scoring…</div>');
+      bits.push('<div class="cv-review-hist-line">JD coverage: scoring…</div>');
     } else if (r.ai_error === 'no_jd') {
-      bits.push('<div class="cv-review-hist-line">CV quality: no job description on that opportunity.</div>');
+      bits.push('<div class="cv-review-hist-line">JD coverage: no job description on that opportunity.</div>');
     } else if (r.ai_error) {
-      bits.push('<div class="cv-review-hist-line">CV quality: could not be scored.</div>');
+      bits.push('<div class="cv-review-hist-line">JD coverage: could not be scored.</div>');
     }
     if (r.reasons?.length) {
       const labels = r.reasons.map(c => escapeHtml(reasonLabels[c] || c)).join(', ');

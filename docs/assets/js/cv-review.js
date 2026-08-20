@@ -71,6 +71,15 @@
     return `${count}/${total} · ${p}%`;
   }
 
+  // Los análisis guardados antes de la v7 dicen "the source": el prompt viejo se lo
+  // enseñaba al modelo. Esos reviews ya están decididos y nadie los va a re-correr, así
+  // que la palabra se traduce al mostrarla. La sustitución es SINGULAR a propósito: la
+  // frase guardada ya trae el verbo concordado en singular ("the source does not show"),
+  // y meterle "the originals" la dejaría mal escrita ("the originals does not show").
+  const SOURCE_RE = /\bthe source material\b|\bthe source\b/gi;
+  const deSource = (t) => String(t ?? '').replace(SOURCE_RE, m =>
+    (m[0] === 'T' ? "The" : "the") + " candidate's own CV or LinkedIn");
+
   let reasonLabels = {};
   let currentReview = null;
   let queueRows = [];
@@ -93,7 +102,7 @@
     $('cvrMetricsWindow').textContent =
       (meta.desde ? `${meta.desde} → ${meta.hasta}` : '')
       + (meta.sales_lead ? '  ·  your opportunities' : '')
-      + (meta.ai_version ? `  ·  rubric v${meta.ai_version}` : '');
+      + (meta.ai_version ? `  ·  scoring v${meta.ai_version}` : '');
 
     if (!rows.length) {
       box.innerHTML = '';
@@ -112,7 +121,7 @@
         foot.push(`${r.profiles_pending} still waiting on a decision — the rates only count what you decided.`);
       }
       if (r.stale_version_profiles) {
-        foot.push(`${r.stale_version_profiles} excluded from CV quality: scored by an older rubric version.`);
+        foot.push(`${r.stale_version_profiles} excluded: scored under the old rubric, which measured the writing instead of JD coverage.`);
       }
       if (r.unscored_profiles) {
         foot.push(`${r.unscored_profiles} have no AI score (no job description, or scoring failed).`);
@@ -126,7 +135,7 @@
         <div class="cvr-stats">
           <div class="cvr-stat">
             <span class="cvr-stat-v ${qCls(q)}">${q === null || q === undefined ? '—' : q}</span>
-            <span class="cvr-stat-l">CV quality${r.quality_n ? ` n=${r.quality_n}` : ''}</span>
+            <span class="cvr-stat-l">JD coverage${r.quality_n ? ` n=${r.quality_n}` : ''}</span>
           </div>
           <div class="cvr-stat">
             <span class="cvr-stat-v">${r.approved_first_try_pct === null ? '—' : r.approved_first_try_pct + '%'}</span>
@@ -250,17 +259,19 @@
   // simplemente que el candidato no encaja.
   const HL_KINDS = [
     { key: 'described', label: 'Backs a JD requirement',      bg: '#dcffab', ink: '#2f5c00', dot: '#a9e05a',
-      help: 'A role in the experience actually describes doing what the JD asked for — not just a tool sitting in a list.' },
+      help: 'A role in the experience actually describes doing what the JD asked for — not just a tool sitting in a list. It earns the full share of the score.' },
     { key: 'listed',    label: 'Only listed, not described',  bg: '#ffeeb8', ink: '#6b4a00', dot: '#f0c14b',
-      help: 'The requirement shows up somewhere in the CV, but no role tells the story of using it. A client reads these two very differently.' },
-    { key: 'hard',      label: 'Source does not support it',  bg: '#ffcdd8', ink: '#7a0c22', dot: '#e8637f',
-      help: 'The CV says something the source material (the original CV, LinkedIn) does not back up. This is the one to send back.' },
+      help: 'The requirement shows up somewhere in the CV, but no role tells the story of using it. Half the share: a client reads these two very differently.' },
+    { key: 'hard',      label: "The originals don't support it", bg: '#ffcdd8', ink: '#7a0c22', dot: '#e8637f',
+      help: "The CV says something the originals — the candidate's own CV and their LinkedIn — don't back up. This is the one to send back." },
     { key: 'soft',      label: 'Worth double-checking',       bg: '#ffe2c6', ink: '#7a3a00', dot: '#f0a45a',
-      help: 'Wording that may be stretching what the source says. Not necessarily wrong — worth a second look before it goes out.' },
+      help: 'Wording that may be stretching what the originals say. Not necessarily wrong — worth a second look before it goes out.' },
     { key: 'echo',      label: 'Copied from the JD',          bg: '#e3d8ff', ink: '#3b1e8f', dot: '#a48bff',
       help: 'Sentences lifted from the job posting. Aligning with the JD is good; reusing its wording means the client reads their own posting back as experience.' },
-    { key: 'crit',      label: 'Cited by the score',          bg: '#d3e6ff', ink: '#0a3a7a', dot: '#6fa8ff',
-      help: 'The phrase the AI used as evidence when scoring one of the rubric criteria below.' },
+    // Legacy: sólo aparece en análisis v≤9, que llevan la rúbrica adentro. hlRenderLegend
+    // esconde las categorías sin coincidencias, así que en un análisis nuevo el chip no sale.
+    { key: 'crit',      label: 'Cited by the old rubric',      bg: '#d3e6ff', ink: '#0a3a7a', dot: '#6fa8ff',
+      help: 'A phrase the old six-criteria rubric quoted as evidence. It only shows up on rounds scored before the score became JD coverage.' },
   ];
   const HL_NAME = (key) => `cvrhl-${key}`;
 
@@ -694,6 +705,13 @@
     // cuál de todas es la que está pintada de azul en el CV.
     const item = $('cvrAi').querySelector(`[data-hl="${id}"]`);
     if (item) {
+      // La cita puede vivir en una sección plegada. Sin abrirla, el pulso ocurriría en un
+      // elemento invisible y el chip de la leyenda parecería no hacer nada.
+      let d = item.closest('details');
+      while (d) {
+        d.open = true;
+        d = d.parentElement ? d.parentElement.closest('details') : null;
+      }
       item.classList.remove('is-flash');
       void item.offsetWidth;   // reinicia la animación si se vuelve a tocar la misma cita
       item.classList.add('is-flash');
@@ -756,7 +774,8 @@
     if (!a) {
       if (review.ai_error === 'no_jd') {
         return `<p class="cvr-ai-none">No score: opportunity #${review.opportunity_id} has no job
-          description, so scoring the CV against it would be meaningless. Add the JD, then re-run.</p>`;
+          description, and the score is the share of the JD's requirements this CV shows — with no
+          JD there is nothing to measure. Add the JD, then re-run.</p>`;
       }
       if (review.ai_error === 'budget') {
         return '<p class="cvr-ai-none">No score: the OpenAI budget for this month is exhausted.</p>';
@@ -766,6 +785,12 @@
     }
 
     const score = a._composite_score;
+
+    // Un análisis v≤9 se lleva la rúbrica adentro y hay que seguir dibujándola: la decisión
+    // que justificó ya se tomó, y el número no se puede recomputar sin gastar presupuesto
+    // de OpenAI y cambiarle el valor a algo que ya pasó. Se detecta por el DATO y no por
+    // _version: un blob a medio migrar tiene que caer en el camino nuevo, no en uno vacío.
+    const legacy = Array.isArray(a._rubric) && a._rubric.length > 0;
 
     // El desglose se dibuja desde el _rubric guardado con el análisis, no desde la
     // rúbrica actual: así una ronda vieja sigue mostrando con qué pesos se puntuó.
@@ -782,15 +807,59 @@
           <span class="cvr-crit-w">${rb.weight}</span>
         </div>
         <div class="cvr-crit-bar"><span style="width:${na ? 0 : Math.max(0, Math.min(100, c.score))}%"></span></div>
-        ${c.verdict ? `<p class="cvr-crit-note">${esc(c.verdict)}</p>` : ''}
+        ${c.verdict ? `<p class="cvr-crit-note">${esc(deSource(c.verdict))}</p>` : ''}
         ${c.evidence ? `<p class="cvr-crit-ev"${hlRegister('crit', c.evidence)}>“${esc(c.evidence)}”</p>` : ''}
       </div>`;
     }).join('');
 
+    // El criterio más flojo va en la línea del pliegue: es lo único del desglose que
+    // cambia una decisión, y así no hay que abrirlo para saber si vale la pena.
+    const scored = (a._rubric || [])
+      .map(rb => ({ rb, c: byKey[rb.key] || {} }))
+      .filter(x => !(x.c.not_applicable || x.c.score === null || x.c.score === undefined));
+    const weakest = scored.length
+      ? scored.reduce((m, x) => (x.c.score < m.c.score ? x : m))
+      : null;
+
+    // Las herramientas que la experiencia usa de verdad contra las que sólo están en la
+    // lista. NO mueve el número salvo el castigo único de no tener ninguna, y eso se dice
+    // adentro: un aviso que parece un error hace que la recruiter "arregle" lo que no está
+    // roto. El nombre de la herramienta NO se resalta en el CV — hlRegister rechaza texto
+    // de menos de 10 caracteres, y bajar ese piso haría que "Excel" matchee dentro de
+    // "Excellent". Lo que se resalta es el bullet que la describe, vía la evidencia del
+    // requisito, que sí es largo.
+    const tc = a._tools_check || {};
+    const toolsHtml = (tc.checked || 0) ? `
+      <p class="cvr-fold-lead">${tc.penalty
+        ? `<b>This one did move the score: &minus;${tc.penalty}.</b> Not one of the tools
+           in the list turns up in any role. `
+        : 'Nothing here moves the score. '}A tools list is free to write; what a client
+        believes is the role that describes using it. Some described is enough — the rest
+        is just worth knowing.</p>
+      <ul class="cvr-tool-chips">
+        ${(tc.described || []).map(t =>
+          `<li class="cvr-tool is-described" title="Some role describes using it.">${esc(t)}</li>`).join('')}
+        ${(tc.listed_only || []).map(t =>
+          `<li class="cvr-tool" title="This CV lists it, but no role describes using it.">${esc(t)}</li>`).join('')}
+      </ul>
+      ${(tc.listed_only_total || 0) > (tc.listed_only || []).length
+        ? `<p class="cvr-tally-off">…and ${tc.listed_only_total - tc.listed_only.length} more only listed.</p>`
+        : ''}` : '';
+
+    // Un pliegue. `open` sólo cuando lo de adentro puede cambiar la decisión ahora mismo.
+    const fold = (title, meta, body, open) => body ? `
+      <details class="cvr-fold"${open ? ' open' : ''}>
+        <summary>
+          <span class="cvr-fold-t">${title}</span>
+          ${meta ? `<span class="cvr-fold-m">${meta}</span>` : ''}
+        </summary>
+        <div class="cvr-fold-b">${body}</div>
+      </details>` : '';
+
     const claims = (list, kind, title) => list.length ? `
       <div class="cvr-find cvr-find--${kind}">
         <h5>${title}</h5>
-        <ul>${list.map(c => `<li><q${hlRegister(kind === 'hard' ? 'hard' : 'soft', c.cv_quote)}>${esc(c.cv_quote)}</q> ${esc(c.why || '')}</li>`).join('')}</ul>
+        <ul>${list.map(c => `<li><q${hlRegister(kind === 'hard' ? 'hard' : 'soft', c.cv_quote)}>${esc(c.cv_quote)}</q> ${esc(deSource(c.why))}</li>`).join('')}</ul>
       </div>` : '';
 
     const hard = (a.unsupported_claims || []).filter(c => c.severity === 'hard');
@@ -807,7 +876,7 @@
         <ul>${echo.map(e => `<li>
             <q${hlRegister('echo', e.cv_quote)}>${esc(e.cv_quote)}</q>
             ${e.jd_quote ? `<div class="cvr-echo-jd">JD: “${esc(e.jd_quote)}”</div>` : ''}
-            ${e.why ? esc(e.why) : ''}
+            ${e.why ? esc(deSource(e.why)) : ''}
           </li>`).join('')}</ul>
       </div>` : '';
 
@@ -818,51 +887,123 @@
     // El estado visual no es sólo el status: un requisito que falta porque el candidato no
     // lo tiene NO es un defecto del CV y no se pinta en rojo como si la recruiter hubiera
     // hecho algo mal. Lo que decide es el cruce con in_source.
+    // Dos ejes: qué muestra el CV (el badge) y si puntúa (la estructura — posición,
+    // gris y una etiqueta). No se cruzan en una matriz: saldrían doce etiquetas que nadie
+    // lee. `in_source` ya no cambia el badge; vive en la nota, que es donde dice si la
+    // recruiter puede cerrar el hueco.
+    const CREDIT = { described: 1, listed_only: 0.5, missing: 0 };
     const reqFace = r => {
-      if (r.status === 'described') return { cls: 'described', label: 'Described in the experience' };
-      if (r.in_source === 'no')     return { cls: 'fit',       label: "Not in the CV — not in the source either" };
-      if (r.status === 'listed_only') {
-        return { cls: 'listed_only',
-                 label: r.in_source === 'yes' ? 'Only listed — the source backs it up'
-                                              : 'Only listed — no role describes it' };
+      if (!r.counts) {
+        return r.assumed
+          ? { cls: 'nocount', label: "Doesn't count — taken for granted",
+              tag: 'taken for granted',
+              tip: 'Everyone in the running meets this, so counting it would flatter every '
+                 + 'candidate equally. It is listed because the client asked for it.' }
+          : { cls: 'nocount', label: "Doesn't count — soft skill", tag: 'soft skill',
+              tip: 'Soft skills are listed because the client asked for them, but they do '
+                 + 'not score: any CV can claim them.' };
       }
-      return { cls: 'missing',
-               label: r.in_source === 'yes' ? 'Missing — but the source has it'
-                                            : 'Not in the CV' };
+      if (r.status === 'described') {
+        return { cls: 'described', label: 'Described in the experience',
+                 tip: 'A role in the work experience describes actually doing this, with a '
+                    + 'quote to back it. Full credit.' };
+      }
+      if (r.status === 'listed_only') {
+        return { cls: 'listed_only', label: 'Only listed — no role describes it',
+                 tip: 'It is in the CV — a tool, a skill, the About — but no role tells the '
+                    + 'story of using it. Half credit: a client reads the two very '
+                    + 'differently.' };
+      }
+      return r.in_source === 'yes'
+        ? { cls: 'missing', label: 'Missing — the recruiter can add it',
+            tip: "The originals — the candidate's own CV or their LinkedIn — show this and "
+               + 'this CV leaves it out. No credit, and this one is on the recruiter.' }
+        : { cls: 'missing', label: 'Not in the CV',
+            tip: 'Nowhere in this CV. No credit. If the originals do not have it either, '
+               + 'nobody can close that gap without inventing experience.' };
     };
     const reqs = a.jd_requirements || [];
     const rs = a._requirements_summary || {};
-    const reqRow = r => {
+    const reqRow = (r, per) => {
       const f = reqFace(r);
       // "described" pinta verde en el CV; "only listed" ambar. Es la misma distincion que
       // hace el badge, dicha sobre el texto del CV en vez de sobre la fila del panel.
       const evKind = f.cls === 'described' ? 'described' : 'listed';
+      // El aporte por fila SÍ informa acá, porque el crédito es parcial: 1 / 0,5 / 0 son
+      // tres números distintos. Con crédito binario habría sido ruido.
+      const pts = r.counts && per
+        ? `<span class="cvr-req-pts${CREDIT[r.status] ? '' : ' is-zero'}"
+                 title="Cada uno de los requisitos que puntúan vale ${per} puntos.">+${
+             Math.round(per * CREDIT[r.status] * 10) / 10}</span>`
+        : '';
       return `
       <li class="cvr-req cvr-req--${f.cls}">
         <div class="cvr-req-main">
           <b>${esc(r.requirement)}</b>
-          ${r.kind === 'soft' ? '<i class="cvr-req-soft">soft skill</i>' : ''}
-          <span class="cvr-req-status">${esc(f.label)}</span>
+          ${f.tag ? `<i class="cvr-req-tag" title="${esc(f.tip)}">${esc(f.tag)}</i>` : ''}
+          <span class="cvr-req-status" title="${esc(f.tip)}">${esc(f.label)}</span>
+          ${pts}
         </div>
         ${r.evidence ? `<p class="cvr-req-ev"${hlRegister(evKind, r.evidence)}>“${esc(r.evidence)}”</p>` : ''}
-        ${r.note ? `<p class="cvr-req-note">${esc(r.note)}</p>` : ''}
+        ${r.note ? `<p class="cvr-req-note">${esc(deSource(r.note))}</p>` : ''}
       </li>`;
     };
+    // La lista ES el desglose. Antes había dos secciones diciendo lo mismo — ésta y un
+    // fold con las barras de la rúbrica; ahora los requisitos explican el número, así que
+    // se fusionan. Los que no puntúan van al fondo, en gris, PERO SE MUESTRAN SIEMPRE:
+    // esconderlos haría imposible notar que la regla de "se da por sentado" excluyó algo
+    // que sí debería contar.
+    const sd = a._score_detail || {};
+    const per = sd.points_per_requirement;
+    const firstOff = reqs.findIndex(r => !r.counts);
+    const sep = '<li class="cvr-req-sep"><span>Listed by the JD, not counted in the score</span></li>';
+    const rowsHtml = reqs.map((r, i) =>
+      (i === firstOff && firstOff > 0 ? sep : '') + reqRow(r, per)).join('');
+
+    const mathLine = sd.scorable ? `
+      <div class="cvr-tally">
+        <div class="cvr-tally-bar" role="img"
+             aria-label="${sd.earned} of ${sd.scorable} requirements shown">
+          <i style="width:${Math.max(0, Math.min(100, sd.base))}%"></i>
+        </div>
+        <p class="cvr-tally-line">
+          <b>${sd.earned}</b> of <b>${sd.scorable}</b> scoring requirements
+          &rarr; <b>${sd.base}</b>/100${sd.tools_penalty
+            ? ` &minus; <b>${sd.tools_penalty}</b> = <b>${score}</b>` : ''}.
+          Each one is worth ${per} points.
+        </p>
+        ${sd.excluded && sd.excluded.length ? `<p class="cvr-tally-off">Not counted:
+          ${sd.excluded.filter(x => x.reason === 'soft').length} soft ·
+          ${sd.excluded.filter(x => x.reason === 'assumed').length} taken for granted.</p>` : ''}
+      </div>` : '';
+
     const reqsHtml = reqs.length ? `
       <div class="cvr-reqs">
-        <h5>What the JD asked for
-          ${rs.technical ? `<span class="cvr-reqs-count">${rs.described || 0} described ·
-            ${rs.fixable_gaps || 0} the recruiter can fix ·
-            ${rs.fit_gaps || 0} the candidate doesn't have</span>` : ''}
-        </h5>
-        ${rs.incomplete ? `<p class="cvr-reqs-warn">⚠️ The job posting lists
-          ${rs.expected} requirements and only ${rs.listed} could be checked. Read the
-          posting for the rest.</p>` : ''}
-        <p class="cvr-reqs-lead">A tool in the skills list is not the same as a role that
-          describes using it. What counts against the CV is only what the source material
-          <b>does</b> support and the CV still doesn't show — the rest is the candidate not
-          being a fit, which is not something the recruiter can or should fix.</p>
-        <ul>${reqs.map(reqRow).join('')}</ul>
+        <h5>What the JD asked for <span class="cvr-reqs-count">this list <b>is</b> the score</span></h5>
+        ${rs.incomplete ? `<p class="cvr-reqs-warn">⚠️ The posting lists ${rs.expected}
+          requirements and only ${rs.listed} could be read, so this percentage is out of
+          ${rs.listed}, not ${rs.expected}. Treat it as provisional and re-run before you
+          use the number.</p>` : ''}
+        ${mathLine}
+        <details class="cvr-note cvr-note--inline">
+          <summary><i class="fa-regular fa-circle-question"></i> How this score is built</summary>
+          <div class="cvr-note-body">
+            <p>The score is one thing only: <b>the share of the JD's technical requirements
+              this CV shows</b>. Each one is worth the same. Describing it in a role earns
+              the full share, having it only in a list earns half, not having it earns
+              nothing. Nothing else moves the number — not the writing, not the length,
+              not the About.</p>
+            <p><b>Not counted:</b> soft skills, and what everyone is assumed to meet
+              ("Familiarity with Windows"). They are still listed, because the client asked
+              for them — they just cannot tell two candidates apart.</p>
+            <p>A low score is usually the <b>candidate</b>, not the recruiter, and the
+              badges say which. <b>The recruiter can add it</b> means the originals — the
+              candidate's own CV and their LinkedIn — show it and this CV left it out.
+              <b>Not in the CV</b> with nothing in the originals either means nobody can
+              close that gap without inventing experience.</p>
+          </div>
+        </details>
+        <ul>${rowsHtml}</ul>
       </div>` : '';
 
     // Agrupadas por sección: el modelo devuelve una entrada por arreglo, y tres seguidas
@@ -871,13 +1012,30 @@
     (a.fixes || []).forEach(f => {
       const name = String(f.section || 'The document').trim();
       const g = bySection.find(x => x.name.toLowerCase() === name.toLowerCase());
-      (g || bySection[bySection.push({ name, items: [] }) - 1]).items.push(f.fix || '');
+      (g || bySection[bySection.push({ name, items: [] }) - 1]).items.push(deSource(f.fix));
     });
     const fixes = bySection.map(g => `<li><b>${esc(g.name)}</b>${
       g.items.length === 1
         ? `: ${esc(g.items[0])}`
         : `<ul>${g.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
     }</li>`).join('');
+
+    // El panel se lee de arriba a abajo como una decisión, no como un informe:
+    //   1. cuánto vale   2. si cumple la JD (siempre abierto)   3. qué está mal escrito
+    //   4. qué pedirle a la recruiter   5. por qué salió ese número (referencia)
+    // Lo de abajo se pliega: ahí no hay nada que cambie un aprobado por un rechazo, y
+    // teniéndolo todo desplegado la lista de requisitos —lo que de verdad importa—
+    // quedaba enterrada en el medio de dos pantallas de texto.
+    const wordingCounts = [
+      hard.length ? `${hard.length} the originals don't support` : '',
+      echo.length ? `${echo.length} copied from the JD` : '',
+      soft.length ? `${soft.length} to double-check` : '',
+    ].filter(Boolean).join(' · ');
+
+    const wordingBody =
+      claims(hard, 'hard', "Claims the originals don't support")
+      + echoHtml
+      + claims(soft, 'soft', 'Softer wording to double-check');
 
     return `
       <div class="cvr-ai-top">
@@ -887,23 +1045,46 @@
         </div>
         <div class="cvr-ai-sum">
           ${a.verdict ? `<span class="cvr-verdict cvr-verdict--${esc(a.verdict)}">${esc(a.verdict.replace('_', ' '))}</span>` : ''}
-          <p>${esc(a.summary || '')}</p>
-          ${a._cap_reason ? `<p class="cvr-ai-cap">Capped: ${esc(a._cap_reason)} (would have been ${a._uncapped_score}).</p>` : ''}
-          ${a._alignment_floor_reason ? `<p class="cvr-ai-floor">${esc(a._alignment_floor_reason)}</p>` : ''}
-          ${a._partial ? '<p class="cvr-ai-cap">Partial: no job description, so JD alignment (30 of the weight) was skipped. Excluded from the recruiter average.</p>' : ''}
+          <p>${esc(deSource(a.summary))}</p>
+${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue mostrando
+       por qué su número es el que es, pero dice de dónde viene: si no, parecen reglas
+       vigentes y no lo son. */''}
+          ${a._cap_reason ? `<p class="cvr-ai-cap">Capped: ${esc(deSource(a._cap_reason))} (would have been ${a._uncapped_score}). <i>Old rubric — the originals no longer change the score.</i></p>` : ''}
+          ${a._alignment_floor_reason ? `<p class="cvr-ai-floor">${esc(deSource(a._alignment_floor_reason))} <i>Old rubric — the originals no longer change the score.</i></p>` : ''}
+          ${legacy ? `<p class="cvr-ai-legacy">This round was scored by the <b>old rubric</b>
+            — six weighted criteria about the writing, not JD coverage. It is not comparable
+            with newer rounds. Re-run the analysis to score it the new way.</p>` : ''}
+          ${a._partial && !legacy ? `<p class="cvr-ai-cap">${
+            a._score_basis === 'incomplete_requirements'
+              ? 'Provisional: not every requirement in the posting could be read, so this is a share of an incomplete list.'
+              : a._score_basis === 'no_scorable_requirements'
+                ? 'No score: this posting lists nothing technical to measure — only soft skills and things everyone is assumed to meet.'
+                : 'No score: no requirements could be read from this posting.'
+            } Excluded from the recruiter average.</p>` : ''}
+          ${a._partial && legacy ? '<p class="cvr-ai-cap">Partial: this round was scored by the old rubric with no job description, so 30 of its 100 points were skipped. Excluded from the recruiter average.</p>' : ''}
         </div>
       </div>
       ${reqsHtml}
-      ${claims(hard, 'hard', 'Claims the source material does not support')}
-      ${echoHtml}
-      ${claims(soft, 'soft', 'Softer wording to double-check')}
-      ${a.fit_note ? `<p class="cvr-note-block"><b>On the candidate's fit (not scored):</b> ${esc(a.fit_note)}</p>` : ''}
       ${!reqs.length && (a.jd_requirements_missed || []).length
         ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>`
         : ''}
-      ${fixes ? `<div class="cvr-fixes"><h5>What would make it better</h5><ul>${fixes}</ul></div>` : ''}
-      <div class="cvr-crits">${bars}</div>
-      <p class="cvr-ai-foot">The score is a hint, not a verdict. Read the CV before you decide.</p>`;
+
+      ${fold('Wording to check', wordingCounts, wordingBody ? `
+        <p class="cvr-fold-lead">None of this moves the score — the score only counts what
+          the JD asked for. These are flags for you: the honesty check is the one thing
+          worth stopping a CV for.</p>${wordingBody}` : '', hard.length > 0)}
+      ${fold('What would make it better', '', fixes ? `<div class="cvr-fixes"><ul>${fixes}</ul></div>` : '', true)}
+      ${fold('Tools: listed vs. described',
+             tc.checked ? `${(tc.described || []).length} of ${tc.checked} described` : '',
+             toolsHtml, false)}
+      ${legacy ? fold('How the old rubric scored this',
+             weakest ? `weakest: ${esc(weakest.rb.label)} (${weakest.c.score})` : '',
+             bars ? `<div class="cvr-crits">${bars}</div>` : '', false) : ''}
+
+      ${a.fit_note ? `<p class="cvr-note-block"><b>On the candidate's fit:</b> ${esc(deSource(a.fit_note))}</p>` : ''}
+      <p class="cvr-ai-foot">The score measures the match between this CV and this posting,
+        not how well the recruiter writes — a sharp, honest CV for a candidate who doesn't
+        fit will score low, and that is correct. Read the CV before you decide.</p>`;
   }
 
   function renderRounds(reviews) {
@@ -1207,6 +1388,15 @@
           currentReview.ai_error = null;
           $('cvrAi').innerHTML = aiPanelHtml(currentReview);
           hlSync();
+          // El backend devuelve el análisis guardado si nada cambió y hace menos de un
+          // minuto. Callarlo hace creer que la IA volvió a correr y dio el mismo número,
+          // que es exactamente la conclusión opuesta a la verdadera.
+          const note = $('cvrRerunNote');
+          note.textContent = out.cached
+            ? 'Nothing was re-run: same CV, same job description, and it was scored less '
+              + 'than a minute ago — this is the stored result. Wait a moment and try again.'
+            : '';
+          show(note, !!out.cached);
           refresh();
         })
         .catch(err => { $('cvrDrawerError').textContent = err.message; })

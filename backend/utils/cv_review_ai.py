@@ -1,20 +1,26 @@
 """Score de calidad AI para el CV client-facing que armó una recruiter.
 
-Juzga el DOCUMENTO, no al candidato: ¿es un documento de venta bien apuntado, bien
-evidenciado y honesto para ESTA vacante? Tres entradas — la JD, el CV de Vintti, y el
-material fuente del que se supone que se armó — porque las dos preguntas que valen son
-"¿la recruiter sacó a la superficie lo que el material fuente ya tenía?" y "¿inventó
-algo?".
+El score es UNA cosa: la porción de los requisitos técnicos de la JD que el CV muestra. Los
+requisitos ya se extraían y ya se mostraban en pantalla; ahora además son el número. Cada
+requisito que puntúa se lleva una parte igual de 100 — describirlo en la experiencia vale la
+parte entera, tenerlo sólo listado la mitad, no tenerlo cero. No puntúan las soft skills ni
+lo que cualquier profesional da por sentado ("Familiarity with Windows"). El único ajuste
+extra es -10 cuando la experiencia no nombra NI UNA de las herramientas listadas.
 
-Misma forma que backend/routes/hirex_ai_routes.py: el modelo puntúa cada criterio,
-NOSOTROS hacemos la aritmética, y la rúbrica se snapshotea dentro del análisis para que
-las filas viejas sigan renderizando después de cambiar los pesos.
+La virtud del diseño es que se puede auditar a mano: se abre la JD, se cuentan los
+requisitos y se comprueba el número. Ver el changelog de ANALYSIS_VERSION para por qué se
+llegó acá — la rúbrica de seis criterios que había antes castigaba al candidato en vez de al
+documento, y no se pudo arreglar por prompt en tres intentos.
 
-Diferencia deliberada con el juez de Hirex: ahí las entradas son dos (JD, CV) y la
-pregunta es si el candidato sirve. Acá son tres y lo que importa es la DIFERENCIA entre
-el CV y el material fuente. Si el candidato simplemente no encaja con la JD, eso NO es
-un defecto del CV: se reporta en `fit_note` y no baja ningún score. Un CV corto, honesto
-y filoso de un candidato flojo es un BUEN CV.
+El modelo REPORTA (transcribe los requisitos, decide el status de cada uno con una cita
+verbatim, marca invenciones y eco de la JD). La aritmética es NUESTRA: mismas entradas,
+mismo número, y explicable renglón por renglón en pantalla. Las reglas que clasifican
+—técnico/soft, y qué se da por sentado— también son nuestras y determinísticas, porque
+preguntándoselas al modelo contestaba distinto entre corridas.
+
+El material fuente (el CV propio del candidato, su LinkedIn) NO puntúa nada. Se lee sólo
+para avisar de lo que el CV afirma sin respaldo y para que los "fixes" no pidan inventar.
+Que el candidato no encaje con la vacante no es un defecto del CV: se dice en `fit_note`.
 """
 from __future__ import annotations
 
@@ -34,7 +40,30 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
-ANALYSIS_VERSION = 6
+# 10: se sacó la rúbrica entera. Tres versiones seguidas intentando que seis criterios
+# dejaran de castigar el fit del candidato, y el mejor resultado fue 61 sobre un CV que la
+# owner puntúa 9/10. El instrumento estaba mal, no la calibración: ahora el score ES la
+# checklist de requisitos de la JD, que ya se extraía y ya se mostraba. Los técnicos que no
+# se dan por sentado se reparten 100; describir en la experiencia vale el punto, estar sólo
+# listado la mitad, faltar cero. Único ajuste extra: -10 si la experiencia no nombra NI UNA
+# de las herramientas listadas. Se puede verificar a mano abriendo la JD y contando.
+# 9: el fit del candidato se estaba colando en CUATRO criterios, no en uno. Con la v8,
+# el CV de una estudiante de ing. química para una vacante de QA sacaba 40/50/60/45 con
+# veredictos que decían todos lo mismo — "no es QA Analyst" — incluso en "evidence_depth",
+# donde un bullet impecable ("conducted quality control of printed parts and adjusted
+# printing parameters to enhance precision and repeatability") sacó 50 por no ser QA.
+# Eran 80 de los 100 puntos de peso castigando algo que la recruiter no controla. Arreglar
+# la banda de un criterio no alcanzaba: hacía falta una regla por encima de todos.
+# 8: "jd_alignment" mide APUNTADO, no cobertura. Con la v7 un CV impecable para un
+# candidato que no da el perfil sacaba 23 en ese criterio — 30 de los 100 puntos — porque
+# el modelo contaba cuántos requisitos de la JD cubría, y eso es una propiedad del
+# CANDIDATO, no del documento que escribió la recruiter. La cobertura ya se ve entera en
+# "What the JD asked for"; el score no tiene que contarla dos veces.
+# 7: el material fuente dejó de puntuar. Se califica SÓLO el CV que arma la recruiter,
+# que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
+# el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
+# capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
+ANALYSIS_VERSION = 10
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -54,33 +83,16 @@ REJECT_REASONS: List[Tuple[str, str]] = [
 ]
 REJECT_REASON_CODES = {code for code, _ in REJECT_REASONS}
 
-# `completeness` lo calculamos nosotros: es 100 % computable desde el snapshot, así que
-# gastar tokens y varianza del modelo en eso sería desperdicio y dejaría 10 de los 100
-# puntos de peso sin poder auditar.
-RUBRIC: List[Tuple[str, str, int]] = [
-    ("jd_alignment", "Alignment with the JD", 30),
-    ("evidence_depth", "Evidence & specificity", 20),
-    ("relevance_order", "Relevance & ordering", 15),
-    ("about_pitch", "The About pitch", 15),
-    ("writing_quality", "English & writing quality", 10),
-    ("completeness", "Completeness of the document", 10),
-]
-RUBRIC_WEIGHTS = {k: w for k, _, w in RUBRIC}
-COMPUTED_KEY = "completeness"
-MODEL_CRITERIA = [(k, label, w) for k, label, w in RUBRIC if k != COMPUTED_KEY]
-MODEL_CRITERIA_KEYS = {k for k, _, _ in MODEL_CRITERIA}
-
-# Tope por invención. Una rúbrica compensatoria le da 78 a un CV con un empleador
-# inventado porque la prosa es linda — el mismo modo de falla que el FIT_GATE de
-# hirex_ai_routes.py existe para frenar. Graduado, no binario, y siempre recuperable:
-# guardamos _uncapped_score para poder recomputar el período entero sin el tope si
-# resulta que dispara con falsos positivos.
-FABRICATION_CAP_BASE = 55
-FABRICATION_CAP_STEP = 10
-FABRICATION_CAP_FLOOR = 25
-# Sin material fuente no hay nada contra qué chequear. Sin esta guarda, todo CV armado a
-# partir de un transcript de llamada se capea y la métrica colapsa sobre el tope.
+# Sin material fuente no hay nada contra qué chequear la honestidad del CV. Se sigue
+# distinguiendo "chequeado y limpio" de "no se pudo chequear": una lista de invenciones
+# vacía significa cosas muy distintas en cada caso, y el panel lo dice.
+# (v7: el chequeo ya no capea el score. Es un aviso para el reviewer, nada más.)
 MIN_SOURCE_CHARS_FOR_FABRICATION_CHECK = 500
+
+# Castigo único cuando la experiencia no nombra NI UNA de las herramientas listadas. No es
+# por herramienta: con que algunas estén descritas alcanza (decisión de la owner). Que no
+# haya ninguna es otra cosa — es una lista de tools que ningún rol respalda.
+TOOLS_NONE_PENALTY = 10
 
 ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these keys and shapes:
 {
@@ -90,15 +102,6 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
   "summary": string,                    // 2-3 sentences on the DOCUMENT's quality
   "verdict": "ready" | "needs_work" | "not_sendable",
   "verdict_reason": string,
-  "criteria": [                         // EXACTLY one object per rubric key given to you
-    {
-      "key": "jd_alignment" | "evidence_depth" | "relevance_order" | "about_pitch" | "writing_quality",
-      "score": integer,                 // 0-100 for THIS criterion only
-      "not_applicable": boolean,        // true ONLY when the inputs give no signal at all
-      "evidence": string,               // SHORT verbatim quote from THE VINTTI CV, or "Not found in the CV"
-      "verdict": string                 // one short line
-    }
-  ],
   "fixes": [ { "section": string, "problem": string, "fix": string } ],   // 0-6, highest impact first
                                         // ONLY things the recruiter can actually do with the
                                         // source material at hand. Never "add X" when the
@@ -109,7 +112,7 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
       "cv_quote": string,               // SHORT verbatim quote from THE VINTTI CV
       "claim_type": "employer" | "title" | "dates" | "degree" | "certification" | "metric" | "tool" | "other",
       "severity": "hard" | "soft",      // see FABRICATION CHECK
-      "why": string                     // one line: what the source material says instead
+      "why": string                     // one line: what her own CV / LinkedIn says instead
     }
   ],
   "jd_echo": [                          // see JD ECHO — a warning, never scored
@@ -146,8 +149,8 @@ JD ECHO — the CV borrowing the job description's WORDING instead of its substa
     -> ECHO: the CV is the JD line with the verbs conjugated.
 - A few shared words are fine. A shared clause is not. If you would have to quote most of
   a JD line to show the overlap, it is an echo.
-- "why" says what the honest version would be: point at what the SOURCE MATERIAL says this
-  candidate actually did, or say the source shows nothing and the bullet should go.
+- "why" says what the honest version would be: point at what her own CV or her LinkedIn
+  says this candidate actually did, or say neither shows anything and the bullet should go.
 - This is a WARNING for the reviewer, not an accusation of fabrication. Do NOT also list
   these in "unsupported_claims" — echo and invention are different problems and double
   reporting makes both harder to act on.
@@ -220,32 +223,28 @@ the Vintti CV:
 - "no": the source shows nothing supporting it. The person appears not to have it.
 - "unclear": the source is ambiguous or too thin to tell.
 
-This single field is what separates the two completely different problems below, and
-getting it right matters more than any score you produce:
-- status "missing" or "listed_only" WITH in_source "yes" is a DEFECT OF THE CV. The
-  recruiter had the material and did not put it in. This is what "jd_alignment" measures,
-  and it is what should lower the score.
-- status "missing" WITH in_source "no" is NOT a defect of the CV at all. The candidate
-  simply does not have it. A CV cannot show experience the person never had, and inventing
-  it is the worst thing the recruiter could do. This belongs in "fit_note". It must NOT
-  lower "jd_alignment" and it must NOT produce a "fixes" entry — telling a recruiter to
-  "add influencer campaign examples" when the source has none is telling them to make
-  something up.
-
-So: if every requirement the source DOES support is already surfaced in the CV, the CV did
-its job and "jd_alignment" should be high, even when most of the checklist is "missing".
-A short honest CV for a candidate who is not a fit is a GOOD CV.
+"in_source" DOES NOT AFFECT ANY SCORE. Every number you return is about the Vintti CV
+alone, judged against the JD. This field exists only so the reviewer knows what to DO with
+a gap, and so "fixes" never asks for something that would have to be invented:
+- status "missing" or "listed_only" WITH in_source "yes": the recruiter had the material
+  and did not put it in. Say where it sits so she can add it. This is worth a "fixes" entry.
+- status "missing" WITH in_source "no": the candidate simply does not have it. A CV cannot
+  show experience the person never had, and inventing it is the worst thing the recruiter
+  could do. Put the observation in "fit_note". It must NOT produce a "fixes" entry —
+  telling a recruiter to "add influencer campaign examples" when the source has none is
+  telling her to make something up.
 
 THE "note", one line, and make it actionable:
-- "listed_only" is the important case. Say whether THE SOURCE MATERIAL shows this person
-  using it: if it does, name the role where it belongs so the recruiter can describe it
-  honestly ("the source shows this in the Accenture role — the bullet should say so"). If
-  the source shows nothing, say so plainly ("the source never mentions it; the tools list
-  may be overstating"). NEVER suggest inventing the experience.
-- "missing" with in_source "yes": this is the costly one. Name where in the source it
-  sits, so the recruiter can add it.
-- "missing" with in_source "no": say plainly that the source has nothing either, so the
-  reviewer reads it as a fit fact and not as something the recruiter should fix.
+- "listed_only" is the important case. Say whether the material she worked from shows this
+  person using it: if it does, name the role where it belongs so the recruiter can describe
+  it honestly ("her own CV shows this in the Accenture role — the bullet should say so").
+  If nothing shows it, say so plainly ("neither her own CV nor her LinkedIn mentions it;
+  the tools list may be overstating"). NEVER suggest inventing the experience.
+- "missing" with in_source "yes": this is the costly one. Name where it sits — "her
+  LinkedIn lists it under the Accenture role" — so the recruiter can add it.
+- "missing" with in_source "no": say plainly that her own CV and her LinkedIn have nothing
+  either, so the reviewer reads it as a fit fact and not as something the recruiter should
+  fix.
 - "described": leave "" or one short line. Do not pad.
 
 HONESTY: "described" requires a real quote from the CV's work experience. If you cannot
@@ -269,81 +268,65 @@ to their essence — never your description of them.
 - Never return an empty "jd_requirements" when a job description was supplied: a JD always
   states requirements, so an empty checklist means you did not do the work. Return [] only
   when there is no job description at all.
-- Your "jd_alignment" score must agree with this checklist. Mostly "described" cannot sit
-  next to a 40, and a wall of "missing" cannot sit next to a 90.
+- THIS CHECKLIST IS THE SCORE. There is no other input to the number: we take the
+  technical requirements, give each an equal share of 100, and award the full share for
+  "described", half for "listed_only" and none for "missing". Nothing else you return moves
+  it. That means two things, and both are on you:
+    * Generosity is not kindness. A "described" you awarded without a real quote from the
+      work experience inflates a number a human uses to decide.
+    * Severity is not rigour. Marking something "missing" that the CV does show takes points
+      off a recruiter who did her job.
+  Read each requirement against the CV and answer what is actually there. Nothing else.
 - Same rule for "note", "fit_note" and every "verdict": name the actual thing, never the shape of
-  the problem. Write "no influencer or community-management work anywhere in the source,
-  and no beauty-brand clients", NOT "does not fully align with the specific requirements".
+  the problem. Write "no influencer or community-management work anywhere in her own CV
+  or her LinkedIn, and no beauty-brand clients", NOT "does not fully align with the
+  specific requirements".
   A sentence that would read identically for a different candidate and a different job is
   a wasted sentence.
 
-WHAT YOU ARE JUDGING:
-- You are judging a DOCUMENT a Vintti recruiter wrote about a candidate. The question is
-  "is this a well-made, honest, well-targeted sales document for this opening?", never
-  "should we hire this person?".
-- If the candidate is simply not a fit for the JD, that is NOT a defect of the CV. Say it
-  once in "fit_note" and do not let it lower a single score. A truthful, sharply written
-  CV for a weak candidate is a GOOD CV.
+WHAT YOU ARE REPORTING:
+- You are reading a DOCUMENT a Vintti recruiter wrote about a candidate, and reporting what
+  it does and does not show against this opening. You are not deciding whether to hire
+  anyone, and you are not grading the writing.
+- The checklist is allowed to come out badly. If the candidate is not a fit, most of it will
+  be "missing" and the number will be low — that is the checklist working, not a verdict on
+  the recruiter. Say the fit observation once in "fit_note" and move on.
 - Never reward length. A short CV that lands every relevant fact beats a long one that
   buries it.
 
-HOW TO SCORE EACH CRITERION (use the whole 0-100 range; do NOT default to 70-85):
-- "jd_alignment" — does the CV SURFACE the JD-relevant experience that THE SOURCE
-  MATERIAL actually contains? You are scoring the gap between what the source proves and
-  what the CV chose to show — never the gap between the candidate and the JD.
-    0-20   : JD-relevant facts sit in the source and the CV never mentions them.
-    21-45  : some surfaced; the most important ones missing or buried at the bottom.
-    46-70  : the main ones are present but phrased generically.
-    71-90  : every JD priority is visibly addressed in the CV's own words.
-    91-100 : the CV reads as if written line by line for this JD.
-  If NO job description was supplied, set "not_applicable": true. Do NOT guess from a job
-  title alone.
-- "evidence_depth" — do the bullets carry specifics (scope, tools, volumes, outcomes)
-  that exist in the source, or are they duty lists? "Responsible for reporting" is a 20.
-  "Owned the weekly close for 3 entities in NetSuite" is an 85.
-- "relevance_order" — is the most JD-relevant material first, both across the document
-  and inside each role? Reverse-chronological order by itself is not a 90.
-- "about_pitch" — does the About paragraph position THIS person for THIS role in 3-5
-  lines, in concrete terms? Adjective soup ("dynamic, results-driven professional")
-  scores below 30 however fluent it reads.
-- "writing_quality" — English a US hiring manager reads as native-professional: tense
-  consistency, no Spanish calques, nothing left untranslated, consistent capitalisation
-  and date formats, no truncated sentences.
+THE CANDIDATE IS NOT ON TRIAL:
+You will often be handed a CV for someone who is plainly not a fit for this opening. The
+checklist will say so on its own — that is what it is for. What must NOT happen is that the
+fit leaks into the prose you write.
 
-FABRICATION CHECK — the most important thing you do here:
-- Compare every concrete claim in THE VINTTI CV against THE SOURCE MATERIAL and list in
-  "unsupported_claims" anything the source does not support.
-- "severity": "hard" ONLY when the underlying FACT is absent from the source altogether or
-  contradicts it — an employer, job title, degree, certification or metric that simply
-  isn't there, or a date that puts the candidate somewhere the source says they were not.
-  Everything else is "soft".
-- "hard" is a serious accusation: it means "the recruiter invented this". Do not spend it
-  on precision. These are ALL "soft", never "hard":
-    * the CV states a month or day where the source only gave a year, or vice versa
-      (source "2025, ongoing" -> CV "2025-01-01 to Present" is SOFT: same fact, more
-      precise formatting, and our own generator fills dates in this shape)
-    * a rounded or approximate figure the source supports
-    * a job title reworded into its common English equivalent
-    * a reasonable summary or inference from something the source does say
-- Do NOT flag a claim merely because it is phrased differently from the source. Flag it
-  only when the underlying FACT is absent or contradicted.
-- When you hesitate between "hard" and "soft", choose "soft". A wrong "hard" caps the
-  score and sends the recruiter hunting for a fabrication that isn't there.
-- Every entry needs a "cv_quote" copied VERBATIM from the CV. No quote, no entry.
-- Return [] when everything checks out. An empty list is a normal, good answer.
+THE TEST, apply it to every line of "summary", "verdict_reason", "note" and "fixes": could
+this complaint only be fixed by the candidate having had a different career? Then it is not
+a defect of the document. Say it once in "fit_note" and nowhere else. A short, honest CV for
+a candidate who is not a fit is a WELL-MADE CV that happens to score low, and those are two
+different sentences.
+
+WORDING OF EVERYTHING A HUMAN READS ("summary", "verdict_reason", "note", "why",
+"fit_note", every criterion "verdict"): NEVER use the words "the source", "the source
+material" or "the material". Nobody reading the screen knows what those mean, and the
+reviewer reads them as the CV in front of him. Name the actual document every time:
+"her own CV", "her LinkedIn", "her own CV and her LinkedIn". When you mean the Vintti CV
+being reviewed, call it "the CV" or "this CV" — never anything else.
 
 HARD RULES:
-- EVERY "evidence" must be a SHORT VERBATIM quote from THE VINTTI CV. If you cannot find
-  a real quote for a criterion, write "Not found in the CV" and lower that score.
-- Return EXACTLY one "criteria" entry per key listed above: no extras, none missing.
-- Do NOT return a total, an average or an overall score. We compute the composite.
-- Be strict and consistent: identical inputs must yield identical scores."""
+- EVERY "evidence" must be a SHORT VERBATIM quote from THE VINTTI CV, copied character for
+  character. We verify it against the CV: a quote we cannot find downgrades your
+  "described" to "listed_only" automatically, so inventing one costs the recruiter points.
+- Do NOT return a total, an average or an overall score of any kind. We compute the number
+  from your checklist.
+- Be strict and consistent: identical inputs must yield identical checklists."""
 
 SYSTEM_PROMPT = (
     "You are a demanding Vintti sales lead reviewing a client-facing CV a recruiter wrote, "
-    "before it goes to the client. You judge the DOCUMENT — its targeting, its evidence, its "
-    "English and its honesty against the source material — never whether the candidate "
-    "deserves the job. " + ANALYSIS_SCHEMA_HINT
+    "before it goes to the client. You RETURN NO SCORE: you produce a requirement-by-"
+    "requirement checklist of what this CV shows against this job description, and we "
+    "compute the number from it. You still READ the source, but only to flag "
+    "sentences it does not support and to keep your suggestions from asking anyone to "
+    "invent. Those flags do not move the score. " + ANALYSIS_SCHEMA_HINT
 )
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -484,92 +467,6 @@ def build_source_text(candidate_row: Dict[str, Any]) -> str:
     if str(linkedin).strip():
         blocks.append("--- LINKEDIN PROFILE ---\n" + _strip_html(linkedin))
     return "\n\n".join(blocks)[:SOURCE_TEXT_LIMIT]
-
-
-# --- completeness: determinista, calculado por nosotros ---------------------
-
-def completeness_score(snapshot: Dict[str, Any]) -> Tuple[int, List[Dict[str, Any]]]:
-    work = _as_list(snapshot.get("work_experience"))
-    education = _as_list(snapshot.get("education"))
-    tools = _as_list(snapshot.get("tools"))
-    languages = _as_list(snapshot.get("languages"))
-    about = _strip_html(snapshot.get("about"))
-
-    checks = [
-        ("about", "About of at least 250 characters", 20, len(about) >= 250),
-        ("work_entries", "At least 2 work experience entries", 20, len(work) >= 2),
-        ("work_fields", "Every role has company, title and start date", 15,
-         bool(work) and all(e.get("company") and e.get("title") and e.get("start_date") for e in work)),
-        ("work_bullets", "Every role has at least 2 bullets", 15,
-         bool(work) and all(len(_bullets(e.get("description"))) >= 2 for e in work)),
-        ("education", "At least one education entry", 10, len(education) >= 1),
-        ("tools", "At least 5 tools", 10, len(tools) >= 5),
-        ("languages", "At least one language with a level", 5,
-         any(l.get("language") and l.get("level") for l in languages)),
-        ("video", "Video link present", 5, bool(_strip_html(snapshot.get("video_link")))),
-    ]
-    score = sum(weight for _, _, weight, ok in checks if ok)
-    detail = [{"key": k, "label": label, "weight": w, "ok": bool(ok)} for k, label, w, ok in checks]
-    return score, detail
-
-
-# --- composite --------------------------------------------------------------
-
-def weighted_score(criteria: Any, weights: Dict[str, int]) -> Optional[int]:
-    """Composite determinista a partir de los scores por criterio del modelo.
-
-    La aritmética es NUESTRA, no del modelo, así las mismas entradas dan siempre el mismo
-    número y se puede explicar. Los criterios que las entradas nunca tocaron se caen de
-    los DOS lados del promedio en vez de contar como 0.
-    """
-    total_w, acc = 0, 0
-    for c in criteria or []:
-        key = c.get("key")
-        if key not in weights or c.get("not_applicable"):
-            continue
-        try:
-            s = max(0, min(100, int(round(float(c.get("score"))))))
-        except (TypeError, ValueError):
-            continue
-        w = weights[key]
-        total_w += w
-        acc += s * w
-    return int(round(acc / total_w)) if total_w else None
-
-
-def _align_criteria(raw: Any) -> List[Dict[str, Any]]:
-    """Fuerza exactamente un item por criterio del modelo. Lo que no se pueda ubicar
-    queda `not_applicable`, nunca en 0: un criterio faltante mostrado como 0 sería un bug
-    de correctitud, no cosmético."""
-    by_key: Dict[str, Dict[str, Any]] = {}
-    for item in raw or []:
-        if not isinstance(item, dict):
-            continue
-        key = str(item.get("key") or "").strip()
-        if key not in MODEL_CRITERIA_KEYS or key in by_key:
-            continue  # desconocido, o duplicado — se queda el primero
-        try:
-            score = max(0, min(100, int(round(float(item.get("score"))))))
-        except (TypeError, ValueError):
-            score = None
-        by_key[key] = {
-            "key": key,
-            "score": score,
-            "not_applicable": bool(item.get("not_applicable")) or score is None,
-            "evidence": str(item.get("evidence") or "").strip(),
-            "verdict": str(item.get("verdict") or "").strip(),
-        }
-
-    out = []
-    for key, _label, _w in MODEL_CRITERIA:
-        out.append(by_key.get(key, {
-            "key": key,
-            "score": None,
-            "not_applicable": True,
-            "evidence": "",
-            "verdict": "The model did not return a verdict for this criterion.",
-        }))
-    return out
 
 
 # Muletillas del modelo cuando no quiere comprometerse: describen la JD en vez de citar un
@@ -733,6 +630,40 @@ _REQ_SOFT = re.compile(r"""
 """, re.I | re.X)
 
 
+# Requisitos que cualquier profesional da por sentado. NO puntúan y NO entran al
+# denominador: castigar un CV por no dedicarle un bullet a "Windows" es castigar a la
+# recruiter por no escribir una obviedad. Se siguen mostrando, en gris.
+#
+# Determinista y no del modelo, por la misma razón que `classify_requirement` (ver abajo),
+# pero el argumento es MÁS fuerte acá: un flip de esta regla no mueve un contador del
+# encabezado, mueve el número que se guarda en `cv_reviews.ai_score`, que es con lo que se
+# evalúa gente. Y como el análisis se cachea por fingerprint, el número que quede guardado
+# dependería de en qué corrida cayó.
+#
+# La lista es CORTA a propósito. Un falso negativo (algo obvio que igual puntúa) baja el
+# score y se nota; un falso positivo (algo real que se cae del denominador) lo SUBE en
+# silencio, que es el error caro. Ante la duda, no está en la lista.
+#
+# Microsoft Office NO está acá y no debe estarlo: "Excel avanzado" es un requisito real que
+# discrimina de verdad entre candidatos. El sistema operativo es el sustrato; la suite es
+# una herramienta con la que se produce trabajo.
+_REQ_ASSUMED = re.compile(r"""
+    \b(?:microsoft\s+)?windows\b(?!\s*(?:server|azure|nt\b|ad\b|active\s+directory|admin))
+  | \bmac\s?os\b | \bmacintosh\b | \bos\s*x\b
+  | \bcomputer\s+(?:literac\w+|proficiency|skills|knowledge)\b
+  | \bbasic\s+(?:computer|it|pc|technical)\s+(?:skills|knowledge|literacy)\b
+  | \btech(?:nologically)?[-\s]?savv\w+\b
+  | \bcomfortable\s+(?:using|with)\s+(?:a\s+)?computers?\b
+  | \binternet\s+(?:navigation|browsing)\b
+  | \b(?:e-?mail|browser)\s+(?:use|usage|literacy|navigation)\b
+""", re.I | re.X)
+
+
+def is_assumed_requirement(text: str) -> bool:
+    """Lo que cualquier profesional da por sentado. Mismo texto -> misma respuesta."""
+    return bool(_REQ_ASSUMED.search(str(text or "")))
+
+
 def classify_requirement(text: str) -> str:
     """técnico o soft, por reglas nuestras. Mismo texto -> misma respuesta, siempre."""
     t = str(text or "")
@@ -743,7 +674,22 @@ def classify_requirement(text: str) -> str:
     return "technical"
 
 
-def _clean_requirements(raw: Any, jd_text: Any = None) -> List[Dict[str, Any]]:
+def _quote_in_cv(quote: str, cv_norm: str) -> bool:
+    """¿La cita existe de verdad en el CV?
+
+    Antes de v10 una "described" con una cita inventada sólo ensuciaba la pantalla. Ahora
+    vale el punto entero de un requisito, así que se verifica. Misma escalera de prefijos que
+    `_is_after_cut` y por el mismo motivo: el modelo recorta y reformula los finales, así que
+    exigir la frase completa daría falsos negativos.
+    """
+    q = _norm_for_match(quote)
+    if len(q) < 12:
+        return False
+    return any(q[:n] in cv_norm for n in (40, 20, 12) if len(q) >= n or n == 12)
+
+
+def _clean_requirements(raw: Any, jd_text: Any = None,
+                        cv_text: Any = None) -> List[Dict[str, Any]]:
     """Cobertura requisito por requisito. Es el campo que el reviewer lee primero.
 
     Los técnicos van antes que los soft porque son los que decide el reviewer; dentro de
@@ -757,6 +703,7 @@ def _clean_requirements(raw: Any, jd_text: Any = None) -> List[Dict[str, Any]]:
     jd_norm = _norm_for_match(jd_text)
     cut = optional_section_start(jd_norm) if jd_norm else None
 
+    cv_norm = _norm_for_match(cv_text) if cv_text else ""
     out: List[Dict[str, Any]] = []
     dropped = 0
     for item in raw or []:
@@ -784,20 +731,37 @@ def _clean_requirements(raw: Any, jd_text: Any = None) -> List[Dict[str, Any]]:
             status = "listed_only"
         if status == "missing":
             evidence = ""
+        # La cita ES la evidencia: sin una que exista en el CV, esto no es "described".
+        if status == "described" and cv_norm and not _quote_in_cv(evidence, cv_norm):
+            logging.warning("cv_review: 'described' con una cita que no está en el CV: %r",
+                            evidence)
+            status = "listed_only"
         kind_model = str(item.get("kind") or "").strip().lower()
         in_source = str(item.get("in_source") or "").strip().lower()
         if in_source not in ("yes", "no", "unclear"):
             in_source = "unclear"
+        kind = classify_requirement(text)
+        assumed = is_assumed_requirement(text)
         out.append({
             "requirement": text,
-            "kind": classify_requirement(text),
+            "kind": kind,
             # Lo que dijo el modelo, sólo para poder auditar la regla contra su criterio.
             "kind_model": "soft" if kind_model == "soft" else "technical",
+            # Eje aparte de `kind`, no un tercer valor: "Windows" ES técnico, lo que pasa es
+            # que no puntúa. Un tercer valor rompería en silencio los dos lugares del panel
+            # que chequean `kind === 'soft'` y `summary.technical`.
+            "assumed": assumed,
+            # La política de qué puntúa vive acá y en ningún otro lado. El frontend ramifica
+            # por `counts`, nunca la re-deriva: son dos copias que se desincronizan.
+            "counts": kind == "technical" and not assumed,
             "status": status,
             "in_source": in_source,
             "evidence": evidence,
             "note": str(item.get("note") or "").strip(),
         })
+        if assumed:
+            # La lista se hace crecer con datos de producción, no adivinando.
+            logging.info("cv_review: requisito dado por sentado, no puntúa: %r", text)
 
     # dedupe conservando el orden: el modelo a veces repite el mismo requisito
     seen, deduped = set(), []
@@ -810,20 +774,141 @@ def _clean_requirements(raw: Any, jd_text: Any = None) -> List[Dict[str, Any]]:
 
     if dropped:
         logging.info("cv_review: %s deseables descartados (no son requisitos)", dropped)
-    deduped.sort(key=lambda r: 0 if r["kind"] == "technical" else 1)
+    # Tres grupos: lo que puntúa arriba, las soft en el medio, lo que se da por sentado al
+    # fondo. `sort` es estable, así que dentro de cada grupo se respeta el orden de la JD —
+    # que es como el reviewer la lee, bullet por bullet contra la vacante.
+    deduped.sort(key=lambda r: 0 if r["counts"] else (1 if r["kind"] == "soft" else 2))
     return deduped
 
 
+# --- tools: ¿la experiencia las usa, o sólo están en la lista? --------------------------
+# Una lista de herramientas es gratis de escribir; lo que un cliente cree es el rol que
+# describe usándola. Esto lo cruzamos NOSOTROS y no el modelo: es una operación de strings
+# sobre datos que ya tenemos en memoria, y pedírsela sería pagar tokens y varianza por un
+# re.search. Además el modelo ya emite una versión de este juicio en status="listed_only", y
+# dos campos que tienen que coincidir son un campo que se contradice.
+
+# Herramientas sobre las que nadie escribe un bullet, y sobre las que nadie debería. Mismo
+# espíritu que _REQ_ASSUMED y misma disciplina: corta. Excel NO está — por la misma razón
+# por la que Office no es "assumed": es una herramienta con la que se produce trabajo.
+_TOOL_UNREMARKABLE = re.compile(r"""
+    ^(?:microsoft\s+|ms\s+|google\s+)?
+     (?:office(?:\s+suite)?|word|powerpoint|outlook|gmail|mail|e-?mail
+       |zoom|meet|teams|slack|skype|whatsapp|telegram
+       |windows|macos|mac\s?os|linux|chrome|firefox|safari|edge|internet|browser
+       |drive|docs)\s*$
+""", re.I | re.X)
+
+# Tokeniza con conciencia de camelCase: "PowerBI" -> [power, bi], "Node.js" -> [node, js].
+_TOOL_TOKENS = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z]+|[0-9]+")
+
+
+def _tool_needle(tool: str):
+    """Un patrón que encuentra la herramienta escrita de cualquier forma razonable.
+
+    "Power BI" tiene que encontrar tanto "power bi" como "powerbi", pero "Excel" NO puede
+    encontrarse dentro de "excellent communication" — de ahí los lookarounds. Devuelve None
+    para nombres de menos de 3 caracteres ("R", "Go", "C"): son imposibles de buscar sin
+    falsos positivos, y decir "R no se menciona" cuando no lo podemos verificar es peor que
+    no decir nada.
+    """
+    parts = [re.escape(p.lower()) for p in _TOOL_TOKENS.findall(str(tool or ""))]
+    if not parts or len("".join(parts)) < 3:
+        return None
+    return re.compile(r"(?<![a-z0-9])" + r"[^a-z0-9]{0,2}".join(parts) + r"(?![a-z0-9])")
+
+
+def tools_mentions(snapshot: Dict[str, Any],
+                   requirements: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Qué herramientas de la lista aparecen de verdad en la experiencia.
+
+    El heno son los bullets, los títulos y las empresas. El About queda AFUERA a propósito:
+    es el pitch, no evidencia. Si se incluyera, cualquier CV que parafrasee su lista de
+    tools en el About pasaría el chequeo entero y el campo no diría nada.
+    """
+    hay_parts: List[str] = []
+    for entry in _as_list(snapshot.get("work_experience")):
+        hay_parts.append(str(entry.get("title") or ""))
+        hay_parts.append(str(entry.get("company") or ""))
+        hay_parts.extend(_bullets(entry.get("description")))
+    hay = " \n ".join(hay_parts).lower()
+
+    req_text = " ".join(r.get("requirement", "") for r in (requirements or [])).lower()
+
+    described: List[Dict[str, str]] = []
+    listed_only: List[Dict[str, Any]] = []
+    skipped = 0
+
+    for item in _as_list(snapshot.get("tools")):
+        name = str(item.get("tool") or "").strip()
+        if not name:
+            continue
+        level = str(item.get("level") or "").strip()
+        needle = _tool_needle(name)
+        # "no todas, sólo las que valga la pena": lo irremarcable, el nivel básico (que
+        # ningún rol lo describa es CORRECTO ahí) y lo que no se puede verificar.
+        if needle is None or _TOOL_UNREMARKABLE.match(name) or level.lower() == "basic":
+            skipped += 1
+            continue
+        if needle.search(hay):
+            described.append({"tool": name})
+        else:
+            listed_only.append({
+                "tool": name,
+                "in_jd": bool(needle.search(req_text)),
+                "level": level,
+            })
+
+    # Lo más accionable primero: una herramienta que la JD pidió y ningún rol describe. Tope
+    # de 6 — una lista de veinte no se lee.
+    listed_only.sort(key=lambda t: (not t["in_jd"], t["level"].lower() not in ("advanced", "expert")))
+
+    checked = len(described) + len(listed_only)
+    # El castigo es un UMBRAL, no un descuento por herramienta: no hace falta que estén
+    # todas descritas, pero que no haya ni una es un CV cuya experiencia no nombra una sola
+    # herramienta. Decisión de la owner.
+    penalty = TOOLS_NONE_PENALTY if (checked and not described) else 0
+
+    return {
+        "described": [t["tool"] for t in described],
+        "listed_only": [t["tool"] for t in listed_only[:6]],
+        "listed_only_total": len(listed_only),
+        "checked": checked,
+        "skipped": skipped,
+        "penalty": penalty,
+    }
+
+
+# Crédito por estado. Es una constante de módulo Y se snapshotea en el análisis: si mañana
+# se mueve a 0,4, las rondas viejas siguen explicando su propio número.
+#
+# `listed_only` = medio punto y no cero. Colapsarlo sobre `missing` diría que un CV que
+# menciona la herramienta vale lo mismo que uno que no la menciona en absoluto, y la
+# pantalla seguiría mostrando dos badges distintos con el mismo efecto — dos campos que se
+# contradicen. Tampoco 0,75: describir en un bullet lo que ya está en la lista de tools es
+# la única palanca que la recruiter controla de verdad, y tiene que valer la pena.
+_STATUS_CREDIT = {"described": 1.0, "listed_only": 0.5, "missing": 0.0}
+
+
 def _requirements_summary(reqs: List[Dict[str, Any]]) -> Dict[str, int]:
-    """Contadores para el encabezado. Sólo técnicos: son los que se deciden."""
+    """Contadores para el encabezado.
+
+    `technical` y `soft` son conteos CRUDOS y no cambian de significado — el panel usa
+    `technical` como guarda para decidir si dibuja la línea. Todo lo demás se cuenta sobre
+    los que PUNTÚAN, o el encabezado diría "1 the candidate doesn't have" por el Windows que
+    justamente decidimos que no le importa a nadie.
+    """
     tech = [r for r in reqs if r["kind"] == "technical"]
-    gaps = [r for r in tech if r["status"] != "described"]
+    scorable = [r for r in reqs if r["counts"]]
+    gaps = [r for r in scorable if r["status"] != "described"]
     return {
         "technical": len(tech),
-        "described": sum(1 for r in tech if r["status"] == "described"),
-        "listed_only": sum(1 for r in tech if r["status"] == "listed_only"),
-        "missing": sum(1 for r in tech if r["status"] == "missing"),
         "soft": len(reqs) - len(tech),
+        "assumed": sum(1 for r in reqs if r.get("assumed")),
+        "scorable": len(scorable),
+        "described": sum(1 for r in scorable if r["status"] == "described"),
+        "listed_only": sum(1 for r in scorable if r["status"] == "listed_only"),
+        "missing": sum(1 for r in scorable if r["status"] == "missing"),
         # El corte que importa: el hueco que la recruiter PUEDE cerrar (la fuente lo tiene y
         # el CV no lo muestra) contra el que no depende de ella (el candidato no lo tiene).
         "fixable_gaps": sum(1 for r in gaps if r["in_source"] in ("yes", "unclear")),
@@ -831,55 +916,72 @@ def _requirements_summary(reqs: List[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-# Cuando el CV ya sacó a la superficie TODO lo que la fuente respalda, lo que queda son
-# huecos del candidato, no del documento. La rúbrica lo dice desde v1 ("el fit no es un
-# defecto del CV") pero el modelo igual bajaba jd_alignment al ver la lista llena de
-# "missing", así que dejó de ser una instrucción y pasó a ser aritmética nuestra.
-ALIGNMENT_FIT_FLOOR = 70
-# …pero sólo si el CV ya cubre buena parte de lo que la vacante pide. Sin esta condición el
-# piso se disparaba SIEMPRE con un candidato del perfil equivocado: si no da el perfil en
-# nada, todos los huecos son de fit y "la recruiter no dejó nada afuera" se vuelve una
-# verdad vacía — no había nada que sacar a la superficie. Un CV de analista de datos para
-# una vacante de Community Manager sacaba 70 de alineación y le ganaba a uno que sí
-# apuntaba. Medio es el corte: por debajo, el documento no está apuntado a esta vacante y
-# el score tiene que decirlo.
-ALIGNMENT_FLOOR_MIN_COVERAGE = 0.5
+def derive_verdict(score, req_summary, hard_claims, tools_penalty):
+    """El veredicto sale de qué HAY QUE HACER, no del número.
 
-
-def alignment_floor(criteria: List[Dict[str, Any]],
-                    summary: Dict[str, int]) -> Optional[str]:
-    """Sube jd_alignment cuando los huecos son de fit. Muta `criteria`. Devuelve el motivo.
-
-    Conservador a propósito: sólo dispara si NINGÚN hueco es cerrable. Un solo requisito
-    que la fuente respalda y el CV no muestra ya es un defecto real del documento, y ahí
-    el score tiene que bajar.
+    Lo elegía el modelo y el prompt no le daba ninguna guía, así que salía un "needs work"
+    encima de un 90. Y atarlo al score tampoco sirve: un score bajo casi siempre significa
+    que el candidato no encaja, y eso no vuelve al CV "no enviable" — el sales lead puede
+    mandarlo igual. Lo que sí cambia la decisión es si queda algo por arreglar.
     """
-    if summary.get("fixable_gaps") or not summary.get("fit_gaps"):
-        return None
-    technical = summary.get("technical") or 0
-    described = summary.get("described") or 0
-    if not technical or described < technical * ALIGNMENT_FLOOR_MIN_COVERAGE:
-        # El candidato no es el perfil. No es culpa de la recruiter, pero tampoco es un CV
-        # alineado con ESTA vacante, y el número no puede decir que sí.
-        return None
-    for c in criteria:
-        if c["key"] != "jd_alignment" or c.get("not_applicable"):
-            continue
-        score = c.get("score")
-        if score is None or score >= ALIGNMENT_FIT_FLOOR:
-            return None
-        c["score"] = ALIGNMENT_FIT_FLOOR
-        n = summary["fit_gaps"]
-        reason = (f"{n} JD requirement{'s' if n != 1 else ''} the source material does not "
-                  f"support either — a fit gap, not a CV defect. JD alignment raised from "
-                  f"{score} to {ALIGNMENT_FIT_FLOOR}.")
-        # El verdict del modelo describía el score viejo. Dejarlo produce una ficha que se
-        # contradice: "70" arriba de "No alignment with the JD".
-        c["verdict"] = (f"{described} of {technical} technical requirements described; the "
-                        f"rest is not in the source either.")
-        c["floor_applied"] = True
-        return reason
-    return None
+    if score is None:
+        return "", ""
+    if hard_claims:
+        return "not_sendable", (f"{len(hard_claims)} claim(s) the candidate's own CV and "
+                                "LinkedIn don't support. Check them before this goes out.")
+    fixable = req_summary.get("fixable_gaps") or 0
+    if fixable:
+        return "needs_work", (f"{fixable} requirement(s) the recruiter can still close — "
+                              "the material is there and the CV doesn't show it.")
+    if tools_penalty:
+        return "needs_work", ("No role describes a single one of the tools listed, so the "
+                              "skills list has nothing behind it.")
+    return "ready", "Nothing left that the recruiter can fix on this CV."
+
+
+def requirements_score(reqs: List[Dict[str, Any]], tools_penalty: int = 0):
+    """El score: la porción de los requisitos técnicos de la JD que el CV muestra.
+
+    Devuelve `(score, detalle, motivo)`. `score` es None cuando no hay nada que medir —
+    nunca 0 ni 100: un 0 es una acusación falsa contra el CV y un 100 le infla el promedio a
+    la recruiter gratis.
+
+    La aritmética es NUESTRA, como siempre en este módulo: mismas entradas, mismo número, y
+    se puede explicar en pantalla renglón por renglón.
+    """
+    if not reqs:
+        return None, {}, "no_requirements"
+
+    scorable = [r for r in reqs if r["counts"]]
+    if not scorable:
+        return None, {}, "no_scorable_requirements"
+
+    per = 100.0 / len(scorable)
+    earned = sum(_STATUS_CREDIT.get(r["status"], 0.0) for r in scorable)
+    base = 100.0 * earned / len(scorable)
+    score = int(round(max(0.0, min(100.0, base - tools_penalty))))
+
+    detail = {
+        "credit": dict(_STATUS_CREDIT),
+        "scorable": len(scorable),
+        "points_per_requirement": round(per, 1),
+        "earned": round(earned, 2),
+        "base": int(round(base)),
+        "tools_penalty": tools_penalty,
+        "items": [{
+            "requirement": r["requirement"],
+            "status": r["status"],
+            "credit": _STATUS_CREDIT.get(r["status"], 0.0),
+            "points": round(per * _STATUS_CREDIT.get(r["status"], 0.0), 1),
+        } for r in scorable],
+        "excluded": [{
+            "requirement": r["requirement"],
+            "reason": "assumed" if r.get("assumed") else "soft",
+        } for r in reqs if not r["counts"]],
+    }
+    return score, detail, "requirements"
+
+
 
 
 def _clean_echo(raw: Any) -> List[Dict[str, Any]]:
@@ -923,11 +1025,7 @@ def _clean_unsupported(raw: Any) -> List[Dict[str, Any]]:
 
 
 def build_user_prompt(*, jd_block: str, cv_text: str, source_text: str) -> str:
-    rubric_desc = "\n".join(f"- {k} ({label}), weight {w}" for k, label, w in MODEL_CRITERIA)
-    return f"""Rubric criteria (score each 0-100, one 'criteria' entry per key):
-{rubric_desc}
-
-=== THE OPENING THIS CV IS FOR ===
+    return f"""=== THE OPENING THIS CV IS FOR ===
 {jd_block}
 
 === THE VINTTI CV (the document under review) ===
@@ -953,26 +1051,16 @@ supported, and (b) whether JD-relevant facts were available and left out.
 
 def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
              fingerprint: str, jd_text: Any = None) -> Dict[str, Any]:
-    """Inyecta el criterio calculado, saca el composite, aplica el tope y estampa la
-    metadata que hace auditable el número."""
-    criteria = _align_criteria(parsed.get("criteria"))
-    comp_score, comp_detail = completeness_score(snapshot)
-    criteria.append({
-        "key": COMPUTED_KEY,
-        "score": comp_score,
-        "not_applicable": False,
-        "evidence": "Computed from the CV itself, not by the model.",
-        "verdict": f"{sum(1 for c in comp_detail if c['ok'])} of {len(comp_detail)} checks pass.",
-        "computed": True,
-    })
-
+    """Calcula el score desde la checklist de requisitos y estampa la metadata que hace
+    auditable el número. El modelo REPORTA; la aritmética es nuestra."""
     unsupported = _clean_unsupported(parsed.get("unsupported_claims"))
     checked = source_len >= MIN_SOURCE_CHARS_FOR_FABRICATION_CHECK
     if not checked:
         # Sin fuente no se puede acusar de inventar nada.
         unsupported = []
 
-    requirements = _clean_requirements(parsed.get("jd_requirements"), jd_text)
+    requirements = _clean_requirements(parsed.get("jd_requirements"), jd_text,
+                                       flatten_resume_for_prompt(snapshot))
     req_summary = _requirements_summary(requirements)
     # La lista transcrita es el control: si el modelo copió 8 bullets y anotó 6, dropeó dos.
     # No los inventamos — se avisa, porque una checklist incompleta que parece completa es
@@ -991,51 +1079,53 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     if req_summary["incomplete"]:
         logging.warning("cv_review: la JD tenía %s requisitos y el modelo anotó %s",
                         len(verbatim), len(requirements))
-    # Antes del composite: el piso corrige el criterio, no el total.
-    floor_reason = alignment_floor(criteria, req_summary)
+    # v10: el score ES la checklist. Los requisitos técnicos que no se dan por sentado se
+    # reparten los 100 puntos; describir en la experiencia vale el punto entero, estar sólo
+    # listado la mitad, faltar cero. Lo único que además toca el número es el castigo único
+    # cuando la experiencia no nombra NI UNA de las herramientas listadas.
+    tools_check = tools_mentions(snapshot, requirements)
+    composite, score_detail, basis = requirements_score(requirements, tools_check["penalty"])
 
-    composite = weighted_score(criteria, RUBRIC_WEIGHTS)
-    uncapped, cap_reason = composite, None
-    hard = [c for c in unsupported if c["severity"] == "hard"]
-    if composite is not None and hard:
-        cap = max(FABRICATION_CAP_FLOOR,
-                  FABRICATION_CAP_BASE - FABRICATION_CAP_STEP * (len(hard) - 1))
-        if composite > cap:
-            cap_reason = f"{len(hard)} unsupported factual claim(s) — capped at {cap}"
-            composite = cap
+    # Un denominador demostrablemente incompleto sesga el score HACIA ARRIBA: los requisitos
+    # que el modelo dropea son desproporcionadamente los que no supo evaluar. Al humano el
+    # número aproximado le sirve (la pantalla ya le grita el aviso); al promedio que evalúa
+    # recruiters lo corrompe, así que se calcula pero no se promedia.
+    if basis == "requirements" and req_summary["incomplete"]:
+        basis = "incomplete_requirements"
 
-    jd_na = any(c["key"] == "jd_alignment" and c["not_applicable"] for c in criteria)
+    hard_claims = [c for c in unsupported if c["severity"] == "hard"]
+    verdict, verdict_reason = derive_verdict(
+        composite, req_summary, hard_claims, tools_check["penalty"])
 
     return {
         "summary": str(parsed.get("summary") or "").strip(),
-        "verdict": str(parsed.get("verdict") or "").strip().lower(),
-        "verdict_reason": str(parsed.get("verdict_reason") or "").strip(),
-        "criteria": criteria,
+        "verdict": verdict,
+        "verdict_reason": verdict_reason,
         "fixes": [f for f in (parsed.get("fixes") or []) if isinstance(f, dict)],
         "unsupported_claims": unsupported,
         # Advertencia pura: NO entra en el composite ni en el tope por invención.
         "jd_echo": _clean_echo(parsed.get("jd_echo")),
         "jd_requirements": requirements,
         "_requirements_summary": req_summary,
-        "_alignment_floor_reason": floor_reason,
         # Se deriva de la matriz en vez de pedírsela aparte al modelo: dos campos que
         # tienen que coincidir es un campo que se contradice. Si el modelo no devolvió
         # matriz (o quedó un análisis viejo en vuelo) cae al campo suelto de v5.
+        # Sólo los que puntúan: "the CV never addresses: Familiarity with Windows" es
+        # exactamente el ruido que la categoría "se da por sentado" existe para sacar.
         "jd_requirements_missed": _clean_gaps(
-            [r["requirement"] for r in requirements if r["status"] == "missing"]
+            [r["requirement"] for r in requirements
+             if r["counts"] and r["status"] == "missing"]
             or parsed.get("jd_requirements_missed")
         ),
         "fit_note": str(parsed.get("fit_note") or "").strip(),
         "_composite_score": composite,
-        "_uncapped_score": uncapped,
-        "_cap_reason": cap_reason,
-        "_completeness_detail": comp_detail,
+        "_score_basis": basis,
+        "_score_detail": score_detail,
+        "_tools_check": tools_check,
         "_fabrication_check": "ran" if checked else "skipped_no_source",
-        # True cuando jd_alignment (30 % del peso) no se pudo puntuar: mezclar un 82 sin
-        # JD con un 41 con JD corrompe el promedio, así que la métrica los excluye.
-        "_partial": bool(jd_na),
-        "_rubric": [{"key": k, "label": label, "weight": w, "computed": k == COMPUTED_KEY}
-                    for k, label, w in RUBRIC],
+        # Un solo lugar decide, en vez de booleanos sueltos que pueden contradecirse: todo
+        # lo que no sea un score comparable se excluye del promedio por recruiter.
+        "_partial": basis != "requirements",
         "_version": ANALYSIS_VERSION,
         "_model": MODEL,
         # temperature=0 no es determinista en gpt-4o, así que guardamos la huella de las

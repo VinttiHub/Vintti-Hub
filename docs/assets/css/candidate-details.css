@@ -6347,12 +6347,36 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .cv-review-reqs .cvr-req--listed_only .cvr-req-status { background: #ffe9b8; color: #8a5a00; }
 .cv-review-reqs .cvr-req--missing { border-left-color: #d84343; background: #fff7f8; }
 .cv-review-reqs .cvr-req--missing .cvr-req-status { background: #ffe0e5; color: #8f0f2a; }
-/* Fit del candidato: gris. No es un pendiente de la recruiter. */
+/* Fit del candidato: gris. No es un pendiente de la recruiter. (Sólo análisis v≤9.) */
 .cv-review-reqs .cvr-req--fit { border-left-color: #e4ebfb; opacity: .82; }
 .cv-review-reqs .cvr-req--fit .cvr-req-status {
   background: #fff;
   color: #50607f;
   border: 1px solid #e4ebfb;
+}
+
+/* v10: un requisito que NO puntúa (soft, o algo que se da por sentado). Gris y con
+   etiqueta, nunca tachado — sigue siendo un requisito vivo por el que se puede rechazar.
+   Esta página no carga hirex.css, así que los tokens --hx-* van escritos a mano; es la
+   gemela de las reglas en assets/css/cv-review.css. Si tocás una, tocá la otra. */
+.cv-review-reqs .cvr-req--nocount {
+  border-left-color: #e4ebfb;
+  background: #f7f9fc;
+  opacity: .78;
+}
+.cv-review-reqs .cvr-req--nocount .cvr-req-status {
+  background: #fff;
+  color: #50607f;
+  border: 1px solid #e4ebfb;
+}
+.cv-review-reqs .cvr-req-tag {
+  font-style: normal;
+  font-size: 10px;
+  color: #50607f;
+  border: 1px solid #e4ebfb;
+  border-radius: 999px;
+  padding: 0 5px;
+  cursor: help;
 }
 
 .cv-review-reqs .cvr-reqs-warn {

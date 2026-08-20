@@ -1530,17 +1530,22 @@ def _review_cta_block(review_id, title, body):
     """
 
 
-def _score_pill(score):
+def _score_pill(score, summary=None):
+    """El pill del mail. Lleva la fracción además del número: con pocos requisitos el score
+    salta de a tramos grandes, y "2 of 3" explica el 67 mejor que el 67 solo."""
     if score is None:
         return ('<span style="display:inline-block;padding:2px 10px;border-radius:999px;'
                 'background:#eceff5;color:#50607f;font-weight:700;font-size:12px;">'
-                'Not scored</span>')
+                'No JD to score against</span>')
     # Lima de marca para lo bueno, ámbar para el medio, rojo para lo flojo.
     bg, fg = ("#c1ff72", "#3a6b00") if score >= 75 else \
              ("#ffe4a3", "#7a5200") if score >= 50 else ("#ffd9d9", "#a01111")
+    n = (summary or {}).get("scorable")
+    shown = (summary or {}).get("described")
+    frac = f"{shown} of {n} · " if n else ""
     return (f'<span style="display:inline-block;padding:2px 10px;border-radius:999px;'
             f'background:{bg};color:{fg};font-weight:700;font-size:12px;">'
-            f'CV quality {score}/100</span>')
+            f'JD coverage {frac}{score}/100</span>')
 
 
 # Chequeo deliberadamente laxo: sólo queremos descartar lo que NO es una dirección, no
@@ -1619,8 +1624,8 @@ def _notify_submitted(review_id):
     if any(c.get("severity") == "hard" for c in unsupported):
         warn = ('<p style="padding:12px 16px;background:#ffeaea;border-left:5px solid #d84343;'
                 'border-radius:12px;color:#8f0f0f;font-weight:700;">'
-                '⚠️ The AI flagged claims in this CV that the source material does not '
-                'support. Check them before this goes out.</p>')
+                "⚠️ The AI flagged claims in this CV that the candidate's own CV and "
+                'LinkedIn do not support. Check them before this goes out.</p>')
     # Eco de JD: ámbar, no rojo. No es invención, es redacción calcada — pero si sale así
     # el cliente lee su propio aviso de vuelta, así que tiene que verse antes de abrir.
     echo = analysis.get("jd_echo") or []
@@ -1638,14 +1643,15 @@ def _notify_submitted(review_id):
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['opp_position_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Recruiter:</b> {_escape_html(row['recruiter_email'] or '—')}</p>
-      <p style="margin:0 0 16px;"><b>Round:</b> {row['round']} &nbsp; {_score_pill(row.get('ai_score'))}</p>
+      <p style="margin:0 0 16px;"><b>Round:</b> {row['round']} &nbsp; {_score_pill(row.get('ai_score'), (row.get('ai_analysis') or {}).get('_requirements_summary'))}</p>
       {orphan_note}
       {warn}
       {f'<p style="margin:0 0 6px;"><b>Note from the recruiter:</b> {_escape_html(row["recruiter_note"])}</p>' if row.get('recruiter_note') else ''}
       {f'<p style="margin:0 0 6px;"><b>Top AI suggestions:</b></p><ul>{fixes_html}</ul>' if fixes_html else ''}
       {_review_cta_block(review_id, '✅ Approve or reject this CV',
-                         'The score is a hint, not a verdict — read the CV, then approve it '
-                         'or reject it with the reason so the recruiter knows what to fix.')}
+                         'The score is the match between this CV and the posting, not a verdict — '
+                         'read the CV, then approve it or reject it with the reason so the '
+                         'recruiter knows what to fix.')}
     </div>
     """
     subject = (f"CV to review – {row['candidate_name'] or 'Candidate'} • "
@@ -1784,7 +1790,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
             <div style="font-size:12px;color:#50607f;">Round {r['round']}</div>
           </td>
           <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
-            {_score_pill(r.get('ai_score'))}
+            {_score_pill(r.get('ai_score'), (r.get('ai_analysis') or {}).get('_requirements_summary'))}
           </td>
           <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
             <a href="{url}" style="color:#0028ff;">Open CV</a>

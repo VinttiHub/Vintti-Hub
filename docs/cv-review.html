@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260819-hl5" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260820-reqs" />
 </head>
 
 <body class="light-mode">
@@ -115,10 +115,12 @@
             <div class="cvr-note-body">
               A <b>profile</b> is one candidate for one vacancy, counted in the period it was
               <b>first</b> sent. Rates are over profiles you already decided, so a backlog
-              doesn't flatter anyone. <b>CV quality</b> is the AI score of the <b>first</b>
-              round — later rounds are quality after your coaching — and only counts analyses
-              from the current rubric version. Rejection reasons are not exclusive, so their
-              percentages add up to more than 100.
+              doesn't flatter anyone. <b>JD coverage</b> is the share of the vacancy's
+              technical requirements the <b>first</b>-round CV shows — later rounds are
+              coverage after your coaching. It measures the match between candidate and
+              opening, not how well the recruiter writes, and it only counts analyses scored
+              the current way. Rejection reasons are not exclusive, so their percentages add
+              up to more than 100.
             </div>
           </details>
         </div>
@@ -142,7 +144,7 @@
                 <th>Client</th>
                 <th>Recruiter</th>
                 <th class="cvr-col-round">Round</th>
-                <th class="cvr-col-score">Quality</th>
+                <th class="cvr-col-score">Coverage</th>
                 <th class="cvr-col-status">Status</th>
                 <th class="cvr-col-age">Age</th>
               </tr>
@@ -216,12 +218,15 @@
             <div class="cvr-warn" id="cvrDrift" hidden></div>
 
             <details class="hx-section" open>
-              <summary>AI quality score</summary>
+              <summary>JD coverage score</summary>
               <div class="cvr-section-body">
                 <div id="cvrAi"></div>
                 <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="cvrReanalyze">
                   <i class="fa-solid fa-rotate"></i> Re-run the analysis
                 </button>
+                <!-- Un re-run que devuelve el cache y no dice nada se lee como "la IA
+                     volvió a dar lo mismo", que es una conclusión muy distinta. -->
+                <p class="cvr-rerun-note" id="cvrRerunNote" hidden></p>
               </div>
             </details>
 
@@ -275,6 +280,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260819-hl5" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260820-reqs" defer></script>
 </body>
 </html>

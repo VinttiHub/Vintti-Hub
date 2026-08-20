@@ -267,6 +267,15 @@
   background: var(--hx-surface);
 }
 .cvr-rerun { margin-top: 10px; }
+.cvr-rerun-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
 
 /* --- las dos columnas ----------------------------------------------------- */
 /* El body del drawer deja de scrollear como un todo: scrollea cada columna por su lado,
@@ -676,6 +685,75 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   color: var(--hx-ink-2);
 }
 
+/* ---------- Pliegues del panel ---------- */
+/* Todo lo que no cambia un aprobado por un rechazo vive plegado. La línea del pliegue
+   lleva el dato que decide si vale la pena abrirlo (cuántos hallazgos, cuál es el
+   criterio más flojo), así plegar no equivale a esconder. */
+.cvr-fold {
+  border-top: 1px solid var(--hx-line-2);
+  margin-top: 4px;
+}
+.cvr-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 0;
+}
+/* El título no se parte; el resumen sí, en vez de cortarse con puntos suspensivos.
+   Un contador truncado ("1 to double-che…") es peor que un contador en dos líneas. */
+.cvr-fold > summary::-webkit-details-marker { display: none; }
+.cvr-fold > summary::before {
+  content: "\f105";                 /* chevron-right */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 11px;
+  width: 9px;
+  flex: none;
+  color: var(--hx-muted);
+  transition: transform .15s ease;
+}
+.cvr-fold[open] > summary::before { transform: rotate(90deg); }
+.cvr-fold > summary:hover .cvr-fold-t { color: #003bff; }
+.cvr-fold-t {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--hx-ink);
+  white-space: nowrap;
+  flex: none;
+}
+.cvr-fold-m {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--hx-ink-2);
+  min-width: 0;
+  text-align: right;
+  margin-left: auto;
+}
+.cvr-fold-b { padding: 0 0 12px; }
+.cvr-fold-lead {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--hx-ink-2);
+}
+/* Los bloques de adentro ya no necesitan su propio margen ni su propia línea divisoria:
+   los da el pliegue. */
+.cvr-fold-b > .cvr-find:first-child,
+.cvr-fold-b > .cvr-fixes,
+.cvr-fold-b > .cvr-crits { margin-top: 0; }
+.cvr-fold-b > .cvr-crits { padding-top: 0; border-top: none; }
+
+/* La nota plegable de "cómo leer esto" dentro de una sección, no en la barra de arriba. */
+.cvr-note-body p { margin: 0 0 8px; }
+.cvr-note-body p:last-child { margin-bottom: 0; }
+.cvr-note--inline { margin: 0 0 8px; }
+.cvr-note--inline > summary { font-size: 11px; }
+.cvr-note--inline .cvr-note-body { font-size: 11.5px; line-height: 1.55; }
+
 /* Los fixes agrupados por sección anidan una lista. */
 .cvr-fixes ul ul { margin: 4px 0 0; padding-left: 16px; }
 .cvr-fixes ul ul li { margin-bottom: 2px; }
@@ -710,7 +788,8 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 .cvr-fixes ul { margin: 0; padding-left: 16px; }
 .cvr-fixes li { font-size: 12.5px; line-height: 1.55; margin-bottom: 4px; color: var(--hx-ink-2); }
 
-/* Desglose de la rúbrica */
+/* Desglose de la rúbrica — SÓLO análisis v≤9. Ver el branch `legacy` en aiPanelHtml:
+   la rúbrica se borró, pero las rondas ya decididas siguen explicando su propio número. */
 .cvr-crits {
   margin-top: 14px;
   padding-top: 12px;
@@ -812,3 +891,119 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   line-height: 1.45;
   color: #6b4700;
 }
+
+
+/* ---------- v10: el score sale de los requisitos ---------- */
+/* La lista de requisitos ES el desglose, así que arriba va la aritmética. Con pocos
+   requisitos el score salta de a tramos grandes (con 3, de 17 en 17), y decir cuánto vale
+   cada uno es la forma honesta de comunicar que 100 significa "los 3 que pedía la JD están
+   descritos", no "perfecto". */
+.cvr-tally { margin: 0 0 10px; }
+.cvr-tally-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hx-line);
+  overflow: hidden;
+}
+.cvr-tally-bar i { display: block; height: 100%; background: var(--hx-lime); }
+.cvr-tally-line {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--hx-ink);
+}
+.cvr-tally-line b { font-family: var(--hx-mono); }
+.cvr-tally-off { margin: 3px 0 0; font-size: 11.5px; color: var(--hx-faint); }
+
+/* El corte entre lo que puntúa y lo que no. Va como <li> para no romper la lista. */
+.cvr-req-sep {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--hx-faint);
+}
+.cvr-req-sep::before, .cvr-req-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hx-line);
+}
+
+/* El aporte de cada fila. Informa porque el crédito es parcial: 1 / 0,5 / 0 son tres
+   números distintos. Con crédito binario todas las filas dirían lo mismo. */
+.cvr-req-pts {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--hx-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hx-lime-ink);
+}
+.cvr-req-pts.is-zero { color: var(--hx-faint); }
+
+/* Un requisito que no puntúa: gris y con etiqueta, NUNCA tachado. Tachado se lee como
+   "anulado", y estos son requisitos vivos por los que un reviewer puede rechazar — el
+   solape horario se clasifica soft y es un motivo de rechazo real. */
+.cvr-req--nocount {
+  border-left-color: var(--hx-line);
+  background: var(--hx-surface-2);
+  opacity: .78;
+}
+.cvr-req--nocount .cvr-req-status {
+  background: var(--hx-surface);
+  color: var(--hx-ink-2);
+  border: 1px solid var(--hx-line);
+}
+.cvr-req-tag {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--hx-ink-2);
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  padding: 0 5px;
+  cursor: help;
+}
+
+/* Análisis viejo: el número está en otra escala y hay que decirlo, o dos números
+   incomparables conviven en la misma pantalla sin avisar. */
+.cvr-ai-legacy {
+  margin: 6px 0 0;
+  padding: 7px 10px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Tools: chips, lima las que algún rol describe. */
+.cvr-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cvr-tool {
+  padding: 3px 9px;
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  background: var(--hx-surface-2);
+  font-size: 11.5px;
+  color: var(--hx-ink-2);
+  cursor: help;
+}
+.cvr-tool.is-described {
+  background: var(--hx-lime);
+  color: var(--hx-lime-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+.cvr-fold-b > .cvr-tools { margin-top: 0; }
