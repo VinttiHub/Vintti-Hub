@@ -5271,6 +5271,14 @@ function _replaceDateText(node){
       bits.push('<div class="cv-review-hist-line">JD coverage: no job description on that opportunity.</div>');
     } else if (r.ai_error) {
       bits.push('<div class="cv-review-hist-line">JD coverage: could not be scored.</div>');
+    } else if (r.score_basis) {
+      // Sin score y sin error: la vacante no da nada que medir. Antes esta rama no existía
+      // y la fila salía muda, que se lee como "todavía no corrió" — y el mail encima decía
+      // "No JD to score against" sobre una opp que sí tenía JD.
+      bits.push(`<div class="cv-review-hist-line">JD coverage: ${
+        r.score_basis === 'no_scorable_requirements'
+          ? 'the posting asks for nothing technical — its required list is all soft skills'
+          : 'no requirements could be read from that posting'}.</div>`);
     }
     // Job hopping: UNA línea. El desglose por empresa vive en cv-review.html, que es donde
     // el sales lead decide; acá alcanza con saber si costó puntos. Deliberadamente NO es

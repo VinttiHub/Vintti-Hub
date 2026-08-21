@@ -242,6 +242,10 @@ def _serialize(row, *, reasons=None, analysis=None, live_hash=None):
     if isinstance(blob, dict):
         out["jd_requirements"] = blob.get("jd_requirements") or []
         out["requirements_summary"] = blob.get("_requirements_summary") or {}
+        # El motivo por el que no hay número va como dato, no se re-deriva en el front:
+        # "sin score" se puede leer de scorable==0, pero dos copias de la misma regla se
+        # desincronizan — misma razón por la que `counts` viaja en vez de recalcularse.
+        out["score_basis"] = blob.get("_score_basis")
         # Del job hopping va sólo el resumen, no los tramos: acá se pinta UNA línea. Mandar
         # la lista entera repetiría el mismo peso por cada ronda del historial para algo que
         # esa vista no muestra.
@@ -1537,13 +1541,35 @@ def _review_cta_block(review_id, title, body):
     """
 
 
-def _score_pill(score, summary=None):
+# Un score en None NO significa una sola cosa, y decir "No JD to score against" para todas
+# fue una mentira que llegó a los mails: la vacante 771 (BDR) SÍ tenía JD, y bien larga —
+# lo que no tenía era un solo requisito técnico obligatorio, porque el "Requirements
+# (Must-Haves)" listaba tres soft skills y todo lo demás (BDR/SDR, CRM, lead generation)
+# estaba abajo, en "Nice-to-Haves", que no se puntúa a propósito.
+# El sales lead leyó "no hay JD", fue a mirar, y la JD estaba. Cada motivo dice el suyo.
+_NO_SCORE_PILL = {
+    "no_jd": "No JD on that opportunity",
+    "no_requirements": "JD has no requirements list",
+    "no_scorable_requirements": "JD asks for nothing technical",
+    "budget": "Not scored — AI budget spent",
+}
+
+
+def _score_pill(score, summary=None, basis=None, error=None):
     """El pill del mail. Lleva la fracción además del número: con pocos requisitos el score
     salta de a tramos grandes, y "2 of 3" explica el 67 mejor que el 67 solo."""
     if score is None:
+        label = _NO_SCORE_PILL.get(error or basis)
+        if label is None:
+            # Cualquier otro ai_error (failed / truncated / unparseable) es un problema
+            # nuestro, no de la vacante. No se le echa la culpa a la JD.
+            label = "Not scored" if error else "No score"
+        # Sin escapar a propósito: `label` sale siempre de _NO_SCORE_PILL o de dos
+        # literales de acá al lado, nunca de la base ni del modelo. (_escape_html en este
+        # módulo se importa adentro de cada función, no existe a nivel de módulo.)
         return ('<span style="display:inline-block;padding:2px 10px;border-radius:999px;'
                 'background:#eceff5;color:#50607f;font-weight:700;font-size:12px;">'
-                'No JD to score against</span>')
+                f'{label}</span>')
     # Lima de marca para lo bueno, ámbar para el medio, rojo para lo flojo.
     bg, fg = ("#c1ff72", "#3a6b00") if score >= 75 else \
              ("#ffe4a3", "#7a5200") if score >= 50 else ("#ffd9d9", "#a01111")
@@ -1621,6 +1647,26 @@ def _notify_submitted(review_id):
                    ) if orphan else ''
 
     analysis = row.get("ai_analysis") or {}
+    # Un pill de dos palabras no alcanza para explicar por qué no hay número: el sales lead
+    # abre el mail, ve que falta el score y no sabe si se rompió algo o si la vacante está
+    # mal escrita. Esto último es accionable y por eso se dice acá, no sólo en el panel.
+    no_score_note = ""
+    if row.get("ai_score") is None and not row.get("ai_error"):
+        basis = analysis.get("_score_basis")
+        if basis == "no_scorable_requirements":
+            no_score_note = (
+                'There is a job description, but everything it lists under its required '
+                'section is a soft skill, so there is nothing technical to measure this CV '
+                'against. If this posting has real must-haves, they are sitting under '
+                '“Nice to have” — move them up and score it again.')
+        elif basis == "no_requirements":
+            no_score_note = (
+                'There is a job description, but no requirements list could be read from '
+                'it, so there is nothing to measure this CV against.')
+    if no_score_note:
+        no_score_note = ('<p style="padding:12px 16px;background:#eef2ff;border-left:5px '
+                         'solid #4f46e5;border-radius:12px;color:#312e81;">'
+                         f'{no_score_note}</p>')
     fixes = analysis.get("fixes") or []
     fixes_html = "".join(
         f"<li><b>{_escape_html(f.get('section') or '')}</b>: {_escape_html(f.get('fix') or '')}</li>"
@@ -1650,8 +1696,9 @@ def _notify_submitted(review_id):
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['opp_position_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Recruiter:</b> {_escape_html(row['recruiter_email'] or '—')}</p>
-      <p style="margin:0 0 16px;"><b>Round:</b> {row['round']} &nbsp; {_score_pill(row.get('ai_score'), (row.get('ai_analysis') or {}).get('_requirements_summary'))}</p>
+      <p style="margin:0 0 16px;"><b>Round:</b> {row['round']} &nbsp; {_score_pill(row.get('ai_score'), (row.get('ai_analysis') or {}).get('_requirements_summary'), (row.get('ai_analysis') or {}).get('_score_basis'), row.get('ai_error'))}</p>
       {orphan_note}
+      {no_score_note}
       {warn}
       {f'<p style="margin:0 0 6px;"><b>Note from the recruiter:</b> {_escape_html(row["recruiter_note"])}</p>' if row.get('recruiter_note') else ''}
       {f'<p style="margin:0 0 6px;"><b>Top AI suggestions:</b></p><ul>{fixes_html}</ul>' if fixes_html else ''}
@@ -1797,7 +1844,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
             <div style="font-size:12px;color:#50607f;">Round {r['round']}</div>
           </td>
           <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
-            {_score_pill(r.get('ai_score'), (r.get('ai_analysis') or {}).get('_requirements_summary'))}
+            {_score_pill(r.get('ai_score'), (r.get('ai_analysis') or {}).get('_requirements_summary'), (r.get('ai_analysis') or {}).get('_score_basis'), r.get('ai_error'))}
           </td>
           <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
             <a href="{url}" style="color:#0028ff;">Open CV</a>
@@ -1824,6 +1871,28 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
                    '⚠️ This opportunity has no usable sales lead on file. Assign one on the '
                    'opportunity, or review these yourself.</p>') if orphan else ''
 
+    # Un batch es de UNA vacante, así que si no hay nada técnico que medir les pasa a todos
+    # los CVs por el mismo motivo: se explica una vez arriba y no N veces en la tabla.
+    def _basis(r):
+        return (r.get("ai_analysis") or {}).get("_score_basis") if r.get("ai_score") is None \
+            and not r.get("ai_error") else None
+    bases = {_basis(r) for r in rows} - {None}
+    no_score_note = ""
+    if bases == {"no_scorable_requirements"}:
+        no_score_note = (
+            'None of these got a score, and it is not the CVs: there is a job description, '
+            'but everything under its required section is a soft skill, so there is nothing '
+            'technical to measure them against. If this posting has real must-haves, they '
+            'are sitting under “Nice to have” — move them up and score again.')
+    elif bases == {"no_requirements"}:
+        no_score_note = (
+            'None of these got a score: there is a job description, but no requirements '
+            'list could be read from it, so there is nothing to measure them against.')
+    if no_score_note:
+        no_score_note = ('<p style="padding:12px 16px;background:#eef2ff;border-left:5px '
+                         'solid #4f46e5;border-radius:12px;color:#312e81;">'
+                         f'{no_score_note}</p>')
+
     html = f"""
     <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
       <h2 style="margin:0 0 12px;">{len(rows)} CV{'s' if len(rows) != 1 else ''} ready for your review</h2>
@@ -1832,6 +1901,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
       <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(first['client_name'] or '—')}</p>
       <p style="margin:0 0 16px;"><b>Recruiter:</b> {_escape_html(first['recruiter_email'] or '—')}</p>
       {orphan_note}
+      {no_score_note}
       {warn}
       {f'<p style="margin:0 0 12px;"><b>Note from the recruiter:</b> {_escape_html(note)}</p>' if note else ''}
       <table style="width:100%;border-collapse:collapse;margin:0 0 18px;
