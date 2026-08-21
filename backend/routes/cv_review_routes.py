@@ -844,7 +844,7 @@ def list_cv_reviews():
     where = ["TRUE"]
     params = {}
     if status:
-        if status not in ("pending", "approved", "rejected", "cancelled"):
+        if status not in ("pending", "approved", "rejected", "changes_requested", "cancelled"):
             return jsonify({"error": "unknown status"}), 400
         where.append("r.status = %(status)s")
         params["status"] = status
@@ -1013,8 +1013,9 @@ def decide_cv_review(review_id):
 
     data = request.get_json(silent=True) or {}
     decision = (data.get("decision") or "").strip().lower()
-    if decision not in ("approved", "rejected"):
-        return jsonify({"error": "decision must be 'approved' or 'rejected'"}), 400
+    if decision not in ("approved", "rejected", "changes_requested"):
+        return jsonify({"error": "decision must be 'approved', 'rejected' or "
+                                 "'changes_requested'"}), 400
 
     reasons = [str(r).strip().lower() for r in (data.get("reasons") or []) if str(r).strip()]
     reasons = list(dict.fromkeys(reasons))  # dedupe, conservando el orden
@@ -1035,6 +1036,17 @@ def decide_cv_review(review_id):
         if "other" in reasons and not reason_other:
             return jsonify({"error": "Describe the 'Other' reason.",
                             "code": "no_reason_other"}), 422
+    elif decision == "changes_requested":
+        # Pedir cambios NO lleva razones a propósito: la lista fija existe para poder
+        # medir POR QUÉ se rechaza un perfil, y esto no es un rechazo — el candidato sigue
+        # en carrera y lo que falla es el documento. Encajarlo en esos códigos ensuciaría
+        # el donut de razones de rechazo con casos que no lo son.
+        # El comentario, en cambio, es obligatorio: es literalmente lo único que la
+        # recruiter recibe, y sin él esto no le dice qué corregir.
+        reasons, reason_other = [], None
+        if not comment:
+            return jsonify({"error": "Say what needs changing — the comment is the only "
+                                     "thing the recruiter gets.", "code": "no_comment"}), 422
     else:
         reasons, reason_other = [], None
 
@@ -1077,6 +1089,9 @@ def decide_cv_review(review_id):
             )
 
         batch_synced = False
+        # SÓLO el rechazo, nunca "changes_requested": pedir cambios es sobre el documento y
+        # el candidato sigue en carrera. Marcarlo "Rejected By Sales" lo sacaría del batch
+        # por un CV mal escrito, que es justo lo que este estado existe para evitar.
         if decision == "rejected":
             # Que el donut existente siga siendo verdad. El EXISTS es lo que evita pisar
             # batches de OTRAS oportunidades del mismo candidato (misma forma que
@@ -1280,7 +1295,10 @@ first_dec AS (
     SELECT DISTINCT ON (candidate_id, opportunity_id)
            candidate_id, opportunity_id, review_id AS decided_review_id, status, reviewed_at
     FROM live
-    WHERE status IN ('approved', 'rejected')
+    -- "changes_requested" cierra la ronda igual que las otras dos, así que cuenta como
+    -- decidido: si no, un perfil devuelto para corregir quedaría para siempre en
+    -- "pendiente" y le inflaría el backlog a la recruiter que ya hizo su parte.
+    WHERE status IN ('approved', 'rejected', 'changes_requested')
     ORDER BY candidate_id, opportunity_id, requested_at, review_id
 ),
 scope AS (
@@ -1344,6 +1362,8 @@ def cv_review_metrics():
                 COUNT(*) - COUNT(d.decided_review_id)          AS profiles_pending,
                 COUNT(*) FILTER (WHERE d.status = 'rejected')  AS rejected_first_try,
                 COUNT(*) FILTER (WHERE d.status = 'approved')  AS approved_first_try,
+                COUNT(*) FILTER (WHERE d.status = 'changes_requested')
+                                                               AS changes_first_try,
                 -- Dos exclusiones del promedio de calidad, por la misma razón: mezclar
                 -- escalas distintas corrompe el número.
                 --   1) los scores parciales (sin JD, así que jd_alignment, que pesa 30
@@ -1421,6 +1441,7 @@ def cv_review_metrics():
             "quality_avg": float(r["quality_avg"]) if r["quality_avg"] is not None else None,
             "rejected_first_try_pct": _pct(r["rejected_first_try"], decided),
             "approved_first_try_pct": _pct(r["approved_first_try"], decided),
+            "changes_first_try_pct": _pct(r["changes_first_try"], decided),
             "reasons": reasons,
         })
 
@@ -1430,6 +1451,7 @@ def cv_review_metrics():
         "profiles_pending": sum(r["profiles_pending"] for r in rows),
         "rejected_first_try": sum(r["rejected_first_try"] for r in rows),
         "approved_first_try": sum(r["approved_first_try"] for r in rows),
+        "changes_first_try": sum(r["changes_first_try"] for r in rows),
         "quality_n": sum(r["quality_n"] for r in rows),
         "stale_version_profiles": sum(r["stale_version_profiles"] for r in rows),
     }
@@ -1439,6 +1461,7 @@ def cv_review_metrics():
     totals["quality_avg"] = round(weighted / totals["quality_n"], 1) if totals["quality_n"] else None
     totals["rejected_first_try_pct"] = _pct(totals["rejected_first_try"], totals["profiles_decided"])
     totals["approved_first_try_pct"] = _pct(totals["approved_first_try"], totals["profiles_decided"])
+    totals["changes_first_try_pct"] = _pct(totals["changes_first_try"], totals["profiles_decided"])
 
     return jsonify({
         "rows": out_rows,
@@ -1928,13 +1951,21 @@ def _notify_decided(review_id):
         return False
 
     labels = dict(cv_review_ai.REJECT_REASONS)
-    approved = row["status"] == "approved"
+    status = row["status"]
     reasons_html = "".join(f"<li>{_escape_html(labels.get(c, c))}</li>" for c in reasons)
 
-    if approved:
+    # Tres veredictos, tres mails distintos. Que "pedir cambios" llegue con cara de rechazo
+    # sería exactamente el problema que este estado vino a resolver: la recruiter lee
+    # "rejected" y entiende que el candidato no sirve, cuando lo que falla es el documento.
+    if status == "approved":
         banner = ('<p style="padding:12px 16px;background:#eefbdd;border-left:5px solid #7aa23c;'
                   'border-radius:12px;color:#33600a;font-weight:700;">'
                   '✅ Approved — you can send this CV to the client.</p>')
+    elif status == "changes_requested":
+        banner = ('<p style="padding:12px 16px;background:#eef2ff;border-left:5px solid #4f46e5;'
+                  'border-radius:12px;color:#312e81;font-weight:700;">'
+                  '✏️ Changes requested — the candidate is still in play. Fix what the '
+                  'comment asks for and send it back for another round.</p>')
     else:
         banner = ('<p style="padding:12px 16px;background:#ffeaea;border-left:5px solid #d84343;'
                   'border-radius:12px;color:#8f0f0f;font-weight:700;">'
@@ -1951,10 +1982,12 @@ def _notify_decided(review_id):
          &nbsp;·&nbsp; Round {row['round']}</p>
       {f'<p style="margin:0 0 6px;"><b>Reasons:</b></p><ul>{reasons_html}</ul>' if reasons_html else ''}
       {f'<p style="margin:0 0 6px;"><b>Other:</b> {_escape_html(row["reject_other"])}</p>' if row.get('reject_other') else ''}
-      {f'<p style="margin:0 0 16px;"><b>Comment:</b> {_escape_html(row["reviewer_comment"])}</p>' if row.get('reviewer_comment') else ''}
+      {f'<p style="margin:0 0 16px;"><b>{"What to change" if status == "changes_requested" else "Comment"}:</b> {_escape_html(row["reviewer_comment"])}</p>' if row.get('reviewer_comment') else ''}
     </div>
     """
-    subject = ("CV approved" if approved else "CV rejected") + \
+    subject = {"approved": "CV approved",
+               "changes_requested": "CV needs changes",
+               }.get(status, "CV rejected") + \
         f" – {row['candidate_name'] or 'Candidate'} • {row['opp_position_name'] or 'Opportunity'}"
     # La recruiter que lo mandó es la destinataria; la supervisión ve cerrarse el circuito.
     # clean_emails: un solo destinatario inválido hace que SendGrid descarte TODO el mensaje.

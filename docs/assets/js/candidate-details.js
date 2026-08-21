@@ -5259,7 +5259,8 @@ function _replaceDateText(node){
     bits.push(`<div class="cv-review-hist-head">
         <b>Round ${r.round}</b> · ${escapeHtml(r.opp_position_name || 'Opportunity')}
         ${r.client_name ? '· ' + escapeHtml(r.client_name) : ''}
-        <span class="cv-review-hist-status cv-review-hist-status--${r.status}">${r.status}</span>
+        <span class="cv-review-hist-status cv-review-hist-status--${r.status}">${
+          r.status === 'changes_requested' ? 'needs changes' : r.status}</span>
       </div>`);
     if (r.ai_score !== null && r.ai_score !== undefined) {
       const rs = r.requirements_summary || {};

@@ -213,6 +213,9 @@
 }
 .cvr-split i { display: block; height: 100%; }
 .cvr-split-a { background: var(--hx-lime); }
+/* Violeta para "devuelto a corregir": ni el lima de aprobado ni el rojo de rechazado.
+   Que el ojo lo lea como una tercera cosa es todo el punto del estado. */
+.cvr-split-c { background: #4f46e5; }
 .cvr-split-r { background: var(--hx-urgent); }
 .cvr-split-legend {
   display: flex;
@@ -224,7 +227,7 @@
 }
 .cvr-split-legend b { font-family: var(--hx-mono); font-size: 13px; color: var(--hx-ink); }
 /* Puntito del color de su tramo, para atar leyenda y barra sin escribir "lima = ...". */
-.cvr-lg-a::before, .cvr-lg-r::before {
+.cvr-lg-a::before, .cvr-lg-c::before, .cvr-lg-r::before {
   content: "";
   display: inline-block;
   width: 7px;
@@ -234,6 +237,7 @@
   vertical-align: middle;
 }
 .cvr-lg-a::before { background: var(--hx-lime); }
+.cvr-lg-c::before { background: #4f46e5; }
 .cvr-lg-r::before { background: var(--hx-urgent); }
 .cvr-split-base { margin: 6px 0 0; font-size: 11.5px; color: var(--hx-faint); }
 .cvr-split-base--empty { margin: 0; font-size: 12.5px; color: var(--hx-muted); }
@@ -1401,3 +1405,33 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 /* Un chip que NO se pudo ubicar en el CV se queda como estaba: sin cursor de mano y sin
    hover, para que no prometa un salto que no va a pasar. Es la misma degradación que
    tienen las citas — el atributo está, la clase .cvr-hl-item no. */
+
+/* --- Pedir cambios: un tercer veredicto, no un rechazo suave ------------------------- */
+.cvr-st-changes { background: #e5e7ff; color: #312e81; }
+
+/* El botón queda entre Reject y Approve, y tiene que leerse como una tercera opción y no
+   como un rechazo más blando: violeta, no rojo ni verde. */
+.cvr-btn-changes {
+  border-color: #c7cbff;
+  background: #eef0ff;
+  color: #312e81;
+}
+.cvr-btn-changes:hover:not(:disabled) {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+.cvr-changes {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #c7cbff;
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: #f7f8ff;
+}
+.cvr-changes-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--hx-ink-2);
+  line-height: 1.45;
+}

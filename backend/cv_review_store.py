@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS cv_reviews (
     opportunity_id   INTEGER     NOT NULL,
     round            SMALLINT    NOT NULL CHECK (round >= 1),
     status           TEXT        NOT NULL DEFAULT 'pending'
-                                 CHECK (status IN ('pending','approved','rejected','cancelled')),
+                                 CHECK (status IN ('pending','approved','rejected',
+                                                   'changes_requested','cancelled')),
     recruiter_email  TEXT        NOT NULL,
     hr_lead_email    TEXT,
     sales_lead_email TEXT,
@@ -101,6 +102,36 @@ _REASONS_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS cv_review_reasons_code_idx ON cv_review_reasons (reason_code)"
 )
 
+# --- migraciones sobre una tabla que YA existe -------------------------------------------
+# El camino rápido de _ensure_locked() no corre DDL cuando las tablas están, que es el caso
+# de producción. Así que un valor nuevo de `status` no entra por el CREATE TABLE: hay que
+# rehacer el CHECK. Sin esto, "changes_requested" revienta con un error de constraint en
+# producción mientras anda perfecto en una base recién creada.
+#
+# El chequeo previo lee pg_constraint, que es catálogo puro y NO toma un solo lock. Esa es
+# la condición para que esto pueda correr en cada arranque sin repetir el problema que
+# documenta _tables_exist(): varias laptops peleándose el ACCESS EXCLUSIVE sobre cv_reviews
+# contra la base de producción.
+_STATUS_VALUES = ("pending", "approved", "rejected", "changes_requested", "cancelled")
+
+_STATUS_CHECK_SQL = (
+    "ALTER TABLE cv_reviews DROP CONSTRAINT IF EXISTS cv_reviews_status_check",
+    "ALTER TABLE cv_reviews ADD CONSTRAINT cv_reviews_status_check CHECK (status IN "
+    + "(" + ", ".join("'%s'" % v for v in _STATUS_VALUES) + "))",
+)
+
+
+def _status_check_is_current(cur) -> bool:
+    """¿El CHECK de status ya admite todos los valores? Lectura de catálogo, sin locks."""
+    cur.execute(
+        """SELECT pg_get_constraintdef(oid) FROM pg_constraint
+            WHERE conrelid = 'public.cv_reviews'::regclass
+              AND conname  = 'cv_reviews_status_check'"""
+    )
+    row = cur.fetchone()
+    # Sin constraint no hay nada que arreglar (tabla recién creada por el DDL de arriba).
+    return not row or all(v in row[0] for v in _STATUS_VALUES)
+
 
 def ensure_cv_review_tables() -> bool:
     """Crea las tablas si faltan. Devuelve True si están listas.
@@ -148,6 +179,23 @@ def _tables_exist(cur) -> bool:
     return bool(row and row[0] and row[1])
 
 
+def _migrate_status_check(conn) -> None:
+    """Rehace el CHECK de status. Con los mismos timeouts que el DDL de creación.
+
+    Rehacer un CHECK toma ACCESS EXCLUSIVE, pero es instantáneo: el ADD valida las filas
+    existentes con un seq scan sobre una tabla de decenas de filas. Si igual no consigue el
+    lock en _LOCK_TIMEOUT se rinde y lo reintenta el próximo arranque — nunca se cuelga.
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SET LOCAL lock_timeout = '{_LOCK_TIMEOUT}'")
+        cur.execute(f"SET LOCAL statement_timeout = '{_STATEMENT_TIMEOUT}'")
+        for stmt in _STATUS_CHECK_SQL:
+            cur.execute(stmt)
+    conn.commit()
+    logging.info("cv_reviews: CHECK de status migrado, ahora admite %s",
+                 ", ".join(_STATUS_VALUES))
+
+
 def _ensure_locked() -> bool:
     global _TABLE_READY, _LAST_FAILURE_TS
     conn = None
@@ -157,7 +205,16 @@ def _ensure_locked() -> bool:
         with conn.cursor() as cur:
             cur.execute("SET LOCAL statement_timeout = '5s'")
             if _tables_exist(cur):
+                # Las tablas están, pero pueden ser de una versión anterior. Es el ÚNICO
+                # lugar por donde pasa producción, así que las migraciones van acá adentro
+                # o no corren nunca.
+                current = _status_check_is_current(cur)
                 conn.commit()
+                if current:
+                    _TABLE_READY = True
+                    _LAST_FAILURE_TS = 0.0
+                    return True
+                _migrate_status_check(conn)
                 _TABLE_READY = True
                 _LAST_FAILURE_TS = 0.0
                 return True

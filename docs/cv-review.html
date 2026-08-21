@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-queue-groups" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-changes4" />
 </head>
 
 <body class="light-mode">
@@ -74,6 +74,7 @@
                 <option value="pending">Waiting for review</option>
                 <option value="">All</option>
                 <option value="approved">Approved</option>
+                <option value="changes_requested">Needs changes</option>
                 <option value="rejected">Rejected</option>
                 <option value="cancelled">Cancelled</option>
               </select>
@@ -129,6 +130,10 @@
               opening, not how well the recruiter writes, and it only counts analyses scored
               the current way. Rejection reasons are not exclusive, so their percentages add
               up to more than 100.
+              <b>Needs changes</b> counts as decided, like the other two: the round is
+              closed and the ball is back with the recruiter. It is kept apart from
+              rejected on purpose — a rejection is about the candidate, a correction is
+              about the document, and only the rejection marks the candidate in the batch.
             </div>
           </details>
 
@@ -259,6 +264,21 @@
             </label>
           </div>
 
+          <!-- Pedir cambios NO lleva la lista de razones. Esa lista existe para medir por
+               qué se RECHAZA un perfil; acá el candidato sigue en carrera y lo único que
+               hace falta es decir qué corregir. Un formulario aparte y no un checkbox más
+               adentro del de rechazo: son dos decisiones distintas. -->
+          <div class="cvr-changes" id="cvrChangesForm" hidden>
+            <p class="cvr-field-label">What needs changing?</p>
+            <label class="hx-field">
+              <span>Comment for the recruiter <em class="hx-hint">required</em></span>
+              <textarea id="cvrChangesComment" rows="4"
+                placeholder="e.g. The Tambourine bullets are three words each — expand them with what she told you in the interview. Everything else is fine."></textarea>
+            </label>
+            <p class="cvr-changes-note">The candidate stays in play and nothing is marked as
+              rejected. The recruiter fixes the CV and sends it back as the next round.</p>
+          </div>
+
             <p class="hx-err" id="cvrDrawerError"></p>
           </section>
         </div>
@@ -272,6 +292,9 @@
             <button type="button" class="hx-btn cvr-btn-reject" id="cvrRejectToggle">
               <i class="fa-solid fa-xmark"></i> Reject
             </button>
+            <button type="button" class="hx-btn cvr-btn-changes" id="cvrChangesToggle">
+              <i class="fa-solid fa-pen"></i> Request changes
+            </button>
             <button type="button" class="hx-btn hx-btn-primary" id="cvrApprove">
               <i class="fa-solid fa-check"></i> Approve
             </button>
@@ -279,6 +302,9 @@
             <button type="button" class="hx-btn hx-btn-ghost" id="cvrRejectCancel" hidden>Cancel</button>
             <button type="button" class="hx-btn hx-btn-danger" id="cvrRejectConfirm" hidden>
               <i class="fa-solid fa-rotate-left"></i> Send it back
+            </button>
+            <button type="button" class="hx-btn cvr-btn-changes" id="cvrChangesConfirm" hidden>
+              <i class="fa-solid fa-paper-plane"></i> Send the corrections
             </button>
           </div>
         </footer>
@@ -288,6 +314,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260821-queue-groups" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260821-changes4" defer></script>
 </body>
 </html>

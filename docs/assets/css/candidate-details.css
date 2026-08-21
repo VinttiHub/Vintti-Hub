@@ -6233,6 +6233,8 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .cv-review-hist-status--pending  { background: #ffe4a3; color: #7a5200; }
 .cv-review-hist-status--approved { background: #c1ff72; color: #3a6b00; }
 .cv-review-hist-status--rejected { background: #ffd9d9; color: #a01111; }
+/* Violeta: es un tercer veredicto, no un rechazo más suave. El candidato sigue en carrera. */
+.cv-review-hist-status--changes_requested { background: #e5e7ff; color: #312e81; }
 .cv-review-hist-line { font-size: 13px; color: #42516a; margin-top: 3px; }
 .cv-review-hist-comment {
   margin-top: 8px;

@@ -145,14 +145,22 @@
       const dec = r.profiles_decided || 0;
       const ap = r.approved_first_try_pct;
       const rj = r.rejected_first_try_pct;
+      // Tres tramos, no dos: "devuelto para corregir" no es ni aprobado ni rechazado, y
+      // sumarlo a cualquiera de los dos miente en la dirección que más importa — el
+      // rechazo es sobre el candidato, la corrección es sobre el documento.
+      // El tramo va siempre (0 % es ancho 0) pero la leyenda sólo si hubo alguno: una
+      // línea que dice "0% needs changes" en cada tarjeta es ruido.
+      const ch = r.changes_first_try_pct || 0;
       const split = dec
         ? `<div class="cvr-split" role="img"
-                aria-label="${ap}% approved on the first try, ${rj}% rejected">
+                aria-label="${ap} per cent approved on the first try, ${ch} per cent sent back for changes, ${rj} per cent rejected">
              <i class="cvr-split-a" style="width:${ap}%"></i>
+             <i class="cvr-split-c" style="width:${ch}%"></i>
              <i class="cvr-split-r" style="width:${rj}%"></i>
            </div>
            <div class="cvr-split-legend">
              <span class="cvr-lg-a"><b>${ap}%</b> approved 1st try</span>
+             ${ch ? `<span class="cvr-lg-c"><b>${ch}%</b> needs changes</span>` : ''}
              <span class="cvr-lg-r"><b>${rj}%</b> rejected</span>
            </div>
            <p class="cvr-split-base">over ${dec} decided profile${dec === 1 ? '' : 's'}</p>`
@@ -227,6 +235,7 @@
     pending:   ['Waiting',   'cvr-st-pending'],
     approved:  ['Approved',  'cvr-st-approved'],
     rejected:  ['Rejected',  'cvr-st-rejected'],
+    changes_requested: ['Needs changes', 'cvr-st-changes'],
     cancelled: ['Cancelled', 'cvr-st-cancelled'],
   };
 
@@ -1486,24 +1495,35 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     }).join('');
   }
 
-  function setRejectMode(on) {
-    show($('cvrRejectForm'), on);
-    show($('cvrRejectConfirm'), on);
+  // UN solo modo, no dos booleanos: con `rejectMode` y `changesMode` sueltos se pueden
+  // prender los dos y el footer queda con dos confirmaciones distintas a la vez.
+  // null = elegir; 'rejected' | 'changes_requested' = escribiendo el formulario de ese.
+  function setDecisionMode(mode) {
+    const rej = mode === 'rejected';
+    const chg = mode === 'changes_requested';
+    const on = rej || chg;
+    show($('cvrRejectForm'), rej);
+    show($('cvrChangesForm'), chg);
+    show($('cvrRejectConfirm'), rej);
+    show($('cvrChangesConfirm'), chg);
     show($('cvrRejectCancel'), on);
     show($('cvrRejectToggle'), !on);
+    show($('cvrChangesToggle'), !on);
     show($('cvrApprove'), !on);
-    $('cvrFootHint').textContent = on
+    $('cvrFootHint').textContent = rej
       ? 'Pick at least one reason and leave a comment — it is what the recruiter acts on.'
-      : '';
+      : chg
+        ? 'The comment is the only thing the recruiter gets, so say what to change.'
+        : '';
     if (on) {
       // Llevar el ojo al formulario: en un CV largo queda debajo del iframe.
-      $('cvrRejectForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      $(rej ? 'cvrRejectForm' : 'cvrChangesForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
 
   function openDrawer(reviewId) {
     $('cvrDrawerError').textContent = '';
-    setRejectMode(false);
+    setDecisionMode(null);
     $('cvrAi').innerHTML = '<p class="cvr-ai-none">Loading…</p>';
     $('cvrRounds').innerHTML = '';
     hlResetQuotes();
@@ -1597,9 +1617,14 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       body.reasons = Array.from($('cvrReasons').querySelectorAll('input:checked')).map(i => i.value);
       body.reason_other = $('cvrReasonOther').value.trim();
       body.reviewer_comment = $('cvrComment').value.trim();
+    } else if (decision === 'changes_requested') {
+      // Sin razones a propósito: los códigos fijos miden por qué se RECHAZA un perfil, y
+      // esto no es un rechazo. El backend igual las descarta si llegaran.
+      body.reviewer_comment = $('cvrChangesComment').value.trim();
     }
 
-    const buttons = [$('cvrApprove'), $('cvrRejectConfirm'), $('cvrRejectToggle')];
+    const buttons = [$('cvrApprove'), $('cvrRejectConfirm'), $('cvrRejectToggle'),
+                     $('cvrChangesConfirm'), $('cvrChangesToggle')];
     buttons.forEach(b => { b.disabled = true; });
     $('cvrDrawerError').textContent = '';
 
@@ -1613,6 +1638,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       })
       .then(out => {
         $('cvrComment').value = '';
+        $('cvrChangesComment').value = '';
         $('cvrReasonOther').value = '';
         $('cvrReasons').querySelectorAll('input:checked').forEach(i => { i.checked = false; });
         closeDrawer();
@@ -1743,8 +1769,10 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     wireQueue();
     wireMetricsToggle();
 
-    $('cvrRejectToggle').addEventListener('click', () => setRejectMode(true));
-    $('cvrRejectCancel').addEventListener('click', () => setRejectMode(false));
+    $('cvrRejectToggle').addEventListener('click', () => setDecisionMode('rejected'));
+    $('cvrChangesToggle').addEventListener('click', () => setDecisionMode('changes_requested'));
+    $('cvrChangesConfirm').addEventListener('click', () => decide('changes_requested'));
+    $('cvrRejectCancel').addEventListener('click', () => setDecisionMode(null));
     $('cvrApprove').addEventListener('click', () => decide('approved'));
     $('cvrRejectConfirm').addEventListener('click', () => decide('rejected'));
 
