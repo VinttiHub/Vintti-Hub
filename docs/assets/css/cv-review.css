@@ -1007,3 +1007,42 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   font-weight: 600;
 }
 .cvr-fold-b > .cvr-tools { margin-top: 0; }
+
+/* La cuenta de años, rol por rol. Va plegada: sólo importa cuando el total sorprende. */
+.cvr-years { margin: 5px 0 0; }
+.cvr-years > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--hx-ink-2);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.cvr-years > summary::-webkit-details-marker { display: none; }
+.cvr-years ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.cvr-years li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--hx-ink-2);
+}
+.cvr-years li b { font-weight: 600; color: var(--hx-ink); }
+.cvr-years li span { font-family: var(--hx-mono); font-size: 10px; }
+.cvr-years li i { margin-left: auto; font-style: normal; font-family: var(--hx-mono); }
+.cvr-years li.is-bad { color: #8f0f2a; }
+.cvr-years p { margin: 6px 0 0; font-size: 11px; color: var(--hx-faint); }
+
+/* Los roles que NO se contaron. Van dentro del mismo desplegable y con el mismo peso
+   visual que los contados: son la parte discutible de la cuenta, no una nota al pie. */
+.cvr-years-off { margin: 8px 0 0 !important; }
+.cvr-years ul.cvr-years-skip { margin-top: 4px; opacity: .85; }
+.cvr-years-skip li b { color: var(--hx-ink-2); font-weight: 500; }
+.cvr-years-skip li em {
+  flex: 1 1 100%;
+  margin: 0;
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--hx-faint);
+}
+.cvr-years-skip li { flex-wrap: wrap; }

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import datetime as _dt
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,6 +41,18 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 11: qué roles cuentan para un requisito de "N años de X" se decide en una llamada aparte
+# (apply_years_roles), y la lista de descartados con su motivo se muestra al lado del total.
+# El juez principal lo hacía mal de forma reproducible: contra "7+ years managing SEM
+# campaigns" dejaba afuera a la "Social & Paid Media Manager" con "focused on social media,
+# not SEM" — dos años, y la diferencia entre 5,7 y 7,8 sobre un piso de 7. No era falta de
+# instrucciones: la regla estaba escrita tres veces en su prompt, con auto-chequeo y con el
+# ejemplo exacto, y la ignoraba igual. Era falta de atención, así que la decisión se mudó a
+# un prompt que no habla de otra cosa. Y dentro de ese prompt, tres cosas se le sacaron al
+# modelo y las hace el código: la aritmética (ya estaba), el matching de la familia de
+# trabajo que él mismo escribe en "counts_as", y la última palabra cuando cita el bullet
+# correcto y acto seguido descarta el rol. Bump porque los scores se mueven: los CV que
+# perdían un requisito de años entero pasan a cubrirlo.
 # 10: se sacó la rúbrica entera. Tres versiones seguidas intentando que seis criterios
 # dejaran de castigar el fit del candidato, y el mejor resultado fue 61 sobre un CV que la
 # owner puntúa 9/10. El instrumento estaba mal, no la calibración: ahora el score ES la
@@ -63,7 +76,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 10
+ANALYSIS_VERSION = 11
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -129,6 +142,13 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
       "status": "described" | "listed_only" | "missing",
       "in_source": "yes" | "no" | "unclear",   // does the SOURCE MATERIAL show it? see below
       "evidence": string,               // VERBATIM quote from THE VINTTI CV, or "" when missing
+      "years_roles": number[],          // ONLY when the requirement asks for N years: the
+                                        //   [R#] numbers of the roles that count toward it.
+                                        //   [] when no role does. Omit otherwise.
+      "years_roles_excluded": [         // ONLY when the requirement asks for N years: EVERY
+        { "role": number, "why": string }  //   other [R#], with one line saying why it does
+      ],                                //   not count. Together with "years_roles" this must
+                                        //   name every role in WORK EXPERIENCE, exactly once.
       "note": string                    // one line, see below
     }
   ],                                    // EXACTLY as many entries as "jd_requirements_verbatim",
@@ -185,6 +205,12 @@ are most likely to fail:
   drop because they fit neither box. There is no third option and there is no "skip":
   every bullet is either "technical" or "soft".
   Both kinds get listed; only the technical ones drive the summary and the score.
+- LANGUAGE requirements ("Fluent English", "Advanced English proficiency", "Inglés
+  fluido") are always "kind": "soft", no exception. List them so the reviewer sees them,
+  but they must NEVER move "jd_alignment" and must never appear in the summary as a
+  reason the CV falls short. Whether the document happens to spell out the candidate's
+  English is a writing choice, not a measure of the candidate — language is judged in the
+  interview, not by reading the CV.
 - What you do NOT list: anything under a heading that marks it as optional —
   "Nice to have", "Non-mandatory skills", "Not mandatory", "Bonus", "Preferred
   qualifications", "Desirable", "Optional", "Good to have", "Deseable", "Opcional",
@@ -268,6 +294,73 @@ to their essence — never your description of them.
 - Never return an empty "jd_requirements" when a job description was supplied: a JD always
   states requirements, so an empty checklist means you did not do the work. Return [] only
   when there is no job description at all.
+- YEARS OF EXPERIENCE: DO NOT COUNT THEM. Do the one part you are good at and leave the
+  arithmetic to us. When a requirement asks for N years OF SOMETHING, sort the roles and we
+  add up the dates of the ones you kept, exactly. Then we overwrite your "status" and your
+  "note". Getting this list right is the single highest-stakes call you make: one role left
+  out is often a year or two, and a year or two is the difference between a candidate who
+  clears the bar and one who does not.
+
+  THE METHOD, and it is not optional — GO THROUGH EVERY [R#] ROLE, TOP TO BOTTOM, INCLUDING
+  THE OLD ONES AT THE BOTTOM. Every role lands in exactly one of the two lists:
+    "years_roles"          -> [R#]s whose work IS the kind the requirement names
+    "years_roles_excluded" -> every OTHER [R#], each with one line saying why not
+  The two lists together must name EVERY role in the WORK EXPERIENCE section, once. If the
+  CV has 7 roles, the two arrays hold 7 numbers between them. This is a forcing device: it
+  exists because skimming the first few roles and stopping is exactly how this comes back
+  wrong, and because a reviewer who disagrees with an exclusion needs to see it.
+
+  WHAT COUNTS, and read this before you exclude anything:
+    * NAME THE DISCIPLINE, THEN MATCH ON IT. A requirement like "7+ years managing SEM
+      campaigns across Google Ads and Microsoft/Bing Ads" asks for years of SEM / paid
+      search. The platforms it lists describe the FLAVOUR of that work — they are not a
+      second gate the role also has to pass. A role that ran paid search on some other
+      platform, or that does not name its platforms at all, still did the discipline.
+      Ask "is this the same job, done somewhere else?", never "does this bullet repeat the
+      posting's nouns?".
+    * Judge each role by what its bullets and its title describe, not by how close the
+      words are. "Paid Search Specialist" running Google Ads IS SEM experience even if the
+      posting says "SEM" and the CV never uses that word. "Social & Paid Media Manager"
+      who managed paid media IS paid-media experience.
+    * THE DISCIPLINE IS A FAMILY, NOT AN ACRONYM. Match on the work, not the label the
+      posting happened to use. "SEM" and paid search, PPC, SEA, Google Ads, paid media
+      buying are one family; "bookkeeping" and AP/AR, reconciliations, month-end close are
+      one family. A role that did the family did the work.
+    * PART OF THE JOB IS ENOUGH — this is the rule you are most likely to break. If the
+      role did this work AMONG OTHER THINGS, it counts in full. We cannot split a role in
+      half and neither can you, so a half-and-half role is counted whole. That is
+      deliberate: a candidate who ran paid media for half of a two-year job really did
+      spend those two years in the field.
+    * THE ONLY TEST FOR EXCLUDING A ROLE: read its title and every one of its bullets and
+      ask — is the requirement's work ABSENT here? If the title names it, or if ANY bullet
+      shows the person doing it, the role counts. Full stop.
+      These are NOT reasons to exclude, and each one is a mistake we have actually seen:
+        "focused on X, not Y"  · "primarily/mainly/mostly something else"
+        "not the main part of the role"  · "too junior" · "a coordinator, not a manager"
+        "an internship" · "too long ago" · "a different industry"
+      SELF-CHECK, run it before you answer: if a "why" you wrote contains "focused on",
+      "primarily", "mainly", "mostly", "not the main", "rather than" or "more of a", you
+      excluded a role whose bullets DO show the work. Move it into "years_roles".
+      Example of the mistake, and it costs two whole years: a role titled "Social & Paid
+      Media Manager" whose first bullet reads "Managed social and paid media strategy"
+      COUNTS toward "7+ years managing SEM campaigns" — paid media is the family, the
+      bullet shows them doing it, and "it was mostly social" is not a reason.
+    * SENIORITY IS NOT THE SUBJECT. "7 years managing SEM campaigns" asks for 7 years of
+      SEM, not 7 years of managing. A specialist, coordinator or analyst doing the work
+      counts in full. Only exclude on seniority when the requirement is explicitly about
+      leading PEOPLE ("managing a team of paid search analysts").
+    * A REAL exclusion looks like ABSENCE, and it is worth making: a Marketing Coordinator
+      whose bullets are "coordinated website updates in the CMS" and "conducted QA on
+      website functionality" never touched a campaign, so it does not count toward
+      "7 years managing SEM campaigns", however long they held the title. Say that in one
+      line — name the work the bullets DO show — and move on.
+    * Return [] for "years_roles" when NO role did this work. That is a real answer and it
+      is not a failure. But [] plus a long "years_roles_excluded" of near-misses means you
+      matched on wording instead of on the discipline — go back and re-read them.
+    * When the requirement asks for years with NO subject at all ("5+ years of professional
+      experience"), every role goes in "years_roles" and "years_roles_excluded" is [].
+  Never estimate a total yourself, and never argue the number from the candidate's own CV
+  or LinkedIn — the dates in the document under review are the answer.
 - THIS CHECKLIST IS THE SCORE. There is no other input to the number: we take the
   technical requirements, give each an equal share of 100, and award the full share for
   "described", half for "listed_only" and none for "missing". Nothing else you return moves
@@ -419,10 +512,12 @@ def flatten_resume_for_prompt(snapshot: Dict[str, Any]) -> str:
     work = _as_list(snapshot.get("work_experience"))
     if not work:
         out.append("(empty)")
-    for entry in work:
+    # Los roles van NUMERADOS para que el modelo pueda decir cuáles cuentan para un
+    # requisito de años sin tener que reescribir el título (y equivocarse al hacerlo).
+    for i, entry in enumerate(work, start=1):
         end = "Present" if entry.get("current") else (entry.get("end_date") or "?")
         out.append(
-            f"\n### {entry.get('title') or '(no title)'} — {entry.get('company') or '(no company)'}"
+            f"\n### [R{i}] {entry.get('title') or '(no title)'} — {entry.get('company') or '(no company)'}"
             f"  [{entry.get('start_date') or '?'} → {end}]"
         )
         for bullet in _bullets(entry.get("description")):
@@ -596,21 +691,21 @@ def _is_after_cut(requirement, jd_norm, cut):
 # Estos ganan aunque la frase también tenga palabras blandas: "3+ years of experience
 # communicating with clients" es un requisito de experiencia, no una soft skill.
 #
-# Nombrar un idioma alcanza para que sea técnico, sin importar cómo esté redactado. Acá el
-# idioma es un requisito duro —"English level" es una de las razones de rechazo del
-# review— y las JDs lo escriben de mil formas: "Fluent English", "Fluency in English with
-# exceptional communication skills", "Advanced English proficiency". Pedir una fórmula
-# exacta dejaba afuera la mitad, y la que dice "communication" se iba derecho a soft.
+# El IDIOMA no está acá: va a soft por decisión de la owner. Casi toda JD pide inglés, y
+# que el CV lo diga o no es un dato de redacción, no una medida del candidato — el inglés
+# se evalúa en la entrevista, no leyendo el documento. Se sigue mostrando en la checklist
+# (con su etiqueta de soft) pero no cuenta para el score. La razón de rechazo "English
+# level" sigue existiendo aparte, para que el sales lead la tilde a mano cuando aplique.
 _REQ_TECHNICAL_OVERRIDE = re.compile(r"""
     \b\d+\s*(?:[-–—+]|\s+to\s+)?\s*\d*\s*\+?\s*(?:years?|yrs?)\b   # "3 years", "2–3+ years"
   | \b(?:bachelor|master|mba|degree|diploma|certified|certification|licen[cs]e|cpa|cfa)\b
-  | \b(?:english|spanish|portuguese|french|ingl[eé]s|espa[nñ]ol|portugu[eé]s)\b
 """, re.I | re.X)
 
 # Fórmulas blandas y logísticas. Lo logístico (horario, equipo, zona horaria) va acá porque
 # tampoco es una capacidad técnica del candidato, pero SÍ se muestra: la owner lo pidió.
 _REQ_SOFT = re.compile(r"""
-    \b(?:communicat\w+|interpersonal|written\s+and\s+(?:verbal|oral|spoken))\b
+    \b(?:english|spanish|portuguese|french|ingl[eé]s|espa[nñ]ol|portugu[eé]s)\b
+  | \b(?:communicat\w+|interpersonal|written\s+and\s+(?:verbal|oral|spoken))\b
   | \bteam\s*(?:work|player|-?oriented)\b | \bcollaborat\w+\b
   | \battention\s+to\s+detail\b | \bdetail[-\s]oriented\b
   | \borganiz\w*\s+skills?\b | \b(?:strong|excellent|good)\s+organiz\w+\b
@@ -664,6 +759,34 @@ def is_assumed_requirement(text: str) -> bool:
     return bool(_REQ_ASSUMED.search(str(text or "")))
 
 
+# El idioma NO puntúa, y no es por ser poco importante — "English level" es una de las
+# razones de rechazo. Es que el CV no lo puede evidenciar: TODO CV que manda Vintti está
+# escrito en inglés, así que el requisito se cumple trivialmente para cualquier candidato y
+# no distingue a nadie. El nivel real se verifica en la grabación y en la entrevista.
+# Se sigue listando, como todo lo que no puntúa.
+_REQ_LANGUAGE = re.compile(r"""
+    \b(?:english|spanish|portuguese|french|italian|german
+       |ingl[eé]s|espa[nñ]ol|portugu[eé]s|franc[eé]s)\b
+  | \bbilingual\b | \bbiling[uü]e\b | \bnative\s+speaker\b
+""", re.I | re.X)
+
+
+def no_score_reason(text: str) -> str:
+    """Por qué un requisito no puntúa, o "" si puntúa.
+
+    Un solo campo en vez de un booleano por motivo: la lista va a crecer, y tres flags que
+    hay que consultar juntos son tres formas de olvidarse de una.
+    """
+    t = str(text or "")
+    if _REQ_LANGUAGE.search(t):
+        return "language"
+    if _REQ_ASSUMED.search(t):
+        return "assumed"
+    if classify_requirement(t) == "soft":
+        return "soft"
+    return ""
+
+
 def classify_requirement(text: str) -> str:
     """técnico o soft, por reglas nuestras. Mismo texto -> misma respuesta, siempre."""
     t = str(text or "")
@@ -688,8 +811,14 @@ def _quote_in_cv(quote: str, cv_norm: str) -> bool:
     return any(q[:n] in cv_norm for n in (40, 20, 12) if len(q) >= n or n == 12)
 
 
-def _clean_requirements(raw: Any, jd_text: Any = None,
-                        cv_text: Any = None) -> List[Dict[str, Any]]:
+def _role_number(value) -> Optional[int]:
+    """El [R#] de un rol, venga como 6, "6" o "R6". El modelo alterna entre las tres."""
+    m = re.search(r"\d+", str(value if value is not None else ""))
+    return int(m.group()) if m else None
+
+
+def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
+                        snapshot: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Cobertura requisito por requisito. Es el campo que el reviewer lee primero.
 
     Los técnicos van antes que los soft porque son los que decide el reviewer; dentro de
@@ -704,6 +833,48 @@ def _clean_requirements(raw: Any, jd_text: Any = None,
     cut = optional_section_start(jd_norm) if jd_norm else None
 
     cv_norm = _norm_for_match(cv_text) if cv_text else ""
+    snap = snapshot or {}
+    roles_list = _as_list(snap.get("work_experience"))
+
+    def years_of(roles):
+        """El desglose de la cuenta: total, qué se contó y qué no se pudo leer."""
+        if not roles_list:
+            return {"years": None, "counted": [], "unreadable": [], "overlap_months": 0}
+        return experience_breakdown(snap, roles)
+
+    def excluded_roles(raw_excluded, kept):
+        """Los roles que NO se contaron, con el motivo, para que se puedan discutir.
+
+        Es el único error que la cuenta todavía puede cometer: la aritmética es exacta, la
+        elección de roles no. Un rol de dos años dejado afuera son dos años que el reviewer
+        no ve desaparecer — salvo que se los mostremos al lado del total. Un rol que el
+        modelo no clasificó en ninguna de las dos listas se muestra igual, marcado, porque
+        una omisión silenciosa es indistinguible de una decisión.
+        """
+        why = {}
+        for e in _as_list(raw_excluded):
+            if not isinstance(e, dict):
+                continue
+            n = _role_number(e.get("role"))
+            if n is not None and 1 <= n <= len(roles_list) and n not in kept:
+                why.setdefault(n, str(e.get("why") or "").strip())
+        rows = []
+        for i, entry in enumerate(roles_list, start=1):
+            if i in kept:
+                continue
+            rows.append({
+                "role": i,
+                "title": str(entry.get("title") or f"role {i}"),
+                "start_date": str(entry.get("start_date") or ""),
+                "end_date": "Present" if entry.get("current") else str(entry.get("end_date") or ""),
+                "why": why.get(i, ""),
+                "unjudged": i not in why,
+            })
+        missing = [r["role"] for r in rows if r["unjudged"]]
+        if missing:
+            logging.warning("cv_review: el modelo no clasificó los roles %s para un requisito "
+                            "de años; se muestran como no juzgados", missing)
+        return rows
     out: List[Dict[str, Any]] = []
     dropped = 0
     for item in raw or []:
@@ -741,7 +912,58 @@ def _clean_requirements(raw: Any, jd_text: Any = None,
         if in_source not in ("yes", "no", "unclear"):
             in_source = "unclear"
         kind = classify_requirement(text)
-        assumed = is_assumed_requirement(text)
+        reason = no_score_reason(text)
+        assumed = reason == "assumed"
+
+        # Los años NO los opina el modelo: los tenemos en las fechas del CV. Se pisa su
+        # status con la aritmética y se reemplaza la nota por la cuenta, para que el
+        # reviewer pueda verificarla de un vistazo en vez de creernos.
+        needed = required_years(text)
+        note = str(item.get("note") or "").strip()
+        years_roles = None
+        years_detail = None
+        if needed is not None:
+            raw_roles = item.get("years_roles")
+            if isinstance(raw_roles, list):
+                # "R6" tanto como 6: el modelo alterna entre las dos formas.
+                nums = (_role_number(x) for x in raw_roles)
+                years_roles = sorted({n for n in nums if n is not None and 1 <= n <= 40})
+            else:
+                # Sin la lista no sabemos qué contar. Se cae a la carrera entera, que es lo
+                # generoso, y se avisa: es la única rama donde la cuenta puede sobrestimar.
+                logging.warning("cv_review: sin years_roles para %r; se cuenta la carrera entera", text)
+            yb = years_of(years_roles)
+            have = yb["years"]
+            titles = [c["title"] for c in yb["counted"]]
+            where = ("The dates in this CV" if years_roles is None else
+                     titles[0] if len(titles) == 1 else
+                     " and ".join(titles) if len(titles) == 2 else
+                     ", ".join(titles[:-1]) + " and " + titles[-1] if titles else "")
+            y_status, y_note = years_status(needed, have, where)
+            # Una fecha ilegible se saltea, y saltearla en silencio es cómo un total queda
+            # más bajo de lo que el CV muestra sin que nadie pueda saber por qué.
+            if yb["unreadable"]:
+                bad = ", ".join(f'{u["title"]} ({u["start_date"] or "no start date"})'
+                                for u in yb["unreadable"])
+                y_note += f" Not counted, unreadable dates: {bad}."
+                logging.warning("cv_review: fechas ilegibles al contar años: %s", bad)
+            if yb["overlap_months"]:
+                y_note += (f' Overlapping roles were counted once, not twice '
+                           f'({yb["overlap_months"]} month(s) of overlap).')
+            # Se calcula incluso cuando el modelo no mandó la lista (years_roles is None):
+            # ahí no hay descartados porque se contó la carrera entera, y el panel lo dice.
+            yb["excluded"] = ([] if years_roles is None
+                              else excluded_roles(item.get("years_roles_excluded"), set(years_roles)))
+            yb["all_roles"] = years_roles is None
+            years_detail = yb
+            if y_status:
+                if y_status != status:
+                    logging.info("cv_review: años por fechas del CV (%s de %s pedidos, roles %s): "
+                                 "%r pasa de %s a %s",
+                                 have, needed, years_roles, text, status, y_status)
+                status, note = y_status, y_note
+                if y_status == "missing":
+                    evidence = ""
         out.append({
             "requirement": text,
             "kind": kind,
@@ -752,16 +974,21 @@ def _clean_requirements(raw: Any, jd_text: Any = None,
             # que chequean `kind === 'soft'` y `summary.technical`.
             "assumed": assumed,
             # La política de qué puntúa vive acá y en ningún otro lado. El frontend ramifica
-            # por `counts`, nunca la re-deriva: son dos copias que se desincronizan.
-            "counts": kind == "technical" and not assumed,
+            # por `counts`/`no_score_reason`, nunca los re-deriva: dos copias se desincronizan.
+            "no_score_reason": reason,
+            "counts": not reason,
             "status": status,
             "in_source": in_source,
             "evidence": evidence,
-            "note": str(item.get("note") or "").strip(),
+            "note": note,
+            # Para que la pantalla pueda mostrar la cuenta al lado del requisito.
+            "years_required": needed,
+            "years_roles": years_roles,
+            "years_detail": years_detail,
         })
-        if assumed:
-            # La lista se hace crecer con datos de producción, no adivinando.
-            logging.info("cv_review: requisito dado por sentado, no puntúa: %r", text)
+        if reason in ("assumed", "language"):
+            # Las listas se hacen crecer con datos de producción, no adivinando.
+            logging.info("cv_review: no puntúa (%s): %r", reason, text)
 
     # dedupe conservando el orden: el modelo a veces repite el mismo requisito
     seen, deduped = set(), []
@@ -777,8 +1004,129 @@ def _clean_requirements(raw: Any, jd_text: Any = None,
     # Tres grupos: lo que puntúa arriba, las soft en el medio, lo que se da por sentado al
     # fondo. `sort` es estable, así que dentro de cada grupo se respeta el orden de la JD —
     # que es como el reviewer la lee, bullet por bullet contra la vacante.
-    deduped.sort(key=lambda r: 0 if r["counts"] else (1 if r["kind"] == "soft" else 2))
+    _GROUP = {"": 0, "soft": 1, "language": 2, "assumed": 3}
+    deduped.sort(key=lambda r: _GROUP.get(r["no_score_reason"], 1))
     return deduped
+
+
+# --- años de experiencia: se cuentan, no se estiman ---------------------------------------
+# El CV TRAE LAS FECHAS. Preguntarle al modelo cuántos años tiene el candidato es pedirle que
+# haga a ojo una cuenta que nosotros podemos hacer exacta — y lo hacía mal: contra un
+# requisito de "7+ years" contestaba "her own CV shows 6+ years" mirando el material fuente,
+# cuando las fechas del propio CV sumaban más de siete.
+#
+# Se suman los INTERVALOS UNIDOS, no las duraciones: dos roles en paralelo son un período de
+# experiencia, no dos. Sin eso, un CV con dos trabajos simultáneos de 4 años reclamaría 8.
+_DATE_RE = re.compile(r"(\d{4})(?:[-/](\d{1,2}))?")
+
+
+def _as_month(value, default_month=1):
+    """Una fecha del CV a "meses desde el año 0". Tolera "2021", "2021-03", "2021/03/15"."""
+    m = _DATE_RE.search(str(value or ""))
+    if not m:
+        return None
+    year = int(m.group(1))
+    if year < 1950 or year > 2100:
+        return None
+    month = int(m.group(2) or default_month)
+    return year * 12 + max(1, min(12, month)) - 1
+
+
+def experience_breakdown(snapshot: Dict[str, Any],
+                         roles: Optional[List[int]] = None) -> Dict[str, Any]:
+    """La cuenta de años, rol por rol, para que se pueda auditar.
+
+    Un total suelto no se puede verificar: si dice 5,7 y el CV parece sumar 6,8, no hay
+    forma de saber si fue un solapamiento, un hueco entre trabajos o una fecha ilegible que
+    se salteó. Lo último es lo peor y es invisible, así que se reporta aparte.
+    """
+    today = _dt.date.today()
+    now = today.year * 12 + today.month - 1
+    counted, unreadable = [], []
+    spans = []
+    for i, entry in enumerate(_as_list(snapshot.get("work_experience")), start=1):
+        if roles is not None and i not in roles:
+            continue
+        title = str(entry.get("title") or f"role {i}")
+        start = _as_month(entry.get("start_date"))
+        if start is None:
+            unreadable.append({"role": i, "title": title,
+                               "start_date": str(entry.get("start_date") or "")})
+            continue
+        end = now if entry.get("current") else _as_month(entry.get("end_date"), 12)
+        if end is None:
+            end = now
+        end = min(end, now)
+        if end < start:
+            unreadable.append({"role": i, "title": title,
+                               "start_date": str(entry.get("start_date") or "")})
+            continue
+        spans.append((start, end + 1))
+        counted.append({"role": i, "title": title,
+                        "start_date": str(entry.get("start_date") or ""),
+                        "end_date": "Present" if entry.get("current") else str(entry.get("end_date") or ""),
+                        "months": end + 1 - start})
+
+    if not spans:
+        return {"years": None if unreadable or roles is None else 0.0,
+                "counted": counted, "unreadable": unreadable, "overlap_months": 0}
+    spans.sort()
+    merged = [list(spans[0])]
+    for a, b in spans[1:]:
+        if a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    months = sum(b - a for a, b in merged)
+    raw = sum(c["months"] for c in counted)
+    return {"years": round(months / 12.0, 1), "counted": counted,
+            "unreadable": unreadable, "overlap_months": raw - months}
+
+
+def experience_years(snapshot: Dict[str, Any],
+                     roles: Optional[List[int]] = None) -> Optional[float]:
+    """Sólo el total. El desglose está en experience_breakdown()."""
+    return experience_breakdown(snapshot, roles)["years"]
+
+
+# Cuántos años pide el requisito. Cubre "7+ years", "3-5 years", "2 to 4 yrs", "5 años".
+_REQ_YEARS_RE = re.compile(
+    r"\b(\d{1,2})\s*(?:[-–—+]|\s+to\s+)?\s*(\d{1,2})?\s*\+?\s*(?:years?|yrs?|años?|anos?)\b",
+    re.I)
+
+# Cuánto se puede quedar corto y todavía valer medio punto. Un año: las fechas de un CV
+# vienen redondeadas al mes o al año, y "6,7 contra 7" no es lo mismo que no tenerlo.
+YEARS_NEAR_MISS = 1.0
+
+
+def required_years(text: str) -> Optional[int]:
+    """El piso de años que pide el requisito, o None si no pide años."""
+    m = _REQ_YEARS_RE.search(str(text or ""))
+    if not m:
+        return None
+    # En un rango ("3-5 years") lo exigible es el piso.
+    return int(m.group(1))
+
+
+def years_status(needed: int, have: Optional[float], where: str = "") -> Tuple[str, str]:
+    """Status y nota para un requisito de años, decidido por aritmética.
+
+    `where` nombra los roles que se contaron. Va en la nota a propósito: el reviewer tiene
+    que poder ver de un vistazo si el modelo eligió los roles equivocados, que es el único
+    error que esta cuenta todavía puede cometer.
+    """
+    if have is None:
+        return "", ""
+    src = f"{where} add up to" if where else "The dates in this CV add up to"
+    if have + 1e-9 >= needed:
+        return "described", f"{src} {have} years, against the {needed} the posting asks for."
+    if have + YEARS_NEAR_MISS + 1e-9 >= needed:
+        return "listed_only", (f"{src} {have} years against {needed} — just short, so it "
+                               f"counts for half.")
+    if have == 0:
+        return "missing", (f"No role in this CV describes this kind of work, so none of its "
+                           f"{needed} years are covered.")
+    return "missing", f"{src} {have} years, against the {needed} the posting asks for."
 
 
 # --- tools: ¿la experiencia las usa, o sólo están en la lista? --------------------------
@@ -976,7 +1324,7 @@ def requirements_score(reqs: List[Dict[str, Any]], tools_penalty: int = 0):
         } for r in scorable],
         "excluded": [{
             "requirement": r["requirement"],
-            "reason": "assumed" if r.get("assumed") else "soft",
+            "reason": r.get("no_score_reason") or "soft",
         } for r in reqs if not r["counts"]],
     }
     return score, detail, "requirements"
@@ -1059,8 +1407,9 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         # Sin fuente no se puede acusar de inventar nada.
         unsupported = []
 
+    cv_years = experience_years(snapshot)
     requirements = _clean_requirements(parsed.get("jd_requirements"), jd_text,
-                                       flatten_resume_for_prompt(snapshot))
+                                       flatten_resume_for_prompt(snapshot), snapshot)
     req_summary = _requirements_summary(requirements)
     # La lista transcrita es el control: si el modelo copió 8 bullets y anotó 6, dropeó dos.
     # No los inventamos — se avisa, porque una checklist incompleta que parece completa es
@@ -1122,6 +1471,7 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         "_score_basis": basis,
         "_score_detail": score_detail,
         "_tools_check": tools_check,
+        "_cv_years": cv_years,
         "_fabrication_check": "ran" if checked else "skipped_no_source",
         # Un solo lugar decide, en vez de booleanos sueltos que pueden contradecirse: todo
         # lo que no sea un score comparable se excluye del promedio por recruiter.
@@ -1132,6 +1482,260 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         # entradas para poder contestar "¿por qué cambió esto?".
         "_input_hash": fingerprint,
     }
+
+
+# --- qué roles cuentan para un requisito de años: una llamada aparte -----------------------
+# Esta decisión se le sacó al juez principal y vive en su propia llamada. NO por costo: el
+# juez la hacía MAL de una forma reproducible, y la razón es la atención. Su prompt tiene
+# cientos de líneas sobre transcribir la JD, citar evidencia, detectar invenciones y no
+# insultar a la candidata; la regla "un rol que hizo el trabajo ENTRE OTRAS COSAS cuenta
+# entero" queda enterrada ahí adentro y se pierde. Escrita tres veces, con auto-chequeo y
+# con un ejemplo del error exacto, el modelo seguía descartando "Social & Paid Media
+# Manager" de un requisito de SEM con "focused on social media, not SEM" — dos años, y la
+# diferencia entre llegar a los 7 y no llegar.
+#
+# Acá el prompt no habla de otra cosa. Es la misma disciplina que ya se aplicó con la
+# aritmética: primero le sacamos la suma, ahora le sacamos la selección de roles, y al juez
+# principal le queda lo que hace bien.
+#
+# Si esta llamada falla, se conserva lo que dijo el juez principal. Un review sin score no
+# es una opción: el gate no puede depender de dos llamadas en vez de una.
+_YEARS_SYSTEM = """You do exactly one thing: decide which jobs on a CV count toward a
+"N years of X" requirement. Nothing else. You do not score, you do not judge the CV, you do
+not add the years up — we do the arithmetic from the dates once you have sorted the roles.
+
+For EACH requirement you are given, go through EVERY role, top to bottom, and mark it
+counts:true or counts:false with one short line saying why.
+
+THE TEST, and it is the only one: read the role's title and every one of its bullets, then
+ask — IS THE REQUIREMENT'S WORK ABSENT HERE? If the title names it, or if ANY bullet shows
+the person doing it, then counts:true. Otherwise counts:false.
+
+COUNT IT even when:
+- it was only PART of the job. A role that did this work among other things counts IN FULL.
+  We cannot split a role in half, so a half-and-half role is counted whole. Someone who ran
+  paid media for half of a two-year job did spend those two years in the field.
+- the role was junior, an internship, a coordinator or an assistant — the requirement asks
+  for years OF THE WORK, not years of seniority. Only weigh seniority when the requirement
+  is explicitly about leading people ("managing a team of analysts").
+- it was long ago, at a small company, or in another industry.
+- it names different tools or platforms. The platforms a requirement lists ("SEM across
+  Google Ads and Microsoft/Bing Ads") describe the FLAVOUR of the work, they are not a
+  second gate. Match on the FAMILY of work: SEM / paid search / PPC / SEA / paid media
+  buying are one family; accounting / bookkeeping / audit / AP / AR / reconciliations /
+  tax compliance / month-end close are one family; B2B sales / SDR / BDR / business
+  development / account executive are one family. The test for a family: would the same
+  degree, the same department or the same career ladder cover both? Then a year in one is a
+  year in the other. Ask "is this the same job, done somewhere else?", never "does this
+  bullet repeat the posting's nouns?".
+- the CV never uses the posting's word for it. "Paid Search Specialist" running Google Ads
+  IS SEM experience.
+
+THESE ARE NOT REASONS to say counts:false, and every one of them is a mistake we have
+actually seen ship:
+  "focused on X, not Y"        "primarily / mainly / mostly something else"
+  "not the main part"          "too junior" / "a coordinator, not a manager"
+  "an internship"              "too long ago"       "a different industry"
+If the "why" you are about to write contains "focused on", "primarily", "mainly", "mostly",
+"not the main", "rather than" or "more of a", you are about to exclude a role whose bullets
+DO show the work — set counts:true instead.
+
+WORKED EXAMPLE for "7+ years managing SEM campaigns across Google Ads and Microsoft/Bing":
+  "Social & Paid Media Manager" — bullets: "Managed social and paid media strategy",
+  "Monitored social media performance and prepared reports"
+  -> counts:TRUE. Paid media is the family and the first bullet shows them managing it.
+     "It was mostly social" is not a reason. Getting this one wrong costs two whole years.
+  "Marketing Coordinator" — bullets: "Coordinated website updates using the CMS",
+  "Conducted QA on website functionality"
+  -> counts:FALSE. No campaign work appears anywhere in it. This is what absence looks
+     like, and saying so is a real answer.
+
+When the requirement asks for years with NO subject at all ("5+ years of professional
+experience"), every role is counts:true.
+
+FIX THE BOUNDARY ONCE, BEFORE YOU LOOK AT A SINGLE ROLE. This is step one for every
+requirement and it is what keeps your answers consistent: judged role by role, the same
+work gets waved through in one job and rejected in the next.
+  "discipline" — the work the requirement asks for, in plain words, stripped of the
+    platforms and the seniority. "7+ years managing SEM campaigns across Google Ads and
+    Microsoft/Bing Ads" -> "paid search / paid media campaign management".
+  "counts_as" — the kinds of work and the job titles that ARE that discipline. Write the
+    WHOLE family, generously, including the adjacent labels and the junior ones: for the
+    example above, ["SEM", "paid search", "PPC", "paid media", "Google Ads", "performance
+    marketing", "campaign management", "media buying"]. For "5+ years of accounting
+    experience": ["accounting", "audit", "bookkeeping", "AP/AR", "tax compliance",
+    "financial reporting", "reconciliations"].
+You then APPLY THIS LIST LITERALLY to every role. Having written that paid media is in the
+family, you may not turn around and drop a Paid Media Manager because "it was mostly
+social". Write the list you are willing to live with.
+
+THE QUOTE DECIDES, AND YOU WRITE IT FIRST. Do not decide the role and then look for
+support — that is backwards, and it is how roles get dropped. For each role, in this order:
+  1. "evidence" — go through that role's title and EVERY one of its bullets looking for the
+     requirement's work, and copy out a SHORT VERBATIM fragment that shows it. Word for
+     word: we check it against the role's own text. Search before you conclude. If after
+     reading all of them there is genuinely nothing to quote, write "".
+  2. "counts" — this is now just a reading of step 1: a quote means true, "" means false.
+     Nothing else goes into it. Not how big a part of the job it was, not the seniority,
+     not the industry, not how the role happens to be titled. In particular: if the role's
+     title or a bullet contains something from your own "counts_as" list, you have your
+     quote and the role counts.
+  3. "why" — one line describing what you found, or what the role does instead.
+A quote plus counts:false is a contradiction and we resolve it by counting the role, so do
+not withhold a quote from a role that has one, and do not hunt for one in a role that
+does not.
+
+Return ONLY this JSON, with the keys in this order:
+{"requirements":[{"i":<the requirement's index as given>,
+                  "discipline":"<the work it asks for, in plain words>",
+                  "counts_as":["<label>", "..."],
+                  "roles":[{"role":<R number>,
+                            "evidence":"<verbatim fragment from THIS role, or \"\">",
+                            "counts":true|false,
+                            "why":"<one short line>"}]}]}
+Every role, for every requirement, exactly once."""
+
+
+def _years_roles_prompt(reqs: List[Tuple[int, str]], snapshot: Dict[str, Any]) -> str:
+    """La misma numeración [R#] que ve el juez principal: la aritmética indexa por ahí."""
+    out = ["WORK EXPERIENCE"]
+    for i, entry in enumerate(_as_list(snapshot.get("work_experience")), start=1):
+        end = "Present" if entry.get("current") else (entry.get("end_date") or "?")
+        out.append(f"\n[R{i}] {entry.get('title') or '(no title)'} — "
+                   f"{entry.get('company') or '(no company)'} "
+                   f"[{entry.get('start_date') or '?'} → {end}]")
+        for bullet in _bullets(entry.get("description")):
+            out.append(f"- {bullet}")
+    out.append("\nREQUIREMENTS THAT ASK FOR YEARS")
+    for i, text in reqs:
+        out.append(f"[{i}] {text}")
+    return "\n".join(out)[:CV_TEXT_LIMIT]
+
+
+# El modelo escribe la familia bien y después no la aplica: para un requisito de SEM pone
+# "paid media" en "counts_as" y acto seguido descarta al "Social & Paid Media Manager" con
+# "no SEM campaign management is mentioned". Escribir la lista es una tarea de lenguaje y la
+# hace bien; buscarla en el texto es un re.search y lo hacemos nosotros, que no nos
+# distraemos. Misma división de trabajo que con la aritmética de los años.
+def _family_hit(role_text: str, labels: Any) -> Optional[str]:
+    """La etiqueta de la familia que aparece en el título o los bullets del rol, si alguna.
+
+    Frase entera y con bordes de palabra: "sem" no puede matchear dentro de "assessment",
+    y "ads" no puede matchear dentro de "leads". Las etiquetas de una sola letra o dos se
+    descartan — no distinguen nada y sí producen falsos positivos.
+    """
+    # OJO: _as_list() se queda SÓLO con los dicts, y esto es una lista de strings. Pasarla
+    # por ahí devuelve [] y el matching no corre nunca, sin un solo error a la vista.
+    if not role_text or not isinstance(labels, list):
+        return None
+    for raw in labels:
+        if not isinstance(raw, str):
+            continue
+        label = _norm_for_match(raw)
+        if len(label) < 3:
+            continue
+        if re.search(r"(?<![a-z0-9])" + re.escape(label) + r"(?![a-z0-9])", role_text):
+            return str(raw).strip()
+    return None
+
+
+def apply_years_roles(parsed: Dict[str, Any], snapshot: Dict[str, Any]) -> None:
+    """Pisa "years_roles"/"years_roles_excluded" del juez con la llamada dedicada.
+
+    Muta `parsed` in place y no levanta: cualquier fallo deja lo que dijo el juez principal.
+    """
+    items = parsed.get("jd_requirements")
+    if not isinstance(items, list) or not _as_list(snapshot.get("work_experience")):
+        return
+    targets = [(i, str(it.get("requirement") or "").strip())
+               for i, it in enumerate(items)
+               if isinstance(it, dict) and required_years(it.get("requirement") or "")]
+    if not targets:
+        return
+    try:
+        from ai_routes import call_openai_with_retry
+        resp = call_openai_with_retry(
+            MODEL,
+            [{"role": "system", "content": _YEARS_SYSTEM},
+             {"role": "user", "content": _years_roles_prompt(targets, snapshot)}],
+            temperature=0, max_tokens=1400,
+            response_format={"type": "json_object"},
+        )
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            logging.warning("cv_review: la clasificación de roles por años salió truncada")
+            return
+        data = parse_json(resp.choices[0].message.content or "")
+    except Exception:
+        logging.exception("cv_review: falló la clasificación de roles por años")
+        return
+    if not isinstance(data, dict):
+        return
+
+    # Ojo con el parseo del [R#]: el modelo devuelve 6 o "R6" según el día, y un rol que no
+    # se puede leer se saltea. Cuando se salteaban TODOS, keep y drop quedaban vacíos y esta
+    # llamada no pisaba nada — se pagaba y no servía para nada, sin un solo error a la vista.
+    # El texto de cada rol, normalizado, para poder chequear la cita contra ÉL y no contra
+    # el CV entero: una cita del rol de al lado no prueba nada sobre éste.
+    role_text = {}
+    for i, entry in enumerate(_as_list(snapshot.get("work_experience")), start=1):
+        role_text[i] = _norm_for_match(" ".join(
+            [str(entry.get("title") or ""), str(entry.get("company") or "")]
+            + _bullets(entry.get("description"))))
+
+    by_index = {i: it for i, it in targets}
+    for entry in _as_list(data.get("requirements")):
+        if not isinstance(entry, dict):
+            continue
+        idx = _role_number(entry.get("i"))
+        if idx not in by_index:
+            continue
+        family = entry.get("counts_as")
+        keep, drop = [], []
+        for r in _as_list(entry.get("roles")):
+            if not isinstance(r, dict):
+                continue
+            n = _role_number(r.get("role"))
+            if n is None or not 1 <= n <= len(_as_list(snapshot.get("work_experience"))):
+                continue
+            counts = r.get("counts") is True or str(r.get("counts")).lower() == "true"
+            # LA CITA MANDA SOBRE LA FRASE. El modelo encuentra el bullet correcto y acto
+            # seguido descarta el rol con "focused on auditing, not accounting" o "not
+            # specifically B2B SaaS" — razonamientos que el prompt prohíbe explícitamente y
+            # que igual escribe. Se los prohibimos acá, donde no puede desobedecer: si citó
+            # el trabajo desde ESE rol, el trabajo está, y el rol cuenta. Mismo criterio que
+            # con "described" en la checklist — sin cita no hay evidencia, y con cita no hay
+            # discusión.
+            quote = str(r.get("evidence") or "").strip()
+            if not counts and quote and _quote_in_cv(quote, role_text.get(n, "")):
+                logging.info("cv_review: R%s contaba después de todo, lo dice su propio "
+                             "bullet (%r); el modelo lo descartaba por %r",
+                             n, quote[:60], str(r.get("why") or "")[:60])
+                counts = True
+            # Y si no citó nada, la familia que él mismo escribió: un rol que se llama
+            # "Paid Media Manager" contra un requisito cuya familia incluye "paid media" no
+            # se descarta porque el bullet no repita la sigla de la vacante.
+            if not counts:
+                hit = _family_hit(role_text.get(n, ""), family)
+                if hit:
+                    logging.info("cv_review: R%s cuenta por la familia %r que el propio "
+                                 "modelo listó; lo descartaba por %r",
+                                 n, hit, str(r.get("why") or "")[:60])
+                    counts = True
+            if counts:
+                keep.append(n)
+            else:
+                drop.append({"role": n, "why": str(r.get("why") or "").strip()})
+        # Una respuesta sin un solo rol marcado no se distingue de una llamada que se fue
+        # por las ramas, y "0 años" es el resultado más caro que podemos producir. Sin
+        # nada que aportar, se queda lo del juez principal.
+        if not keep and not drop:
+            continue
+        before = items[idx].get("years_roles")
+        items[idx]["years_roles"] = sorted(set(keep))
+        items[idx]["years_roles_excluded"] = drop
+        if sorted(set(before or [])) != sorted(set(keep)):
+            logging.info("cv_review: roles para %r: %s -> %s (llamada dedicada)",
+                         by_index[idx][:60], before, sorted(set(keep)))
 
 
 def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
@@ -1150,7 +1754,7 @@ def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
     try:
         from ai_routes import call_openai_with_retry  # después de init_services()
         resp = call_openai_with_retry(
-            MODEL, messages, temperature=0, max_tokens=2600,
+            MODEL, messages, temperature=0, max_tokens=3400,
             response_format={"type": "json_object"},
         )
         choice = resp.choices[0]
@@ -1170,6 +1774,9 @@ def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
     parsed = parse_json(content)
     if not isinstance(parsed, dict):
         return None, None, "unparseable"
+
+    # Qué roles cuentan para un requisito de años se decide aparte. Ver apply_years_roles.
+    apply_years_roles(parsed, snapshot)
 
     analysis = finalize(parsed, snapshot, len(source_text or ""), fingerprint,
                         jd_text=jd_block)

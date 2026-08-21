@@ -5213,9 +5213,11 @@ function _replaceDateText(node){
   // mostraba etiquetas que la otra ya había reemplazado.
   function reqFace(r){
     if (!r.counts) {
-      return r.assumed
-        ? { cls:'nocount', label:"Doesn't count — taken for granted", tag:'taken for granted' }
-        : { cls:'nocount', label:"Doesn't count — soft skill",        tag:'soft skill' };
+      return {
+        assumed:  { cls:'nocount', label:"Doesn't count — taken for granted", tag:'taken for granted' },
+        language: { cls:'nocount', label:"Doesn't count — checked in the interview", tag:'language' },
+        soft:     { cls:'nocount', label:"Doesn't count — soft skill", tag:'soft skill' },
+      }[r.no_score_reason] || { cls:'nocount', label:"Doesn't count", tag:'' };
     }
     if (r.status === 'described')  return { cls:'described',   label:'Described in the experience' };
     if (r.status === 'listed_only') return { cls:'listed_only', label:'Only listed — no role describes it' };

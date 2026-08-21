@@ -894,14 +894,40 @@
     const CREDIT = { described: 1, listed_only: 0.5, missing: 0 };
     const reqFace = r => {
       if (!r.counts) {
-        return r.assumed
-          ? { cls: 'nocount', label: "Doesn't count — taken for granted",
-              tag: 'taken for granted',
-              tip: 'Everyone in the running meets this, so counting it would flatter every '
-                 + 'candidate equally. It is listed because the client asked for it.' }
-          : { cls: 'nocount', label: "Doesn't count — soft skill", tag: 'soft skill',
-              tip: 'Soft skills are listed because the client asked for them, but they do '
-                 + 'not score: any CV can claim them.' };
+        const why = {
+          assumed: { label: "Doesn't count — taken for granted", tag: 'taken for granted',
+                     tip: 'Everyone in the running meets this, so counting it would flatter '
+                        + 'every candidate equally. It is listed because the client asked '
+                        + 'for it.' },
+          language: { label: "Doesn't count — checked in the interview", tag: 'language',
+                      tip: 'Every CV Vintti sends is written in English, so this requirement '
+                         + 'is met by every candidate and tells you nothing. The real level '
+                         + 'is judged from the recording and the interview, not the CV.' },
+          soft: { label: "Doesn't count — soft skill", tag: 'soft skill',
+                  tip: 'Soft skills are listed because the client asked for them, but they '
+                     + 'do not score: any CV can claim them.' },
+        }[r.no_score_reason] || { label: "Doesn't count", tag: '', tip: '' };
+        return Object.assign({ cls: 'nocount' }, why);
+      }
+      // Un requisito de AÑOS no se arregla escribiendo mejor: o los años están o no están.
+      // Decirle a la recruiter "you can add it" sobre un requisito de tiempo es pedirle que
+      // invente fechas, que es lo contrario de todo lo demás en esta pantalla.
+      if (r.years_required) {
+        const yrs = (r.years_detail || {}).years;
+        const got = yrs === null || yrs === undefined ? '' : `${yrs} of ${r.years_required} yrs · `;
+        if (r.status === 'described') {
+          return { cls: 'described', label: `${r.years_required}+ years covered`,
+                   tip: got + 'Counted from the dates of the roles that do this kind of work. '
+                      + 'Full credit.' };
+        }
+        if (r.status === 'listed_only') {
+          return { cls: 'listed_only', label: 'Just short on years',
+                   tip: got + 'Within a year of what the posting asks for, so it counts for '
+                      + 'half. Nobody can fix this by rewriting the CV.' };
+        }
+        return { cls: 'missing', label: "Doesn't have the years",
+                 tip: got + 'Counted from the dates of the roles that do this kind of work. '
+                    + 'This is the candidate, not the CV — rewriting it cannot close the gap.' };
       }
       if (r.status === 'described') {
         return { cls: 'described', label: 'Described in the experience',
@@ -924,6 +950,39 @@
     };
     const reqs = a.jd_requirements || [];
     const rs = a._requirements_summary || {};
+    // La cuenta de años, rol por rol. Un total suelto no se puede verificar: si dice 5,7 y
+    // el CV parece sumar 6,8, hay que poder ver de dónde salió cada mes.
+    const yearsRows = (r) => {
+      const yd = r.years_detail;
+      if (!yd || !(yd.counted || []).length) return '';
+      const fmt = (m) => m >= 12
+        ? `${Math.floor(m / 12)} yr${Math.floor(m / 12) > 1 ? 's' : ''}${m % 12 ? ` ${m % 12} mo` : ''}`
+        : `${m} mo`;
+      // Los roles DESCARTADOS van acá también, y son la mitad importante: la aritmética es
+      // exacta, la elección de roles no. Un rol de dos años dejado afuera son dos años que
+      // nadie ve desaparecer si sólo mostramos los que sí contaron.
+      const skipped = yd.excluded || [];
+      return `<details class="cvr-years">
+        <summary>How the ${yd.years} years were counted</summary>
+        <ul>${yd.counted.map(c => `<li><b>${esc(c.title)}</b>
+          <span>${esc(c.start_date || '?')} → ${esc(c.end_date || '?')}</span>
+          <i>${fmt(c.months)}</i></li>`).join('')}
+          ${(yd.unreadable || []).map(u => `<li class="is-bad"><b>${esc(u.title)}</b>
+            <span>unreadable dates — not counted</span></li>`).join('')}
+        </ul>
+        ${yd.overlap_months ? `<p>Roles that overlap were counted once:
+          ${yd.overlap_months} month(s) of overlap removed.</p>` : ''}
+        ${yd.all_roles ? `<p>Every role in the CV was counted: the requirement asks for
+          years of experience without naming a speciality.</p>` : ''}
+        ${skipped.length ? `<p class="cvr-years-off">Not counted — these roles were read as
+          a different kind of work. If one of them belongs, the years change:</p>
+          <ul class="cvr-years-skip">${skipped.map(x => `<li${x.unjudged ? ' class="is-bad"' : ''}>
+            <b>${esc(x.title)}</b>
+            <span>${esc(x.start_date || '?')} → ${esc(x.end_date || 'Present')}</span>
+            <em>${esc(x.why || 'not classified')}</em></li>`).join('')}</ul>` : ''}
+      </details>`;
+    };
+
     const reqRow = (r, per) => {
       const f = reqFace(r);
       // "described" pinta verde en el CV; "only listed" ambar. Es la misma distincion que
@@ -942,10 +1001,12 @@
           <b>${esc(r.requirement)}</b>
           ${f.tag ? `<i class="cvr-req-tag" title="${esc(f.tip)}">${esc(f.tag)}</i>` : ''}
           <span class="cvr-req-status" title="${esc(f.tip)}">${esc(f.label)}</span>
+          ${r.years_required ? `<i class="cvr-req-tag" title="We add the years up from the dates in this CV — the model does not estimate them.">${r.years_required}+ yrs · counted</i>` : ''}
           ${pts}
         </div>
         ${r.evidence ? `<p class="cvr-req-ev"${hlRegister(evKind, r.evidence)}>“${esc(r.evidence)}”</p>` : ''}
         ${r.note ? `<p class="cvr-req-note">${esc(deSource(r.note))}</p>` : ''}
+        ${yearsRows(r)}
       </li>`;
     };
     // La lista ES el desglose. Antes había dos secciones diciendo lo mismo — ésta y un
@@ -972,9 +1033,10 @@
             ? ` &minus; <b>${sd.tools_penalty}</b> = <b>${score}</b>` : ''}.
           Each one is worth ${per} points.
         </p>
-        ${sd.excluded && sd.excluded.length ? `<p class="cvr-tally-off">Not counted:
-          ${sd.excluded.filter(x => x.reason === 'soft').length} soft ·
-          ${sd.excluded.filter(x => x.reason === 'assumed').length} taken for granted.</p>` : ''}
+        ${sd.excluded && sd.excluded.length ? `<p class="cvr-tally-off">Not counted: ${
+          [['soft', 'soft'], ['language', 'language'], ['assumed', 'taken for granted']]
+            .map(([k, l]) => [sd.excluded.filter(x => x.reason === k).length, l])
+            .filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(' · ')}.</p>` : ''}
       </div>` : '';
 
     const reqsHtml = reqs.length ? `
