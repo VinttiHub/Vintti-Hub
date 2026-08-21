@@ -5272,6 +5272,21 @@ function _replaceDateText(node){
     } else if (r.ai_error) {
       bits.push('<div class="cv-review-hist-line">JD coverage: could not be scored.</div>');
     }
+    // Job hopping: UNA línea. El desglose por empresa vive en cv-review.html, que es donde
+    // el sales lead decide; acá alcanza con saber si costó puntos. Deliberadamente NO es
+    // otro espejo a mano de un template — ya cargamos con el de reqFace().
+    const jh = r.job_hopping;
+    if (jh && jh.state) {
+      const txt = {
+        unexplained: `<b>${jh.unexplained}</b> stint(s) under a year the CV never explains
+                      &mdash; <b>&minus;${jh.penalty}</b> off the score`,
+        explained: `${jh.short} stint(s) under a year, explained in the CV &mdash; no penalty`,
+        clean: 'no stint under a year',
+        no_history: 'only one employer on this CV, nothing to judge',
+        unreadable: 'could not be checked — the dates could not be read',
+      }[jh.state];
+      if (txt) bits.push(`<div class="cv-review-hist-line">Job hopping: ${txt}.</div>`);
+    }
     if (r.reasons?.length) {
       const labels = r.reasons.map(c => escapeHtml(reasonLabels[c] || c)).join(', ');
       bits.push(`<div class="cv-review-hist-line"><b>Reasons:</b> ${labels}</div>`);

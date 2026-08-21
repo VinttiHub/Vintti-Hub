@@ -41,6 +41,23 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 12: se agrega el chequeo de JOB HOPPING, la segunda y última cosa que se evalúa fuera de
+# la checklist de requisitos. Permanencia de menos de un año = job hopping; si el CV explica
+# por qué terminó, no pasa nada; si no lo explica, −10. Tres decisiones que importan:
+#   · Se cuentan EMPRESAS, no puestos. Un ascenso a los 11 meses no es irse — Sandra Alarcón
+#     tiene tres puestos en Tambourine y estuvo tres años y medio ahí. El agrupado es un port
+#     del que ya hace el CV que ve el cliente (resume-readonly.js:735-763), para que el panel
+#     no diga "8 meses en Acme" sobre un bloque que el cliente ve como un encabezado de 4 años.
+#   · Se castiga QUE EL CV NO LO EXPLIQUE, nunca el job hopping. Es la misma línea de la v9/v10:
+#     la carrera del candidato no es un defecto del documento, pero escribir el motivo de
+#     salida sí es algo que la recruiter puede hacer.
+#   · La detección del motivo es determinística, no del modelo. Sobre los 55 CVs reales las
+#     dos listas de regex aciertan los 7 casos con motivo sin un solo falso positivo, y el
+#     error caro acá es el silencioso: un motivo inventado SACA un castigo sin que se note,
+#     mientras que uno que se escapa se ve en pantalla con la empresa nombrada al lado.
+# OJO con el promedio por recruiter: 16 de los 55 CVs del corpus vuelven 10 puntos más abajo,
+# así que la media de calidad baja ~3 puntos por algo que ninguna recruiter hizo distinto.
+# Se quedan igual dentro del promedio: sacarlos crearía el incentivo a no escribir el motivo.
 # 11: qué roles cuentan para un requisito de "N años de X" se decide en una llamada aparte
 # (apply_years_roles), y la lista de descartados con su motivo se muestra al lado del total.
 # El juez principal lo hacía mal de forma reproducible: contra "7+ years managing SEM
@@ -76,7 +93,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 11
+ANALYSIS_VERSION = 12
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -106,6 +123,23 @@ MIN_SOURCE_CHARS_FOR_FABRICATION_CHECK = 500
 # por herramienta: con que algunas estén descritas alcanza (decisión de la owner). Que no
 # haya ninguna es otra cosa — es una lista de tools que ningún rol respalda.
 TOOLS_NONE_PENALTY = 10
+
+# --- job hopping ---------------------------------------------------------------------
+# Menos de un año en una empresa. El umbral se compara contra los meses INCLUSIVOS que usa
+# todo este módulo (end + 1 - start), así que 12 es "un año justo NO es corto". Ojo con
+# tocarlo: _as_month() rellena un año suelto con enero al empezar y diciembre al terminar,
+# entonces un rol escrito "2021 → 2021" da exactamente 12. Con `<= 12` se marcaría como
+# corto TODO rol escrito con granularidad de año, que en este corpus son decenas. Los
+# defaults también estiran cada período al máximo posible a propósito: cuando las fechas
+# vienen flojas, el error tiene que caer del lado de NO acusar.
+JOB_HOPPING_MIN_MONTHS = 12
+# Castigo único, umbral y no acumulativo: una permanencia corta sin explicar ya son 10,
+# tenga una o cinco. Mismo criterio que TOOLS_NONE_PENALTY.
+#
+# Lo que se castiga es QUE EL CV NO LO EXPLIQUE, nunca el job hopping en sí. La distinción
+# es la que sostiene la política de la v9/v10: el score no castiga a la recruiter por la
+# carrera del candidato, y escribir el motivo de salida sí es algo que ella puede hacer.
+JOB_HOPPING_PENALTY = 10
 
 ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these keys and shapes:
 {
@@ -1089,6 +1123,250 @@ def experience_years(snapshot: Dict[str, Any],
     return experience_breakdown(snapshot, roles)["years"]
 
 
+# --- job hopping: permanencias, no puestos --------------------------------------------
+# Job hopping es dejar EMPRESAS, no cambiar de título. Sandra Alarcón tiene tres puestos en
+# Tambourine, uno de 11 meses — y estuvo tres años y medio ahí. Contar puestos la marcaría
+# por un ascenso.
+#
+# El agrupado es un PORT del que ya hace el CV que ve el cliente: normalizeCompanyKey() y
+# el bucle de grupos en docs/assets/js/resume-readonly.js:735-763, ordenado con
+# sortByEndDateDescending() (:1242). Tiene que dar igual que allá, porque el panel dice
+# "8 meses en Acme" sobre un bloque que el cliente ve como un único encabezado de 4 años.
+# SI TOCÁS UNO, TOCÁ EL OTRO.
+
+
+def _company_key(company: Any) -> str:
+    """Port de normalizeCompanyKey() (resume-readonly.js:736). Vacío = NO agrupar.
+
+    El "—" es un placeholder que la gente deja escrito. Sin este caso, dos roles sin empresa
+    se fusionarían en una permanencia larga inventada y el chequeo se quedaría ciego.
+    """
+    c = str(company or "").strip().lower()
+    return "" if not c or c == "\u2014" else c
+
+
+def _role_span(entry: Dict[str, Any], now: int):
+    """(inicio, fin, en_curso) en meses, o None si no se puede leer.
+
+    La política de fechas es DISTINTA a la de experience_breakdown() a propósito, y las tres
+    diferencias importan acá:
+      · Un fin ilegible allá se estira hasta hoy, porque para un total conviene. Acá "no sé
+        cuánto duró" no se puede convertir en "duró mucho" sin decirlo: devuelve None y la
+        permanencia queda marcada como ilegible, nunca como corta.
+      · Un fin en el FUTURO allá se recorta a hoy con min(end, now). Acá eso convertiría un
+        "2026-01 → 2026-12" mal tipeado en 8 meses y lo acusaría de job hopping por un rol
+        que ni siquiera terminó. Un fin en el futuro es un rol en curso.
+      · Un rol en curso no cuenta jamás: no se puede haber dejado un trabajo en el que seguís.
+    """
+    start = _as_month(entry.get("start_date"))
+    if start is None:
+        return None
+    if entry.get("current"):
+        return start, now, True
+    end = _as_month(entry.get("end_date"), 12)
+    if end is None or end < start:
+        return None
+    if end >= now:
+        return start, end, True
+    return start, end, False
+
+
+def _stints(snapshot: Dict[str, Any], now: int) -> List[Dict[str, Any]]:
+    """Los roles del CV agrupados en permanencias por empresa. Ver el comentario de arriba."""
+    roles = []
+    unreadable = []
+    for i, entry in enumerate(_as_list(snapshot.get("work_experience")), start=1):
+        span = _role_span(entry, now)
+        title = str(entry.get("title") or f"role {i}")
+        if span is None:
+            unreadable.append({"role": i, "title": title})
+            continue
+        start, end, ongoing = span
+        roles.append({
+            "role": i, "title": title, "company": str(entry.get("company") or ""),
+            "key": _company_key(entry.get("company")),
+            "start": start, "end": end, "ongoing": ongoing,
+            # Dos copias del mismo texto: `text` en minúsculas para buscar, `raw` con el
+            # original para CITAR. _norm_for_match sólo baja a minúscula y colapsa espacios,
+            # así que los índices de las dos coinciden y se puede matchear en una y cortar en
+            # la otra. Sin esto la cita salía en pantalla como "relocated temporarily to spain".
+            "raw": re.sub(r"\s+", " ", " ".join(
+                [title, str(entry.get("company") or "")] + _bullets(entry.get("description")))).strip(),
+        })
+
+    # Mismo orden que el CV del cliente: por fecha de FIN descendente, con lo actual primero.
+    roles.sort(key=lambda r: (0 if r["ongoing"] else 1, -r["end"], -r["start"]))
+
+    groups: List[Dict[str, Any]] = []
+    for r in roles:
+        last = groups[-1] if groups else None
+        # Sólo ADYACENTES y sólo con clave no vacía, igual que el renderer del CV.
+        if last and r["key"] and last["key"] == r["key"]:
+            last["roles"].append(r)
+        else:
+            groups.append({"key": r["key"], "roles": [r]})
+
+    out = []
+    for g in groups:
+        rs = g["roles"]
+        start = min(r["start"] for r in rs)
+        end = max(r["end"] for r in rs)
+        out.append({
+            "key": g["key"],
+            "company": rs[0]["company"],
+            "titles": [r["title"] for r in rs],
+            "roles": sorted(r["role"] for r in rs),
+            "start": start, "end": end,
+            "months": end + 1 - start,
+            "ongoing": any(r["ongoing"] for r in rs),
+            "start_date": _month_label(start),
+            "end_date": "Present" if any(r["ongoing"] for r in rs) else _month_label(end),
+            "raw": " ".join(r["raw"] for r in rs),
+        })
+    out.sort(key=lambda s: s["start"])
+
+    # Una permanencia CONTENIDA dentro de otra es un trabajo en paralelo, no una salida: el
+    # contrato de 4 meses que alguien hizo mientras tenía su empleo de 5 años. Sin esto, un
+    # CV que no muestra una sola salida se lleva el castigo igual.
+    for i, s in enumerate(out):
+        s["concurrent"] = any(o["start"] <= s["start"] and s["end"] <= o["end"]
+                              for j, o in enumerate(out) if j != i and
+                              (o["end"] - o["start"]) > (s["end"] - s["start"]))
+    return out, unreadable
+
+
+def _month_label(m: int) -> str:
+    return f"{m // 12}-{m % 12 + 1:02d}"
+
+
+# Motivos de salida. Dos niveles y los dos DEVUELVEN UNA CITA, porque una razón que no se
+# puede leer en el CV no le sirve al reviewer para decidir si la acepta.
+#
+# Listas cortas y crecidas con datos de producción, no adivinando — mismo criterio que
+# _REQ_ASSUMED y _TOOL_UNREMARKABLE. Sobre los 55 CVs reales de cv_reviews éstas aciertan
+# los 7 casos que tienen motivo, sin un solo falso positivo.
+_REASON_STATED = re.compile(r"""
+    reason\s+for\s+(leaving|departure)
+  | reason\s+(he|she|they)\s+left
+  | left\s+(the\s+)?(company|role|position)\s+(to|because|when|after|due)
+  | (end|conclusion)\s+of\s+(a\s+|the\s+)?(short[- ]term\s+)?(contract|engagement|project)
+  | contract\s+(ended|was\s+not\s+renewed|expired)
+  | (role|position|team)\s+was\s+eliminated
+  | company\s+(closed|shut\s+down|went\s+under)
+  | motivo\s+de\s+salida
+  | raz[oó]n\s+de\s+salida
+""", re.I | re.X)
+
+# El puesto se explica solo: nadie espera que una pasantía dure dos años. Se busca en el
+# TÍTULO y en la EMPRESA — "Freelance" y "Self-employed" viven en el campo empresa, y ése es
+# justo el caso que más importa: el que factura por cliente tiene un puesto corto por cliente
+# y no dejó nada.
+_REASON_SELF_EVIDENT = re.compile(r"""
+    (?<![a-z])(intern|internship|trainee|apprentice|pasant[ea]|practicante|becari[oa])(?![a-z])
+  | (?<![a-z])(temporary|temporal|interim|fixed[- ]term|seasonal|maternity)(?![a-z])
+  | (?<![a-z])(freelance|self[- ]employed|independiente|aut[oó]nomo)(?![a-z])
+  | project[- ]based
+  | temporary\s+(position|project|contract)
+""", re.I | re.X)
+
+
+def _stint_reason(stint: Dict[str, Any], later_keys: set):
+    """(tipo, cita) del motivo de salida de una permanencia corta, o ("", "").
+
+    El tipo "rehired" es el más fuerte de los tres y no hace falta que nadie lo escriba: si
+    la MISMA empresa vuelve a aparecer más adelante, la volvieron a contratar, que es la
+    mejor evidencia posible de que aquella salida no fue un problema.
+    """
+    if stint["key"] and stint["key"] in later_keys:
+        return "rehired", f'{stint["company"]} hired them again later'
+    m = _REASON_STATED.search(stint["raw"])
+    if m:
+        return "stated", _sentence_around(stint["raw"], m.start())
+    joined = " ".join(stint["titles"] + [stint["company"]])
+    m = _REASON_SELF_EVIDENT.search(joined)
+    if m:
+        return "self_evident", m.group().strip()
+    return "", ""
+
+
+def _sentence_around(text: str, pos: int) -> str:
+    """La oración donde cae el match, recortada. La cita ES lo que el reviewer audita."""
+    start = max(text.rfind(". ", 0, pos) + 2, 0)
+    end = text.find(". ", pos)
+    end = len(text) if end == -1 else end
+    return text[start:end].strip()[:220]
+
+
+def job_hopping(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Permanencias de menos de un año y si el CV las explica.
+
+    Puro, sin llamada al modelo y sin la JD: esto es lo ÚNICO que se evalúa fuera de la
+    checklist de requisitos, y la firma lo deja imposible de olvidar. Mismo criterio que
+    tools_mentions(): son fechas que ya tenemos en memoria, pedirle la cuenta al modelo
+    sería pagar tokens y varianza por una resta.
+    """
+    today = _dt.date.today()
+    now = today.year * 12 + today.month - 1
+    stints, unreadable = _stints(snapshot, now)
+
+    # Dos conteos DISTINTOS, y confundirlos fue un bug: `closed` es de dónde puede salir una
+    # salida corta (terminadas, no simultáneas); `stints` es cuánto historial hay. Génesis
+    # Arroyo tiene dos empleadores reales pero uno es el actual — contando sólo `closed`
+    # salía como "sin historial suficiente" cuando en realidad está limpia.
+    closed = [s for s in stints if not s["ongoing"] and not s["concurrent"]]
+    short, skipped = [], []
+    for s in stints:
+        row = {
+            "company": s["company"] or "(no company)",
+            "titles": s["titles"], "roles": s["roles"],
+            "start_date": s["start_date"], "end_date": s["end_date"],
+            "months": s["months"], "reason_kind": "", "reason_quote": "", "skipped": "",
+        }
+        if s["months"] >= JOB_HOPPING_MIN_MONTHS:
+            continue
+        if s["ongoing"]:
+            row["skipped"] = "current"
+        elif s["concurrent"]:
+            row["skipped"] = "concurrent"
+        if row["skipped"]:
+            skipped.append(row)
+            continue
+        later = {o["key"] for o in stints if o["start"] > s["start"] and o["key"]}
+        kind, quote = _stint_reason(s, later)
+        row["reason_kind"], row["reason_quote"] = kind, quote
+        short.append(row)
+
+    explained = [s for s in short if s["reason_kind"]]
+    unexplained = [s for s in short if not s["reason_kind"]]
+
+    # El orden de estos ifs ES la política, y el primero es el que evita el papelón: con
+    # menos de dos permanencias terminadas no hay de dónde saltar. Un recién recibido con una
+    # única pasantía de 6 meses no es un job hopper.
+    if unreadable and not closed:
+        # Un CV donde ninguna fecha se pudo leer no puede llevarse un certificado de limpio.
+        state = "unreadable"
+    elif len(stints) < 2:
+        state = "no_history"
+    elif unexplained:
+        state = "unexplained"
+    elif explained:
+        state = "explained"
+    else:
+        state = "clean"
+
+    return {
+        "state": state,
+        "penalty": JOB_HOPPING_PENALTY if state == "unexplained" else 0,
+        "stints": short + skipped,
+        "checked": len(closed),
+        "short": len(short),
+        "explained": len(explained),
+        "unexplained": len(unexplained),
+        "unreadable": unreadable,
+        "min_months": JOB_HOPPING_MIN_MONTHS,
+    }
+
+
 # Cuántos años pide el requisito. Cubre "7+ years", "3-5 years", "2 to 4 yrs", "5 años".
 _REQ_YEARS_RE = re.compile(
     r"\b(\d{1,2})\s*(?:[-–—+]|\s+to\s+)?\s*(\d{1,2})?\s*\+?\s*(?:years?|yrs?|años?|anos?)\b",
@@ -1264,7 +1542,7 @@ def _requirements_summary(reqs: List[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-def derive_verdict(score, req_summary, hard_claims, tools_penalty):
+def derive_verdict(score, req_summary, hard_claims, tools_penalty, hopping_penalty=0):
     """El veredicto sale de qué HAY QUE HACER, no del número.
 
     Lo elegía el modelo y el prompt no le daba ninguna guía, así que salía un "needs work"
@@ -1281,13 +1559,22 @@ def derive_verdict(score, req_summary, hard_claims, tools_penalty):
     if fixable:
         return "needs_work", (f"{fixable} requirement(s) the recruiter can still close — "
                               "the material is there and the CV doesn't show it.")
+    # El job hopping va ANTES que las herramientas: un tramo corto sin explicar es de lo que
+    # un sales lead rechaza de verdad (está en REJECT_REASONS), una lista de tools flaca es
+    # un CV flaco. Si saltan los dos, se dicen los dos — la escalera devuelve el primero que
+    # matchea, y quedarse con uno solo esconde la mitad de lo que hay que arreglar.
+    reasons = []
+    if hopping_penalty:
+        reasons.append("short stint(s) the CV never explains — say why they ended")
     if tools_penalty:
-        return "needs_work", ("No role describes a single one of the tools listed, so the "
-                              "skills list has nothing behind it.")
+        reasons.append("no role describes a single one of the tools listed")
+    if reasons:
+        return "needs_work", " And ".join(r[0].upper() + r[1:] for r in reasons) + "."
     return "ready", "Nothing left that the recruiter can fix on this CV."
 
 
-def requirements_score(reqs: List[Dict[str, Any]], tools_penalty: int = 0):
+def requirements_score(reqs: List[Dict[str, Any]],
+                       penalties: Optional[List[Dict[str, Any]]] = None):
     """El score: la porción de los requisitos técnicos de la JD que el CV muestra.
 
     Devuelve `(score, detalle, motivo)`. `score` es None cuando no hay nada que medir —
@@ -1304,10 +1591,16 @@ def requirements_score(reqs: List[Dict[str, Any]], tools_penalty: int = 0):
     if not scorable:
         return None, {}, "no_scorable_requirements"
 
+    # Los descuentos llegan como LISTA y no como argumentos sueltos: ya son dos, y el que
+    # venga después no tiene que volver a cambiar la firma en cuatro lugares.
+    penalties = [p for p in (penalties or []) if p.get("points")]
+    total_penalty = sum(int(p["points"]) for p in penalties)
+    tools_penalty = sum(int(p["points"]) for p in penalties if p.get("key") == "tools")
+
     per = 100.0 / len(scorable)
     earned = sum(_STATUS_CREDIT.get(r["status"], 0.0) for r in scorable)
     base = 100.0 * earned / len(scorable)
-    score = int(round(max(0.0, min(100.0, base - tools_penalty))))
+    score = int(round(max(0.0, min(100.0, base - total_penalty))))
 
     detail = {
         "credit": dict(_STATUS_CREDIT),
@@ -1315,6 +1608,9 @@ def requirements_score(reqs: List[Dict[str, Any]], tools_penalty: int = 0):
         "points_per_requirement": round(per, 1),
         "earned": round(earned, 2),
         "base": int(round(base)),
+        "penalties": penalties,
+        # Se sigue escribiendo suelto para que un análisis v11 ya guardado y uno v12 se
+        # pinten los dos con el mismo código de pantalla.
         "tools_penalty": tools_penalty,
         "items": [{
             "requirement": r["requirement"],
@@ -1433,7 +1729,14 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     # listado la mitad, faltar cero. Lo único que además toca el número es el castigo único
     # cuando la experiencia no nombra NI UNA de las herramientas listadas.
     tools_check = tools_mentions(snapshot, requirements)
-    composite, score_detail, basis = requirements_score(requirements, tools_check["penalty"])
+    # Lo único que se evalúa fuera de la checklist además de las herramientas. Ver job_hopping().
+    hopping = job_hopping(snapshot)
+    composite, score_detail, basis = requirements_score(requirements, [
+        {"key": "tools", "label": "tools list nothing backs up",
+         "points": tools_check["penalty"]},
+        {"key": "job_hopping", "label": "short stint the CV never explains",
+         "points": hopping["penalty"]},
+    ])
 
     # Un denominador demostrablemente incompleto sesga el score HACIA ARRIBA: los requisitos
     # que el modelo dropea son desproporcionadamente los que no supo evaluar. Al humano el
@@ -1444,7 +1747,7 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
 
     hard_claims = [c for c in unsupported if c["severity"] == "hard"]
     verdict, verdict_reason = derive_verdict(
-        composite, req_summary, hard_claims, tools_check["penalty"])
+        composite, req_summary, hard_claims, tools_check["penalty"], hopping["penalty"])
 
     return {
         "summary": str(parsed.get("summary") or "").strip(),
@@ -1471,6 +1774,7 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         "_score_basis": basis,
         "_score_detail": score_detail,
         "_tools_check": tools_check,
+        "_job_hopping": hopping,
         "_cv_years": cv_years,
         "_fabrication_check": "ran" if checked else "skipped_no_source",
         # Un solo lugar decide, en vez de booleanos sueltos que pueden contradecirse: todo

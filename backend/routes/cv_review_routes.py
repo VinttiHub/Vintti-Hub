@@ -242,6 +242,13 @@ def _serialize(row, *, reasons=None, analysis=None, live_hash=None):
     if isinstance(blob, dict):
         out["jd_requirements"] = blob.get("jd_requirements") or []
         out["requirements_summary"] = blob.get("_requirements_summary") or {}
+        # Del job hopping va sólo el resumen, no los tramos: acá se pinta UNA línea. Mandar
+        # la lista entera repetiría el mismo peso por cada ronda del historial para algo que
+        # esa vista no muestra.
+        hop = blob.get("_job_hopping")
+        if isinstance(hop, dict):
+            out["job_hopping"] = {k: hop.get(k) for k in
+                                  ("state", "penalty", "short", "explained", "unexplained")}
     # "Todavía scoreando": la fila se crea antes que el score a propósito (ver el submit).
     # Con ventana de tiempo: el score corre en un hilo daemon, así que si App Runner
     # recicla el worker a mitad de camino nadie lo vuelve a tocar. Sin este corte la UI

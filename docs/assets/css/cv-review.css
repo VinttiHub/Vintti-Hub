@@ -1046,3 +1046,54 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   color: var(--hx-faint);
 }
 .cvr-years-skip li { flex-wrap: wrap; }
+
+/* Job hopping. Va al mismo nivel que la checklist porque es la otra cosa que mueve el
+   número — pero sólo se abre en el caso que hay que arreglar; los demás son una línea. */
+.cvr-hop-line {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--hx-faint);
+}
+.cvr-hop-line.is-bad { color: #8f0f2a; font-weight: 500; }
+.cvr-hop {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--hx-line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--hx-surface-2);
+}
+.cvr-hop.is-bad { border-left-color: #8f0f2a; }
+.cvr-hop.is-ok { border-left-color: var(--hx-lime); }
+.cvr-hop-lead { margin: 0; font-size: 12px; color: var(--hx-ink-2); line-height: 1.45; }
+.cvr-hop-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.cvr-hop-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--hx-ink-2);
+}
+.cvr-hop-list li b { font-weight: 600; color: var(--hx-ink); }
+.cvr-hop-list li span { font-family: var(--hx-mono); font-size: 10px; }
+.cvr-hop-list li i { margin-left: auto; font-style: normal; font-family: var(--hx-mono); }
+.cvr-hop-list li em {
+  flex: 1 1 100%;
+  margin: 0;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--hx-faint);
+}
+.cvr-hop-list li em.is-ok { color: var(--hx-ink-2); }
+.cvr-hop-fix { margin: 9px 0 0; font-size: 11.5px; color: var(--hx-ink-2); line-height: 1.45; }
+.cvr-hop-fix code {
+  font-family: var(--hx-mono);
+  font-size: 10.5px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--hx-surface);
+  border: 1px solid var(--hx-line);
+}
+/* El descuento en la línea de la cuenta: el número en mono, la etiqueta en gris. */
+.cvr-tally-line span { color: var(--hx-faint); font-size: 11px; }

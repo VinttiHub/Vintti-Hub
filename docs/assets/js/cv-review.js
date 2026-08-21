@@ -983,6 +983,56 @@
       </details>`;
     };
 
+    // JOB HOPPING — lo único que se mide fuera de la checklist además de las herramientas.
+    // El tamaño del bloque sigue al estado a propósito: en 34 de los 55 CVs del corpus la
+    // respuesta es "no hay tramos cortos", y una caja grande diciendo que no pasa nada entre
+    // la checklist y los folds rompe la regla de esta pantalla — se abre sólo lo que puede
+    // cambiar la decisión ahora mismo.
+    const jh = a._job_hopping || {};
+    const jhMonths = (m) => m >= 12
+      ? `${Math.floor(m / 12)} yr${Math.floor(m / 12) > 1 ? 's' : ''}${m % 12 ? ` ${m % 12} mo` : ''}`
+      : `${m} mo`;
+    const jhRow = (st) => `<li>
+        <b>${esc(st.company)}</b>
+        <span>${esc(st.start_date)} → ${esc(st.end_date)}</span>
+        <i>${jhMonths(st.months)}</i>
+        ${st.reason_kind
+          ? `<em class="is-ok"${hlRegister('ev', st.reason_quote)}>${
+              st.reason_kind === 'rehired' ? 'Hired back later — ' : ''}“${esc(st.reason_quote)}”</em>`
+          : '<em>the CV never says why it ended</em>'}
+      </li>`;
+    const jhHtml = (() => {
+      if (!jh.state) return '';
+      const line = (cls, txt) => `<p class="cvr-hop-line ${cls}">${txt}</p>`;
+      if (jh.state === 'no_history')
+        return line('', 'Job hopping: nothing to judge — this CV shows one employer, so '
+                      + 'there is nothing to leave.');
+      if (jh.state === 'clean')
+        return line('', `Job hopping: none. Every one of the ${jh.checked} employers this CV `
+                      + 'shows lasted a year or more.');
+      if (jh.state === 'unreadable')
+        return line('is-bad', '⚠️ Job hopping could not be checked: none of the dates in this '
+                            + 'CV could be read. Fix the dates and score again.');
+      if (jh.state === 'explained')
+        return `<div class="cvr-hop is-ok">
+          <p class="cvr-hop-lead"><b>Job hopping, and the CV explains it.</b> ${jh.short}
+            stint${jh.short > 1 ? 's' : ''} under a year, ${jh.short > 1 ? 'each' : ''} with a
+            reason the reviewer can read. <b>Nothing came off the score.</b></p>
+          <ul class="cvr-hop-list">${(jh.stints || []).filter(x => x.reason_kind).map(jhRow).join('')}</ul>
+        </div>`;
+      const un = (jh.stints || []).filter(x => !x.reason_kind && !x.skipped);
+      return `<div class="cvr-hop is-bad">
+        <p class="cvr-hop-lead"><b>This one did move the score: &minus;${jh.penalty}.</b>
+          ${un.length} employer${un.length > 1 ? 's' : ''} left in under a year with no reason
+          anywhere in this CV. A short stint is not the problem — an unexplained one is, and
+          the client will ask.</p>
+        <ul class="cvr-hop-list">${un.map(jhRow).join('')}</ul>
+        <p class="cvr-hop-fix">Add it to that role's bullets — <code>Reason for leaving: …</code>
+          — and score again. If you don't know why, ask the candidate before this goes out:
+          this is the one gap on the page you cannot close by rewriting.</p>
+      </div>`;
+    })();
+
     const reqRow = (r, per) => {
       const f = reqFace(r);
       // "described" pinta verde en el CV; "only listed" ambar. Es la misma distincion que
@@ -1029,8 +1079,17 @@
         </div>
         <p class="cvr-tally-line">
           <b>${sd.earned}</b> of <b>${sd.scorable}</b> scoring requirements
-          &rarr; <b>${sd.base}</b>/100${sd.tools_penalty
-            ? ` &minus; <b>${sd.tools_penalty}</b> = <b>${score}</b>` : ''}.
+          &rarr; <b>${sd.base}</b>/100${(() => {
+            // Los descuentos vienen como lista desde la v12; un análisis v11 guardado sólo
+            // trae tools_penalty suelto, y se sigue pintando igual.
+            const ps = (sd.penalties || []).filter(p => p.points).length
+              ? sd.penalties.filter(p => p.points)
+              : (sd.tools_penalty ? [{ label: 'tools', points: sd.tools_penalty }] : []);
+            return ps.length
+              ? ps.map(p => ` &minus; <b>${p.points}</b> <span>(${esc(p.label)})</span>`).join('')
+                + ` = <b>${score}</b>`
+              : '';
+          })()}.
           Each one is worth ${per} points.
         </p>
         ${sd.excluded && sd.excluded.length ? `<p class="cvr-tally-off">Not counted: ${
@@ -1041,7 +1100,7 @@
 
     const reqsHtml = reqs.length ? `
       <div class="cvr-reqs">
-        <h5>What the JD asked for <span class="cvr-reqs-count">this list <b>is</b> the score</span></h5>
+        <h5>What the JD asked for <span class="cvr-reqs-count">this list <b>sets</b> the score</span></h5>
         ${rs.incomplete ? `<p class="cvr-reqs-warn">⚠️ The posting lists ${rs.expected}
           requirements and only ${rs.listed} could be read, so this percentage is out of
           ${rs.listed}, not ${rs.expected}. Treat it as provisional and re-run before you
@@ -1053,8 +1112,10 @@
             <p>The score is one thing only: <b>the share of the JD's technical requirements
               this CV shows</b>. Each one is worth the same. Describing it in a role earns
               the full share, having it only in a list earns half, not having it earns
-              nothing. Nothing else moves the number — not the writing, not the length,
-              not the About.</p>
+              nothing. Two fixed deductions can come off that share &mdash; a tools list no
+              role backs up, and a stint under a year the CV never explains &mdash; and each
+              one is shown where it happens, with what it cost. Nothing else moves the
+              number: not the writing, not the length, not the About.</p>
             <p><b>Not counted:</b> soft skills, and what everyone is assumed to meet
               ("Familiarity with Windows"). They are still listed, because the client asked
               for them — they just cannot tell two candidates apart.</p>
@@ -1127,6 +1188,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         </div>
       </div>
       ${reqsHtml}
+      ${jhHtml}
       ${!reqs.length && (a.jd_requirements_missed || []).length
         ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>`
         : ''}
