@@ -93,6 +93,21 @@
 
   /* ---------------------------------------------------------------- métricas */
 
+  // Anillo de coverage. Lo comparten la cola y las tarjetas: es la misma medida, así que
+  // tiene que verse igual en los dos lados. pathLength="100" deja escribir el dasharray
+  // directo en porcentaje, sin calcular la circunferencia.
+  function ringHtml(score, modCls) {
+    const pct = Math.max(0, Math.min(100, Number(score) || 0));
+    return `<span class="cvr-cov ${modCls || ''}">
+        <svg class="cvr-ring ${qCls(score)}" viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="cvr-ring-t" cx="18" cy="18" r="16" pathLength="100"></circle>
+          <circle class="cvr-ring-p" cx="18" cy="18" r="16" pathLength="100"
+                  stroke-dasharray="${pct} 100"></circle>
+        </svg>
+        <span class="cvr-cov-n">${score}</span>
+      </span>`;
+  }
+
   function renderMetrics(data) {
     const box = $('cvrMetrics');
     const rows = data.rows || [];
@@ -104,6 +119,15 @@
       + (meta.sales_lead ? '  ·  your opportunities' : '')
       + (meta.ai_version ? `  ·  scoring v${meta.ai_version}` : '');
 
+    // Resumen para leer la sección SIN abrirla: plegada tiene que decir algo igual.
+    const sum = [];
+    if (rows.length) sum.push(`${rows.length} recruiter${rows.length === 1 ? '' : 's'}`);
+    if (totals.profiles_sent) sum.push(`${totals.profiles_sent} sent`);
+    if (totals.quality_avg !== null && totals.quality_avg !== undefined) {
+      sum.push(`${totals.quality_avg} avg coverage`);
+    }
+    $('cvrMetricsSum').textContent = sum.join('  ·  ');
+
     if (!rows.length) {
       box.innerHTML = '';
       show($('cvrMetricsEmpty'), true);
@@ -113,41 +137,66 @@
 
     const card = (r, isTotal) => {
       const q = r.quality_avg;
+      const hasQ = q !== null && q !== undefined;
+
+      // Aprobado y rechazado en primera son las dos mitades de lo MISMO (lo que ya
+      // decidiste), así que van en una sola barra partida en vez de dos porcentajes
+      // sueltos que el ojo tiene que sumar.
+      const dec = r.profiles_decided || 0;
+      const ap = r.approved_first_try_pct;
+      const rj = r.rejected_first_try_pct;
+      const split = dec
+        ? `<div class="cvr-split" role="img"
+                aria-label="${ap}% approved on the first try, ${rj}% rejected">
+             <i class="cvr-split-a" style="width:${ap}%"></i>
+             <i class="cvr-split-r" style="width:${rj}%"></i>
+           </div>
+           <div class="cvr-split-legend">
+             <span class="cvr-lg-a"><b>${ap}%</b> approved 1st try</span>
+             <span class="cvr-lg-r"><b>${rj}%</b> rejected</span>
+           </div>
+           <p class="cvr-split-base">over ${dec} decided profile${dec === 1 ? '' : 's'}</p>`
+        : `<p class="cvr-split-base cvr-split-base--empty">Nothing decided yet in this period.</p>`;
+
       const reasons = (r.reasons || []).map(x =>
         `<li><span>${esc(x.reason_label)}</span>
              <b>${fmtRate(x.profiles, r.profiles_decided, x.pct)}</b></li>`).join('');
-      const foot = [];
-      if (r.profiles_pending) {
-        foot.push(`${r.profiles_pending} still waiting on a decision — the rates only count what you decided.`);
-      }
-      if (r.stale_version_profiles) {
-        foot.push(`${r.stale_version_profiles} excluded: scored under the old rubric, which measured the writing instead of JD coverage.`);
-      }
-      if (r.unscored_profiles) {
-        foot.push(`${r.unscored_profiles} have no AI score (no job description, or scoring failed).`);
-      }
+
+      // Las salvedades eran cuatro renglones de gris repetidos en cada tarjeta. Van como
+      // chips con el porqué en el tooltip: se ven de un vistazo y se leen si te importan.
+      const chip = (n, label, why) => n
+        ? `<span class="cvr-mchip" title="${esc(why)}"><b>${n}</b> ${esc(label)}</span>` : '';
+      const chips = [
+        chip(r.profiles_pending, 'pending',
+             'Still waiting on your decision. The rates only count profiles you already decided.'),
+        chip(r.stale_version_profiles, 'old rubric',
+             'Scored under the old rubric, which measured the writing instead of JD coverage. Excluded from the coverage average.'),
+        chip(r.unscored_profiles, 'unscored',
+             'No AI score: the vacancy had no job description, or the scoring failed.'),
+      ].filter(Boolean).join('');
+
       return `
       <article class="cvr-mcard ${isTotal ? 'cvr-mcard--total' : ''}">
         <div class="cvr-mcard-head">
           <h3>${esc(isTotal ? 'All recruiters' : (r.recruiter_label || r.recruiter_email))}</h3>
           <span class="cvr-mcard-sent"><b>${r.profiles_sent}</b> sent</span>
         </div>
-        <div class="cvr-stats">
-          <div class="cvr-stat">
-            <span class="cvr-stat-v ${qCls(q)}">${q === null || q === undefined ? '—' : q}</span>
-            <span class="cvr-stat-l">JD coverage${r.quality_n ? ` n=${r.quality_n}` : ''}</span>
-          </div>
-          <div class="cvr-stat">
-            <span class="cvr-stat-v">${r.approved_first_try_pct === null ? '—' : r.approved_first_try_pct + '%'}</span>
-            <span class="cvr-stat-l">Approved 1st</span>
-          </div>
-          <div class="cvr-stat">
-            <span class="cvr-stat-v">${r.rejected_first_try_pct === null ? '—' : r.rejected_first_try_pct + '%'}</span>
-            <span class="cvr-stat-l">Rejected 1st</span>
+
+        <div class="cvr-mcard-hero">
+          ${hasQ ? ringHtml(q, 'cvr-cov--lg') : '<span class="cvr-cov--lg cvr-cov-empty">—</span>'}
+          <div class="cvr-hero-txt">
+            <div class="cvr-hero-l">JD coverage</div>
+            <div class="cvr-hero-s">${hasQ
+              ? `average of ${r.quality_n} first-round CV${r.quality_n === 1 ? '' : 's'}`
+              : 'no scored CVs in this period'}</div>
           </div>
         </div>
-        ${reasons ? `<ul class="cvr-reasons-list">${reasons}</ul>` : ''}
-        ${foot.length ? `<p class="cvr-mfoot">${foot.map(esc).join(' ')}</p>` : ''}
+
+        <div class="cvr-mcard-split">${split}</div>
+
+        ${reasons ? `<p class="cvr-reasons-cap">Why they were sent back</p>
+                     <ul class="cvr-reasons-list">${reasons}</ul>` : ''}
+        ${chips ? `<div class="cvr-mchips">${chips}</div>` : ''}
       </article>`;
     };
 
@@ -181,6 +230,44 @@
     cancelled: ['Cancelled', 'cvr-st-cancelled'],
   };
 
+  // Grupos abiertos de la cola, por opportunity_id. Vive fuera de renderQueue porque el
+  // buscador re-renderiza en cada tecla: sin esto, escribir colapsaría todo lo que abriste.
+  const openGroups = new Set();
+
+  // El <tbody> lo emite renderQueue (uno por vacante), así que limpiar la cola es sacar
+  // los tbody y dejar el thead en pie.
+  function clearQueue() {
+    $('cvrQueueTable').querySelectorAll('tbody').forEach(tb => tb.remove());
+  }
+
+  // Coverage como anillo con el número adentro: una sola pieza por fila, que se escanea de
+  // un vistazo. El arco lleva el semáforo y el número queda en tinta neutra, porque una
+  // columna de números en rojo y verde era justo el ruido que sobraba.
+  function covCell(r) {
+    if (r.ai_pending) return '<span class="cvr-score-none">scoring…</span>';
+    if (r.ai_score === null || r.ai_score === undefined) return '<span class="cvr-score-none">—</span>';
+    return ringHtml(r.ai_score);
+  }
+
+  // Para los pendientes la antigüedad son días de espera; para los ya decididos, la fecha
+  // en que se decidieron. Son dos unidades distintas en la misma columna a propósito.
+  function ageCell(r) {
+    const waited = r.status === 'pending' ? daysWaiting(r.requested_at) : null;
+    if (waited === null) return `<span class="cvr-age">${fmtDate(r.reviewed_at || r.requested_at)}</span>`;
+    return `<span class="cvr-age${waited >= 3 ? ' cvr-age--old' : ''}">${waited === 0 ? 'today' : waited + 'd'}</span>`;
+  }
+
+  // La espera del CV más viejo del grupo, para que el grupo colapsado siga gritando urgencia.
+  // Mismo formato corto que las filas: vive en la columna Age y tiene que alinear con ellas.
+  function groupAge(rows) {
+    const waits = rows
+      .map(r => (r.status === 'pending' ? daysWaiting(r.requested_at) : null))
+      .filter(v => v !== null);
+    if (!waits.length) return '';
+    const oldest = Math.max(...waits);
+    return `<span class="cvr-age${oldest >= 3 ? ' cvr-age--old' : ''}">${oldest === 0 ? 'today' : oldest + 'd'}</span>`;
+  }
+
   function renderQueue() {
     const term = ($('cvrSearch').value || '').toLowerCase().trim();
     let list = !term ? queueRows : queueRows.filter(r =>
@@ -189,12 +276,11 @@
     // El CTA de un batch apunta a una oportunidad: son N reviews, no uno.
     if (deepOppId) list = list.filter(r => Number(r.opportunity_id) === deepOppId);
 
-    const body = $('cvrQueue');
     $('cvrCount').innerHTML = `<b>${list.length}</b> of ${queueRows.length}`;
 
     show($('cvrQueueLoading'), false);
     if (!list.length) {
-      body.innerHTML = '';
+      clearQueue();
       show($('cvrQueueWrap'), false);
       show($('cvrQueueEmpty'), true);
       return;
@@ -202,38 +288,124 @@
     show($('cvrQueueEmpty'), false);
     show($('cvrQueueWrap'), true);
 
-    body.innerHTML = list.map(r => {
-      const [label, cls] = STATUS[r.status] || [r.status, ''];
-      const waited = r.status === 'pending' ? daysWaiting(r.requested_at) : null;
-      const score = r.ai_pending
-        ? '<span class="cvr-score-none">scoring…</span>'
-        : (r.ai_score === null || r.ai_score === undefined
-            ? '<span class="cvr-score-none">—</span>'
-            : `<span class="cvr-score ${qCls(r.ai_score)}">${r.ai_score}</span>`);
-      const age = waited !== null
-        ? `<span class="cvr-age${waited >= 3 ? ' cvr-age--old' : ''}">${waited === 0 ? 'today' : waited + 'd'}</span>`
-        : `<span class="cvr-age">${fmtDate(r.reviewed_at || r.requested_at)}</span>`;
-      return `
-      <tr data-review-id="${r.review_id}" tabindex="0">
-        <td><div class="cvr-cand">${esc(r.candidate_name || 'Candidate')}</div></td>
-        <td class="hx-cell-muted">${esc(r.opp_position_name || '—')}
-            <span class="cvr-oppid">#${r.opportunity_id}</span></td>
-        <td class="hx-cell-muted">${esc(r.client_name || '—')}</td>
-        <td class="hx-cell-muted">${esc(r.recruiter_email || '—')}</td>
-        <td class="cvr-col-round"><span class="cvr-round-n">${r.round}</span></td>
-        <td class="cvr-col-score">${score}</td>
-        <td><span class="hx-status ${cls}">${label}</span></td>
-        <td>${age}</td>
+    // Agrupar por vacante respetando el orden que ya trae el backend (pendientes primero,
+    // el más viejo arriba): así la búsqueda más urgente queda arriba de todo sin ordenar acá.
+    const groups = new Map();
+    list.forEach(r => {
+      const k = String(r.opportunity_id);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    });
+
+    // Si todas las filas comparten estado, la columna Status no dice nada: se esconde.
+    const statuses = new Set(list.map(r => r.status));
+    $('cvrQueueTable').classList.toggle('cvr-table--nostatus', statuses.size <= 1);
+
+    // Todo arranca colapsado, salvo que no haya nada que elegir (un solo grupo o un
+    // deep-link a una vacante) o que estés buscando: con término activo, dejar los grupos
+    // cerrados haría parecer que el buscador no encuentra nada.
+    const autoOpen = !!term || groups.size === 1 || !!deepOppId;
+
+    const html = [...groups.entries()].map(([oppId, rows]) => {
+      const first = rows[0];
+      const open = autoOpen || openGroups.has(oppId);
+
+      // El recruiter sube al encabezado sólo si es el mismo para todo el grupo; si no,
+      // baja a cada fila, que es donde recién ahí distingue algo.
+      const recs = new Set(rows.map(r => r.recruiter_email || '—'));
+      const sharedRec = recs.size === 1 ? [...recs][0] : '';
+
+      const sub = [first.client_name || '—', sharedRec].filter(Boolean).join(' · ');
+      const n = rows.length;
+
+      // El encabezado usa las MISMAS cuatro celdas que las filas (nada de colspan): así el
+      // contador y la antigüedad del grupo caen en columnas reales y alinean con los datos
+      // de abajo en vez de flotar según lo largo que sea el nombre de la vacante. El
+      // contador va pegado al chevron, con ancho fijo, para que arranque siempre en la
+      // misma x sin importar el grupo.
+      const head = `
+      <tr class="cvr-grp-head" role="button" tabindex="0" aria-expanded="${open}">
+        <td class="cvr-grp-cell">
+          <i class="fa-solid fa-chevron-right cvr-chev"></i>
+          <span class="cvr-grp-count">${n} CV${n === 1 ? '' : 's'}</span>
+          <span class="cvr-grp-txt">
+            <span class="cvr-grp-title">${esc(first.opp_position_name || '—')}</span>
+            <span class="cvr-oppid">#${esc(oppId)}</span>
+            <span class="cvr-grp-sub">${esc(sub)}</span>
+          </span>
+        </td>
+        <td class="cvr-col-score"></td>
+        <td class="cvr-col-status"></td>
+        <td class="cvr-col-age">${groupAge(rows)}</td>
       </tr>`;
+
+      const body = rows.map(r => {
+        const [label, cls] = STATUS[r.status] || [r.status, ''];
+        // Ronda 1 es el caso normal y no se muestra: el chip aparece recién cuando el CV
+        // ya volvió al menos una vez, que es la única ronda que dice algo.
+        const round = Number(r.round) > 1
+          ? `<span class="cvr-round-chip">R${esc(r.round)}</span>` : '';
+        const rec = sharedRec ? ''
+          : `<div class="cvr-row-sub">${esc(r.recruiter_email || '—')}</div>`;
+        return `
+        <tr class="cvr-row" data-review-id="${r.review_id}" tabindex="0">
+          <td><div class="cvr-cand">${esc(r.candidate_name || 'Candidate')}${round}</div>${rec}</td>
+          <td class="cvr-col-score">${covCell(r)}</td>
+          <td class="cvr-col-status"><span class="hx-status ${cls}">${esc(label)}</span></td>
+          <td class="cvr-col-age">${ageCell(r)}</td>
+        </tr>`;
+      }).join('');
+
+      return `<tbody class="cvr-grp${open ? '' : ' is-closed'}" data-opp="${esc(oppId)}">${head}${body}</tbody>`;
     }).join('');
 
-    body.querySelectorAll('tr').forEach(el => {
-      const open = () => openDrawer(Number(el.dataset.reviewId));
-      el.addEventListener('click', open);
-      el.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      });
+    clearQueue();
+    $('cvrQueueTable').insertAdjacentHTML('beforeend', html);
+  }
+
+  // Un solo par de listeners delegados en la tabla, en vez de re-adjuntar N handlers en
+  // cada render (y el render se dispara con cada tecla del buscador).
+  function wireQueue() {
+    const table = $('cvrQueueTable');
+
+    const hit = (e) => {
+      const head = e.target.closest('.cvr-grp-head');
+      if (head) return () => toggleGroup(head);
+      const row = e.target.closest('.cvr-row');
+      if (row) return () => openDrawer(Number(row.dataset.reviewId));
+      return null;
+    };
+
+    table.addEventListener('click', e => { const act = hit(e); if (act) act(); });
+    table.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const act = hit(e);
+      if (act) { e.preventDefault(); act(); }
     });
+  }
+
+  function wireMetricsToggle() {
+    const head = $('cvrMetricsToggle');
+    const panel = $('cvrMetricsPanel');
+    const toggle = () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      head.setAttribute('aria-expanded', String(open));
+      head.classList.toggle('is-open', open);
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  }
+
+  function toggleGroup(head) {
+    const grp = head.closest('.cvr-grp');
+    if (!grp) return;
+    const open = grp.classList.toggle('is-closed') === false;
+    head.setAttribute('aria-expanded', String(open));
+    if (open) openGroups.add(grp.dataset.opp);
+    else openGroups.delete(grp.dataset.opp);
   }
 
 
@@ -1498,7 +1670,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       .then(d => { queueRows = d.reviews || []; renderQueue(); })
       .catch(err => {
         queueRows = [];
-        $('cvrQueue').innerHTML = '';
+        clearQueue();
         show($('cvrQueueLoading'), false);
         show($('cvrQueueWrap'), false);
         const empty = $('cvrQueueEmpty');
@@ -1568,6 +1740,8 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     $('cvrMine').addEventListener('change', refresh);
     // El buscador filtra en memoria: la cola ya está cargada, no hace falta ir al backend.
     $('cvrSearch').addEventListener('input', renderQueue);
+    wireQueue();
+    wireMetricsToggle();
 
     $('cvrRejectToggle').addEventListener('click', () => setRejectMode(true));
     $('cvrRejectCancel').addEventListener('click', () => setRejectMode(false));

@@ -83,8 +83,33 @@
   color: var(--hx-faint);
 }
 
+/* Encabezado de sección plegable: mismo gesto que los grupos de la cola. */
+.cvr-sec-head--toggle {
+  cursor: pointer;
+  user-select: none;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.cvr-sec-head--toggle:hover h2,
+.cvr-sec-head--toggle:hover .cvr-chev { color: var(--hx-accent); }
+.cvr-sec-head--toggle .cvr-chev { transition: transform .15s ease; }
+.cvr-sec-head--toggle.is-open .cvr-chev { transform: rotate(90deg); }
+.cvr-sec-head--toggle:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
+  border-radius: var(--hx-r-sm);
+}
+/* Plegada igual tiene que decir algo: "6 recruiters · 52 sent · 79.6 avg coverage". */
+.cvr-sec-sum {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--hx-muted);
+}
+.cvr-sec-sum:empty { display: none; }
+
 /* La explicación larga vive plegada: ocupaba media pantalla y se lee una vez. */
-.cvr-note { margin-left: auto; }
+.cvr-note { margin: 0 0 12px; }
 .cvr-note > summary {
   list-style: none;
   cursor: pointer;
@@ -111,7 +136,7 @@
 /* ---------- Métricas por recruiter ---------- */
 .cvr-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 12px;
 }
 .cvr-mcard {
@@ -134,41 +159,119 @@
 }
 .cvr-mcard-head h3 {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--hx-ink);
 }
 .cvr-mcard-sent { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-muted); }
 .cvr-mcard-sent b { color: var(--hx-ink); }
 
-.cvr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.cvr-stat { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.cvr-stat-v {
-  font-family: var(--hx-mono);
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -.02em;
-  line-height: 1;
-  color: var(--hx-ink);
+/* ---- Cuerpo de la tarjeta ----
+   Antes eran tres números mono sueltos ("100%" / "0%") con etiquetas en mayúsculas que se
+   partían en dos renglones, más cuatro líneas de salvedades repetidas en cada tarjeta.
+   Ahora: el coverage como anillo (el mismo de la cola), aprobado/rechazado como UNA barra
+   partida —son las dos mitades de lo mismo— y las salvedades como chips con tooltip.
+   El semáforo .cvr-q-* ya no pinta texto: vive en el arco del anillo, y el número va
+   siempre en tinta neutra. Las clases se siguen emitiendo porque seleccionan ese arco. */
+.cvr-mcard-hero {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 16px;
 }
-.cvr-stat-l {
-  font-family: var(--hx-mono);
-  font-size: 9.5px;
-  letter-spacing: .09em;
-  text-transform: uppercase;
+.cvr-cov--lg { flex: none; }
+.cvr-cov--lg .cvr-ring { width: 58px; height: 58px; }
+.cvr-cov--lg .cvr-ring circle { stroke-width: 3.6; }
+.cvr-cov--lg .cvr-cov-n { font-size: 16px; }
+.cvr-cov-empty {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 3px dashed var(--hx-line);
   color: var(--hx-faint);
+  font-family: var(--hx-mono);
+  font-size: 15px;
 }
-/* Semáforo del score. La lima de marca es muy clara para texto, así que va con
-   tinta oscura encima. */
-.cvr-q-good { color: var(--hx-lime-ink); }
-.cvr-q-mid  { color: var(--hx-amber-ink); }
-.cvr-q-low  { color: var(--hx-urgent); }
-.cvr-q-none { color: var(--hx-faint); }
+.cvr-hero-txt { min-width: 0; }
+.cvr-hero-l {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--hx-ink);
+  letter-spacing: -.005em;
+}
+.cvr-hero-s { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--hx-muted); }
 
-.cvr-reasons-list {
-  margin: 14px 0 0;
-  padding: 12px 0 0;
+/* Barra partida: lima lo aprobado, rosa lo rechazado. Suman el 100% de lo decidido. */
+.cvr-split {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--hx-line-2);
+}
+.cvr-split i { display: block; height: 100%; }
+.cvr-split-a { background: var(--hx-lime); }
+.cvr-split-r { background: var(--hx-urgent); }
+.cvr-split-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--hx-muted);
+}
+.cvr-split-legend b { font-family: var(--hx-mono); font-size: 13px; color: var(--hx-ink); }
+/* Puntito del color de su tramo, para atar leyenda y barra sin escribir "lima = ...". */
+.cvr-lg-a::before, .cvr-lg-r::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.cvr-lg-a::before { background: var(--hx-lime); }
+.cvr-lg-r::before { background: var(--hx-urgent); }
+.cvr-split-base { margin: 6px 0 0; font-size: 11.5px; color: var(--hx-faint); }
+.cvr-split-base--empty { margin: 0; font-size: 12.5px; color: var(--hx-muted); }
+
+/* Salvedades: una línea de chips en vez de un párrafo gris repetido tarjeta por tarjeta.
+   El porqué de cada una vive en el title, a un hover de distancia. */
+.cvr-mchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--hx-line-2);
+}
+.cvr-mchip {
+  cursor: help;
+  font-size: 11.5px;
+  color: var(--hx-muted);
+  background: var(--hx-surface-2);
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.cvr-mchip b { font-family: var(--hx-mono); font-weight: 700; color: var(--hx-ink-2); }
+.cvr-mchip:hover { border-color: var(--hx-slate-ink); color: var(--hx-ink-2); }
+
+/* Sin encabezado, la lista era una hilera de frases sueltas con un porcentaje al lado
+   y no se entendía de qué hablaban. */
+.cvr-reasons-cap {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--hx-line-2);
+  font-size: 11.5px;
+  color: var(--hx-muted);
+}
+.cvr-reasons-list {
+  margin: 6px 0 0;
+  padding: 0;
   list-style: none;
 }
 .cvr-reasons-list li {
@@ -180,25 +283,177 @@
   color: var(--hx-ink-2);
 }
 .cvr-reasons-list b { font-family: var(--hx-mono); font-size: 11.5px; color: var(--hx-ink); }
-.cvr-mfoot {
-  margin: 10px 0 0;
-  font-size: 11.5px;
-  line-height: 1.5;
+
+/* ---------- Tabla de la cola ----------
+   La cola se lee por vacante, no por candidato: cada <tbody class="cvr-grp"> es una
+   búsqueda con su encabezado colapsable, y las columnas que se repetían fila a fila
+   (posición, cliente, recruiter) subieron ahí. Todo va scopeado a .cvr-table para no
+   tocar las tablas de hirex.html / hirex-job-detail.html, que comparten .hx-table. */
+.cvr-table tbody tr:focus-visible { outline: 2px solid var(--hx-accent); outline-offset: -2px; }
+.cvr-col-cand { min-width: 220px; }
+.cvr-col-score { width: 108px; text-align: center; }
+.cvr-col-status { width: 132px; }
+.cvr-col-age { width: 104px; }
+.cvr-table th.cvr-col-score { text-align: center; }
+
+/* Con un solo estado en la lista (el caso por defecto: todo "Waiting") la columna no
+   informa nada, sólo suma una columna de píldoras amarillas. */
+.cvr-table--nostatus .cvr-col-status { display: none; }
+
+/* Colapsada, la lista de grupos ES la tabla: tiene que respirar igual que cualquier
+   otra fila de .hx-table, no verse como una barra de sección apretada. */
+.cvr-table td { padding: 13px 16px; }
+
+/* ---- Encabezado de grupo ----
+   Usa las mismas 4 celdas que las filas (nada de colspan) para que el contador y la
+   antigüedad caigan en columnas reales y alinien con los datos de abajo. */
+.cvr-table .cvr-grp-head > td {
+  padding: 13px 16px;
+  background: var(--hx-surface);
+  border-bottom: 1px solid var(--hx-line-2);
+}
+.cvr-grp + .cvr-grp .cvr-grp-head > td { border-top: none; }
+.cvr-grp.is-closed .cvr-row { display: none; }
+.cvr-table .cvr-grp-head:hover > td { background: var(--hx-surface-2); }
+/* Último y cerrado: el borde inferior sería una raya suelta contra el borde redondeado. */
+.cvr-grp:last-child.is-closed .cvr-grp-head > td { border-bottom: none; }
+/* La última fila de un grupo abierto no lleva borde (regla de .hx-table): sin esto queda
+   pegada al encabezado del grupo siguiente. */
+.cvr-grp:not(.is-closed) .cvr-row:last-child > td { border-bottom: 1px solid var(--hx-line); }
+
+.cvr-grp-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cvr-chev {
+  flex: none;
+  width: 11px;
+  font-size: 11px;
   color: var(--hx-faint);
+  transition: transform .15s ease;
+}
+.cvr-grp:not(.is-closed) .cvr-chev { transform: rotate(90deg); color: var(--hx-ink-2); }
+.cvr-grp-head:hover .cvr-chev { color: var(--hx-ink-2); }
+
+/* Ancho fijo: los contadores forman columna y el título de todos los grupos arranca en
+   la misma x, sin importar si dice "1 CV" o "3 CVs". */
+.cvr-grp-count {
+  flex: none;
+  min-width: 58px;
+  text-align: center;
+  font-family: var(--hx-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hx-ink-2);
+  background: var(--hx-surface);
+  border: 1px solid var(--hx-line);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.cvr-grp:not(.is-closed) .cvr-grp-count {
+  background: var(--hx-accent-wash);
+  border-color: transparent;
+  color: var(--hx-accent);
 }
 
-/* ---------- Tabla de la cola ---------- */
-.cvr-table tbody tr:focus-visible { outline: 2px solid var(--hx-accent); outline-offset: -2px; }
-.cvr-col-cand { min-width: 190px; }
-.cvr-col-round, .cvr-col-score { width: 86px; text-align: center; }
-.cvr-col-status { width: 132px; }
-.cvr-col-age { width: 96px; }
-.cvr-cand { font-weight: 600; color: var(--hx-ink); }
+/* Una línea con corte por elipsis: el encabezado no puede crecer a dos renglones. */
+.cvr-grp-txt {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cvr-grp-title {
+  flex: none;
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hx-ink);
+  letter-spacing: -.005em;
+}
+.cvr-grp-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  color: var(--hx-muted);
+}
+.cvr-grp-sub::before { content: "· "; color: var(--hx-faint); }
+
+/* ---- Fila de candidato ----
+   El contraste con el encabezado NO lo hace el encabezado achicándose, sino las filas
+   hijas: sangría, guía vertical y un fondo apenas tramado, para que el grupo abierto se
+   lea como un bloque anidado dentro de la lista blanca. */
+.cvr-table .cvr-row > td {
+  background: color-mix(in srgb, var(--hx-slate) 22%, #fff);
+}
+.cvr-table .cvr-row:hover > td {
+  background: color-mix(in srgb, var(--hx-slate) 45%, #fff);
+}
+.cvr-table .cvr-row > td:first-child {
+  padding-left: 42px;
+  box-shadow: inset 3px 0 0 var(--hx-line);
+}
+.cvr-cand {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hx-ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cvr-row-sub { margin-top: 2px; font-size: 12px; color: var(--hx-muted); }
 .cvr-oppid { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-faint); }
-.cvr-round, .cvr-score { font-family: var(--hx-mono); font-weight: 600; }
+
+/* La ronda sólo aparece cuando es > 1: la 1 es el caso normal y no vale una columna. */
+.cvr-round-chip {
+  font-family: var(--hx-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--hx-slate-ink);
+  background: var(--hx-slate);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* Coverage como anillo con el número adentro. Los colores del semáforo de TEXTO
+   (.cvr-q-* : verde oliva, ámbar oscuro) sirven para leer un número, pero como arco se
+   ven sucios; el anillo usa la paleta de marca, que es para eso: lima para lo bueno,
+   naranja y rosa para lo que hay que mirar. Lo bueno va callado, lo problemático grita. */
+.cvr-cov { position: relative; display: inline-grid; place-items: center; }
+.cvr-ring { width: 34px; height: 34px; transform: rotate(-90deg); }
+.cvr-ring circle { fill: none; stroke-width: 3.2; }
+.cvr-ring-t { stroke: var(--hx-line-2); }
+.cvr-ring-p { stroke: var(--hx-slate-ink); stroke-linecap: round; }
+.cvr-ring.cvr-q-good .cvr-ring-p { stroke: var(--hx-lime); }
+.cvr-ring.cvr-q-mid  .cvr-ring-p { stroke: var(--hx-high); }
+.cvr-ring.cvr-q-low  .cvr-ring-p { stroke: var(--hx-urgent); }
+
+.cvr-cov-n {
+  position: absolute;
+  font-family: var(--hx-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hx-ink-2);
+  letter-spacing: -.02em;
+}
 .cvr-score-none { color: var(--hx-faint); font-family: var(--hx-mono); font-size: 12px; }
-.cvr-age { font-family: var(--hx-mono); font-size: 11.5px; color: var(--hx-muted); }
-.cvr-age--old { color: var(--hx-urgent); font-weight: 700; }
+
+.cvr-age { font-family: var(--hx-mono); font-size: 12.5px; color: var(--hx-muted); }
+/* Lo viejo se marca con un punto, no pintando el texto de rojo bold. */
+.cvr-age--old { color: var(--hx-ink-2); }
+.cvr-age--old::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: var(--hx-urgent);
+  vertical-align: middle;
+}
 
 /* Reusa .hx-status; sólo agrega los estados propios del review. */
 .cvr-st-pending   { background: var(--hx-amber); color: var(--hx-amber-ink); }
@@ -877,8 +1132,28 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 }
 
 @media (max-width: 900px) {
-  .cvr-stats { grid-template-columns: repeat(2, 1fr); }
   .cvr-note { margin-left: 0; width: 100%; }
+
+  /* hirex.css apila las celdas y esconde el thead: sin esto, coverage / status / age
+     quedan como tres valores sueltos sin etiqueta debajo del nombre. */
+  .cvr-table .cvr-grp-head { display: flex !important; align-items: center; gap: 10px; }
+  .cvr-table .cvr-grp-head > td { padding: 7px 12px !important; }
+  .cvr-table .cvr-grp-head > .cvr-grp-cell { flex: 1 1 auto; min-width: 0; }
+  .cvr-table .cvr-grp-head > .cvr-col-score,
+  .cvr-table .cvr-grp-head > .cvr-col-status { display: none; }
+  .cvr-table .cvr-grp-head > .cvr-col-age { flex: none; width: auto; }
+  .cvr-table .cvr-row > td:first-child { padding-left: 12px !important; }
+  .cvr-table .cvr-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+    padding: 9px 12px 11px 26px;
+  }
+  .cvr-table .cvr-row > td { flex: none; padding: 0 !important; }
+  .cvr-table .cvr-row > td:first-child { flex: 1 0 100%; padding: 0 !important; }
+  .cvr-table .cvr-grp-meta { gap: 8px; }
+  .cvr-table .cvr-grp-sub { white-space: normal; }
 }
 
 .cvr-reqs-warn {

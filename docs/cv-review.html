@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-tools2" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-queue-groups" />
 </head>
 
 <body class="light-mode">
@@ -107,9 +107,17 @@
         <p class="cvr-scope" id="cvrScope"></p>
 
         <!-- ============ Métricas por recruiter ============ -->
-        <div class="cvr-sec-head">
+        <!-- La sección arranca plegada: es material de repaso, no lo que venís a hacer.
+             Se abre con el mismo gesto que los grupos de la cola. -->
+        <div class="cvr-sec-head cvr-sec-head--toggle" id="cvrMetricsToggle"
+             role="button" tabindex="0" aria-expanded="false" aria-controls="cvrMetricsPanel">
+          <i class="fa-solid fa-chevron-right cvr-chev"></i>
           <h2>Per recruiter</h2>
           <span class="cvr-window" id="cvrMetricsWindow"></span>
+          <span class="cvr-sec-sum" id="cvrMetricsSum"></span>
+        </div>
+
+        <div id="cvrMetricsPanel" hidden>
           <details class="cvr-note">
             <summary><i class="fa-regular fa-circle-question"></i> How these are counted</summary>
             <div class="cvr-note-body">
@@ -123,11 +131,11 @@
               up to more than 100.
             </div>
           </details>
-        </div>
 
-        <div id="cvrMetrics" class="cvr-metrics"></div>
-        <div class="hx-state cvr-state-sm" id="cvrMetricsEmpty" hidden>
-          <p>No profiles were sent to review in this period.</p>
+          <div id="cvrMetrics" class="cvr-metrics"></div>
+          <div class="hx-state cvr-state-sm" id="cvrMetricsEmpty" hidden>
+            <p>No profiles were sent to review in this period.</p>
+          </div>
         </div>
 
         <!-- ============ Cola ============ -->
@@ -135,21 +143,21 @@
           <h2>Queue</h2>
         </div>
 
+        <!-- La cola se agrupa por vacante: posición, cliente y recruiter viven en el
+             encabezado del grupo (donde se dicen una sola vez) y no se repiten fila a fila.
+             El JS emite un <tbody class="cvr-grp"> por oportunidad; acá sólo va el thead.
+             La columna Status queda en el markup pero se esconde con .cvr-table--nostatus
+             cuando todas las filas visibles comparten estado (el caso por defecto). -->
         <div class="hx-table-wrap" id="cvrQueueWrap" hidden>
-          <table class="hx-table cvr-table">
+          <table class="hx-table cvr-table" id="cvrQueueTable">
             <thead>
               <tr>
                 <th class="cvr-col-cand">Candidate</th>
-                <th>Position</th>
-                <th>Client</th>
-                <th>Recruiter</th>
-                <th class="cvr-col-round">Round</th>
                 <th class="cvr-col-score">Coverage</th>
                 <th class="cvr-col-status">Status</th>
                 <th class="cvr-col-age">Age</th>
               </tr>
             </thead>
-            <tbody id="cvrQueue"></tbody>
           </table>
         </div>
 
@@ -280,6 +288,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260821-tools2" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260821-queue-groups" defer></script>
 </body>
 </html>
