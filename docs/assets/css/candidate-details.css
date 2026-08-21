@@ -6220,31 +6220,92 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   padding: 12px 14px;
   background: #fff;
 }
-.cv-review-hist-head { font-size: 14px; color: #172036; margin-bottom: 6px; }
-.cv-review-hist-status {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
+/* Con varias rondas apiladas, el borde es lo que deja ver cómo terminó cada una sin leer. */
+.cv-review-hist-item--ok      { border-left-color: #7aa23c; }
+.cv-review-hist-item--bad     { border-left-color: #d84343; }
+.cv-review-hist-item--changes { border-left-color: #4f46e5; }
+.cv-review-hist-item--wait    { border-left-color: #e0a300; }
+/* La cabecera pasó a ser una referencia (qué ronda, qué vacante): el veredicto ya no vive
+   acá adentro como un chip, tiene su propio bloque abajo. */
+.cv-review-hist-head {
+  font-size: 12.5px;
+  color: #50607f;
+  margin-bottom: 10px;
 }
-.cv-review-hist-status--pending  { background: #ffe4a3; color: #7a5200; }
-.cv-review-hist-status--approved { background: #c1ff72; color: #3a6b00; }
-.cv-review-hist-status--rejected { background: #ffd9d9; color: #a01111; }
-/* Violeta: es un tercer veredicto, no un rechazo más suave. El candidato sigue en carrera. */
-.cv-review-hist-status--changes_requested { background: #e5e7ff; color: #312e81; }
-.cv-review-hist-line { font-size: 13px; color: #42516a; margin-top: 3px; }
-.cv-review-hist-comment {
-  margin-top: 8px;
+.cv-review-hist-head b { color: #172036; }
+
+/* --- El veredicto: lo primero que la recruiter tiene que leer -------------------------
+   Antes era un chip de 11px arriba a la derecha, con el mismo peso que "JD coverage".
+   Lo que la recruiter necesita saber al abrir esto es qué pasó y si tiene que hacer algo,
+   así que ahora ocupa un renglón entero y va en color. */
+.cv-review-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f4f6fb;
-  color: #172036;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.45;
 }
+.cv-review-verdict-icon { font-size: 15px; line-height: 1.3; }
+.cv-review-verdict b { font-weight: 800; }
+.cv-review-verdict-by { font-weight: 600; opacity: .75; font-size: 12.5px; }
+.cv-review-verdict-sub { display: block; margin-top: 2px; font-size: 12.5px; opacity: .85; }
+.cv-review-verdict--ok      { background: #f0ffdc; color: #33600a; }
+.cv-review-verdict--bad     { background: #ffeaea; color: #8f0f0f; }
+.cv-review-verdict--changes { background: #eef0ff; color: #312e81; }
+.cv-review-verdict--wait    { background: #fff6e2; color: #7a5200; }
+.cv-review-verdict--off     { background: #f2f4f8; color: #50607f; }
+
+/* Las razones como chips: son etiquetas de una lista fija, no prosa. */
+.cv-review-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cv-review-reason {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #e4e7f0;
+  background: #fbfcff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #42516a;
+}
+
+/* El comentario: es LO ÚNICO accionable, así que se lee como una cita de una persona y no
+   como un recuadro gris más. Título arriba ("Why" / "What to change") y la barra del color
+   del veredicto: sin el título nadie sabía de dónde salía ese texto. */
+.cv-review-hist-comment {
+  margin: 10px 0 0;
+  padding: 10px 12px 10px 14px;
+  border-radius: 10px;
+  border-left: 3px solid #cbd5e1;
+  background: #f7f8fc;
+}
+.cv-review-hist-comment figcaption {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #50607f;
+  margin-bottom: 4px;
+}
+.cv-review-hist-comment blockquote {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #172036;
+}
+.cv-review-hist-comment--bad     { border-left-color: #d84343; background: #fff7f7; }
+.cv-review-hist-comment--changes { border-left-color: #4f46e5; background: #f7f8ff; }
+.cv-review-hist-comment--ok      { border-left-color: #7aa23c; background: #fafff2; }
+
+/* Las métricas al pie y en gris: son contexto, no la decisión. */
+.cv-review-hist-meta {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #eef1f6;
+  font-size: 12px;
+  color: #6b7a90;
+}
+.cv-review-hist-meta b { color: #42516a; font-weight: 700; }
 .cv-review-hist-drift {
   margin-top: 8px;
   font-size: 12px;

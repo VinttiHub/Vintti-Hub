@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-changes4" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260821-reopen7" />
 </head>
 
 <body class="light-mode">
@@ -249,7 +249,7 @@
             </details>
 
           <div class="cvr-reject" id="cvrRejectForm" hidden>
-            <p class="cvr-field-label">Why is it going back? Pick every reason that applies.</p>
+            <p class="cvr-field-label">Why is this candidate out? Pick every reason that applies.</p>
             <div id="cvrReasons" class="cvr-reasons"></div>
 
             <label class="hx-field" id="cvrReasonOtherWrap" hidden>
@@ -260,8 +260,11 @@
             <label class="hx-field">
               <span>Comment for the recruiter <em class="hx-hint">required</em></span>
               <textarea id="cvrComment" rows="4"
-                placeholder="e.g. The About reads B1 at best and the JD asks for client-facing English. Ask her for a recording before re-sending."></textarea>
+                placeholder="e.g. Six years of paid social, no paid search anywhere. Not this opening — keep her in mind for the Meta Ads role."></textarea>
             </label>
+            <p class="cvr-changes-note">This takes the candidate out of this opening. If the
+              problem is how the CV is written and not the person, use
+              <b>Request changes</b> instead.</p>
           </div>
 
           <!-- Pedir cambios NO lleva la lista de razones. Esa lista existe para medir por
@@ -285,7 +288,24 @@
 
         <!-- Aprobar y rechazar pesan LO MISMO en el flujo del sales lead, así que van
              juntos y con el mismo peso visual. El rechazo pide razones, por eso son dos
-             pasos: Reject abre el formulario y el footer pasa a Cancel / Send it back. -->
+             pasos: Reject abre el formulario y el footer pasa a Cancel / confirmar.
+             OJO con el verbo: "send it back" era de cuando rechazar era la única forma de
+             devolver un CV. Desde que existe "Request changes", rechazar saca al candidato
+             y no pide otra ronda — los dos textos tienen que decir cosas distintas. -->
+        <!-- Deshacer un rechazo. Va en su propio footer y no junto a Approve/Reject: son
+             momentos distintos — acá la ronda YA está decidida y lo único que se puede
+             hacer es reabrirla. Existe porque el rechazo bloquea la ronda siguiente, así
+             que sin esto un click equivocado deja al candidato fuera de la vacante. -->
+        <footer class="hx-drawer-foot" id="cvrReopenFoot" hidden>
+          <span class="cvr-foot-hint">Rejected. The recruiter cannot send another round for
+            this vacancy — reopen it if that was a mistake.</span>
+          <div class="hx-foot-right">
+            <button type="button" class="hx-btn hx-btn-ghost" id="cvrReopen">
+              <i class="fa-solid fa-rotate-left"></i> Reopen this rejection
+            </button>
+          </div>
+        </footer>
+
         <footer class="hx-drawer-foot" id="cvrDecisionFoot">
           <span class="cvr-foot-hint" id="cvrFootHint"></span>
           <div class="hx-foot-right">
@@ -301,7 +321,7 @@
 
             <button type="button" class="hx-btn hx-btn-ghost" id="cvrRejectCancel" hidden>Cancel</button>
             <button type="button" class="hx-btn hx-btn-danger" id="cvrRejectConfirm" hidden>
-              <i class="fa-solid fa-rotate-left"></i> Send it back
+              <i class="fa-solid fa-xmark"></i> Reject the candidate
             </button>
             <button type="button" class="hx-btn cvr-btn-changes" id="cvrChangesConfirm" hidden>
               <i class="fa-solid fa-paper-plane"></i> Send the corrections
@@ -314,6 +334,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260821-changes4" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260821-reopen7" defer></script>
 </body>
 </html>

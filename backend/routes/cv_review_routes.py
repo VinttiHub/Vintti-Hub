@@ -409,11 +409,23 @@ def _insert_review(conn, cur, ctx, actor, note):
                        %s, %s, %s, %s, %s, %s
                 FROM cv_reviews
                 WHERE candidate_id = %s AND opportunity_id = %s
+                -- Un RECHAZO cierra el perfil para esta vacante: el candidato no va, y
+                -- otra ronda sería rehacer un CV que igual no se manda. Para pedir una
+                -- corrección está el otro botón, que sí deja reenviar.
+                -- HAVING y no un SELECT previo: así la guarda es atómica contra el INSERT,
+                -- igual que el índice parcial lo es contra el doble submit.
+                -- El COALESCE es obligatorio: sin filas, bool_or() da NULL y el HAVING
+                -- bloquearía el PRIMER envío de todos los perfiles.
+                HAVING COALESCE(bool_or(status = 'rejected'), false) = false
                 RETURNING """ + _SELECT_COLS.replace("r.", ""),
                 (cid, oid, actor, ctx["hr_lead"], ctx["sales_lead"], note,
                  Json(ctx["snapshot"]), ctx["resume_hash"], cid, oid),
             )
             row = cur.fetchone()
+            if row is None:
+                # Sólo lo devuelve vacío el HAVING de arriba: el perfil está rechazado.
+                conn.rollback()
+                return None, "rejected"
             conn.commit()
             return row, None
         except pg_errors.UniqueViolation:
@@ -477,6 +489,12 @@ def submit_cv_review(candidate_id):
                 "code": "already_pending",
                 "review": _serialize(inserted),
             }), 409
+        if ins_err == "rejected":
+            return jsonify({
+                "error": "This candidate was rejected for this vacancy, so there is no new "
+                         "round to send. If that was a mistake, ask the sales lead to "
+                         "reopen the rejection.",
+                "code": "rejected"}), 409
     except Exception:
         # Exception y no psycopg2.Error: este bloque también arma el snapshot e importa
         # ai_routes, así que un fallo no-SQL acá tiene que devolver un error limpio en vez
@@ -1032,7 +1050,8 @@ def decide_cv_review(review_id):
                             "code": "no_reason"}), 422
         if not comment:
             return jsonify({"error": "A rejection needs a comment so the recruiter knows "
-                                     "what to fix.", "code": "no_comment"}), 422
+                                     "why. If the CV can be fixed, request changes "
+                                     "instead.", "code": "no_comment"}), 422
         if "other" in reasons and not reason_other:
             return jsonify({"error": "Describe the 'Other' reason.",
                             "code": "no_reason_other"}), 422
@@ -1128,6 +1147,78 @@ def decide_cv_review(review_id):
         "batch_synced": batch_synced,
         "email_sent": bool(email_sent),
     })
+
+
+@bp.route("/cv_reviews/<int:review_id>/reopen", methods=["POST", "OPTIONS"])
+def reopen_cv_review(review_id):
+    """Deshacer un rechazo: la ronda vuelve a 'pending' y la recruiter puede reenviar.
+
+    Existe porque el rechazo pasó a ser TERMINAL — bloquea la ronda siguiente. Sin una
+    salida, un click en el botón equivocado deja a ese candidato fuera de esa vacante para
+    siempre y la única forma de arreglarlo sería tocar la base a mano.
+
+    Sólo sobre rechazos, y sólo el sales lead: aprobar por error no traba a nadie (la
+    recruiter puede volver a mandar), así que no hace falta deshacerlo desde acá.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    denied = _require_reviewer()
+    if denied:
+        return denied
+    actor = _user_email()
+
+    ensure_cv_review_tables()
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Se limpia TODO el veredicto, no sólo el status: dejar reviewed_by y el comentario
+        # de un rechazo que ya no existe haría que la ronda se lea como decidida en el
+        # historial, y `cv_reviews_decided_has_reviewer` deja de exigirlos en 'pending'.
+        cur.execute(
+            """
+            UPDATE cv_reviews
+               SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL,
+                   reviewer_comment = NULL, reject_other = NULL, updated_at = NOW()
+             WHERE review_id = %s AND status = 'rejected'
+            RETURNING """ + _SELECT_COLS.replace("r.", ""),
+            (review_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            cur.execute("SELECT " + _SELECT_COLS + " FROM cv_reviews r WHERE r.review_id = %s",
+                        (review_id,))
+            existing = cur.fetchone()
+            if not existing:
+                return jsonify({"error": "review not found"}), 404
+            return jsonify({
+                "error": "Only a rejected round can be reopened.",
+                "code": "not_rejected",
+                "review": _serialize(existing),
+            }), 409
+
+        # Las razones eran de un rechazo que se está deshaciendo. Si quedaran, seguirían
+        # contando en el donut de "por qué las rechazan" de una decisión que ya no existe.
+        cur.execute("DELETE FROM cv_review_reasons WHERE review_id = %s", (review_id,))
+        conn.commit()
+    except psycopg2.Error as exc:
+        conn.rollback()
+        # El índice parcial cv_reviews_one_pending_uq: ya hay otra ronda abierta para este
+        # perfil, así que ésta no puede volver a 'pending'.
+        if isinstance(exc, pg_errors.UniqueViolation):
+            return jsonify({
+                "error": "There is already an open round for this candidate on this "
+                         "vacancy, so this one cannot be reopened.",
+                "code": "already_pending"}), 409
+        logging.exception("cv_review reopen failed")
+        return jsonify({"error": "Could not reopen the review."}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    logging.info("cv_review: %s reabrió el rechazo del review %s", actor, review_id)
+    return jsonify({"review": _serialize(row)})
 
 
 @bp.route("/cv_reviews/<int:review_id>/cancel", methods=["POST", "OPTIONS"])
@@ -1725,10 +1816,10 @@ def _notify_submitted(review_id):
       {warn}
       {f'<p style="margin:0 0 6px;"><b>Note from the recruiter:</b> {_escape_html(row["recruiter_note"])}</p>' if row.get('recruiter_note') else ''}
       {f'<p style="margin:0 0 6px;"><b>Top AI suggestions:</b></p><ul>{fixes_html}</ul>' if fixes_html else ''}
-      {_review_cta_block(review_id, '✅ Approve or reject this CV',
+      {_review_cta_block(review_id, '✅ Decide on this CV',
                          'The score is the match between this CV and the posting, not a verdict — '
-                         'read the CV, then approve it or reject it with the reason so the '
-                         'recruiter knows what to fix.')}
+                         'read the CV, then approve it, request changes if the document can be '
+                         'fixed, or reject it if the candidate is not right for this opening.')}
     </div>
     """
     subject = (f"CV to review – {row['candidate_name'] or 'Candidate'} • "
@@ -1932,9 +2023,10 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
         {''.join(blocks)}
       </table>
       {_batch_cta_block(first['opportunity_id'],
-                        '✅ Approve or reject each CV',
-                        'The scores are a hint, not a verdict — read each CV, then approve '
-                        'it or send it back with the reason so the recruiter knows what to fix.')}
+                        '✅ Decide on each CV',
+                        'The scores are a hint, not a verdict — read each CV, then approve it, '
+                        'request changes if the document can be fixed, or reject it if the '
+                        'candidate is not right for this opening.')}
       {_client_draft_block(client_subject, client_body)}
     </div>
     """
@@ -1967,9 +2059,13 @@ def _notify_decided(review_id):
                   '✏️ Changes requested — the candidate is still in play. Fix what the '
                   'comment asks for and send it back for another round.</p>')
     else:
+        # Desde que existe "changes requested", el rechazo dejó de ser "arreglalo y
+        # reenvialo": ése es el otro botón. Un rechazo es sobre el CANDIDATO, y decirle a la
+        # recruiter que lo mande de nuevo la manda a rehacer un CV que no va a ir igual.
         banner = ('<p style="padding:12px 16px;background:#ffeaea;border-left:5px solid #d84343;'
                   'border-radius:12px;color:#8f0f0f;font-weight:700;">'
-                  '❌ Rejected — fix it and send it back for another round.</p>')
+                  '❌ Rejected — this candidate is not going to the client for this opening. '
+                  'The reasons below are for the next search, not for another round.</p>')
 
     html = f"""
     <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">

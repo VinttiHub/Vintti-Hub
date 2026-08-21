@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260821-changes4" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260821-recruiter8" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -640,9 +640,13 @@
         <div class="cv-review-hero">
           <div class="cv-review-kicker">Sales Review</div>
           <h3 id="cv-review-popup-title">Send this CV to the sales lead</h3>
+          <!-- Tres desenlaces desde que existe "request changes", y el del medio es el que
+               la recruiter necesita entender: pedir cambios NO es un rechazo, el candidato
+               sigue en carrera y hay que reenviar. Rechazar sí lo saca de la vacante. -->
           <p class="cv-review-subtitle">
-            The sales lead approves it or sends it back with the reason. An AI score of the
-            CV against the job description runs automatically.
+            The sales lead either approves it, asks for changes so you can fix the CV and
+            send it back, or rejects the candidate for this opening. An AI score of the CV
+            against the job description runs automatically.
           </p>
         </div>
 
@@ -1249,7 +1253,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260821-changes4"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260821-recruiter8"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

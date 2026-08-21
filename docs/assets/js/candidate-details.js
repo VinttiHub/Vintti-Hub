@@ -5254,64 +5254,101 @@ function _replaceDateText(node){
     </details>`;
   }
 
+  // Qué dice cada veredicto y cómo se titula su comentario. Antes el estado era un chip
+  // chiquito arriba a la derecha y el comentario un recuadro gris sin título, con el mismo
+  // peso que la cobertura de la JD — y el comentario es LO ÚNICO que la recruiter tiene
+  // que accionar. Acá manda el veredicto, después lo que dijo la persona, y las métricas
+  // bajan a un renglón gris al pie.
+  const VERDICT = {
+    approved:  { cls: 'ok',      icon: '✅', head: 'Approved',
+                 sub: 'This CV can go to the client.', label: 'Note' },
+    rejected:  { cls: 'bad',     icon: '❌', head: 'Rejected',
+                 sub: 'This candidate is not going to the client for this opening. '
+                    + 'There is no new round to send.', label: 'Why' },
+    changes_requested: { cls: 'changes', icon: '✏️', head: 'Changes requested',
+                 sub: 'The candidate is still in play — fix the CV and send it back.',
+                 label: 'What to change' },
+    pending:   { cls: 'wait',    icon: '⏳', head: 'Waiting for the sales lead',
+                 sub: '', label: 'Note' },
+    cancelled: { cls: 'off',     icon: '—',  head: 'Withdrawn',
+                 sub: 'This round was pulled back before anyone decided.', label: 'Note' },
+  };
+
   function reviewDetailHtml(r, isLatest){
+    const v = VERDICT[r.status] || VERDICT.pending;
     const bits = [];
     bits.push(`<div class="cv-review-hist-head">
         <b>Round ${r.round}</b> · ${escapeHtml(r.opp_position_name || 'Opportunity')}
         ${r.client_name ? '· ' + escapeHtml(r.client_name) : ''}
-        <span class="cv-review-hist-status cv-review-hist-status--${r.status}">${
-          r.status === 'changes_requested' ? 'needs changes' : r.status}</span>
       </div>`);
-    if (r.ai_score !== null && r.ai_score !== undefined) {
-      const rs = r.requirements_summary || {};
-      bits.push(`<div class="cv-review-hist-line">JD coverage: ${rs.scorable
-        ? `<b>${rs.described || 0} of ${rs.scorable}</b> shown · ` : ''}<b>${r.ai_score}</b>/100</div>`);
-    } else if (r.ai_pending) {
-      bits.push('<div class="cv-review-hist-line">JD coverage: scoring…</div>');
-    } else if (r.ai_error === 'no_jd') {
-      bits.push('<div class="cv-review-hist-line">JD coverage: no job description on that opportunity.</div>');
-    } else if (r.ai_error) {
-      bits.push('<div class="cv-review-hist-line">JD coverage: could not be scored.</div>');
-    } else if (r.score_basis) {
-      // Sin score y sin error: la vacante no da nada que medir. Antes esta rama no existía
-      // y la fila salía muda, que se lee como "todavía no corrió" — y el mail encima decía
-      // "No JD to score against" sobre una opp que sí tenía JD.
-      bits.push(`<div class="cv-review-hist-line">JD coverage: ${
-        r.score_basis === 'no_scorable_requirements'
-          ? 'the posting asks for nothing technical — its required list is all soft skills'
-          : 'no requirements could be read from that posting'}.</div>`);
+
+    bits.push(`<div class="cv-review-verdict cv-review-verdict--${v.cls}">
+        <span class="cv-review-verdict-icon">${v.icon}</span>
+        <div>
+          <b>${escapeHtml(v.head)}</b>${r.reviewed_by
+            ? ` <span class="cv-review-verdict-by">by ${escapeHtml(r.reviewed_by)}</span>` : ''}
+          ${v.sub ? `<span class="cv-review-verdict-sub">${escapeHtml(v.sub)}</span>` : ''}
+        </div>
+      </div>`);
+
+    // Las razones como chips y no como "Reasons: a, b, c": son etiquetas de una lista fija
+    // y se leen de un vistazo, que es lo que hace falta cuando hay varias.
+    if (r.reasons?.length || r.reject_other) {
+      const chips = (r.reasons || [])
+        .map(c => `<span class="cv-review-reason">${escapeHtml(reasonLabels[c] || c)}</span>`)
+        .join('');
+      const other = r.reject_other
+        ? `<span class="cv-review-reason">${escapeHtml(r.reject_other)}</span>` : '';
+      bits.push(`<div class="cv-review-reasons">${chips}${other}</div>`);
     }
-    // Job hopping: UNA línea. El desglose por empresa vive en cv-review.html, que es donde
-    // el sales lead decide; acá alcanza con saber si costó puntos. Deliberadamente NO es
-    // otro espejo a mano de un template — ya cargamos con el de reqFace().
-    const jh = r.job_hopping;
-    if (jh && jh.state) {
-      const txt = {
-        unexplained: `<b>${jh.unexplained}</b> stint(s) under a year the CV never explains
-                      &mdash; <b>&minus;${jh.penalty}</b> off the score`,
-        explained: `${jh.short} stint(s) under a year, explained in the CV &mdash; no penalty`,
-        clean: 'no stint under a year',
-        no_history: 'only one employer on this CV, nothing to judge',
-        unreadable: 'could not be checked — the dates could not be read',
-      }[jh.state];
-      if (txt) bits.push(`<div class="cv-review-hist-line">Job hopping: ${txt}.</div>`);
-    }
-    if (r.reasons?.length) {
-      const labels = r.reasons.map(c => escapeHtml(reasonLabels[c] || c)).join(', ');
-      bits.push(`<div class="cv-review-hist-line"><b>Reasons:</b> ${labels}</div>`);
-    }
-    if (r.reject_other) {
-      bits.push(`<div class="cv-review-hist-line"><b>Other:</b> ${escapeHtml(r.reject_other)}</div>`);
-    }
+
     if (r.reviewer_comment) {
-      bits.push(`<div class="cv-review-hist-comment">${escapeHtml(r.reviewer_comment)}</div>`);
+      bits.push(`<figure class="cv-review-hist-comment cv-review-hist-comment--${v.cls}">
+          <figcaption>${escapeHtml(v.label)}</figcaption>
+          <blockquote>${escapeHtml(r.reviewer_comment)}</blockquote>
+        </figure>`);
     }
+
     if (r.resume_drift) {
       bits.push('<div class="cv-review-hist-drift">⚠️ The CV changed after this round was submitted.</div>');
     }
+
+    // Las métricas van juntas en UN renglón al pie: son contexto, no la decisión.
+    const meta = [];
+    if (r.ai_score !== null && r.ai_score !== undefined) {
+      const rs = r.requirements_summary || {};
+      meta.push(`JD coverage <b>${r.ai_score}</b>/100${rs.scorable
+        ? ` · ${rs.described || 0} of ${rs.scorable} shown` : ''}`);
+    } else if (r.ai_pending) {
+      meta.push('JD coverage: scoring…');
+    } else if (r.ai_error === 'no_jd') {
+      meta.push('no job description on that opportunity');
+    } else if (r.ai_error) {
+      meta.push('could not be scored');
+    } else if (r.score_basis) {
+      meta.push(r.score_basis === 'no_scorable_requirements'
+        ? 'the posting asks for nothing technical'
+        : 'no requirements could be read from that posting');
+    }
+    const jh = r.job_hopping;
+    if (jh && jh.state) {
+      const txt = {
+        unexplained: `<b>${jh.unexplained}</b> short stint(s) unexplained &middot; <b>&minus;${jh.penalty}</b>`,
+        explained: `${jh.short} short stint(s), explained`,
+        clean: 'no job hopping',
+        no_history: 'one employer only',
+        unreadable: 'job hopping: dates unreadable',
+      }[jh.state];
+      if (txt) meta.push(txt);
+    }
+    if (meta.length) {
+      bits.push(`<div class="cv-review-hist-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>`);
+    }
     const reqs = requirementsHtml(r.jd_requirements, r.requirements_summary, isLatest);
     if (reqs) bits.push(reqs);
-    return `<article class="cv-review-hist-item">${bits.join('')}</article>`;
+    // La clase del veredicto también en la tarjeta: es lo que pinta el borde izquierdo, y
+    // con varias rondas apiladas eso es lo que deja ver el desenlace de cada una sin leer.
+    return `<article class="cv-review-hist-item cv-review-hist-item--${v.cls}">${bits.join('')}</article>`;
   }
 
   function escapeHtml(s){
@@ -5340,8 +5377,16 @@ function _replaceDateText(node){
       sendBtn.disabled = true;
       sendBtn.textContent = 'Already waiting for review';
     } else if (current?.status === 'rejected') {
+      // Un rechazo es terminal: el candidato no va a esta vacante. El backend además lo
+      // bloquea, así que ofrecer "Re-send" acá era invitarla a un 409.
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Rejected for this vacancy';
+    } else if (current?.status === 'changes_requested') {
+      // El caso para el que existe el botón: el sales lead pidió correcciones y ESTO es lo
+      // que tiene que hacer la recruiter. Caía en el else y decía "Send to review", como si
+      // fuera un envío nuevo — que es justo lo que no es.
       sendBtn.disabled = false;
-      sendBtn.textContent = `Re-send · round ${current.round + 1}`;
+      sendBtn.textContent = `Send the fix · round ${current.round + 1}`;
     } else if (current?.status === 'approved') {
       sendBtn.disabled = false;
       sendBtn.textContent = `Send again · round ${current.round + 1}`;
@@ -5472,7 +5517,9 @@ function _replaceDateText(node){
         });
       })
       .catch(err => {
-        // already_pending no es un error del usuario: es información. Refrescamos.
+        // Ni already_pending ni rejected son un error del usuario: son información sobre
+        // el estado del perfil. Se refresca para que el botón se ponga al día solo.
+        if (err.body?.code === 'rejected') loadReviews();
         if (err.body?.code === 'already_pending') {
           loadReviews().then(() => { paintHistory(); paintSendButton(); });
         }

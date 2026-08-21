@@ -202,7 +202,7 @@
 
         <div class="cvr-mcard-split">${split}</div>
 
-        ${reasons ? `<p class="cvr-reasons-cap">Why they were sent back</p>
+        ${reasons ? `<p class="cvr-reasons-cap">Why they were rejected</p>
                      <ul class="cvr-reasons-list">${reasons}</ul>` : ''}
         ${chips ? `<div class="cvr-mchips">${chips}</div>` : ''}
       </article>`;
@@ -1511,7 +1511,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     show($('cvrChangesToggle'), !on);
     show($('cvrApprove'), !on);
     $('cvrFootHint').textContent = rej
-      ? 'Pick at least one reason and leave a comment — it is what the recruiter acts on.'
+      ? 'This takes the candidate out of this opening. To ask for a rewrite, use Request changes.'
       : chg
         ? 'The comment is the only thing the recruiter gets, so say what to change.'
         : '';
@@ -1524,6 +1524,9 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
   function openDrawer(reviewId) {
     $('cvrDrawerError').textContent = '';
     setDecisionMode(null);
+    // Los dos footers se apagan ANTES del fetch. Sin esto, abrir un rechazo y después uno
+    // aprobado mostraba el footer de reabrir durante el "Loading…", sobre otra review.
+    show($('cvrReopenFoot'), false);
     $('cvrAi').innerHTML = '<p class="cvr-ai-none">Loading…</p>';
     $('cvrRounds').innerHTML = '';
     hlResetQuotes();
@@ -1569,6 +1572,8 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         hlSync();
 
         show($('cvrDecisionFoot'), r.status === 'pending');
+        // Sólo sobre un rechazo: es el único veredicto que traba a la recruiter.
+        show($('cvrReopenFoot'), r.status === 'rejected');
 
         return fetch(`${API}/candidates/${r.candidate_id}/cv_reviews?opportunity_id=${r.opportunity_id}`,
           { headers: headers() })
@@ -1773,6 +1778,24 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     $('cvrChangesToggle').addEventListener('click', () => setDecisionMode('changes_requested'));
     $('cvrChangesConfirm').addEventListener('click', () => decide('changes_requested'));
     $('cvrRejectCancel').addEventListener('click', () => setDecisionMode(null));
+
+    $('cvrReopen').addEventListener('click', () => {
+      if (!currentReview) return;
+      const btn = $('cvrReopen');
+      btn.disabled = true;
+      $('cvrDrawerError').textContent = '';
+      fetch(`${API}/cv_reviews/${currentReview.review_id}/reopen`, {
+        method: 'POST', headers: headers(),
+      })
+        .then(async res => {
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { body: out });
+          return out;
+        })
+        .then(() => { closeDrawer(); refresh(); })
+        .catch(err => { $('cvrDrawerError').textContent = err.body?.error || err.message; })
+        .finally(() => { btn.disabled = false; });
+    });
     $('cvrApprove').addEventListener('click', () => decide('approved'));
     $('cvrRejectConfirm').addEventListener('click', () => decide('rejected'));
 
