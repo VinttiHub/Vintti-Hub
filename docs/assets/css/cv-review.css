@@ -1097,3 +1097,32 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 }
 /* El descuento en la línea de la cuenta: el número en mono, la etiqueta en gris. */
 .cvr-tally-line span { color: var(--hx-faint); font-size: 11px; }
+
+/* Chips de herramienta clickeables. Heredan de .cvr-hl-item el comportamiento de botón,
+   pero no su forma: el cuadradito de color de ::before adentro de una píldora se lee como
+   suciedad, y el padding/radio chico le romperían la píldora. Sólo se quedan el cursor,
+   el hover y el estado activo. */
+.cvr-tool.cvr-hl-item {
+  padding: 3px 9px;
+  margin-left: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.cvr-tool.cvr-hl-item::before { display: none; }
+.cvr-tool.cvr-hl-item:hover {
+  background: var(--hx-surface);
+  border-color: var(--hx-ink-2);
+}
+.cvr-tool.is-described.cvr-hl-item:hover {
+  background: var(--hx-lime);
+  border-color: var(--hx-lime-ink);
+}
+.cvr-tool.cvr-hl-item.is-active {
+  background: #003bff;
+  border-color: #003bff;
+  color: #fff;
+  box-shadow: none;
+}
+/* Un chip que NO se pudo ubicar en el CV se queda como estaba: sin cursor de mano y sin
+   hover, para que no prometa un salto que no va a pasar. Es la misma degradación que
+   tienen las citas — el atributo está, la clase .cvr-hl-item no. */

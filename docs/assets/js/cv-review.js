@@ -394,6 +394,45 @@
     return out;
   }
 
+  // Buscar un NOMBRE de herramienta. Es un port de _tool_needle() en
+  // backend/utils/cv_review_ai.py:1432 y tiene que encontrar exactamente lo mismo que el
+  // backend contó como "described": si divergen, un chip verde no llevaría a ninguna parte.
+  // SI TOCÁS UNO, TOCÁ EL OTRO.
+  //   · Se parte en tokens con la MISMA regla, que separa camelCase: "Power BI" y "PowerBI"
+  //     dan los dos ["power","bi"], así que cualquiera de las dos escrituras encuentra a la
+  //     otra. Entre token y token se admiten hasta 2 caracteres que no sean alfanuméricos
+  //     ("power bi", "power-bi", "powerbi").
+  //   · Los bordes se chequean a mano en vez de con lookbehind: es lo que impide que
+  //     "Excel" matchee dentro de "Excellent", y no depende de soporte de regex del navegador.
+  const HL_TERM_TOKENS = /[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z]+|[0-9]+/g;
+  function hlTermPattern(raw) {
+    const parts = String(raw || '').match(HL_TERM_TOKENS);
+    if (!parts) return null;
+    const esc = parts.map(p => p.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (esc.join('').length < 3) return null;
+    return new RegExp(esc.join('[^a-z0-9]{0,2}'), 'g');
+  }
+
+  function hlFindTerm(idx, raw, cap) {
+    const out = [];
+    const re = hlTermPattern(raw);
+    if (!re) return out;
+    const limit = cap || 8;
+    let m;
+    while ((m = re.exec(idx.text)) && out.length < limit) {
+      const at = m.index;
+      const end = at + m[0].length;
+      const before = at > 0 ? idx.text[at - 1] : ' ';
+      const after = idx.text[end] || ' ';
+      if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) {
+        const r = hlRange(idx, at, end);
+        if (r) out.push(r);
+      }
+      if (re.lastIndex === at) re.lastIndex = at + 1;   // patrón vacío: no colgarse
+    }
+    return out;
+  }
+
   // Ubicar una cita, con dos degradés. El modelo lee el CV serializado como texto
   // ("Título — Empresa [2021-01-15 → Present]"), que no es lo que la pantalla muestra:
   // la pantalla dice "Jan 2025 – Dec 2025" y parte el rol y la empresa en dos elementos.
@@ -448,11 +487,17 @@
 
   // Devuelve el atributo listo para pegar en el HTML, o '' si la cita no es citable:
   // así el panel no queda con anzuelos muertos que no llevan a ninguna parte.
-  function hlRegister(kind, text) {
+  //
+  // `opts.term` es para NOMBRES, no para frases: una herramienta ("Excel", "Power BI").
+  // Cambia las dos cosas que hacían imposible buscarlos — el piso de 10 caracteres y la
+  // búsqueda por substring, que hacía que "Excel" cayera dentro de "Excellent". Un término
+  // se busca con bordes de palabra (hlFindTerm) y por eso puede ser corto sin mentir.
+  function hlRegister(kind, text, opts) {
     const t = String(text || '').trim();
-    if (t.length < 10 || HL_NOT_A_QUOTE.test(t)) return '';
+    const term = !!(opts && opts.term);
+    if (term ? t.length < 3 : (t.length < 10 || HL_NOT_A_QUOTE.test(t))) return '';
     const id = `q${++hlState.seq}`;
-    const entry = { id, kind, text: t, ranges: [], located: false };
+    const entry = { id, kind, text: t, term, ranges: [], located: false };
     hlState.list.push(entry);
     hlState.byId.set(id, entry);
     return ` data-hl="${id}"`;
@@ -547,6 +592,11 @@
     const groups = {};
     hlState.list.forEach(e => {
       if (!e.ranges.length || e.id === hlState.active) return;
+      // Los NOMBRES no se pintan siempre, sólo cuando se los toca. Un CV lista 8 o 10
+      // herramientas y cada una cae varias veces — pintarlas todas dejaría la sección de
+      // Tools resaltada de punta a punta y taparía las citas, que son lo que se lee.
+      // Cuando se hace click, el resaltado azul de "activa" y el destello alcanzan.
+      if (e.term) return;
       (groups[e.kind] = groups[e.kind] || []).push(...e.ranges);
     });
     HL_KINDS.forEach((k, i) => {
@@ -569,20 +619,28 @@
 
   // Marca en el panel qué citas se pudieron ubicar. Sólo esas se comportan como botón.
   function hlMarkPanel() {
-    $('cvrAi').querySelectorAll('[data-hl]').forEach(el => {
+    // También los que sólo traen data-hl-title: un chip de herramienta demasiado corta para
+    // buscar (el backend ni la evalúa) no se registra, y sin esto se quedaría sin tooltip.
+    $('cvrAi').querySelectorAll('[data-hl], [data-hl-title]').forEach(el => {
       const e = hlState.byId.get(el.getAttribute('data-hl'));
       const ok = !!(e && e.ranges.length);
       el.classList.toggle('cvr-hl-item', ok);
       el.classList.toggle('is-active', ok && hlState.active === e.id);
+      // Un elemento puede traer su propia explicación (los chips de herramienta dicen si
+      // algún rol la describe). Se respeta y sólo se le suma el "click": pisarla perdería
+      // lo único que distingue un chip verde de uno gris, y ponerle "click" a uno que no se
+      // pudo ubicar sería prometer un salto que no va a pasar.
+      const own = el.getAttribute('data-hl-title');
       if (ok) {
         el.dataset.hlKind = e.kind;
         el.setAttribute('role', 'button');
         el.setAttribute('tabindex', '0');
-        el.setAttribute('title', 'Show this phrase in the CV');
+        el.setAttribute('title', own ? `${own} Click to show it in the CV.`
+                                     : 'Show this phrase in the CV');
       } else {
         el.removeAttribute('role');
         el.removeAttribute('tabindex');
-        el.removeAttribute('title');
+        if (own) el.setAttribute('title', own); else el.removeAttribute('title');
       }
     });
   }
@@ -619,6 +677,10 @@
     const counts = {};
     let missing = 0;
     hlState.list.forEach(e => {
+      // Los nombres de herramienta no entran: no se pintan solos, así que un chip con su
+      // cuenta prometería un color que no está, y sumarlos a "no encontradas" mezclaría
+      // una herramienta que el CV no nombra con una cita que el modelo pudo haber inventado.
+      if (e.term) return;
       if (e.ranges.length) counts[e.kind] = (counts[e.kind] || 0) + 1;
       else if (e.located) missing += 1;
     });
@@ -643,7 +705,8 @@
     if (!hlState.idx) { hlRenderLegend(); return; }
     hlState.list.forEach(e => {
       if (e.located) return;
-      e.ranges = hlLocate(hlState.idx, e.text);
+      e.ranges = e.term ? hlFindTerm(hlState.idx, e.text)
+                        : hlLocate(hlState.idx, e.text);
       e.located = true;
     });
     hlApply();
@@ -722,7 +785,19 @@
     if (!win) return;
     // Una cita puede caer en más de un lugar (el About repite lo que dice la experiencia).
     // Se va a la primera del documento, no a la primera que encontró el buscador.
-    const rects = e.ranges.map(r => r.getBoundingClientRect()).filter(r => r.height);
+    //
+    // Con una herramienta hay una preferencia más: el nombre está SIEMPRE en la lista de
+    // Tools del CV, y saltar ahí no le dice nada a nadie — lo que se quiere ver es el rol
+    // que la usa. Si aparece en algún lado fuera de esa lista, se va ahí.
+    let ranges = e.ranges;
+    if (e.term) {
+      const outside = ranges.filter(r => {
+        const el = r.startContainer.parentElement;
+        return el && !el.closest('#toolsSection');
+      });
+      if (outside.length) ranges = outside;
+    }
+    const rects = ranges.map(r => r.getBoundingClientRect()).filter(r => r.height);
     if (!rects.length) return;
     const rect = rects.reduce((a, b) => (b.top < a.top ? b : a));
     const raw = rect.top + win.scrollY - (win.innerHeight / 2) + (rect.height / 2);
@@ -738,7 +813,7 @@
     const fire = () => {
       if (fired || token !== hlState.token) return;
       fired = true;
-      hlFlash(win, e.ranges);
+      hlFlash(win, ranges);
     };
     if (Math.abs(win.scrollY - target) < 4) {
       // Ya estaba a la vista: no hay scroll que esperar y esperar se notaría como lag.
@@ -824,23 +899,29 @@
     // Las herramientas que la experiencia usa de verdad contra las que sólo están en la
     // lista. NO mueve el número salvo el castigo único de no tener ninguna, y eso se dice
     // adentro: un aviso que parece un error hace que la recruiter "arregle" lo que no está
-    // roto. El nombre de la herramienta NO se resalta en el CV — hlRegister rechaza texto
-    // de menos de 10 caracteres, y bajar ese piso haría que "Excel" matchee dentro de
-    // "Excellent". Lo que se resalta es el bullet que la describe, vía la evidencia del
-    // requisito, que sí es largo.
+    // roto.
+    //
+    // Cada chip SALTA al lugar del CV donde está el nombre. Antes no se podía: hlRegister
+    // exigía 10 caracteres y buscaba por substring, con lo cual "Excel" caía adentro de
+    // "Excellent". Ahora van como término (hlFindTerm), que busca con bordes de palabra y
+    // con la misma regla de tokens que usó el backend para contarlas — así un chip verde
+    // aterriza justo en el bullet por el que se pintó de verde.
     const tc = a._tools_check || {};
+    const toolChip = (t, described) => `<li class="cvr-tool${described ? ' is-described' : ''}"
+        data-hl-title="${described
+          ? 'A role describes using it.'
+          : 'This CV lists it, but no role describes using it.'}"
+        ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
     const toolsHtml = (tc.checked || 0) ? `
       <p class="cvr-fold-lead">${tc.penalty
         ? `<b>This one did move the score: &minus;${tc.penalty}.</b> Not one of the tools
            in the list turns up in any role. `
         : 'Nothing here moves the score. '}A tools list is free to write; what a client
         believes is the role that describes using it. Some described is enough — the rest
-        is just worth knowing.</p>
+        is just worth knowing. <b>Click any of them to jump to it in the CV.</b></p>
       <ul class="cvr-tool-chips">
-        ${(tc.described || []).map(t =>
-          `<li class="cvr-tool is-described" title="Some role describes using it.">${esc(t)}</li>`).join('')}
-        ${(tc.listed_only || []).map(t =>
-          `<li class="cvr-tool" title="This CV lists it, but no role describes using it.">${esc(t)}</li>`).join('')}
+        ${(tc.described || []).map(t => toolChip(t, true)).join('')}
+        ${(tc.listed_only || []).map(t => toolChip(t, false)).join('')}
       </ul>
       ${(tc.listed_only_total || 0) > (tc.listed_only || []).length
         ? `<p class="cvr-tally-off">…and ${tc.listed_only_total - tc.listed_only.length} more only listed.</p>`
