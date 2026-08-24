@@ -20,7 +20,7 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260824-score3" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260824-opps4" />
 </head>
 
 <body class="light-mode">
@@ -230,6 +230,13 @@
           <section class="cvr-col cvr-col-analysis">
             <div class="cvr-warn" id="cvrDrift" hidden></div>
 
+            <!-- En cuántas vacantes este candidato ya llegó a "In Client Process". Es un
+                 gate: pasado el límite el CV no se manda, así que va SIEMPRE a la vista y
+                 arriba del score — plegado no lo mira nadie, y leer la cobertura de la JD
+                 no cambia nada si la decisión ya está tomada. El tamaño sigue al estado,
+                 igual que job hopping: una línea cuando no hay nada, la lista cuando sí. -->
+            <div id="cvrOpps" hidden></div>
+
             <details class="hx-section" open>
               <summary>JD coverage score</summary>
               <div class="cvr-section-body">
@@ -334,6 +341,6 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260824-score3" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260824-opps4" defer></script>
 </body>
 </html>

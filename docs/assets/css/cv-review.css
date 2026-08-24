@@ -516,6 +516,78 @@
   font-weight: 600;
   line-height: 1.5;
 }
+.cvr-warn b { font-weight: 700; }
+
+/* Dónde más estuvo el candidato. Cada fila es un enlace de verdad (<a href>), no un div
+   con onclick: así el click del medio abre en pestaña y el hover muestra a dónde va.
+   Dos renglones fijos por fila —arriba puesto + stage del pipeline, abajo cliente y stage
+   de la vacante— porque en una sola línea el nombre del puesto empujaba los pills y todo
+   terminaba envuelto en tres renglones distintos según el largo del título. */
+.cvr-opp-list { display: grid; gap: 4px; margin-top: 9px; }
+.cvr-opp {
+  display: block;
+  padding: 7px 9px;
+  border: 1px solid var(--hx-line);
+  border-radius: 7px;
+  background: var(--hx-surface);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .12s, background .12s;
+}
+.cvr-opp:hover,
+.cvr-opp:focus-visible {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-wash);
+  outline: none;
+}
+.cvr-opp.is-here { border-color: var(--hx-line-2); background: var(--hx-surface-2); }
+.cvr-opp-l1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* El puesto se recorta con puntos suspensivos: es lo único de largo impredecible acá, y
+   dejándolo envolver mueve el pill de línea y la fila deja de leerse como una fila. */
+.cvr-opp-l1 b {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hx-ink);
+}
+.cvr-opp-l2 {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--hx-muted);
+}
+.cvr-opp-pipe {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #eef0f3;
+  color: var(--hx-faint);
+}
+/* Los mismos tintes que las columnas del pipeline en opportunity-detail. */
+.cvr-opp-pipe.is-applicant { background: #fff7ed; color: #8a5a00; }
+.cvr-opp-pipe.is-contacted { background: #fef2f2; color: #a3323a; }
+.cvr-opp-pipe.is-first     { background: #edf4ff; color: #24518f; }
+.cvr-opp-pipe.is-noadv     { background: #effaf0; color: #1b6b2b; }
+/* Client process va en tinte suave como los demás. Se pinta lleno SÓLO cuando el
+   candidato está en el límite o pasado: ahí el pill dice cuál de las filas es el
+   problema. Lleno siempre gritaba en el caso normal, que es la mayoría. */
+.cvr-opp-pipe.is-client    { background: #fce7f6; color: var(--hx-mag-ink); }
+.cvr-opp-pipe.is-client.is-loud { background: #e45bbf; color: #fff; }
 
 .cvr-frame {
   width: 100%;
@@ -1462,6 +1534,12 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   background: #f8fdf0;
 }
 .cvr-hop.is-flat { border-left-color: var(--hx-slate); }
+.cvr-hop.is-warn {
+  border-color: #f0dcb0;
+  border-left-color: var(--hx-amber-ink);
+  background: #fffaef;
+}
+.cvr-hop.is-warn .cvr-hop-head i { color: var(--hx-amber-ink); }
 
 /* Encabezado: el título a la izquierda, el impacto en el score a la derecha. El chip dice
    siempre qué pasó con el número, que es lo único que se busca de un vistazo. */
@@ -1494,6 +1572,7 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 .cvr-hop-chip.is-bad { background: #ffe0e6; color: #a30f31; }
 .cvr-hop-chip.is-ok { background: var(--hx-lime); color: var(--hx-lime-ink); }
 .cvr-hop-chip.is-base { background: var(--hx-accent-wash); color: var(--hx-accent); }
+.cvr-hop-chip.is-warn { background: var(--hx-amber); color: var(--hx-amber-ink); }
 
 /* La lista de herramientas usa la misma caja: es el otro descuento, no un anexo. */
 .cvr-hop--tools .cvr-tool-chips { margin-top: 9px; }

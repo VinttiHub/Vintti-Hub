@@ -1023,6 +1023,15 @@
   /* ---------------------------------------------------------------- el panel */
 
 
+  // Encabezado común de todo lo que el sales lead mira antes de decidir: ícono, título y
+  // a la derecha el único dato que se busca de un vistazo — cuánto se llevó del score, o
+  // en cuántas vacantes viene el candidato.
+  const scoreHead = (icon, title, cls, chip) => `<h5 class="cvr-hop-head">
+      <i class="fa-solid ${icon}"></i>
+      <span>${title}</span>
+      <span class="cvr-hop-chip ${cls}">${chip}</span>
+    </h5>`;
+
   function aiPanelHtml(review) {
     // El panel se rearma entero, así que las citas registradas se rearman con él.
     hlResetQuotes();
@@ -1087,14 +1096,6 @@
     // "Excellent". Ahora van como término (hlFindTerm), que busca con bordes de palabra y
     // con la misma regla de tokens que usó el backend para contarlas — así un chip verde
     // aterriza justo en el bullet por el que se pintó de verde.
-    // Encabezado común de todo lo que mueve el score: ícono, título y a la derecha lo
-    // único que se busca de un vistazo — cuánto se llevó (o que no se llevó nada).
-    const scoreHead = (icon, title, cls, chip) => `<h5 class="cvr-hop-head">
-        <i class="fa-solid ${icon}"></i>
-        <span>${title}</span>
-        <span class="cvr-hop-chip ${cls}">${chip}</span>
-      </h5>`;
-
     const tc = a._tools_check || {};
     const toolChip = (t, described) => `<li class="cvr-tool${described ? ' is-described' : ''}"
         data-hl-title="${described
@@ -1547,6 +1548,120 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         fit will score low, and that is correct. Read the CV before you decide.</p>`;
   }
 
+  /* ---------------------------------------------------------- historial del candidato
+   * Dónde más estuvo este candidato. Existe por una regla de negocio: un candidato que ya
+   * llegó a "In Client Process" más de CLIENT_PROCESS_LIMIT veces no se manda de nuevo.
+   *
+   * OJO con qué se cuenta: `opportunity_candidates.stage_pipeline` es el estado ACTUAL en
+   * el pipeline, no un historial. No hay tabla de historial de stages, así que esto cuenta
+   * en cuántas vacantes el candidato ESTÁ HOY en client process — a alguien que pasó por
+   * ahí y después fue movido a otra columna no lo cuenta. Es el mismo dato que muestra el
+   * pipeline de cada oportunidad, así que los dos números siempre coinciden.
+   */
+  const CLIENT_PROCESS_STAGE = 'En proceso con Cliente';
+  const CLIENT_PROCESS_LIMIT = 3;
+
+  const PIPE_LABEL = {
+    'Applicant': 'Applicant',
+    'Contactado': 'Contacted',
+    'No avanza primera': 'No advance',
+    'Primera entrevista': 'First interview',
+    [CLIENT_PROCESS_STAGE]: 'In client process',
+  };
+  // Los mismos tintes que las columnas del pipeline en opportunity-detail, para que la
+  // fila se reconozca sin leerla.
+  const PIPE_CLS = {
+    'Applicant': 'is-applicant',
+    'Contactado': 'is-contacted',
+    'No avanza primera': 'is-noadv',
+    'Primera entrevista': 'is-first',
+    [CLIENT_PROCESS_STAGE]: 'is-client',
+  };
+
+  function renderOpps(rows, review) {
+    // El endpoint hace LEFT JOIN con batches, así que una vacante con dos batches vuelve
+    // dos veces. Se cuenta por vacante, no por fila: si no, un candidato con dos batches
+    // en la misma oportunidad se pasaría del límite él solo.
+    const seen = new Set();
+    const opps = [];
+    (Array.isArray(rows) ? rows : []).forEach(o => {
+      const id = o && o.opportunity_id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      opps.push(o);
+    });
+    // Sin fecha en opportunity_candidates, el id sirve de orden: es autoincremental, así
+    // que de mayor a menor es lo más reciente primero. No se muestra como fecha.
+    opps.sort((x, y) => (y.opportunity_id || 0) - (x.opportunity_id || 0));
+
+    const stageOf = (o) => String(o.candidate_stage || '').trim();
+    const isHere = (o) => String(o.opportunity_id) === String(review.opportunity_id);
+    const n = opps.filter(o => stageOf(o) === CLIENT_PROCESS_STAGE).length;
+    const others = opps.filter(o => !isHere(o));
+    const who = esc(review.candidate_name || 'This candidate');
+
+    // Rojo sólo pasado el límite, ámbar justo en el límite, gris el resto. El bloque no
+    // puede verse igual de grave cuando no pasa nada: si grita siempre, no lo lee nadie.
+    const over = n > CLIENT_PROCESS_LIMIT;
+    const at = n === CLIENT_PROCESS_LIMIT;
+    const cls = over ? 'is-bad' : at ? 'is-warn' : 'is-flat';
+    const chip = n
+      ? `${n} of ${CLIENT_PROCESS_LIMIT} used`
+      : 'none yet';
+
+    const opps_ = (k) => `${k} opportunit${k === 1 ? 'y' : 'ies'}`;
+    const lead = over
+      ? `<b>Do not send this CV.</b> ${who} is in client process on <b>${opps_(n)}</b> —
+         over the limit of ${CLIENT_PROCESS_LIMIT}.`
+      : at
+        ? `<b>At the limit.</b> ${who} is already in client process on <b>${opps_(n)}</b>.
+           One more goes over ${CLIENT_PROCESS_LIMIT}.`
+        : others.length
+          ? `${who} is also in the pipeline of ${opps_(others.length)}, listed below.`
+          : `Only this opportunity — ${who} is not in any other pipeline.`;
+
+    // La lista sólo aparece si hay algo más que la vacante que se está revisando: una
+    // fila que dice "this review" repite lo que ya está en el encabezado del drawer.
+    const rowsHtml = others.length ? opps.map(o => {
+      const st = stageOf(o);
+      const here = isHere(o);
+      const name = o.opp_position_name || `Opportunity ${o.opportunity_id}`;
+      return `
+      <a class="cvr-opp${here ? ' is-here' : ''}"
+         href="opportunity-detail.html?id=${encodeURIComponent(o.opportunity_id)}"
+         target="_blank" rel="noopener" title="${esc(name)} — open in a new tab">
+        <span class="cvr-opp-l1">
+          <b>${esc(name)}</b>
+          <i class="cvr-opp-pipe ${PIPE_CLS[st] || ''}${
+            st === CLIENT_PROCESS_STAGE && (over || at) ? ' is-loud' : ''}">${
+            esc(PIPE_LABEL[st] || st || 'not in the pipeline')}</i>
+        </span>
+        <span class="cvr-opp-l2">${
+          [o.client_name && esc(o.client_name), o.opp_stage && esc(o.opp_stage),
+           here && 'this review'].filter(Boolean).join(' · ')}</span>
+      </a>`;
+    }).join('') : '';
+
+    $('cvrOpps').className = `cvr-hop cvr-hop--opps ${cls}`;
+    $('cvrOpps').innerHTML =
+      // El título dice para qué está el bloque, no qué contiene: con "otras vacantes"
+      // había que leer el chip para entender por qué importa.
+      scoreHead('fa-layer-group', 'Client process check', cls, chip)
+      + `<p class="cvr-hop-lead">${lead}</p>`
+      + (rowsHtml ? `<div class="cvr-opp-list">${rowsHtml}</div>` : '');
+    show($('cvrOpps'), opps.length > 0);
+  }
+
+  function loadOpps(review) {
+    show($('cvrOpps'), false);
+    // Un fallo acá NO puede tumbar el drawer: la revisión se puede hacer igual sin el
+    // historial, y quedarse sin pantalla por una lista secundaria sería peor.
+    return fetch(`${API}/candidates/${review.candidate_id}/opportunities`, { headers: headers() })
+      .then(res => res.ok ? res.json() : [])
+      .then(rows => { if (currentReview === review) renderOpps(rows, review); })
+      .catch(err => console.warn('Could not load the candidate history', err));
+  }
+
   function renderRounds(reviews) {
     const box = $('cvrRounds');
     show($('cvrRoundsSection'), reviews.length > 1);
@@ -1648,6 +1763,8 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         show($('cvrDecisionFoot'), r.status === 'pending');
         // Sólo sobre un rechazo: es el único veredicto que traba a la recruiter.
         show($('cvrReopenFoot'), r.status === 'rejected');
+
+        loadOpps(r);
 
         return fetch(`${API}/candidates/${r.candidate_id}/cv_reviews?opportunity_id=${r.opportunity_id}`,
           { headers: headers() })
