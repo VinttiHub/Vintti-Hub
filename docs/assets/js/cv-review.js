@@ -1213,11 +1213,29 @@
                  tip: 'A role in the work experience describes actually doing this, with a '
                     + 'quote to back it. Full credit.' };
       }
+      // Medio punto sale por dos caminos muy distintos, y hasta ahora los dos decían
+      // "only listed": el requisito está en una lista y ningún rol lo cuenta, O un rol
+      // SÍ lo cuenta pero cubre una parte del requisito. `evidence_in_experience` lo
+      // resuelve en el backend (la cita cae o no dentro de ## WORK EXPERIENCE). Viene
+      // null en los análisis guardados de antes del campo: ahí se dice lo genérico, que
+      // es lo único cierto sin saber de dónde salió la cita.
       if (r.status === 'listed_only') {
-        return { cls: 'listed_only', label: 'Only listed — no role describes it',
-                 tip: 'It is in the CV — a tool, a skill, the About — but no role tells the '
-                    + 'story of using it. Half credit: a client reads the two very '
-                    + 'differently.' };
+        if (r.evidence_in_experience === true) {
+          return { cls: 'listed_only', label: 'Partly covered — half credit',
+                   tip: 'A role does describe doing this, but it only covers part of what '
+                      + 'the posting asks for — the note says which part is missing. Half '
+                      + 'credit.' };
+        }
+        if (r.evidence_in_experience === false) {
+          return { cls: 'listed_only', label: 'Only listed — no role describes it',
+                   tip: 'It is in the CV — a tool, a skill, the About — but no role tells '
+                      + 'the story of using it. Half credit: a client reads the two very '
+                      + 'differently.' };
+        }
+        return { cls: 'listed_only', label: 'Half credit — not fully described',
+                 tip: 'The CV shows this, but no role tells the full story of doing it — '
+                    + 'either it only appears in a list, or a role covers just part of it. '
+                    + 'Re-run the analysis to see which of the two it is.' };
       }
       return r.in_source === 'yes'
         ? { cls: 'missing', label: 'Missing — the recruiter can add it',
@@ -1293,9 +1311,18 @@
       if (jh.state === 'no_history')
         return flat('is-flat', 'nothing to judge', 'This CV shows one employer, so there is '
                              + 'nothing to leave.');
-      if (jh.state === 'clean')
-        return flat('is-ok', 'no penalty', `None. Every one of the ${jh.checked} employers `
-                           + 'this CV shows lasted a year or more.');
+      if (jh.state === 'clean') {
+        // `employers` y no `checked`: el segundo deja afuera el trabajo actual, así que un
+        // CV con 3 empleadores —uno de ellos el actual— decía "los 2 empleadores que
+        // muestra este CV". Y si el actual dura menos de un año no se juzga, pero decir
+        // que TODOS duraron un año o más sería falso: se dice aparte.
+        const n = jh.employers || jh.checked || 0;
+        return flat('is-ok', 'no penalty', jh.short_skipped
+          ? `None to hold against them. Of the ${n} employers this CV shows, every one that
+             has ended lasted a year or more; the current role is under a year, and an
+             unfinished stint is not a short one.`
+          : `None. All ${n} employers this CV shows lasted a year or more.`);
+      }
       if (jh.state === 'unreadable')
         return flat('is-bad', 'not checked', 'None of the dates in this CV could be read, so '
                             + 'short stints could not be looked for. Fix the dates and score '
@@ -1443,13 +1470,20 @@
           requirements and only ${rs.listed} could be read, so this percentage is out of
           ${rs.listed}, not ${rs.expected}. Treat it as provisional and re-run before you
           use the number.</p>` : ''}
+        ${/* El control de paridad compara esta lista contra una transcripción de la JD. Si
+             la transcripción no vino, no se comparó nada — y decirlo importa, porque es el
+             mismo fallo del modelo que hace que se saltee requisitos acá abajo. */''}
+        ${rs.unverified ? `<p class="cvr-reqs-warn cvr-reqs-warn--soft">This list was not
+          checked against the posting: the analysis did not transcribe the JD's bullets, so
+          nothing counted them. Read it against the posting yourself, or re-run.</p>` : ''}
         ${mathLine}
         <details class="cvr-note cvr-note--inline">
           <summary><i class="fa-regular fa-circle-question"></i> The rules behind the score</summary>
           <div class="cvr-note-body">
             <p>The score is one thing only: <b>the share of the JD's technical requirements
-              this CV shows</b>. Each one is worth the same. Describing it in a role earns
-              the full share, having it only in a list earns half, not having it earns
+              this CV shows</b>. Each one is worth the same. A role that describes doing
+              it in full earns the whole share; half goes to a requirement that is only
+              listed somewhere, and to one a role covers just part of. Not having it earns
               nothing. Two fixed deductions can come off that share &mdash; a tools list no
               role backs up, and a stint under a year the CV never explains &mdash; and each
               one is shown where it happens, with what it cost. Nothing else moves the

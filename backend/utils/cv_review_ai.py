@@ -269,11 +269,16 @@ untrustworthy.
 STATUS — this distinction is the whole point of the field:
 - "described": a work-experience bullet shows the candidate actually doing it. "evidence"
   is a VERBATIM quote from that bullet. A tools list does NOT earn "described".
-- "listed_only": the requirement appears in the CV — the Tools/Skills list, the About, a
-  job title — but NO work-experience bullet describes the candidate using it. This is the
-  most useful thing you can tell the reviewer: a client reads "Salesforce" in a skills
-  list very differently from "Managed a 2,000-record Salesforce pipeline". Put the quote
-  you did find in "evidence".
+- "listed_only": half credit. TWO different cases earn it, and both are real:
+  (a) the requirement appears in the CV — the Tools/Skills list, the About, a job title —
+      but NO work-experience bullet describes the candidate using it. This is the most
+      useful thing you can tell the reviewer: a client reads "Salesforce" in a skills list
+      very differently from "Managed a 2,000-record Salesforce pipeline".
+  (b) a work-experience bullet DOES describe doing it, but it covers only part of what the
+      posting asks for ("handling multiple clients" is there, "diverse accounting tasks"
+      is not). Say in "note" which half is missing.
+  Either way, put the quote you did find in "evidence" — the screen works out which of the
+  two it is from where that quote sits, so the quote has to be the real one.
 - "missing": nowhere in the CV at all. "evidence" is "".
 
 "in_source" — answer this SEPARATELY from "status", and think about it independently. It
@@ -667,14 +672,41 @@ _OPTIONAL_SECTION = re.compile(r"""
 """, re.I | re.X)
 
 
-def optional_section_start(jd_text):
-    """Dónde empieza lo que la vacante NO exige. None si no hay sección opcional."""
-    m = _OPTIONAL_SECTION.search(str(jd_text or ""))
-    return m.start() if m else None
-
-
 def _norm_for_match(text):
     return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+# Un marcador puede TITULAR una sección de deseables ("Non-mandatory skills: …") o ser un
+# CALIFICATIVO del bullet en el que está ("…is highly valued but not mandatory."). Sólo el
+# primero corta la JD. Por el renglón no se pueden distinguir: la JD llega de
+# `_strip_html_text`, que colapsa la página entera a UNA sola línea.
+#
+# Lo que sí los separa es lo que viene JUSTO DESPUÉS. Un encabezado ABRE lo que sigue — dos
+# puntos, una coma, el primer deseable. Un calificativo CIERRA su frase, así que atrás tiene
+# un punto (o un paréntesis que cierra y punto). Casos reales de la base:
+#     "non-mandatory skills: previous experience in…"       -> encabezado, corta
+#     "non-mandatory skills experience coaching and…"       -> encabezado, corta
+#     "(nice-to-have): jump into quickbooks…"               -> encabezado, corta
+#     "nice to have, not required excellent communication"  -> encabezado, corta
+#     "…is highly valued but not mandatory. demonstrated"   -> calificativo, NO corta
+#     "…(not mandatory).maintain communication with…"       -> calificativo, NO corta
+# Los dos últimos son bugs que ocurrieron de verdad: en la opp 647 el corte se comía los
+# cuatro requisitos OBLIGATORIOS que venían después (review 72).
+_QUALIFIER_TAIL = re.compile("^[)\\]\"'\\s]*[.;]")
+
+
+def optional_section_start(jd_text):
+    """Dónde empieza lo que la vacante NO exige. None si no hay sección opcional.
+
+    Se saltea los marcadores que cierran una frase en vez de abrir una sección; ver el
+    comentario de `_QUALIFIER_TAIL`.
+    """
+    text = str(jd_text or "")
+    for m in _OPTIONAL_SECTION.finditer(text):
+        if _QUALIFIER_TAIL.match(text[m.end():m.end() + 12]):
+            continue
+        return m.start()
+    return None
 
 
 def _all_positions(haystack, needle):
@@ -845,6 +877,25 @@ def _quote_in_cv(quote: str, cv_norm: str) -> bool:
     return any(q[:n] in cv_norm for n in (40, 20, 12) if len(q) >= n or n == 12)
 
 
+# `flatten_resume_for_prompt` emite el CV por secciones con encabezados fijos, así que se
+# puede recortar la de experiencia y preguntar si una cita cae adentro. Es la diferencia
+# entre "esto está en la lista de tools" y "esto lo cuenta un rol": misma media puntuación,
+# pero cosas distintas para el reviewer, y el badge decía siempre la primera.
+_EXPERIENCE_HEAD = "## WORK EXPERIENCE"
+_AFTER_EXPERIENCE = ("## EDUCATION", "## TOOLS", "## LANGUAGES")
+
+
+def _experience_slice(cv_text) -> str:
+    """El texto de la sección WORK EXPERIENCE, normalizado. '' si no se puede aislar."""
+    text = str(cv_text or "")
+    start = text.find(_EXPERIENCE_HEAD)
+    if start < 0:
+        return ""
+    start += len(_EXPERIENCE_HEAD)
+    ends = [pos for pos in (text.find(h, start) for h in _AFTER_EXPERIENCE) if pos >= 0]
+    return _norm_for_match(text[start:min(ends)] if ends else text[start:])
+
+
 def _role_number(value) -> Optional[int]:
     """El [R#] de un rol, venga como 6, "6" o "R6". El modelo alterna entre las tres."""
     m = re.search(r"\d+", str(value if value is not None else ""))
@@ -867,6 +918,7 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
     cut = optional_section_start(jd_norm) if jd_norm else None
 
     cv_norm = _norm_for_match(cv_text) if cv_text else ""
+    exp_norm = _experience_slice(cv_text)
     snap = snapshot or {}
     roles_list = _as_list(snap.get("work_experience"))
 
@@ -1014,6 +1066,12 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
             "status": status,
             "in_source": in_source,
             "evidence": evidence,
+            # None = no se pudo determinar (CV sin secciones, o sin cita). El frontend
+            # cae al texto viejo cuando es None, que es lo que ven los análisis guardados
+            # de antes de este campo.
+            "evidence_in_experience": (
+                _quote_in_cv(evidence, exp_norm)
+                if evidence and exp_norm else None),
             "note": note,
             # Para que la pantalla pueda mostrar la cuenta al lado del requisito.
             "years_required": needed,
@@ -1358,7 +1416,15 @@ def job_hopping(snapshot: Dict[str, Any]) -> Dict[str, Any]:
         "state": state,
         "penalty": JOB_HOPPING_PENALTY if state == "unexplained" else 0,
         "stints": short + skipped,
+        # OJO: `checked` es de dónde PUEDE salir una salida corta — deja afuera el trabajo
+        # actual y los simultáneos. No es "cuántos empleadores muestra el CV": la pantalla
+        # lo decía así y a un CV con 3 empleadores, uno de ellos el actual, le contaba 2.
+        # Por eso van los dos números y con nombres que no se puedan confundir.
         "checked": len(closed),
+        "employers": len(stints),
+        # Permanencias cortas que NO se juzgan: el trabajo actual (todavía no terminó) y los
+        # simultáneos. Si hay alguna, "todas duraron un año o más" sería mentira.
+        "short_skipped": len(skipped),
         "short": len(short),
         "explained": len(explained),
         "unexplained": len(unexplained),
@@ -1721,9 +1787,17 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     req_summary["expected"] = len(verbatim)
     req_summary["listed"] = len(requirements)
     req_summary["incomplete"] = bool(verbatim) and len(requirements) < len(verbatim)
+    # Sin transcripción no hay contra qué comparar, y hasta ahora eso pasaba por bueno: el
+    # `bool(verbatim)` de arriba daba False y la pantalla decía que la checklist estaba
+    # completa sin que nadie la hubiera contado. Es el peor momento para callarse — que el
+    # modelo se saltee el paso 1 es justo cuando también se saltea requisitos en el paso 2.
+    req_summary["unverified"] = not verbatim
     if req_summary["incomplete"]:
         logging.warning("cv_review: la JD tenía %s requisitos y el modelo anotó %s",
                         len(verbatim), len(requirements))
+    elif req_summary["unverified"]:
+        logging.warning("cv_review: el modelo no devolvió jd_requirements_verbatim; "
+                        "la checklist de %s requisitos queda sin verificar", len(requirements))
     # v10: el score ES la checklist. Los requisitos técnicos que no se dan por sentado se
     # reparten los 100 puntos; describir en la experiencia vale el punto entero, estar sólo
     # listado la mitad, faltar cero. Lo único que además toca el número es el castigo único

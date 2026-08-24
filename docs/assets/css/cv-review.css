@@ -1242,6 +1242,13 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   line-height: 1.45;
   color: #6b4700;
 }
+/* "No se pudo verificar" no es lo mismo que "está mal": va en gris, para que el ámbar
+   siga significando que hay un problema con el número y no con el control. */
+.cvr-reqs-warn--soft {
+  background: var(--hx-surface-2);
+  border-left-color: var(--hx-line);
+  color: var(--hx-muted);
+}
 
 
 /* ---------- v10: el score sale de los requisitos ---------- */
