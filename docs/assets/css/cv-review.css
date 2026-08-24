@@ -1326,46 +1326,229 @@ q.cvr-hl-item::before { vertical-align: 1px; }
 }
 .cvr-years-skip li { flex-wrap: wrap; }
 
-/* Job hopping. Va al mismo nivel que la checklist porque es la otra cosa que mueve el
-   número — pero sólo se abre en el caso que hay que arreglar; los demás son una línea. */
-.cvr-hop-line {
-  margin: 8px 0 0;
-  font-size: 11.5px;
+/* La cuenta del score, entera y arriba. Las tres cosas que mueven el número vivían en
+   tres sitios con tres pesos distintos —la checklist enorme, job hopping suelto abajo y
+   las herramientas plegadas en el fondo—, así que el número grande no se explicaba solo.
+   Acá se lee de un tirón: base − descuentos = score, y cada parte lleva a su bloque. */
+.cvr-math {
+  margin: 12px 0 14px;
+  padding: 11px 13px 12px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+}
+.cvr-math-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hx-ink);
+}
+.cvr-math-head em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
   color: var(--hx-faint);
 }
-.cvr-hop-line.is-bad { color: #8f0f2a; font-weight: 500; }
-.cvr-hop {
-  margin: 10px 0 0;
-  padding: 10px 12px;
+.cvr-math-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cvr-math-op {
+  display: flex;
+  align-items: center;
+  font-family: var(--hx-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hx-faint);
+}
+.cvr-math-part {
+  flex: 1 1 0;
+  min-width: 96px;
+  padding: 8px 10px;
   border: 1px solid var(--hx-line);
-  border-left-width: 3px;
   border-radius: 8px;
   background: var(--hx-surface-2);
+  text-align: left;
 }
-.cvr-hop.is-bad { border-left-color: #8f0f2a; }
-.cvr-hop.is-ok { border-left-color: var(--hx-lime); }
-.cvr-hop-lead { margin: 0; font-size: 12px; color: var(--hx-ink-2); line-height: 1.45; }
-.cvr-hop-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.cvr-math-part b {
+  display: block;
+  font-family: var(--hx-mono);
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--hx-ink);
+}
+.cvr-math-part span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--hx-ink);
+}
+.cvr-math-part em {
+  display: block;
+  margin-top: 1px;
+  font-style: normal;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--hx-muted);
+}
+.cvr-math-part[data-jump] { cursor: pointer; transition: border-color .12s, background .12s; }
+.cvr-math-part[data-jump]:hover,
+.cvr-math-part[data-jump]:focus-visible {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-wash);
+  outline: none;
+}
+.cvr-math-part.is-base b { color: var(--hx-accent); }
+/* Un descuento sólo se pinta de rojo si se llevó puntos; el que valió cero se dice en
+   gris, pero se dice — ver que no descontó nada es parte de entender el número. */
+.cvr-math-part.is-pen { border-color: #f3c9d2; background: #fff6f7; }
+.cvr-math-part.is-pen b { color: #a30f31; }
+.cvr-math-part.is-warn { border-color: #f0dcb0; background: #fffaef; }
+.cvr-math-part.is-warn b { color: var(--hx-amber-ink); }
+.cvr-math-part.is-zero b { color: var(--hx-faint); }
+/* El resultado va en su propio renglón, ancho completo y en horizontal: es la conclusión
+   de la línea de arriba, no un cuarto sumando. */
+.cvr-math-total {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cvr-math-total .cvr-math-op { flex: 0 0 auto; min-width: 14px; justify-content: center; }
+.cvr-math-part.is-total {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-color: var(--hx-ink);
+  background: var(--hx-surface);
+}
+.cvr-math-part.is-total b { font-size: 24px; }
+.cvr-math-part.is-total span,
+.cvr-math-part.is-total em { margin-top: 0; }
+.cvr-math-part.is-total em { margin-left: auto; }
+
+/* Job hopping. Va al mismo nivel que la checklist porque es la otra cosa que mueve el
+   número, y se lee como una sección con título propio — antes empezaba en un párrafo suelto
+   y la vista lo saltaba. El caso que hay que arreglar se abre entero; los demás son una
+   línea, pero con el mismo encabezado para que se vean. */
+.cvr-hop {
+  margin: 14px 0;
+  padding: 11px 13px;
+  border: 1px solid var(--hx-line);
+  border-left-width: 4px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface-2);
+}
+.cvr-hop.is-bad {
+  border-color: #f3c9d2;
+  border-left-color: #d11a41;
+  background: #fff6f7;
+}
+.cvr-hop.is-ok {
+  border-color: #dcefc0;
+  border-left-color: var(--hx-lime);
+  background: #f8fdf0;
+}
+.cvr-hop.is-flat { border-left-color: var(--hx-slate); }
+
+/* Encabezado: el título a la izquierda, el impacto en el score a la derecha. El chip dice
+   siempre qué pasó con el número, que es lo único que se busca de un vistazo. */
+.cvr-hop-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hx-ink);
+  letter-spacing: -.01em;
+}
+.cvr-hop-head i { font-size: 11px; color: var(--hx-muted); }
+.cvr-hop.is-bad .cvr-hop-head i { color: #d11a41; }
+.cvr-hop.is-ok .cvr-hop-head i { color: var(--hx-lime-ink); }
+.cvr-hop-chip {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--hx-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  background: var(--hx-slate);
+  color: var(--hx-slate-ink);
+}
+.cvr-hop-chip.is-bad { background: #ffe0e6; color: #a30f31; }
+.cvr-hop-chip.is-ok { background: var(--hx-lime); color: var(--hx-lime-ink); }
+.cvr-hop-chip.is-base { background: var(--hx-accent-wash); color: var(--hx-accent); }
+
+/* La lista de herramientas usa la misma caja: es el otro descuento, no un anexo. */
+.cvr-hop--tools .cvr-tool-chips { margin-top: 9px; }
+.cvr-hop--tools .cvr-tool { background: var(--hx-surface); }
+
+/* Destello al saltar desde la cuenta: dice a dónde se llegó sin mover nada de sitio. */
+.cvr-jumped { animation: cvrJump 1.1s ease-out 1; }
+@keyframes cvrJump {
+  0%   { box-shadow: 0 0 0 3px var(--hx-accent-wash); }
+  100% { box-shadow: 0 0 0 3px rgba(0,40,255,0); }
+}
+
+.cvr-hop-line { margin: 0; font-size: 12px; color: var(--hx-ink-2); line-height: 1.45; }
+.cvr-hop--flat { padding: 9px 13px; }
+.cvr-hop--flat .cvr-hop-head { margin: 0 0 3px; }
+
+.cvr-hop-lead { margin: 0; font-size: 12.5px; color: var(--hx-ink-2); line-height: 1.5; }
+.cvr-hop-lead b { color: var(--hx-ink); }
+.cvr-hop-list { margin: 9px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .cvr-hop-list li {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--hx-surface);
+  border: 1px solid var(--hx-line);
   font-size: 11.5px;
   color: var(--hx-ink-2);
 }
-.cvr-hop-list li b { font-weight: 600; color: var(--hx-ink); }
+.cvr-hop-list li b { font-weight: 600; color: var(--hx-ink); font-size: 12px; }
 .cvr-hop-list li span { font-family: var(--hx-mono); font-size: 10px; }
-.cvr-hop-list li i { margin-left: auto; font-style: normal; font-family: var(--hx-mono); }
+.cvr-hop-list li i {
+  margin-left: auto;
+  font-style: normal;
+  font-family: var(--hx-mono);
+  font-weight: 600;
+  color: var(--hx-ink);
+}
 .cvr-hop-list li em {
   flex: 1 1 100%;
-  margin: 0;
+  margin: 2px 0 0;
   font-style: normal;
   font-size: 11px;
   color: var(--hx-faint);
 }
 .cvr-hop-list li em.is-ok { color: var(--hx-ink-2); }
-.cvr-hop-fix { margin: 9px 0 0; font-size: 11.5px; color: var(--hx-ink-2); line-height: 1.45; }
+/* La razón que falta es el dato accionable de la fila: en gris tenue se perdía. */
+.cvr-hop-list li em.is-missing { color: #a30f31; font-weight: 500; }
+.cvr-hop-list li em.is-missing::before {
+  content: "✕ ";
+  font-weight: 600;
+}
+.cvr-hop-fix { margin: 10px 0 0; font-size: 11.5px; color: var(--hx-ink-2); line-height: 1.5; }
 .cvr-hop-fix code {
   font-family: var(--hx-mono);
   font-size: 10.5px;

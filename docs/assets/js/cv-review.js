@@ -1087,26 +1087,42 @@
     // "Excellent". Ahora van como término (hlFindTerm), que busca con bordes de palabra y
     // con la misma regla de tokens que usó el backend para contarlas — así un chip verde
     // aterriza justo en el bullet por el que se pintó de verde.
+    // Encabezado común de todo lo que mueve el score: ícono, título y a la derecha lo
+    // único que se busca de un vistazo — cuánto se llevó (o que no se llevó nada).
+    const scoreHead = (icon, title, cls, chip) => `<h5 class="cvr-hop-head">
+        <i class="fa-solid ${icon}"></i>
+        <span>${title}</span>
+        <span class="cvr-hop-chip ${cls}">${chip}</span>
+      </h5>`;
+
     const tc = a._tools_check || {};
     const toolChip = (t, described) => `<li class="cvr-tool${described ? ' is-described' : ''}"
         data-hl-title="${described
           ? 'A role describes using it.'
           : 'This CV lists it, but no role describes using it.'}"
         ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
+    // La lista de herramientas es el OTRO descuento fijo, así que se lee al lado del de
+    // job hopping y con la misma caja — plegada en el fondo se la tomaba por un adorno.
     const toolsHtml = (tc.checked || 0) ? `
-      <p class="cvr-fold-lead">${tc.penalty
-        ? `<b>This one did move the score: &minus;${tc.penalty}.</b> Not one of the tools
-           in the list turns up in any role. `
-        : 'Nothing here moves the score. '}A tools list is free to write; what a client
-        believes is the role that describes using it. Some described is enough — the rest
-        is just worth knowing. <b>Click any of them to jump to it in the CV.</b></p>
-      <ul class="cvr-tool-chips">
-        ${(tc.described || []).map(t => toolChip(t, true)).join('')}
-        ${(tc.listed_only || []).map(t => toolChip(t, false)).join('')}
-      </ul>
-      ${(tc.listed_only_total || 0) > (tc.listed_only || []).length
-        ? `<p class="cvr-tally-off">…and ${tc.listed_only_total - tc.listed_only.length} more only listed.</p>`
-        : ''}` : '';
+      <div class="cvr-hop cvr-hop--tools ${tc.penalty ? 'is-bad' : 'is-ok'}" id="cvrTools">
+        ${scoreHead('fa-screwdriver-wrench', 'Tools: listed vs. described',
+                    tc.penalty ? 'is-bad' : 'is-ok',
+                    tc.penalty ? `&minus;${tc.penalty} pts` : 'no penalty')}
+        <p class="cvr-hop-lead">${tc.penalty
+          ? `<b>This one did move the score.</b> Not one of the ${tc.checked} tools in the
+             list turns up in any role. `
+          : `<b>${(tc.described || []).length} of ${tc.checked} are described in a role.</b>
+             Nothing came off the score. `}A tools list is free to write; what a client
+          believes is the role that describes using it. Some described is enough — the rest
+          is just worth knowing. <b>Click any of them to jump to it in the CV.</b></p>
+        <ul class="cvr-tool-chips">
+          ${(tc.described || []).map(t => toolChip(t, true)).join('')}
+          ${(tc.listed_only || []).map(t => toolChip(t, false)).join('')}
+        </ul>
+        ${(tc.listed_only_total || 0) > (tc.listed_only || []).length
+          ? `<p class="cvr-tally-off">…and ${tc.listed_only_total - tc.listed_only.length} more only listed.</p>`
+          : ''}
+      </div>` : '';
 
     // Un pliegue. `open` sólo cuando lo de adentro puede cambiar la decisión ahora mismo.
     const fold = (title, meta, body, open) => body ? `
@@ -1261,30 +1277,40 @@
         ${st.reason_kind
           ? `<em class="is-ok"${hlRegister('ev', st.reason_quote)}>${
               st.reason_kind === 'rehired' ? 'Hired back later — ' : ''}“${esc(st.reason_quote)}”</em>`
-          : '<em>the CV never says why it ended</em>'}
+          : '<em class="is-missing">the CV never says why it ended</em>'}
       </li>`;
+    // El encabezado va SIEMPRE, en los cinco estados: el bloque se saltaba porque no tenía
+    // título propio y arrancaba en medio de un párrafo. Lo que sigue variando es el cuerpo
+    // — una línea cuando no hay nada que arreglar, la lista completa cuando sí.
+    const jhHead = (cls, chip) =>
+      scoreHead('fa-arrow-right-arrow-left', 'Job hopping', cls, chip);
     const jhHtml = (() => {
       if (!jh.state) return '';
-      const line = (cls, txt) => `<p class="cvr-hop-line ${cls}">${txt}</p>`;
+      const flat = (cls, chip, txt) => `<div class="cvr-hop cvr-hop--flat ${cls}" id="cvrHop">
+          ${jhHead(cls, chip)}<p class="cvr-hop-line">${txt}</p>
+        </div>`;
       if (jh.state === 'no_history')
-        return line('', 'Job hopping: nothing to judge — this CV shows one employer, so '
-                      + 'there is nothing to leave.');
+        return flat('is-flat', 'nothing to judge', 'This CV shows one employer, so there is '
+                             + 'nothing to leave.');
       if (jh.state === 'clean')
-        return line('', `Job hopping: none. Every one of the ${jh.checked} employers this CV `
-                      + 'shows lasted a year or more.');
+        return flat('is-ok', 'no penalty', `None. Every one of the ${jh.checked} employers `
+                           + 'this CV shows lasted a year or more.');
       if (jh.state === 'unreadable')
-        return line('is-bad', '⚠️ Job hopping could not be checked: none of the dates in this '
-                            + 'CV could be read. Fix the dates and score again.');
+        return flat('is-bad', 'not checked', 'None of the dates in this CV could be read, so '
+                            + 'short stints could not be looked for. Fix the dates and score '
+                            + 'again.');
       if (jh.state === 'explained')
-        return `<div class="cvr-hop is-ok">
-          <p class="cvr-hop-lead"><b>Job hopping, and the CV explains it.</b> ${jh.short}
+        return `<div class="cvr-hop is-ok" id="cvrHop">
+          ${jhHead('is-ok', 'no penalty')}
+          <p class="cvr-hop-lead"><b>The CV explains it.</b> ${jh.short}
             stint${jh.short > 1 ? 's' : ''} under a year, ${jh.short > 1 ? 'each' : ''} with a
             reason the reviewer can read. <b>Nothing came off the score.</b></p>
           <ul class="cvr-hop-list">${(jh.stints || []).filter(x => x.reason_kind).map(jhRow).join('')}</ul>
         </div>`;
       const un = (jh.stints || []).filter(x => !x.reason_kind && !x.skipped);
-      return `<div class="cvr-hop is-bad">
-        <p class="cvr-hop-lead"><b>This one did move the score: &minus;${jh.penalty}.</b>
+      return `<div class="cvr-hop is-bad" id="cvrHop">
+        ${jhHead('is-bad', `&minus;${jh.penalty} pts`)}
+        <p class="cvr-hop-lead"><b>This one did move the score.</b>
           ${un.length} employer${un.length > 1 ? 's' : ''} left in under a year with no reason
           anywhere in this CV. A short stint is not the problem — an unexplained one is, and
           the client will ask.</p>
@@ -1333,6 +1359,8 @@
     const rowsHtml = reqs.map((r, i) =>
       (i === firstOff && firstOff > 0 ? sep : '') + reqRow(r, per)).join('');
 
+    // La tarjeta de requisitos se queda con lo suyo: la barra y cuánto vale cada uno. La
+    // cuenta entera (base − descuentos = score) subió al resumen, junto al número grande.
     const mathLine = sd.scorable ? `
       <div class="cvr-tally">
         <div class="cvr-tally-bar" role="img"
@@ -1341,18 +1369,7 @@
         </div>
         <p class="cvr-tally-line">
           <b>${sd.earned}</b> of <b>${sd.scorable}</b> scoring requirements
-          &rarr; <b>${sd.base}</b>/100${(() => {
-            // Los descuentos vienen como lista desde la v12; un análisis v11 guardado sólo
-            // trae tools_penalty suelto, y se sigue pintando igual.
-            const ps = (sd.penalties || []).filter(p => p.points).length
-              ? sd.penalties.filter(p => p.points)
-              : (sd.tools_penalty ? [{ label: 'tools', points: sd.tools_penalty }] : []);
-            return ps.length
-              ? ps.map(p => ` &minus; <b>${p.points}</b> <span>(${esc(p.label)})</span>`).join('')
-                + ` = <b>${score}</b>`
-              : '';
-          })()}.
-          Each one is worth ${per} points.
+          &rarr; <b>${sd.base}</b>/100. Each one is worth ${per} points.
         </p>
         ${sd.excluded && sd.excluded.length ? `<p class="cvr-tally-off">Not counted: ${
           [['soft', 'soft'], ['language', 'language'], ['assumed', 'taken for granted']]
@@ -1360,16 +1377,74 @@
             .filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(' · ')}.</p>` : ''}
       </div>` : '';
 
+    // Los descuentos vienen como lista desde la v12; un análisis v11 guardado sólo trae
+    // tools_penalty suelto. Se arma con tc/jh cuando están, porque así también se pueden
+    // mostrar los que valieron cero — que es justo lo que había que hacer notar.
+    const mathParts = (() => {
+      if (!sd.scorable) return [];
+      const out = [{
+        cls: 'is-base', jump: 'cvrReqs', n: sd.base, label: 'JD requirements',
+        sub: `${sd.earned} of ${sd.scorable} shown`,
+      }];
+      if (tc.checked) out.push({
+        cls: tc.penalty ? 'is-pen' : 'is-zero', jump: 'cvrTools',
+        n: tc.penalty || 0, label: 'Tools list',
+        sub: tc.penalty
+          ? 'no role backs it up'
+          : `${(tc.described || []).length} of ${tc.checked} described`,
+      });
+      else if (sd.tools_penalty) out.push({
+        cls: 'is-pen', n: sd.tools_penalty, label: 'Tools list', sub: 'no role backs it up',
+      });
+      if (jh.state) out.push({
+        cls: jh.penalty ? 'is-pen' : (jh.state === 'unreadable' ? 'is-warn' : 'is-zero'),
+        jump: 'cvrHop', n: jh.penalty || 0, label: 'Job hopping',
+        sub: { unexplained: 'a stint with no reason given', explained: 'short stints, all explained',
+               clean: 'no stint under a year', no_history: 'only one employer',
+               unreadable: 'dates could not be read' }[jh.state] || '',
+      });
+      return out;
+    })();
+
+    const mathHtml = mathParts.length > 1 ? `
+      <div class="cvr-math">
+        <div class="cvr-math-head">
+          <span>How this score is built</span>
+          <em>every part of it — click one to jump to it</em>
+        </div>
+        ${/* Dos renglones a propósito: arriba lo que se suma y se resta, abajo el
+             resultado. Con los cuatro en la misma fila el total caía a la segunda línea
+             según el ancho y quedaba como un sumando más. */''}
+        <ol class="cvr-math-row">
+          ${mathParts.map((p2, i) => `
+            ${i ? '<li class="cvr-math-op">&minus;</li>' : ''}
+            <li class="cvr-math-part ${p2.cls}"${p2.jump ? ` data-jump="${p2.jump}" tabindex="0"` : ''}>
+              <b>${p2.n}</b>
+              <span>${p2.label}</span>
+              <em>${esc(p2.sub)}</em>
+            </li>`).join('')}
+        </ol>
+        <div class="cvr-math-total">
+          <span class="cvr-math-op">=</span>
+          <div class="cvr-math-part is-total">
+            <b class="${qCls(score)}">${score}</b>
+            <span>Final score</span>
+            <em>out of 100</em>
+          </div>
+        </div>
+      </div>` : '';
+
     const reqsHtml = reqs.length ? `
-      <div class="cvr-reqs">
-        <h5>What the JD asked for <span class="cvr-reqs-count">this list <b>sets</b> the score</span></h5>
+      <div class="cvr-reqs" id="cvrReqs">
+        ${scoreHead('fa-list-check', 'What the JD asked for', 'is-base',
+                    sd.scorable ? `${sd.base}/100 base` : 'sets the score')}
         ${rs.incomplete ? `<p class="cvr-reqs-warn">⚠️ The posting lists ${rs.expected}
           requirements and only ${rs.listed} could be read, so this percentage is out of
           ${rs.listed}, not ${rs.expected}. Treat it as provisional and re-run before you
           use the number.</p>` : ''}
         ${mathLine}
         <details class="cvr-note cvr-note--inline">
-          <summary><i class="fa-regular fa-circle-question"></i> How this score is built</summary>
+          <summary><i class="fa-regular fa-circle-question"></i> The rules behind the score</summary>
           <div class="cvr-note-body">
             <p>The score is one thing only: <b>the share of the JD's technical requirements
               this CV shows</b>. Each one is worth the same. Describing it in a role earns
@@ -1449,8 +1524,10 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
           ${a._partial && legacy ? '<p class="cvr-ai-cap">Partial: this round was scored by the old rubric with no job description, so 30 of its 100 points were skipped. Excluded from the recruiter average.</p>' : ''}
         </div>
       </div>
+      ${mathHtml}
       ${reqsHtml}
       ${jhHtml}
+      ${toolsHtml}
       ${!reqs.length && (a.jd_requirements_missed || []).length
         ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>`
         : ''}
@@ -1460,9 +1537,6 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
           the JD asked for. These are flags for you: the honesty check is the one thing
           worth stopping a CV for.</p>${wordingBody}` : '', hard.length > 0)}
       ${fold('What would make it better', '', fixes ? `<div class="cvr-fixes"><ul>${fixes}</ul></div>` : '', true)}
-      ${fold('Tools: listed vs. described',
-             tc.checked ? `${(tc.described || []).length} of ${tc.checked} described` : '',
-             toolsHtml, false)}
       ${legacy ? fold('How the old rubric scored this',
              weakest ? `weakest: ${esc(weakest.rb.label)} (${weakest.c.score})` : '',
              bars ? `<div class="cvr-crits">${bars}</div>` : '', false) : ''}
@@ -1835,12 +1909,26 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
 
     // --- resaltado: del panel al CV y de vuelta ---
     // Cada cita ubicable es un botón: lleva el CV hasta la frase y la pinta de azul.
+    // Cada parte de la cuenta lleva a su bloque y lo destella: el resumen dice cuánto se
+    // fue, el bloque dice por qué, y no hay que buscarlo con la rueda del mouse.
+    const jumpTo = (id) => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.remove('cvr-jumped');
+      void target.offsetWidth;
+      target.classList.add('cvr-jumped');
+    };
     $('cvrAi').addEventListener('click', ev => {
+      const jump = ev.target.closest('[data-jump]');
+      if (jump) { jumpTo(jump.getAttribute('data-jump')); return; }
       const el = ev.target.closest('[data-hl].cvr-hl-item');
       if (el) hlGoTo(el.getAttribute('data-hl'));
     });
     $('cvrAi').addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const jump = ev.target.closest('[data-jump]');
+      if (jump) { ev.preventDefault(); jumpTo(jump.getAttribute('data-jump')); return; }
       const el = ev.target.closest('[data-hl].cvr-hl-item');
       if (!el) return;
       ev.preventDefault();
