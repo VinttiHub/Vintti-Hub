@@ -1381,6 +1381,26 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   border-color: transparent;
   font-weight: 600;
 }
+/* Tres estados, no dos: descrita en un rol, sólo en la lista, o directamente ausente. La
+   ausente va tachada — el hueco es real pero ya se cobró en la checklist de requisitos. */
+.cvr-tool.is-listed {
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+.cvr-tool.is-absent {
+  background: var(--hx-surface-2);
+  color: var(--hx-faint);
+  border-style: dashed;
+  text-decoration: line-through;
+}
+.cvr-tool-extra {
+  margin: 9px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--hx-muted);
+}
 .cvr-fold-b > .cvr-tools { margin-top: 0; }
 
 /* La cuenta de años, rol por rol. Va plegada: sólo importa cuando el total sorprende. */

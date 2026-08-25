@@ -191,8 +191,27 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
     }
   ],                                    // EXACTLY as many entries as "jd_requirements_verbatim",
                                         // same order, one per bullet
+  "jd_tools": string[],                 // the concrete tools/software/platforms the posting
+                                        //   REQUIRES, by name, one per entry: ["QuickBooks
+                                        //   Online", "Excel", "Asana"]. Only named products.
+                                        //   NOT categories ("a CRM"), NOT skills ("month-end
+                                        //   close"), NOT anything from a nice-to-have section.
+                                        //   [] when the posting names no tool.
   "fit_note": string                    // see WHAT YOU ARE JUDGING — reported, never scored
 }
+
+"jd_tools" — the tools THE CLIENT ASKED FOR, which is not the same list as the tools the
+candidate happens to own. Read the posting's requirements and pull out every named product:
+software, platforms, systems. "QuickBooks Online", "Excel", "Salesforce", "Figma", "SAP".
+Rules:
+- Named products only. "a CRM", "accounting software", "project management tools" are
+  categories, not tools — leave them out. If the posting names examples after a category
+  ("PM tools such as Asana, Monday or Notion"), list the examples.
+- Nothing from a "nice to have" / "preferred" section. Those are not required.
+- One tool per entry, spelled as the posting spells it. Do not merge two into one string.
+- This list is checked against the CV by code, not by you: the screen tells the reviewer
+  which of these the candidate's ROLES actually show. Getting it wrong in either direction
+  is expensive, so do not pad it and do not skip one.
 
 JD ECHO — the CV borrowing the job description's WORDING instead of its substance:
 - Tailoring a CV to the JD is GOOD and expected. Sharing keywords with the JD is GOOD when
@@ -1637,8 +1656,14 @@ def _tool_needle(tool: str):
 
 
 def tools_mentions(snapshot: Dict[str, Any],
-                   requirements: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Qué herramientas de la lista aparecen de verdad en la experiencia.
+                   requirements: List[Dict[str, Any]],
+                   jd_tools: Optional[List[str]] = None) -> Dict[str, Any]:
+    """De las herramientas que la VACANTE pide, cuáles muestra de verdad la experiencia.
+
+    La pregunta la hace el cliente, no el candidato: si la JD exige QuickBooks, lo que
+    importa es si algún rol lo describe — no si el CV además lista su agenda. Antes esto
+    recorría la sección Tools del CV y descontaba 10 puntos porque ningún rol describía
+    "Google Calendar" o "RingCentral", herramientas que nadie había pedido (rev95).
 
     El heno son los bullets, los títulos y las empresas. El About queda AFUERA a propósito:
     es el pitch, no evidencia. Si se incluyera, cualquier CV que parafrasee su lista de
@@ -1651,48 +1676,85 @@ def tools_mentions(snapshot: Dict[str, Any],
         hay_parts.extend(_bullets(entry.get("description")))
     hay = " \n ".join(hay_parts).lower()
 
+    # Evidencia DÉBIL: el CV la nombra fuera de un rol. Dice que el candidato la reclama,
+    # no que la haya usado. Sirve para separar "no la describe" de "no está en ningún lado".
+    #
+    # Va la lista de Tools Y el About Y la educación: una herramienta que sólo aparece en el
+    # About sigue siendo algo que el CV afirma, y llamarla "no está en este CV" era
+    # directamente falso — el reviewer abre el documento y la ve.
+    cv_tools = [str(t.get("tool") or "").strip()
+                for t in _as_list(snapshot.get("tools")) if str(t.get("tool") or "").strip()]
+    claimed_parts = list(cv_tools)
+    claimed_parts.append(_strip_html(snapshot.get("about")))
+    for entry in _as_list(snapshot.get("education")):
+        claimed_parts.append(str(entry.get("title") or ""))
+        claimed_parts.extend(_bullets(entry.get("description")))
+    cv_tools_text = " \n ".join(p for p in claimed_parts if p).lower()
+
     req_text = " ".join(r.get("requirement", "") for r in (requirements or [])).lower()
 
-    described: List[Dict[str, str]] = []
-    listed_only: List[Dict[str, Any]] = []
-    skipped = 0
-
-    for item in _as_list(snapshot.get("tools")):
-        name = str(item.get("tool") or "").strip()
-        if not name:
-            continue
-        level = str(item.get("level") or "").strip()
+    # Las que el modelo sacó de la JD, más las que la JD nombra y el CV también lista: si el
+    # modelo se saltea una que está en los dos lados, igual se chequea.
+    # Sin `jd_tools` no se puede saber qué pidió el cliente, y adivinarlo a medias es peor
+    # que no chequear: escaneando sólo la lista del CV se puede encontrar la herramienta que
+    # NO está descrita y perderse la que SÍ, y castigar por eso. Análisis viejos y respuestas
+    # sin el campo caen acá: el bloque no se muestra hasta que se re-corra.
+    wanted: List[str] = []
+    seen_keys = set()
+    for name in (list(jd_tools) + cv_tools) if jd_tools else []:
+        name = str(name or "").strip()
         needle = _tool_needle(name)
-        # "no todas, sólo las que valga la pena": lo irremarcable, el nivel básico (que
-        # ningún rol lo describa es CORRECTO ahí) y lo que no se puede verificar.
-        if needle is None or _TOOL_UNREMARKABLE.match(name) or level.lower() == "basic":
-            skipped += 1
+        if not name or needle is None:
             continue
+        key = name.lower()
+        if key in seen_keys:
+            continue
+        # Del CV sólo entran las que la JD nombra; de `jd_tools` entran todas.
+        if name not in (jd_tools or []) and not needle.search(req_text):
+            continue
+        seen_keys.add(key)
+        wanted.append(name)
+
+    described: List[str] = []
+    listed_only: List[str] = []
+    absent: List[str] = []
+    for name in wanted:
+        needle = _tool_needle(name)
         if needle.search(hay):
-            described.append({"tool": name})
+            described.append(name)
+        elif needle.search(cv_tools_text):
+            listed_only.append(name)
         else:
-            listed_only.append({
-                "tool": name,
-                "in_jd": bool(needle.search(req_text)),
-                "level": level,
-            })
+            absent.append(name)
 
-    # Lo más accionable primero: una herramienta que la JD pidió y ningún rol describe. Tope
-    # de 6 — una lista de veinte no se lee.
-    listed_only.sort(key=lambda t: (not t["in_jd"], t["level"].lower() not in ("advanced", "expert")))
+    # Las que el CV lista y la vacante NO pidió. No puntúan ni descuentan — se muestran
+    # porque saber que un CV lista seis herramientas que nadie describe sigue siendo un dato
+    # sobre el documento, sólo que no sobre este puesto.
+    extra_listed = [t for t in cv_tools
+                    if t.lower() not in seen_keys
+                    and _tool_needle(t) is not None
+                    and not _TOOL_UNREMARKABLE.match(t)
+                    and not _tool_needle(t).search(hay)]
 
-    checked = len(described) + len(listed_only)
-    # El castigo es un UMBRAL, no un descuento por herramienta: no hace falta que estén
-    # todas descritas, pero que no haya ni una es un CV cuya experiencia no nombra una sola
-    # herramienta. Decisión de la owner.
-    penalty = TOOLS_NONE_PENALTY if (checked and not described) else 0
+    checked = len(wanted)
+    # El castigo es sobre lo que el CV AFIRMA y ningún rol respalda. Una herramienta que el
+    # CV no tiene en ningún lado no es una afirmación sin respaldo: es un hueco, y ese ya se
+    # cobra en la checklist de requisitos — cobrarlo también acá sería dos veces lo mismo.
+    #
+    # UMBRAL y no descuento por herramienta: no hace falta que estén todas descritas, pero
+    # que el CV liste las del cliente y NINGÚN rol respalde una sola es un CV que no sostiene
+    # lo que se está vendiendo. Decisión de la owner.
+    penalty = TOOLS_NONE_PENALTY if (listed_only and not described) else 0
 
     return {
-        "described": [t["tool"] for t in described],
-        "listed_only": [t["tool"] for t in listed_only[:6]],
+        "described": described,
+        "listed_only": listed_only,
+        "absent": absent,
         "listed_only_total": len(listed_only),
         "checked": checked,
-        "skipped": skipped,
+        "extra_listed": extra_listed[:6],
+        "extra_listed_total": len(extra_listed),
+        "skipped": 0,
         "penalty": penalty,
     }
 
@@ -1947,7 +2009,11 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     # reparten los 100 puntos; describir en la experiencia vale el punto entero, estar sólo
     # listado la mitad, faltar cero. Lo único que además toca el número es el castigo único
     # cuando la experiencia no nombra NI UNA de las herramientas listadas.
-    tools_check = tools_mentions(snapshot, requirements)
+    # Las herramientas que la JD exige salen del modelo (ver "jd_tools"): un catálogo por
+    # regex sería una lista infinita que se queda corta con el primer rubro nuevo.
+    jd_tools = [str(t).strip() for t in (parsed.get("jd_tools") or []) if str(t).strip()]
+    tools_check = tools_mentions(snapshot, requirements, jd_tools)
+    tools_check["jd_tools"] = jd_tools
     # Lo único que se evalúa fuera de la checklist además de las herramientas. Ver job_hopping().
     hopping = job_hopping(snapshot)
     composite, score_detail, basis = requirements_score(requirements, [

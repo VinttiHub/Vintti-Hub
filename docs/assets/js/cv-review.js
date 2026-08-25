@@ -1104,25 +1104,49 @@
         ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
     // La lista de herramientas es el OTRO descuento fijo, así que se lee al lado del de
     // job hopping y con la misma caja — plegada en el fondo se la tomaba por un adorno.
-    const toolsHtml = (tc.checked || 0) ? `
+    // El bloque responde UNA pregunta: de las herramientas que pidió el cliente, ¿cuáles
+    // muestra la experiencia? Antes recorría la lista de tools del CV y descontaba por no
+    // describir la agenda del candidato, que nadie había pedido (rev95).
+    const toolRow = (t, cls, note) => `<li class="cvr-tool ${cls}"
+        data-hl-title="${esc(note)}" ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
+    // `jd_tools` sólo existe desde este cambio. Un análisis guardado de antes tiene los
+    // mismos nombres de campo con OTRO significado (las tools del CV, no las de la JD), y
+    // pintarlo bajo este título diría algo falso. No se muestra hasta que se re-corra; su
+    // castigo, si lo tuvo, sigue explicándose en la cuenta del score.
+    const toolsHtml = (Array.isArray(tc.jd_tools) && (tc.checked || 0)) ? `
       <div class="cvr-hop cvr-hop--tools ${tc.penalty ? 'is-bad' : 'is-ok'}" id="cvrTools">
-        ${scoreHead('fa-screwdriver-wrench', 'Tools: listed vs. described',
+        ${scoreHead('fa-screwdriver-wrench', 'Tools the posting asks for',
                     tc.penalty ? 'is-bad' : 'is-ok',
                     tc.penalty ? `&minus;${tc.penalty} pts` : 'no penalty')}
         <p class="cvr-hop-lead">${tc.penalty
-          ? `<b>This one did move the score.</b> Not one of the ${tc.checked} tools in the
-             list turns up in any role. `
-          : `<b>${(tc.described || []).length} of ${tc.checked} are described in a role.</b>
-             Nothing came off the score. `}A tools list is free to write; what a client
-          believes is the role that describes using it. Some described is enough — the rest
-          is just worth knowing. <b>Click any of them to jump to it in the CV.</b></p>
+          ? `<b>This one did move the score.</b> This CV claims
+             <b>${esc((tc.listed_only || []).join(', '))}</b> &mdash; in the tools list, the
+             About or the education &mdash; but <b>no role describes using
+             ${(tc.listed_only || []).length === 1 ? 'it' : 'any of them'}</b>. Naming a tool
+             is free; what a client believes is the role that describes using it. `
+          : `<b>${(tc.described || []).length} of the ${tc.checked} tool${tc.checked === 1 ? '' : 's'}
+             the posting asks for ${(tc.described || []).length === 1 ? 'is' : 'are'} described
+             in a role.</b> Nothing came off the score. `}<b>Click any of them to jump to it
+          in the CV.</b></p>
         <ul class="cvr-tool-chips">
-          ${(tc.described || []).map(t => toolChip(t, true)).join('')}
-          ${(tc.listed_only || []).map(t => toolChip(t, false)).join('')}
+          ${(tc.described || []).map(t => toolRow(t, 'is-described',
+              'The posting asks for it and a role describes using it.')).join('')}
+          ${(tc.listed_only || []).map(t => toolRow(t, 'is-listed',
+              'The posting asks for it and this CV names it — in the tools list, the About '
+              + 'or the education — but no role describes using it.')).join('')}
+          ${(tc.absent || []).map(t => toolRow(t, 'is-absent',
+              'The posting asks for it and it is nowhere in this CV. That gap is already '
+              + 'counted in the requirements list above, so it costs nothing extra here.')).join('')}
         </ul>
-        ${(tc.listed_only_total || 0) > (tc.listed_only || []).length
-          ? `<p class="cvr-tally-off">…and ${tc.listed_only_total - tc.listed_only.length} more only listed.</p>`
-          : ''}
+        ${/* Lo que el CV lista y nadie pidió. No puntúa ni descuenta: saber que hay seis
+             herramientas sueltas sin respaldo sigue siendo un dato del documento, sólo que
+             no de este puesto. */''}
+        ${(tc.extra_listed || []).length ? `<p class="cvr-tool-extra">Also listed, and not
+          asked for by this posting — no role describes ${(tc.extra_listed || []).length === 1
+            ? 'it' : 'them'}, and nothing came off the score for that:
+          <b>${esc((tc.extra_listed || []).join(', '))}</b>${
+          (tc.extra_listed_total || 0) > tc.extra_listed.length
+            ? ` and ${tc.extra_listed_total - tc.extra_listed.length} more` : ''}.</p>` : ''}
       </div>` : '';
 
     // Un pliegue. `open` sólo cuando lo de adentro puede cambiar la decisión ahora mismo.
