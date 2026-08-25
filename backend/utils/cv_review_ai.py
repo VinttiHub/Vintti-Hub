@@ -875,6 +875,24 @@ _REQ_SOFT = re.compile(r"""
   | \bmindset\b | \battitude\b | \bpassion\w*\b | \benthusias\w+\b
   | \beager\s+to\s+learn\b | \bcurious\w*\b | \bwork\s+ethic\b
   | \badaptab\w+\b | \bflexib\w+\b | \bfast[-\s]paced\b
+  # "Ability to learn and adapt to new tools and software" puntuaba como técnico: el
+  # requisito NOMBRA herramientas, pero lo que pide es la disposición, no saber usarlas.
+  # `adaptab\w+` sólo agarraba "adaptable/adaptability", nunca el verbo suelto.
+  | \b(?:ability|able|abilities|willing(?:ness)?|capacity|capable)\s+to\s+
+      (?:learn|adapt|adjust|pick\s+up)\b
+  | \badapts?\s+to\s+(?:new|change|changing|shifting)\b
+  | \badapting\s+to\b | \bwilling\s+to\s+learn\b | \bopen\s+to\s+learning\b
+  | \b(?:quick|fast)\s+learner\b | \blearns?\s+(?:quickly|fast)\b
+  | \bsteep\s+learning\s+curve\b | \bcoachab\w+\b | \bresourcefu\w+\b
+  # "multitask" a secas NO: "multi-task scheduling" es un concepto técnico real. Sólo
+  # cuenta cuando la frase lo pide como capacidad de la persona.
+  | \b(?:ability|able|abilities)\s+to\s+multi[-\s]?task\b
+  | \bmulti[-\s]?tasking\s+skills?\b | \b(?:strong|excellent|good)\s+multi[-\s]?task\w*\b
+  | \bsense\s+of\s+urgency\b
+  | \b(?:work|perform|thrive)\w*\s+(?:well\s+)?under\s+pressure\b
+  | \bdeadline[-\s]driven\b
+  | \bcapacidad\s+de\s+(?:aprender|adaptaci[oó]n|adaptarse)\b
+  | \bpredisposici[oó]n\b | \bganas\s+de\s+aprender\b
   | \breliable\s+internet\b | \binternet\s+connection\b
   | \bown\s+(?:computer|equipment|laptop|setup)\b | \bquiet\s+(?:space|workspace)\b
   | \bavailab\w+\b | \bbusiness\s+hours\b | \bworking\s+hours\b
