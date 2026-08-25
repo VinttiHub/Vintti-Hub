@@ -981,12 +981,37 @@ def get_cv_review(review_id):
         cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (row["candidate_id"],))
         live = cur.fetchone()
         live_hash = cv_review_ai.snapshot_hash(cv_review_ai.resume_snapshot(live)) if live else None
+
+        # ¿La JD cambió desde que se corrió el análisis? Sin esto, editar la vacante y
+        # volver a abrir el review muestra una checklist vieja que parece actual, y el
+        # reviewer decide contra requisitos que ya no son los del cliente.
+        # Tres estados, no dos: la JD cambió, la JD está igual, o NO SE PUEDE SABER porque
+        # el análisis es anterior a que se guardara la huella. El tercero es el que más
+        # avisa que hay que re-correr, y tratarlo como "está igual" lo escondía.
+        jd_changed = False
+        blob = row.get("ai_analysis")
+        jd_checked = bool(isinstance(blob, dict) and blob.get("_jd_hash"))
+        if isinstance(blob, dict) and blob.get("_jd_hash"):
+            # El MISMO bloque que arma la ruta de análisis, o la huella no es comparable.
+            from ai_routes import (_build_opportunity_context, _build_resume_target_role_block,
+                                   RESUME_JD_LIMIT, _truncate_preserving_edges)
+            jd_now, opp_ctx = _build_opportunity_context(cur, row["opportunity_id"])
+            block_now = _build_resume_target_role_block({
+                "client_name": row["client_name"],
+                "position": opp_ctx.get("position", "") or (row["opp_position_name"] or ""),
+                "career_country": opp_ctx.get("career_country", ""),
+                "years_experience": str(opp_ctx.get("years_experience") or ""),
+                "jd": _truncate_preserving_edges(jd_now, RESUME_JD_LIMIT),
+            })
+            jd_changed = cv_review_ai.jd_fingerprint(block_now) != blob["_jd_hash"]
     finally:
         cur.close()
         conn.close()
 
     payload = _serialize(row, reasons=reasons, analysis=row.get("ai_analysis"), live_hash=live_hash)
     payload["resume_snapshot"] = row.get("resume_snapshot")
+    payload["jd_changed"] = jd_changed
+    payload["jd_checked"] = jd_checked
     return jsonify({"review": payload, "live_resume_hash": live_hash})
 
 

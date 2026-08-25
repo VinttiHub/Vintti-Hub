@@ -517,6 +517,14 @@
   line-height: 1.5;
 }
 .cvr-warn b { font-weight: 700; }
+/* "No se puede saber" no es "está mal": gris, para que el ámbar siga reservado a lo que
+   sí es un problema comprobado. */
+.cvr-warn--soft {
+  background: var(--hx-surface-2);
+  color: var(--hx-muted);
+  border-left: 3px solid var(--hx-line);
+  font-weight: 500;
+}
 
 /* Dónde más estuvo el candidato. Cada fila es un enlace de verdad (<a href>), no un div
    con onclick: así el click del medio abre en pestaña y el hover muestra a dónde va.
@@ -1326,6 +1334,15 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   border-radius: 999px;
   padding: 0 5px;
   cursor: help;
+}
+/* El único tag que marca un juicio del modelo y no un hecho del CV: vale el punto entero,
+   pero el CV no lo dice — lo dice el trabajo que describe. Se pinta distinto para que sea
+   fácil ir a discutir justo esas filas. */
+.cvr-req-tag--inferred {
+  border-color: var(--hx-accent);
+  color: var(--hx-accent);
+  background: var(--hx-accent-wash);
+  font-weight: 600;
 }
 
 /* Análisis viejo: el número está en otra escala y hay que decirlo, o dos números

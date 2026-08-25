@@ -1209,6 +1209,21 @@
                     + 'This is the candidate, not the CV — rewriting it cannot close the gap.' };
       }
       if (r.status === 'described') {
+        // La inferencia se marca aparte aunque valga lo mismo: el CV NO dice esto, lo dice
+        // el trabajo que el bullet describe. El reviewer tiene que poder ver que hubo un
+        // razonamiento —y la cita de la que salió— para poder tumbarlo.
+        if (r.by_inference) {
+          return { cls: 'described', tag: 'inferred', tagCls: 'cvr-req-tag--inferred',
+                   label: 'Covered by what the role does',
+                   // Sin nota no se promete una explicación que no está: la fila se queda
+                   // con la cita, que sigue siendo verificable.
+                   tip: 'The CV never names this, but the work quoted below ordinarily '
+                      + 'includes it, so it counts in full. '
+                      + (r.note ? 'The note says the reasoning — if you do not buy it, this '
+                                + 'is the one to push back on.'
+                                : 'The analysis gave no reasoning for it, so judge it from '
+                                + 'the quote alone.') };
+        }
         return { cls: 'described', label: 'Described in the experience',
                  tip: 'A role in the work experience describes actually doing this, with a '
                     + 'quote to back it. Full credit.' };
@@ -1365,7 +1380,7 @@
       <li class="cvr-req cvr-req--${f.cls}">
         <div class="cvr-req-main">
           <b>${esc(r.requirement)}</b>
-          ${f.tag ? `<i class="cvr-req-tag" title="${esc(f.tip)}">${esc(f.tag)}</i>` : ''}
+          ${f.tag ? `<i class="cvr-req-tag${f.tagCls ? ` ${f.tagCls}` : ''}" title="${esc(f.tip)}">${esc(f.tag)}</i>` : ''}
           <span class="cvr-req-status" title="${esc(f.tip)}">${esc(f.label)}</span>
           ${r.years_required ? `<i class="cvr-req-tag" title="We add the years up from the dates in this CV — the model does not estimate them.">${r.years_required}+ yrs · counted</i>` : ''}
           ${pts}
@@ -1473,6 +1488,15 @@
         ${/* El control de paridad compara esta lista contra una transcripción de la JD. Si
              la transcripción no vino, no se comparó nada — y decirlo importa, porque es el
              mismo fallo del modelo que hace que se saltee requisitos acá abajo. */''}
+        ${/* Un requisito escrito DESPUÉS de un "Nice to have" cae del lado deseable del
+             corte y no puntúa. Descartarlo en silencio se ve, desde afuera, como que la JD
+             se editó y la checklist no cambió. */''}
+        ${rs.optional_dropped ? `<p class="cvr-reqs-warn cvr-reqs-warn--soft">${
+          rs.optional_dropped} more bullet${rs.optional_dropped === 1 ? '' : 's'} in the
+          posting ${rs.optional_dropped === 1 ? 'sits' : 'sit'} after a
+          <b>“nice to have”</b> heading, so ${rs.optional_dropped === 1 ? 'it was' : 'they were'}
+          read as optional and left out of the score. If something there is actually
+          required, move it above that heading in the posting and re-run.</p>` : ''}
         ${rs.unverified ? `<p class="cvr-reqs-warn cvr-reqs-warn--soft">This list was not
           checked against the posting: the analysis did not transcribe the JD's bullets, so
           nothing counted them. Read it against the posting yourself, or re-run.</p>` : ''}
@@ -1781,6 +1805,28 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         frame.onload = () => { if (currentReview) hlAttach(); };
         frame.src = url;
         $('cvrOpenCv').href = url;
+
+        // Dos derivas distintas y NO son la misma cosa: una es que la recruiter tocó el
+        // CV después de mandarlo, la otra que se editó la JD después de scorear. La
+        // segunda invalida la checklist entera, así que se dice aunque el CV esté igual.
+        const jdDrift = $('cvrJdDrift');
+        const hasAnalysis = !!(r.jd_requirements || []).length;
+        if (r.jd_changed) {
+          jdDrift.className = 'cvr-warn';
+          jdDrift.innerHTML = 'The job description changed after this analysis ran, so the '
+            + 'checklist below is scored against the old one. <b>Re-run the analysis</b> to '
+            + 'score it against the posting as it stands now.';
+          show(jdDrift, true);
+        } else if (hasAnalysis && !r.jd_checked) {
+          // Análisis anterior a la huella: no se puede afirmar que coincida NI que no.
+          jdDrift.className = 'cvr-warn cvr-warn--soft';
+          jdDrift.innerHTML = 'This analysis is older than the job-description check, so '
+            + 'there is no way to tell whether the posting has changed since. If the '
+            + 'checklist does not match the posting you see today, <b>re-run it</b>.';
+          show(jdDrift, true);
+        } else {
+          show(jdDrift, false);
+        }
 
         const drift = $('cvrDrift');
         if (r.resume_drift) {

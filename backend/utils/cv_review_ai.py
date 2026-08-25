@@ -176,6 +176,10 @@ ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these 
       "status": "described" | "listed_only" | "missing",
       "in_source": "yes" | "no" | "unclear",   // does the SOURCE MATERIAL show it? see below
       "evidence": string,               // VERBATIM quote from THE VINTTI CV, or "" when missing
+      "by_inference": boolean,          // true when the quote does not NAME the requirement but
+                                        //   the work it describes necessarily includes it.
+                                        //   See WHAT COUNTS AS COVERED. Omit or false otherwise.
+                                        //   When true, "note" is MANDATORY: it carries the reasoning.
       "years_roles": number[],          // ONLY when the requirement asks for N years: the
                                         //   [R#] numbers of the roles that count toward it.
                                         //   [] when no role does. Omit otherwise.
@@ -269,6 +273,9 @@ untrustworthy.
 STATUS — this distinction is the whole point of the field:
 - "described": a work-experience bullet shows the candidate actually doing it. "evidence"
   is a VERBATIM quote from that bullet. A tools list does NOT earn "described".
+  This INCLUDES the case where the bullet does not use the posting's words but the work it
+  describes necessarily involves the requirement — read WHAT COUNTS AS COVERED before you
+  reach for any other status, and set "by_inference": true when that is why it is covered.
 - "listed_only": half credit. TWO different cases earn it, and both are real:
   (a) the requirement appears in the CV — the Tools/Skills list, the About, a job title —
       but NO work-experience bullet describes the candidate using it. This is the most
@@ -310,11 +317,97 @@ THE "note", one line, and make it actionable:
 - "missing" with in_source "no": say plainly that her own CV and her LinkedIn have nothing
   either, so the reviewer reads it as a fit fact and not as something the recruiter should
   fix.
-- "described": leave "" or one short line. Do not pad.
+- "described" WITHOUT "by_inference": leave "" or one short line. Do not pad.
+- "described" WITH "by_inference": THE NOTE IS MANDATORY — never "". You are telling the
+  reviewer the CV does not say this and you decided it anyway; the note is the only place
+  that reasoning exists, and without it they cannot agree or disagree, only distrust you.
+  One line, naming both ends of the bridge: "the JD asks for CRM familiarity; running a
+  Salesforce pipeline for four years IS that — Salesforce is a CRM."
 
-HONESTY: "described" requires a real quote from the CV's work experience. If you cannot
-quote it, it is not "described". Never mark something covered to be generous, and never
-invent a quote.
+WHAT COUNTS AS COVERED — read this BEFORE you mark anything "missing".
+
+A CV is written by a professional describing their work, not by someone answering this
+posting's checklist. It will almost never repeat the JD's nouns. Your job is to decide
+whether the WORK the CV describes includes what the posting asks for — not whether the
+words match.
+
+So: a requirement is COVERED when a role describes work that ORDINARILY INCLUDES it, even
+if the CV never names it. Mark it "described", quote the bullet you reasoned from, and set
+"by_inference": true. The screen shows the reviewer that it was an inference and shows
+them your quote, so they can overrule you — but a silent "missing" they cannot see is the
+one thing you must not produce.
+
+The test, and apply it to EVERY requirement, not just tools:
+    "Could someone do the work in this quote WITHOUT doing what the requirement asks?"
+  If the honest answer is no, or almost never, it is covered.
+
+Worked examples — these are SHAPES, not a list to match against. The same reasoning
+applies to any field: accounting, engineering, design, marketing, legal, healthcare,
+logistics, HR, anything.
+  * JD: "advanced bank feed and clearing account logic".
+    CV: "Utilized QuickBooks Online for financial management and reporting" across several
+    roles, plus reconciliations.
+    -> COVERED by inference. Bank feeds and clearing accounts are how reconciliation is
+       done in QuickBooks Online; you do not run financial management in QBO for years
+       without them.
+  * JD: "experience in tech".  CV: never says "tech", but says she wrote Python scripts
+    and worked with Claude / LLM tooling.
+    -> COVERED by inference. Writing code and working with AI tooling IS tech experience.
+  * JD: "familiarity with CRM systems".  CV: "managed the Salesforce pipeline".
+    -> COVERED by inference. Salesforce IS a CRM. The same goes for a named product
+       standing in for its category anywhere: Figma for design tools, Kubernetes for
+       container orchestration, SAP for ERP, Workday for HRIS, NetSuite for ERP.
+  * JD: "month-end close".  CV: "prepared monthly financial statements and reconciled all
+    balance sheet accounts".
+    -> COVERED by inference. That IS the close, described by its steps.
+  * JD: "stakeholder management".  CV: "presented findings directly to shareholders and
+    regulatory authorities".
+    -> COVERED by inference.
+  * JD: "able to work US hours".  CV: "worked fully remotely with the US finance team".
+    -> COVERED by inference.
+
+WHERE THE INFERENCE STOPS. Three things do not follow from doing the work, and these are
+the ones to be strict about:
+  * SCOPE THE CV NEVER SHOWS — how big, how senior, how many. "Led a team of 10" is not
+    inferable from "collaborated with the team"; "managed a $2M budget" is not inferable
+    from "owned the forecast"; "enterprise-scale" is not inferable from "managed the
+    platform". This is about the SIZE of the person's remit.
+    It is NOT about adjectives the posting hangs on a tool or a technique. "Advanced bank
+    feed logic", "advanced Excel", "complex reconciliations" describe how deep into the
+    tool the work goes — and years of doing that work in that tool IS that depth. Judge
+    those by the work, like anything else, and do not let the word "advanced" turn a
+    covered requirement into a gap.
+  * AN INDUSTRY THE CV NEVER NAMES. Doing accounting does not imply CPG accounting; doing
+    marketing does not imply healthcare marketing. Industry is a fact about the employers.
+    But read the CV before you decide it is absent: if the CV says "CPG", "beverage",
+    "manufacturing", or names an employer whose industry is obvious, the requirement is
+    COVERED NORMALLY — that is not an inference at all, it is right there. Only the
+    industry that appears NOWHERE is a gap.
+  * A CREDENTIAL: CPA, PMP, a degree, a licence. Doing the work does not imply the
+    certificate.
+  * A TOOL FROM A TOOLS LIST ALONE. A name in a Skills or Tools section with no role
+    behind it is "listed_only", never an inference — that distinction is the whole point
+    of that status.
+  * SOMETHING MERELY PLAUSIBLE. "An accountant has probably touched payroll" is a guess,
+    not an entailment. If a competent practitioner could have done the quoted work without
+    ever doing the requirement, it is not covered.
+
+"listed_only" IS NOT A WAY OUT OF MAKING THE CALL. It means one specific thing: the CV
+shows the requirement somewhere no role backs up, or a role covers only part of it. If the
+entailment test above passes, the answer is "described" with "by_inference": true — say so
+and let the reviewer disagree. Half credit is the right answer only when the bridge itself
+needs something the CV does not give you: the SCOPE, the INDUSTRY or the CREDENTIAL below.
+Reaching for half credit because you would rather not commit is the failure this field was
+built to prevent.
+
+And remember which way the damage runs. An inference you flag, quote and explain costs the
+reviewer ten seconds to reject. A requirement you quietly mark "missing" when the candidate
+plainly does the work costs them the candidate, and they will never know it happened.
+
+HONESTY: "described" requires a real quote from the CV's work experience — including when
+you got there by inference: the REASONING may be yours, the QUOTE never is. If you cannot
+quote the bullet you reasoned from, it is not "described". Never mark something covered to
+be generous, and never invent a quote.
 
 The requirements you list must be QUOTED from the job description you were given, trimmed
 to their essence — never your description of them.
@@ -982,6 +1075,7 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
         if status not in _REQ_STATUSES:
             status = "missing"
         evidence = str(item.get("evidence") or "").strip()
+        by_inference = bool(item.get("by_inference"))
         # "described" sin cita no es described: la cita ES la evidencia, y sin ella no hay
         # forma de que el reviewer verifique que el bullet existe.
         if status == "described" and not evidence:
@@ -1050,6 +1144,16 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
                 status, note = y_status, y_note
                 if y_status == "missing":
                     evidence = ""
+        # Una inferencia sólo existe sobre un bullet descrito, y esto va al final a
+        # propósito: arriba el status todavía se puede caer a "listed_only" por una cita
+        # que no está en el CV, o la aritmética de años lo puede pisar entero.
+        if status != "described":
+            by_inference = False
+        # No se degrada ni se inventa la nota: la fila igual muestra el badge y la cita, y
+        # el reviewer puede juzgar. Pero se avisa, porque una inferencia sin el puente
+        # escrito es la que no se puede discutir.
+        if by_inference and not note:
+            logging.warning("cv_review: inferencia sin nota que la explique: %r", text)
         out.append({
             "requirement": text,
             "kind": kind,
@@ -1066,6 +1170,10 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
             "status": status,
             "in_source": in_source,
             "evidence": evidence,
+            # El requisito no está NOMBRADO en el CV, pero el trabajo que el bullet describe
+            # lo incluye. Va marcado y con la cita a la vista: el reviewer tiene que poder
+            # ver que hubo un razonamiento y tumbarlo. Ver WHAT COUNTS AS COVERED.
+            "by_inference": by_inference,
             # None = no se pudo determinar (CV sin secciones, o sin cita). El frontend
             # cae al texto viejo cuando es None, que es lo que ven los análisis guardados
             # de antes de este campo.
@@ -1734,6 +1842,18 @@ def _clean_unsupported(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def jd_fingerprint(jd_block: Any) -> str:
+    """Huella de la JD contra la que se scoreó, para detectar que la editaron después.
+
+    Toma el BLOQUE entero (cliente, puesto, país, años y la JD), que es exactamente lo que
+    leyó el modelo: si cambia el puesto o los años pedidos, la checklist también envejece.
+    Va acá y no en la ruta porque quien escribe la huella y quien la compara tienen que
+    normalizar igual — si no, el aviso queda prendido para siempre.
+    """
+    norm = _norm_for_match(jd_block)
+    return input_hash(norm) if norm else ""
+
+
 def build_user_prompt(*, jd_block: str, cv_text: str, source_text: str) -> str:
     return f"""=== THE OPENING THIS CV IS FOR ===
 {jd_block}
@@ -1782,8 +1902,15 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     # el mismo criterio, o el control de paridad avisaría de faltantes que no faltan.
     _jd_norm = _norm_for_match(jd_text)
     _cut = optional_section_start(_jd_norm) if _jd_norm else None
+    _optional_dropped = 0
     if _cut is not None:
-        verbatim = [v for v in verbatim if not _is_after_cut(v, _jd_norm, _cut)]
+        _kept = [v for v in verbatim if not _is_after_cut(v, _jd_norm, _cut)]
+        _optional_dropped = len(verbatim) - len(_kept)
+        verbatim = _kept
+    # Cuántos bullets de la JD quedaron del lado deseable del corte. Se descartaban en
+    # silencio, y desde afuera eso se ve como "edité la JD y la checklist no cambió": si el
+    # requisito nuevo cae después de un "Nice to have", no aparece y nadie sabe por qué.
+    req_summary["optional_dropped"] = _optional_dropped
     req_summary["expected"] = len(verbatim)
     req_summary["listed"] = len(requirements)
     req_summary["incomplete"] = bool(verbatim) and len(requirements) < len(verbatim)
@@ -1831,6 +1958,7 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         "unsupported_claims": unsupported,
         # Advertencia pura: NO entra en el composite ni en el tope por invención.
         "jd_echo": _clean_echo(parsed.get("jd_echo")),
+        "_jd_hash": jd_fingerprint(jd_text),
         "jd_requirements": requirements,
         "_requirements_summary": req_summary,
         # Se deriva de la matriz en vez de pedírsela aparte al modelo: dos campos que
