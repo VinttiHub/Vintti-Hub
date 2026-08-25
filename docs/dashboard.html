@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=105">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=107">
 </head>
 <body>
 
@@ -315,18 +315,22 @@
             <div class="skpi-sub">
               <span class="skpi-sub__label">Last week</span>
               <span class="skpi-sub__value" data-chart="sa_kpi_new_clients_30d" data-override-window="week" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__hint">+<span data-chart="sa_kpi_reactivated_clients_30d" data-override-window="week" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span> reactivated</span>
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">Last 30d</span>
               <span class="skpi-sub__value" data-chart="sa_kpi_new_clients_30d" data-override-window="30d" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__hint">+<span data-chart="sa_kpi_reactivated_clients_30d" data-override-window="30d" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span> reactivated</span>
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">Last month</span>
               <span class="skpi-sub__value" data-chart="sa_kpi_new_clients_30d" data-override-window="month" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__hint">+<span data-chart="sa_kpi_reactivated_clients_30d" data-override-window="month" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span> reactivated</span>
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">MTD</span>
               <span class="skpi-sub__value" data-chart="sa_kpi_new_clients_30d" data-override-window="mtd" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__hint">+<span data-chart="sa_kpi_reactivated_clients_30d" data-override-window="mtd" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span> reactivated</span>
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-clients" aria-label="Ver detalle New clients">Ver detalle</button>
@@ -489,7 +493,7 @@
             <span class="callout callout--soft" data-grain-callout>Monthly</span>
           </div>
           <div class="scroll-x" data-chart="gr_table_staffing_history" data-bind="dtable"
-               data-cols="periodo|Período|raw,mrr|MRR|currency-k,active_clients|Active clients|int,new_clients|New clients|int,churn_clients|Churn clients|int,active_contractors|Active contractors|int,new_contractors|New contractors|int,churn_contractors|Churn contractors|int,buyout_contractors|Buyout contractors|int"
+               data-cols="periodo|Período|raw,mrr|MRR|currency-k,active_clients|Active clients|int,new_clients|New clients|int,reactivated_clients|Reactivated clients|int,churn_clients|Churn clients|int,active_contractors|Active contractors|int,new_contractors|New contractors|int,churn_contractors|Churn contractors|int,buyout_contractors|Buyout contractors|int"
                data-empty-text="No data for this range"></div>
         </div>
 
@@ -5962,7 +5966,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · Multi-window</span>
             <h3 class="kpi-drawer__title">New clients</h3>
-            <p class="kpi-drawer__sub">Clientes que arrancaron su primer contrato en cada ventana, con la tendencia mensual y el detalle.</p>
+            <p class="kpi-drawer__sub">Clientes que arrancaron su primer contrato en cada ventana, más los <strong>Reactivated</strong> (clientes que ya lo habían sido, churnearon y volvieron).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -6018,6 +6022,39 @@
                    data-month-aware
                    data-drawer-window-target="new-clients"></div>
             </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Reactivated · por ventana</h4>
+              <div class="kpi-drawer__stats" data-drawer-window-group="reactivated-clients">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_reactivated_clients_30d" data-override-window="week" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_reactivated_clients_30d" data-override-window="month" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_reactivated_clients_30d" data-override-window="mtd" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_reactivated_clients_30d" data-override-window="30d" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+              </div>
+            </section>
+            <section class="kpi-drawer__section" data-drawer-detail-section="reactivated-clients">
+              <h4 class="kpi-drawer__section-title">Detalle · Reactivated <span class="count" data-chart="sa_table_reactivated_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="reactivated-clients" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="reactivated-clients" hidden></span>
+              </h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="sa_table_reactivated_clients_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"
+                   data-month-aware
+                   data-drawer-window-target="reactivated-clients"></div>
+            </section>
+            <p class="kpi-drawer__note">New clients cuenta sólo la <strong>primera vez</strong> de una cuenta. Un cliente que se fue y volvió aparece como <strong>Reactivated</strong>: no suma a New clients pero sí a Active clients, y su baja anterior sigue contando como churn en su mes. Por eso: Active clients = Active previo + New + Reactivated − Churn − Buyouts.</p>
           </div>
         </div>
 

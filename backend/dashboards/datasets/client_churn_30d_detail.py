@@ -102,23 +102,25 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             (h.start_d <= v.win_ini AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_ini)
             OR (h.start_d >= v.win_ini AND h.start_d <= v.win_fin)
         ),
-        ultima_baja_raw AS (
-          SELECT account_id, MAX(end_d) AS fecha_baja
-          FROM hires
-          WHERE end_d IS NOT NULL
-          GROUP BY 1
-        ),
-        cuentas_con_activos_posteriores AS (
-          SELECT DISTINCT ub.account_id
-          FROM ultima_baja_raw ub
-          JOIN hires h
-            ON h.account_id = ub.account_id
-           AND COALESCE(h.end_d, DATE '9999-12-31') > ub.fecha_baja
-        ),
+        -- Una baja de cliente es un EVENTO: la fecha en la que la cuenta se
+        -- queda sin ningún hire activo (no hay hire que cubra fecha_baja + 1).
+        -- La baja queda registrada para siempre aunque el cliente vuelva más
+        -- adelante; esa vuelta es un evento aparte y se cuenta en el dataset
+        -- reactivated_clients_30d_total. Antes se tomaba sólo MAX(end_d) y se
+        -- descartaba la cuenta entera si tenía un hire posterior, lo que borraba
+        -- hacia atrás bajas de meses ya cerrados.
         ultima_baja AS (
-          SELECT *
-          FROM ultima_baja_raw
-          WHERE account_id NOT IN (SELECT account_id FROM cuentas_con_activos_posteriores)
+          SELECT DISTINCT h.account_id, h.end_d AS fecha_baja
+          FROM hires h
+          WHERE h.end_d IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM hires h2
+              WHERE h2.account_id = h.account_id
+                AND h2.start_d IS NOT NULL
+                AND h2.start_d <= h.end_d + 1
+                AND (h2.end_d IS NULL OR h2.end_d >= h.end_d + 1)
+            )
         ),
         buyout_por_cuenta AS (
           SELECT account_id, MAX(buyout_d) AS buyout_d

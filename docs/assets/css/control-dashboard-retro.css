@@ -2254,6 +2254,19 @@ button.skpi-sub--clickable:hover {
   letter-spacing: -0.01em;
 }
 
+/* Línea secundaria neutra dentro de un skpi-sub (misma métrica del bloque de
+   arriba, contexto abajo). Se usa para "+N reactivados" en New clients: mismo
+   alto que .skpi-sub__pct para que las cards de la fila queden parejas. */
+.skpi-sub__hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.skpi-sub__hint [data-chart] { color: var(--c-violet); font-weight: 700; }
+
 @media (max-width: 900px) {
   .skpi-group__grid { grid-template-columns: repeat(2, 1fr); }
   .skpi-tile__value { font-size: 32px; }

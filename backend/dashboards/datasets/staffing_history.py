@@ -131,30 +131,50 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE start_d IS NOT NULL AND candidate_id IS NOT NULL
           GROUP BY candidate_id
         ),
-        last_baja_per_account AS (
-          SELECT account_id, MAX(end_d) AS fecha_baja
-          FROM hires
-          WHERE end_d IS NOT NULL
-          GROUP BY account_id
+        baja_events AS (
+          -- Una baja es un EVENTO: la fecha en la que la cuenta se queda sin
+          -- ningún hire activo. Queda registrada aunque el cliente vuelva
+          -- después (esa vuelta se cuenta en reactivation_events).
+          SELECT DISTINCT h.account_id, h.end_d AS fecha_baja
+          FROM hires h
+          WHERE h.end_d IS NOT NULL
+            AND h.account_id IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM hires h2
+              WHERE h2.account_id = h.account_id
+                AND h2.start_d IS NOT NULL
+                AND h2.start_d <= h.end_d + 1
+                AND (h2.end_d IS NULL OR h2.end_d >= h.end_d + 1)
+            )
         ),
-        accounts_alive_after_last_baja AS (
-          SELECT DISTINCT lb.account_id
-          FROM last_baja_per_account lb
-          JOIN hires h
-            ON h.account_id = lb.account_id
-           AND COALESCE(h.end_d, DATE '9999-12-31') > lb.fecha_baja
+        reactivation_events AS (
+          -- Cliente que vuelve: pasa de 0 hires activos a >= 1, y no es su
+          -- primera alta histórica (esa es un "new client").
+          SELECT DISTINCT h.account_id, h.start_d AS fecha_alta
+          FROM hires h
+          JOIN first_hire_per_account fh ON fh.account_id = h.account_id
+          WHERE h.start_d IS NOT NULL
+            AND h.account_id IS NOT NULL
+            AND h.start_d > fh.first_d
+            AND NOT EXISTS (
+              SELECT 1
+              FROM hires h2
+              WHERE h2.account_id = h.account_id
+                AND h2.start_d IS NOT NULL
+                AND h2.start_d <= h.start_d - 1
+                AND (h2.end_d IS NULL OR h2.end_d >= h.start_d - 1)
+            )
         ),
         churn_account AS (
-          -- Accounts whose last_baja is final (no posterior active hire)
-          SELECT lb.account_id, lb.fecha_baja,
-                 (b.buyout_d IS NOT NULL AND b.buyout_d >= DATE_TRUNC('month', lb.fecha_baja)) AS is_buyout
-          FROM last_baja_per_account lb
+          SELECT be.account_id, be.fecha_baja,
+                 (b.buyout_d IS NOT NULL AND b.buyout_d >= DATE_TRUNC('month', be.fecha_baja)) AS is_buyout
+          FROM baja_events be
           LEFT JOIN (
             SELECT account_id, MAX(buyout_d) AS buyout_d
             FROM hires WHERE buyout_d IS NOT NULL
             GROUP BY account_id
-          ) b ON b.account_id = lb.account_id
-          WHERE lb.account_id NOT IN (SELECT account_id FROM accounts_alive_after_last_baja)
+          ) b ON b.account_id = be.account_id
         ),
         active_at_end AS (
           SELECT
@@ -179,6 +199,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM period_ranges pr
           LEFT JOIN first_hire_per_account fh
             ON fh.first_d BETWEEN pr.period_start AND pr.period_end
+          GROUP BY pr.period_start
+        ),
+        reactivated_clients_per_period AS (
+          SELECT
+            pr.period_start,
+            COUNT(DISTINCT re.account_id) AS reactivated_clients
+          FROM period_ranges pr
+          LEFT JOIN reactivation_events re
+            ON re.fecha_alta BETWEEN pr.period_start AND pr.period_end
           GROUP BY pr.period_start
         ),
         new_contractors_per_period AS (
@@ -224,6 +253,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COALESCE(ae.active_contractors, 0)::int         AS active_contractors,
           COALESCE(ncc.new_contractors, 0)::int           AS new_contractors,
           COALESCE(nc.new_clients, 0)::int                AS new_clients,
+          COALESCE(rc.reactivated_clients, 0)::int        AS reactivated_clients,
           COALESCE(cp.churn_clients, 0)::int              AS churn_clients,
           COALESCE(cp.buyout_clients, 0)::int             AS buyout_clients,
           COALESCE(ccp.churn_contractors, 0)::int         AS churn_contractors,
@@ -231,6 +261,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM period_ranges pr
         LEFT JOIN active_at_end                 ae  ON ae.period_start  = pr.period_start
         LEFT JOIN new_clients_per_period        nc  ON nc.period_start  = pr.period_start
+        LEFT JOIN reactivated_clients_per_period rc ON rc.period_start  = pr.period_start
         LEFT JOIN new_contractors_per_period    ncc ON ncc.period_start = pr.period_start
         LEFT JOIN churn_per_period              cp  ON cp.period_start  = pr.period_start
         LEFT JOIN churn_contractors_per_period  ccp ON ccp.period_start = pr.period_start
@@ -256,6 +287,7 @@ DATASET = {
         {"key": "active_contractors", "label": "Active Contractors", "type": "number"},
         {"key": "new_contractors", "label": "New Contractors", "type": "number"},
         {"key": "new_clients", "label": "New Clients", "type": "number"},
+        {"key": "reactivated_clients", "label": "Reactivated Clients", "type": "number"},
         {"key": "churn_clients", "label": "Churn Clients", "type": "number"},
         {"key": "buyout_clients", "label": "Buyout Clients", "type": "number"},
         {"key": "churn_contractors", "label": "Churn Contractors", "type": "number"},
