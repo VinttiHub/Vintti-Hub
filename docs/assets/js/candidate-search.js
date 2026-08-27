@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const csEmpty  = document.querySelector('#cs-empty');
   const csMore   = document.querySelector('#cs-more');
   const csTpl    = document.querySelector('#cs-card-tpl');
-  let   _csState = { lastParsed: null, page: 1, hasMore: true };
+  let   _csState = { lastParsed: null, page: 1, hasMore: true, seen: new Set() };
 
 async function parseQuery(q){
   console.log('➡️ POST /ai/parse_candidate_query body:', { query: q });
@@ -108,74 +108,74 @@ async function coresignalSearch(parsed, page = 1, locationOverride = null){
     console.log('🔎 sample →', json.debug.sample);
   }
 
-  if (count === 0){
-    console.warn('⚠️ Coresignal devolvió 0 items en todas las estrategias. Revisa filtros/title/location/years.');
+  if (json.out_of_credits){
+    console.error('💳 Coresignal sin créditos →', json.error);
+  } else if (count === 0){
+    console.warn('⚠️ Coresignal devolvió 0 items. Revisa filtros/title/location.');
   }
   console.groupEnd();
   return json;
 }
 
-async function coresignalMultiSearch(parsed){
-  const order = [
-    { tag: '🇲🇽 Mexico',       loc: 'Mexico'        },
-    { tag: '🇺🇸 United States',loc: 'United States' },
-    { tag: '🇨🇦 Canada',       loc: 'Canada'        },
-    { tag: '🇦🇷 Argentina',    loc: 'Argentina'     },
-    { tag: '🇨🇴 Colombia',     loc: 'Colombia'      },
-    { tag: '🌎 General LATAM', loc: null }          // null → gate LATAM en backend
-  ];
+// Antes acá había una multi-búsqueda de 6 países (México, US, Canadá, Argentina,
+// Colombia y "General LATAM"). Tenía dos problemas graves:
+//   1) COSTO: cada pasada es una búsqueda paga. Un click costaba 40-80 créditos
+//      (medido) contra los ~10 de una sola, sobre un plan de 2.500 al mes.
+//   2) CALIDAD: `locationOverride` le ganaba a la ubicación pedida, así que buscar
+//      "contador en México" igual salía a buscar en Colombia, US y Canadá — y el
+//      único resultado podía venir de cualquiera de esos países.
+// El gate LATAM del backend ya cubre los 14 países cuando no se pide ninguno, así
+// que una sola búsqueda alcanza. Para ver más está "Cargar más", que ahora sí se
+// muestra: trae otra página recién cuando la recruiter la pide.
+const CS_PREVIEW_MAX_PAGES = 5;
 
-  const seen = new Set();
-  let firstBatch = true;
-  let total = 0;
+// La paginación no debería repetir perfiles, pero el dedupe evita tarjetas dobles.
+function csDedupe(items){
+  const out = [];
+  for (const it of (items || [])){
+    const id = it.employee_id || it.id || it.public_identifier ||
+               it.publicIdentifier || it.canonical_shorthand_name;
+    if (!id || _csState.seen.has(id)) continue;
+    _csState.seen.add(id);
+    out.push(it);
+  }
+  return out;
+}
 
-  for (const cfg of order){
-    console.groupCollapsed(
-      `%c🌐 Coresignal ${cfg.tag}`,
-      'color:#1f7a8c;font-weight:bold'
-    );
+// Una búsqueda = una llamada paga. locationOverride va en null a propósito: manda
+// la ubicación que pidió la recruiter, y si no puso ninguna el backend aplica el
+// gate LATAM completo.
+async function coresignalPage(page, { append }){
+  const res = await coresignalSearch(_csState.lastParsed, page);
 
-    let res, arr;
-    try {
-      res = await coresignalSearch(parsed, 1, cfg.loc);
-      arr = Array.isArray(res?.data) ? res.data : (res?.data?.items || []);
-      console.log(`📦 ${cfg.tag} items (raw) →`, arr.length);
-    } catch (err) {
-      console.error(`❌ Error en coresignalSearch para ${cfg.tag}`, err);
-      console.groupEnd();
-      continue;
-    }
-
-    // 👉 quitar duplicados entre países
-    const unique = [];
-    for (const it of arr){
-      const id =
-        it.employee_id ||
-        it.id ||
-        it.public_identifier ||
-        it.publicIdentifier ||
-        it.canonical_shorthand_name;
-
-      if (!id) continue;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      unique.push(it);
-    }
-
-    console.log(`✅ ${cfg.tag} únicos →`, unique.length);
-
-    if (unique.length){
-      // La primera búsqueda limpia la lista, las demás solo agregan
-      renderCs(unique, { append: !firstBatch });
-      firstBatch = false;
-      total += unique.length;
-    }
-
-    console.groupEnd();
+  if (res?.out_of_credits){
+    csMore.classList.add('hidden');
+    showCsEmpty(res.error || 'Se acabaron los créditos de Coresignal.');
+    return { count: 0, outOfCredits: true };
   }
 
-  console.log('📦 Total Coresignal combinados (sin duplicados) →', total);
-  return total;
+  const raw = Array.isArray(res?.data) ? res.data : (res?.data?.items || []);
+  const items = csDedupe(raw);
+  _csState.page = page;
+
+  if (!append && !items.length){
+    showCsEmpty(null);
+    csMore.classList.add('hidden');
+    return { count: 0, outOfCredits: false };
+  }
+  renderCs(items, { append });
+
+  _csState.hasMore = raw.length > 0 && page < CS_PREVIEW_MAX_PAGES;
+  csMore.classList.toggle('hidden', !_csState.hasMore);
+  return { count: items.length, outOfCredits: false };
+}
+
+// El empty state dice cosas muy distintas según por qué no hay tarjetas.
+const CS_EMPTY_DEFAULT = csEmpty ? csEmpty.textContent : '';
+function showCsEmpty(message){
+  if (!csEmpty) return;
+  csEmpty.textContent = message || CS_EMPTY_DEFAULT;
+  csEmpty.classList.remove('hidden');
 }
 
 function renderCs(items, {append=false}={}){
@@ -516,18 +516,14 @@ async function doSearch(){
     // Renderizamos usando el filtro actual (que ya apunta a years_experience del parser si existe)
     renderCards(data.items || []);
 
-    // 3) Coresignal: multi-búsqueda (México, Argentina, Colombia, LATAM)
-    _csState = { lastParsed: parsed, page: 1, hasMore: false }; // desactivamos paginación preview
+    // 3) Coresignal: UNA búsqueda, respetando el país que se pidió.
+    _csState = { lastParsed: parsed, page: 1, hasMore: false, seen: new Set() };
     csList.innerHTML = '';
+    csEmpty.textContent = CS_EMPTY_DEFAULT;   // limpia un aviso de créditos anterior
     csEmpty.classList.add('hidden');
-    csMore.classList.add('hidden'); // ocultamos "Cargar más" en este modo
+    csMore.classList.add('hidden');
 
-    const totalCs = await coresignalMultiSearch(parsed);
-
-    if (totalCs === 0){
-      // si ninguna de las 4 búsquedas devolvió nada
-      csEmpty.classList.remove('hidden');
-    }
+    await coresignalPage(1, { append: false });
 
   }catch(err){
     console.error('❌ Error en doSearch:', err);
@@ -541,22 +537,15 @@ async function doSearch(){
 
   btn.addEventListener('click', doSearch);
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(); });
-    if (csMore){
+  if (csMore){
+    // Cada click es UNA búsqueda paga más. Sólo se dispara si la piden.
     csMore.addEventListener('click', async ()=>{
+      if (!_csState.lastParsed) return;
       try{
         csMore.disabled = true; csMore.textContent = 'Cargando…';
-        _csState.page += 1;
-        const pageRes = await coresignalSearch(_csState.lastParsed, _csState.page);
-        const items = (pageRes?.data?.items) || [];
-        renderCs(items, {append:true});
-        // preview tiene hasta 5 páginas
-        const totalPages = 5;
-        if (_csState.page >= totalPages || items.length === 0) {
-          _csState.hasMore = false;
-          csMore.classList.add('hidden');
-        } else {
-          csMore.classList.remove('hidden');
-        }
+        await coresignalPage(_csState.page + 1, { append: true });
+      } catch (err){
+        console.error('❌ Error cargando más resultados', err);
       } finally {
         csMore.disabled = false; csMore.textContent = 'Cargar más';
       }

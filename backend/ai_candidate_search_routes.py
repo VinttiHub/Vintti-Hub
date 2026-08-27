@@ -154,6 +154,29 @@ def _cs_headers():
         raise RuntimeError("Falta CORESIGNAL_API_KEY en variables de entorno")
     return {"apikey": CORESIGNAL_API_KEY, "Content-Type": "application/json"}
 
+_CS_OUT_OF_CREDITS_MESSAGE = (
+    "Se acabaron los créditos de Coresignal: la búsqueda en LinkedIn queda "
+    "desactivada hasta que se recargue la cuenta."
+)
+
+def _cs_out_of_credits(status, body=""):
+    """402 siempre; 401/403 sólo si el cuerpo habla de saldo (una key mal puesta
+    o un rate limit no son lo mismo y no deben decir 'sin créditos')."""
+    if status == 402:
+        return True
+    if status in (401, 403):
+        t = (body or "").lower()
+        return any(m in t for m in ("credit", "quota", "balance", "insufficient", "limit reached"))
+    return False
+
+def _log_cs_credits(response):
+    """El saldo viene en cada respuesta. Logueándolo se puede medir el costo real
+    por endpoint sin gastar nada extra."""
+    left = response.headers.get("x-credits-remaining")
+    if left is not None:
+        logging.info("💳 Coresignal credits remaining: %s", left)
+    return left
+
 @bp_candidate_search.route('/ai/parse_candidate_query', methods=['POST','OPTIONS'])
 def parse_candidate_query():
     if request.method == 'OPTIONS':
@@ -175,7 +198,12 @@ def parse_candidate_query():
 Read the following natural language query describing a candidate.
 Extract a STRICT JSON with:
 - title: role/job title in English (short, lowercase words, no punctuation). If absent, return "".
-- tools: array of tool/technology names in English, lowercase (e.g., ["python","excel","react"]). Only explicit tools; do NOT invent; singularize if possible.
+  Fix obvious misspellings BEFORE translating: the query is typed fast by a recruiter, so
+  "cotador"->accountant, "contdor"->accountant, "desarollador"->developer. A misspelled title
+  is sent verbatim to the search provider and matches almost nobody, so never pass one through.
+- tools: array of tool/technology names in English, lowercase (e.g., ["python","excel","react"]).
+  Only explicit tools; do NOT invent; singularize if possible; fix misspellings and translate
+  ("bases de datos"->"sql", "hoja de calculo"->"excel").
 - years_experience: integer years if explicitly stated (e.g., "3 years"), else null.
 - location: city/region/country if explicitly present (e.g., "Mexico", "Mexico City", "CDMX", "Guadalajara", "Latin America"). If absent, return "".
 
@@ -477,7 +505,12 @@ def coresignal_search():
                 filt["headline"] = title
 
         if tools:
-            filt["skill"] = " OR ".join([f"({t})" for t in tools])
+            # `skill` NO existe en la API v2 de Coresignal: contesta 422
+            # ("extra_forbidden") y descarta la request COMPLETA, así que toda
+            # búsqueda con herramientas devolvía cero. Verificado contra la API:
+            # válidos son keyword / summary / experience_description /
+            # experience_title / headline / country / location / industry / name.
+            filt["keyword"] = " OR ".join([f"({t})" for t in tools])
 
         # --- Ubicación: siempre restringimos a LATAM/CA ---
         # Si el usuario dio país LATAM, usamos country exacto;
@@ -503,15 +536,11 @@ def coresignal_search():
             else:
                 logging.info("🌎 sin location del usuario → aplicando gate LATAM por país")
 
-        # ⚠️ si el usuario no puso años, no agregamos filtro temporal
+        # ⚠️ `experience_date_from` TAMPOCO existe en la API v2 (mismo 422 que
+        # `skill`), así que mandarlo hacía que la búsqueda devolviera cero. No hay
+        # campo temporal en el schema; los años sólo filtran en Vintti Talent.
         if years:
-            try:
-                y = int(years)
-                cutoff_year = dt.date.today().year - y
-                # Coresignal acepta "%Y" o "%B %Y". Mandemos solo el año: "2022"
-                filt["experience_date_from"] = str(cutoff_year)
-            except Exception:
-                logging.exception("⚠️ years_experience inválido, ignorando filtro")
+            logging.info("ℹ️ years_experience=%s: Coresignal v2 no tiene filtro temporal, se ignora", years)
 
         url = f"{CORESIGNAL_API_BASE}/employee_base/search/filter/preview?page={page}"
         logging.info("🌐 [Coresignal] POST %s", url)
@@ -522,14 +551,9 @@ def coresignal_search():
         dur = int((time.time() - t0) * 1000)
 
         logging.info("⬅️ status=%s ms=%s", r.status_code, dur)
-        try:
-            r.raise_for_status()
-            data = r.json()
-        except Exception:
-            txt = (r.text or "")[:800]
-            logging.error("❌ Error Coresignal %s: %s", r.status_code, txt)
-            data = {"items": []}
+        _log_cs_credits(r)
 
+        out_of_credits = False
         try:
             r.raise_for_status()
             data = r.json()
@@ -537,6 +561,11 @@ def coresignal_search():
             txt = (r.text or "")[:800]
             logging.error("❌ Error Coresignal %s: %s", r.status_code, txt)
             data = {"items": []}
+            # Sin esta distinción la UI muestra "sin resultados para este criterio"
+            # y parece que no hay candidatos, cuando en realidad no hay saldo.
+            out_of_credits = _cs_out_of_credits(r.status_code, txt)
+            if out_of_credits:
+                logging.error("💳 Coresignal sin créditos en /ext/coresignal/search")
 
         # --- Soportar list ó dict ---
         if isinstance(data, list):
@@ -555,6 +584,9 @@ def coresignal_search():
         logging.info("🔎 sample=%s", json.dumps(sample, ensure_ascii=False))
 
         out = {"page": page, "filters": filt, "data": data}
+        if out_of_credits:
+            out["out_of_credits"] = True
+            out["error"] = _CS_OUT_OF_CREDITS_MESSAGE
         if debug:
             out["debug"] = {
                 "filters": filt,
