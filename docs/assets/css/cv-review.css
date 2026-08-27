@@ -134,159 +134,9 @@
 }
 
 /* ---------- Métricas por recruiter ---------- */
-.cvr-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-}
-.cvr-mcard {
-  background: var(--hx-surface);
-  border: 1px solid var(--hx-line);
-  border-radius: var(--hx-r-lg);
-  box-shadow: var(--hx-shadow);
-  padding: 16px 18px;
-}
-.cvr-mcard--total {
-  border-color: #d4dbff;
-  background: linear-gradient(180deg, var(--hx-accent-wash), var(--hx-surface) 62%);
-}
-.cvr-mcard-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.cvr-mcard-head h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--hx-ink);
-}
-.cvr-mcard-sent { font-family: var(--hx-mono); font-size: 11px; color: var(--hx-muted); }
-.cvr-mcard-sent b { color: var(--hx-ink); }
+/* Se movieron a assets/css/cv-review-cards.css, compartido con recruiter-power.html.
+   Lo mismo el anillo de coverage (.cvr-cov / .cvr-ring), que usan las dos páginas. */
 
-/* ---- Cuerpo de la tarjeta ----
-   Antes eran tres números mono sueltos ("100%" / "0%") con etiquetas en mayúsculas que se
-   partían en dos renglones, más cuatro líneas de salvedades repetidas en cada tarjeta.
-   Ahora: el coverage como anillo (el mismo de la cola), aprobado/rechazado como UNA barra
-   partida —son las dos mitades de lo mismo— y las salvedades como chips con tooltip.
-   El semáforo .cvr-q-* ya no pinta texto: vive en el arco del anillo, y el número va
-   siempre en tinta neutra. Las clases se siguen emitiendo porque seleccionan ese arco. */
-.cvr-mcard-hero {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  margin-bottom: 16px;
-}
-.cvr-cov--lg { flex: none; }
-.cvr-cov--lg .cvr-ring { width: 58px; height: 58px; }
-.cvr-cov--lg .cvr-ring circle { stroke-width: 3.6; }
-.cvr-cov--lg .cvr-cov-n { font-size: 16px; }
-.cvr-cov-empty {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 3px dashed var(--hx-line);
-  color: var(--hx-faint);
-  font-family: var(--hx-mono);
-  font-size: 15px;
-}
-.cvr-hero-txt { min-width: 0; }
-.cvr-hero-l {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--hx-ink);
-  letter-spacing: -.005em;
-}
-.cvr-hero-s { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--hx-muted); }
-
-/* Barra partida: lima lo aprobado, rosa lo rechazado. Suman el 100% de lo decidido. */
-.cvr-split {
-  display: flex;
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--hx-line-2);
-}
-.cvr-split i { display: block; height: 100%; }
-.cvr-split-a { background: var(--hx-lime); }
-/* Violeta para "devuelto a corregir": ni el lima de aprobado ni el rojo de rechazado.
-   Que el ojo lo lea como una tercera cosa es todo el punto del estado. */
-.cvr-split-c { background: #4f46e5; }
-.cvr-split-r { background: var(--hx-urgent); }
-.cvr-split-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 8px;
-  font-size: 12.5px;
-  color: var(--hx-muted);
-}
-.cvr-split-legend b { font-family: var(--hx-mono); font-size: 13px; color: var(--hx-ink); }
-/* Puntito del color de su tramo, para atar leyenda y barra sin escribir "lima = ...". */
-.cvr-lg-a::before, .cvr-lg-c::before, .cvr-lg-r::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 6px;
-  border-radius: 999px;
-  vertical-align: middle;
-}
-.cvr-lg-a::before { background: var(--hx-lime); }
-.cvr-lg-c::before { background: #4f46e5; }
-.cvr-lg-r::before { background: var(--hx-urgent); }
-.cvr-split-base { margin: 6px 0 0; font-size: 11.5px; color: var(--hx-faint); }
-.cvr-split-base--empty { margin: 0; font-size: 12.5px; color: var(--hx-muted); }
-
-/* Salvedades: una línea de chips en vez de un párrafo gris repetido tarjeta por tarjeta.
-   El porqué de cada una vive en el title, a un hover de distancia. */
-.cvr-mchips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--hx-line-2);
-}
-.cvr-mchip {
-  cursor: help;
-  font-size: 11.5px;
-  color: var(--hx-muted);
-  background: var(--hx-surface-2);
-  border: 1px solid var(--hx-line);
-  border-radius: 999px;
-  padding: 3px 9px;
-}
-.cvr-mchip b { font-family: var(--hx-mono); font-weight: 700; color: var(--hx-ink-2); }
-.cvr-mchip:hover { border-color: var(--hx-slate-ink); color: var(--hx-ink-2); }
-
-/* Sin encabezado, la lista era una hilera de frases sueltas con un porcentaje al lado
-   y no se entendía de qué hablaban. */
-.cvr-reasons-cap {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--hx-line-2);
-  font-size: 11.5px;
-  color: var(--hx-muted);
-}
-.cvr-reasons-list {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.cvr-reasons-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: 12.5px;
-  color: var(--hx-ink-2);
-}
-.cvr-reasons-list b { font-family: var(--hx-mono); font-size: 11.5px; color: var(--hx-ink); }
 
 /* ---------- Tabla de la cola ----------
    La cola se lee por vacante, no por candidato: cada <tbody class="cvr-grp"> es una
@@ -422,27 +272,6 @@
   padding: 1px 5px;
 }
 
-/* Coverage como anillo con el número adentro. Los colores del semáforo de TEXTO
-   (.cvr-q-* : verde oliva, ámbar oscuro) sirven para leer un número, pero como arco se
-   ven sucios; el anillo usa la paleta de marca, que es para eso: lima para lo bueno,
-   naranja y rosa para lo que hay que mirar. Lo bueno va callado, lo problemático grita. */
-.cvr-cov { position: relative; display: inline-grid; place-items: center; }
-.cvr-ring { width: 34px; height: 34px; transform: rotate(-90deg); }
-.cvr-ring circle { fill: none; stroke-width: 3.2; }
-.cvr-ring-t { stroke: var(--hx-line-2); }
-.cvr-ring-p { stroke: var(--hx-slate-ink); stroke-linecap: round; }
-.cvr-ring.cvr-q-good .cvr-ring-p { stroke: var(--hx-lime); }
-.cvr-ring.cvr-q-mid  .cvr-ring-p { stroke: var(--hx-high); }
-.cvr-ring.cvr-q-low  .cvr-ring-p { stroke: var(--hx-urgent); }
-
-.cvr-cov-n {
-  position: absolute;
-  font-family: var(--hx-mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--hx-ink-2);
-  letter-spacing: -.02em;
-}
 .cvr-score-none { color: var(--hx-faint); font-family: var(--hx-mono); font-size: 12px; }
 
 .cvr-age { font-family: var(--hx-mono); font-size: 12.5px; color: var(--hx-muted); }
@@ -1192,6 +1021,78 @@ q.cvr-hl-item::before { vertical-align: 1px; }
    fijado por si el marcado cambia. */
 .cvr-reason input { width: auto; flex: none; margin: 0; accent-color: var(--hx-accent); }
 .cvr-reject .hx-field { margin-bottom: 10px; }
+
+/* ---------- Checklist de calidad ---------- */
+/* Misma gramática que .cvr-reasons pero con color propio: son dos preguntas distintas
+   (el candidato vs. el documento) y mezclarlas visualmente las confunde. Acá tildar
+   siempre significa "encontré este defecto". */
+.cvr-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.cvr-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+  font-size: 12.5px;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cvr-check:hover { border-color: var(--hx-warn, #b7791f); }
+.cvr-check:has(input:checked) {
+  border-color: var(--hx-warn, #b7791f);
+  background: color-mix(in srgb, var(--hx-warn, #b7791f) 10%, #fff);
+  color: var(--hx-warn, #b7791f);
+  font-weight: 600;
+}
+/* Igual que .cvr-reason: width auto explícito por si el marcado cambia y queda bajo la
+   regla descendente de .hx-field, que le pondría width:100 por ciento. */
+.cvr-check input { width: auto; flex: none; margin: 0; accent-color: var(--hx-warn, #b7791f); }
+
+.cvr-checklist-clean {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--hx-line);
+  border-radius: var(--hx-r-sm);
+  font-size: 12.5px;
+  color: var(--hx-ink-2);
+  cursor: pointer;
+}
+.cvr-checklist-clean:has(input:checked) {
+  border-style: solid;
+  border-color: var(--hx-ok, #2f855a);
+  color: var(--hx-ok, #2f855a);
+  font-weight: 600;
+}
+.cvr-checklist-clean input { width: auto; flex: none; margin: 0; accent-color: var(--hx-ok, #2f855a); }
+.cvr-checklist-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--hx-ink-3, var(--hx-ink-2));
+}
+/* Cuando alguien intenta decidir sin haberla completado. La columna scrollea, así que el
+   flash es lo que conecta el botón gris con la sección que falta. */
+#cvrChecklistSection.is-missing {
+  border-color: var(--hx-danger, #c53030);
+  animation: cvr-check-flash .9s ease-out 2;
+}
+@keyframes cvr-check-flash {
+  0%, 100% { background: transparent; }
+  35%      { background: color-mix(in srgb, var(--hx-danger, #c53030) 12%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #cvrChecklistSection.is-missing { animation: none; }
+}
 
 /* ---------- Rondas ---------- */
 .cvr-rounds { display: flex; flex-direction: column; gap: 8px; }

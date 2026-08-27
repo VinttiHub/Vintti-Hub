@@ -113,6 +113,26 @@ REJECT_REASONS: List[Tuple[str, str]] = [
 ]
 REJECT_REASON_CODES = {code for code, _ in REJECT_REASONS}
 
+# Checklist de calidad del DOCUMENTO. No confundir con REJECT_REASONS: aquéllas son sobre el
+# CANDIDATO (por eso decide() las bloquea en 'changes_requested'), y éstas son sobre lo que la
+# recruiter escribió mal y puede arreglar. Un CV se puede APROBAR con tres de estos tildados —
+# ése es justamente el caso que antes no quedaba registrado en ningún lado.
+#
+# Tildar significa SIEMPRE "encontré este defecto", nunca "esto está bien". Los seis están
+# redactados como defecto para que no haya que acordarse de la dirección.
+#
+# Mismo criterio que las razones: fijos en código y sin CHECK en la base, porque agregar un
+# ítem no puede ser una migración.
+CHECKLIST_ITEMS: List[Tuple[str, str]] = [
+    ("missing_tools_in_experience", "Tools missing"),
+    ("missing_video",               "Video"),
+    ("job_hopping_no_reason",       "Unexplained job hopping"),
+    ("missing_experience",          "Work experience missing"),
+    ("missing_education",           "Education missing"),
+    ("wrong_dates",                 "Wrong dates"),
+]
+CHECKLIST_ITEM_CODES = {code for code, _ in CHECKLIST_ITEMS}
+
 # Sin material fuente no hay nada contra qué chequear la honestidad del CV. Se sigue
 # distinguiendo "chequeado y limpio" de "no se pudo chequear": una lista de invenciones
 # vacía significa cosas muy distintas en cada caso, y el panel lo dice.

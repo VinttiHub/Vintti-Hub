@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS cv_reviews (
     ai_error         TEXT,
     resume_snapshot  JSONB       NOT NULL,
     resume_hash      TEXT        NOT NULL,
+    -- "el reviewer pasó por la checklist", no "encontró algo". Es lo que separa un CV limpio
+    -- de uno que nadie miró, y por eso es el denominador de las métricas de checklist.
+    checklist_done   BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT cv_reviews_decided_has_reviewer CHECK (
@@ -102,6 +105,22 @@ _REASONS_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS cv_review_reasons_code_idx ON cv_review_reasons (reason_code)"
 )
 
+# Checklist de calidad del documento. Tabla hija por el MISMO motivo que cv_review_reasons y no
+# por simetría: la métrica es "porcentaje de CVs con el defecto X", que un JOIN + COUNT da bien,
+# mientras que un TEXT[] obliga a unnest() adentro de un agregado — de ahí sale el doble conteo.
+# Sin CHECK: los códigos viven en utils/cv_review_ai.CHECKLIST_ITEMS.
+_CHECKLIST_DDL = """
+CREATE TABLE IF NOT EXISTS cv_review_checklist (
+    review_id BIGINT NOT NULL REFERENCES cv_reviews(review_id) ON DELETE CASCADE,
+    item_code TEXT   NOT NULL,
+    PRIMARY KEY (review_id, item_code)
+)
+"""
+
+_CHECKLIST_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS cv_review_checklist_code_idx ON cv_review_checklist (item_code)"
+)
+
 # --- migraciones sobre una tabla que YA existe -------------------------------------------
 # El camino rápido de _ensure_locked() no corre DDL cuando las tablas están, que es el caso
 # de producción. Así que un valor nuevo de `status` no entra por el CREATE TABLE: hay que
@@ -119,6 +138,51 @@ _STATUS_CHECK_SQL = (
     "ALTER TABLE cv_reviews ADD CONSTRAINT cv_reviews_status_check CHECK (status IN "
     + "(" + ", ".join("'%s'" % v for v in _STATUS_VALUES) + "))",
 )
+
+
+# La checklist llegó DESPUÉS de que las tablas ya existieran en producción, así que ni la tabla
+# nueva ni la columna nueva entran nunca por el CREATE TABLE de arriba: el camino rápido de
+# _ensure_locked() no corre DDL cuando las tablas están. Van acá, por la misma puerta que el
+# CHECK de status.
+_CHECKLIST_MIGRATION_SQL = (
+    _CHECKLIST_DDL,
+    _CHECKLIST_INDEX_DDL,
+    "ALTER TABLE cv_reviews ADD COLUMN IF NOT EXISTS checklist_done BOOLEAN NOT NULL "
+    "DEFAULT FALSE",
+)
+
+
+def _checklist_is_current(cur) -> bool:
+    """¿Están la tabla de checklist y la columna checklist_done? Catálogo puro, sin locks.
+
+    Mismo requisito que _status_check_is_current: esto corre en CADA arranque, así que no puede
+    tomar un solo lock o volvemos al problema que documenta _tables_exist().
+    """
+    cur.execute(
+        """SELECT to_regclass('public.cv_review_checklist') IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_schema = 'public'
+                                 AND table_name   = 'cv_reviews'
+                                 AND column_name  = 'checklist_done')"""
+    )
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def _migrate_checklist(conn) -> None:
+    """Crea la tabla de checklist y agrega checklist_done. Mismos timeouts que el resto.
+
+    El ADD COLUMN con DEFAULT no reescribe la tabla (Postgres 11+ lo guarda en el catálogo), así
+    que toma ACCESS EXCLUSIVE pero es instantáneo. Si igual no consigue el lock en _LOCK_TIMEOUT
+    se rinde y lo reintenta el próximo arranque.
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SET LOCAL lock_timeout = '{_LOCK_TIMEOUT}'")
+        cur.execute(f"SET LOCAL statement_timeout = '{_STATEMENT_TIMEOUT}'")
+        for stmt in _CHECKLIST_MIGRATION_SQL:
+            cur.execute(stmt)
+    conn.commit()
+    logging.info("cv_reviews: checklist migrada (cv_review_checklist + checklist_done)")
 
 
 def _status_check_is_current(cur) -> bool:
@@ -173,6 +237,11 @@ def _tables_exist(cur) -> bool:
     base para TODOS, producción incluida.
 
     Con este chequeo, el caso normal (las tablas ya existen) no toma un solo lock.
+
+    NO preguntar acá por cv_review_checklist: producción tiene estas dos y no aquélla, así que
+    exigirla mandaría a producción por el camino de creación desde cero — donde el CREATE TABLE
+    IF NOT EXISTS de cv_reviews es un no-op y checklist_done no se agregaría nunca. Las tablas y
+    columnas que llegan después van en la rama de migración, no acá.
     """
     cur.execute("SELECT to_regclass('public.cv_reviews'), to_regclass('public.cv_review_reasons')")
     row = cur.fetchone()
@@ -208,13 +277,15 @@ def _ensure_locked() -> bool:
                 # Las tablas están, pero pueden ser de una versión anterior. Es el ÚNICO
                 # lugar por donde pasa producción, así que las migraciones van acá adentro
                 # o no corren nunca.
-                current = _status_check_is_current(cur)
+                # Las dos lecturas de catálogo van juntas y ANTES de cualquier DDL, para no
+                # dejar la transacción abierta mientras se toma un ACCESS EXCLUSIVE.
+                status_ok = _status_check_is_current(cur)
+                checklist_ok = _checklist_is_current(cur)
                 conn.commit()
-                if current:
-                    _TABLE_READY = True
-                    _LAST_FAILURE_TS = 0.0
-                    return True
-                _migrate_status_check(conn)
+                if not status_ok:
+                    _migrate_status_check(conn)
+                if not checklist_ok:
+                    _migrate_checklist(conn)
                 _TABLE_READY = True
                 _LAST_FAILURE_TS = 0.0
                 return True
@@ -231,6 +302,8 @@ def _ensure_locked() -> bool:
             for stmt in _INDEX_DDL:
                 cur.execute(stmt)
             cur.execute(_REASONS_INDEX_DDL)
+            cur.execute(_CHECKLIST_DDL)
+            cur.execute(_CHECKLIST_INDEX_DDL)
         conn.commit()
         _TABLE_READY = True
         _LAST_FAILURE_TS = 0.0

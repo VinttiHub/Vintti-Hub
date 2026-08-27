@@ -1620,3 +1620,527 @@ body {
 .churn-details.is-empty .churn-details-empty{
   display: block;
 }
+
+
+/* ==========================================================================
+   Pestaña "CV quality"
+
+   Regla de oro de este bloque: TODO acá adentro usa el mismo lenguaje que el resto de la
+   página (--card-bg / --card-border / --shadow-soft, radio 22px, Onest, violeta). La
+   tarjeta por recruiter viene de cv-review-cards.css, que está escrito en el lenguaje de
+   Hirex (mono, bordes grises finos, radio chico); acá se le cambia la PIEL para que no
+   parezca pegada de otra pantalla. El marcado y los números siguen saliendo del módulo
+   compartido — lo único que cambia entre páginas es cómo se ve.
+   ========================================================================== */
+
+.cvq-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  align-items: start;
+}
+/* Un único punto de quiebre para esta grilla. Antes había dos (1080 y 900) y una regla
+   suelta más abajo que pisaba al de 1080, así que entre 900 y 1080 quedaban dos columnas
+   apretadas en lugar de apilarse. */
+@media (max-width: 1080px) {
+  .cvq-layout { grid-template-columns: 1fr; gap: 2.4rem; }
+}
+
+/* ---- La tarjeta por recruiter ya NO se re-pinta acá ----
+   Antes este bloque le cambiaba la piel para que se pareciera a Recruiter Power. Se invirtió
+   la dirección: ahora es la PÁGINA la que adopta el lenguaje de esa tarjeta (ver el bloque
+   "Rediseño" al final del archivo), así que la tarjeta se muestra tal como la define
+   cv-review-cards.css y queda idéntica a la de CV Review. Sólo quedan las variables --hx-*
+   que ese archivo necesita y esta página no carga. */
+/* Va en .cvq-layout y no en .cvq-cards: las necesitan las DOS columnas. Cuando estaban
+   acotadas al contenedor de la izquierda, la tarjeta de CV quality (.cvq-card) quedaba fuera
+   del scope, todas las var(--hx-*) resolvían a vacío y la tarjeta salía sin fondo, sin borde
+   y sin anillo — se veía como texto suelto sobre la página. */
+.cvq-layout {
+  --hx-ink:         #0e1116;
+  --hx-ink-2:       #3d4653;
+  --hx-muted:       #6b7480;
+  --hx-faint:       #9aa2ad;
+  --hx-surface:     #ffffff;
+  --hx-surface-2:   #fafbfc;
+  --hx-line:        #e6e8ec;
+  --hx-line-2:      #eef0f3;
+  --hx-lime:        #c1ff72;
+  --hx-slate-ink:   #4a5566;
+  --hx-urgent:      #ff1f5a;
+  --hx-high:        #ff8a3d;
+  --hx-accent-wash: #eef1ff;
+  --hx-r-lg:        16px;
+  --hx-shadow:      0 1px 2px rgba(16,17,22,.04), 0 1px 3px rgba(16,17,22,.06);
+  --hx-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+}
+
+/* ---- Tarjeta de CV quality ----
+   Usa las clases de cv-review-cards.css (.cvr-mcard y compañía), así que hereda el marco,
+   la tipografía y el anillo sin repetir un solo valor. Acá van SÓLO las barras, que son lo
+   único que esa tarjeta no tiene. */
+.cvq-card .cvr-reasons-cap { margin: 1.1rem 0 0.7rem; }
+
+.cvq-bars { display: flex; flex-direction: column; gap: 0.45rem; }
+/* Etiqueta y números con ancho fijo para que las barras arranquen y terminen alineadas; si
+   no, el ítem de nombre más largo corre su barra y no se pueden comparar entre sí. */
+.cvq-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 10rem) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 12.5px;
+  color: var(--hx-ink-2, #3d4653);
+}
+.cvq-label { color: var(--hx-ink-2, #3d4653); }
+.cvq-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hx-line-2, #eef0f3);
+  overflow: hidden;
+}
+/* Color plano, no degradé: en este lenguaje los degradés sólo están en el fondo de página. */
+.cvq-fill { display: block; height: 100%; border-radius: 999px; background: var(--hx-slate-ink, #4a5566); }
+/* Monoespaciada como el resto de las cifras de la tarjeta (.cvr-reasons-list b). */
+.cvq-count,
+.cvq-pct {
+  font-family: var(--hx-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 11.5px;
+  text-align: right;
+}
+.cvq-count { font-weight: 700; color: var(--hx-ink, #0e1116); min-width: 1.4rem; }
+.cvq-pct { color: var(--hx-muted, #6b7480); min-width: 2.9rem; }
+
+.cvq-empty { margin: 0; font-size: 12.5px; color: var(--hx-muted, #6b7480); }
+.cvq-note {
+  margin: 0.9rem 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--hx-faint, #9aa2ad);
+}
+.cvq-card .cvr-mchips { margin-top: 0.9rem; }
+
+@media (max-width: 640px) {
+  /* En pantalla angosta la etiqueta se come la barra: se apila y la barra toma el ancho. */
+  .cvq-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .cvq-label { grid-column: 1 / -1; }
+}
+
+/* ==========================================================================
+   REDISEÑO — Recruiter Power en el lenguaje de Hirex
+   ==========================================================================
+   La página venía en "violeta pastel": degradés, sombras de 55px, blur, botones tipo
+   píldora con glow. Al lado de la tarjeta por recruiter (que viene de hirex.css: blanco
+   plano, borde de 1px, números en monoespaciada) parecían dos productos distintos.
+
+   Se unificó hacia Hirex por pedido de la owner. Este bloque va AL FINAL a propósito: es
+   una capa que pisa lo anterior por orden de cascada, sin tener que reescribir las 1700
+   líneas de arriba ni arriesgar romper la pestaña Historic trends.
+
+   La regla al tocar esto: fondo blanco plano, UN borde de 1px #e6e8ec, sombra apenas
+   perceptible, números en monoespaciada, y el color reservado para los acentos (lima =
+   bien, violeta = atención, rosa = mal). Nada de degradés en superficies.
+   ========================================================================== */
+
+:root {
+  /* El fondo violeta se queda: es la identidad de la página y la owner lo pidió de vuelta.
+     Lo que se limpió es lo que va ENCIMA (cards, botones, tipografía), no el lienzo. */
+  --bg-main: radial-gradient(circle at top, #fdf6fb 0%, #f5f2ff 35%, #f8fbff 70%, #ffffff 100%);
+  --card-bg: #ffffff;
+  --card-border: #e6e8ec;
+  --shadow-soft: 0 1px 2px rgba(16, 17, 22, .04), 0 1px 3px rgba(16, 17, 22, .06);
+  --text-main: #0e1116;
+  --text-muted: #6b7480;
+  --rp-line-2: #eef0f3;
+  --rp-lime: #c1ff72;
+  --rp-violet: #4f46e5;
+  --rp-pink: #ff1f5a;
+  --rp-orange: #ff8a3d;
+  --rp-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+}
+
+body { background: var(--bg-main); color: var(--text-main); }
+
+/* ---- Encabezado ---- */
+.metrics-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+}
+.metrics-subtitle { font-size: 0.875rem; color: var(--text-muted); }
+
+/* ---- Toolbar ---- */
+.metrics-toolbar {
+  background: rgba(250, 248, 255, 0.88);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--card-border);
+}
+.filter-select,
+.apply-range-btn,
+.date-chip {
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: #fff;
+  box-shadow: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+.filter-select:hover, .filter-select:focus {
+  transform: none;
+  box-shadow: none;
+  border-color: #c8ccd4;
+  background: #fff;
+}
+.apply-range-btn {
+  background: var(--text-main);
+  border-color: var(--text-main);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.date-chip input { border: 0; background: transparent; font: inherit; color: inherit; outline: none; }
+.apply-range-btn:hover { background: #232a33; border-color: #232a33; box-shadow: none; transform: none; }
+.filter-label, .date-chip-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---- Pestañas ---- */
+.metrics-tab {
+  border: 1px solid var(--card-border);
+  background: #fff;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.metrics-tab:hover { border-color: #c8ccd4; color: var(--text-main); }
+.metrics-tab.is-active {
+  background: var(--text-main);
+  border-color: var(--text-main);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ---- Encabezado de grupo ---- */
+.metric-group__label { color: var(--text-muted); letter-spacing: 0.14em; }
+.metric-group__rule { background: var(--card-border); }
+
+/* ---- Cards ---- */
+.metric-card {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  padding: 16px 18px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.metric-card:hover {
+  transform: none;
+  border-color: #d8dce2;
+  box-shadow: 0 2px 4px rgba(16, 17, 22, .05), 0 4px 12px rgba(16, 17, 22, .06);
+}
+.metric-label { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+.metric-caption { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
+
+/* El número en monoespaciada es lo que más hace que esto se lea como un tablero y no como
+   una landing. Va en tinta neutra: el color queda para los acentos, no para los números. */
+.metric-card .metric-value,
+.metric-card .metric-number,
+.metric-card .metric-percent {
+  font-family: var(--rp-mono);
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+}
+.metric-early-churn .metric-value-combo { font-size: 2.1rem; }
+
+/* ---- Chips y badges ---- */
+.metric-compare {
+  font-family: var(--rp-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+}
+.metric-compare.up, .metric-compare.is-up { color: #3f9142; }
+.metric-compare.down, .metric-compare.is-down { color: #d0304f; }
+.metric-pill {
+  backdrop-filter: none;
+  border: 1px solid var(--card-border);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+
+/* ---- Paneles genéricos (modales y tarjetas) ----
+   OJO: .history-panel NO va acá. Es el CONTENEDOR de toda la pestaña, no una tarjeta:
+   pintarlo de blanco metía una caja blanca alrededor de otras cajas blancas y tapaba el
+   fondo violeta de la página. Queda transparente para que el lienzo se vea entre las
+   tarjetas, igual que en la pestaña Summary. */
+.history-card,
+.metric-detail-modal__panel,
+.history-chart-modal__panel {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* ---- Historic trends ----
+   Esta pestaña se había quedado con el estilo pastel viejo mientras el resto ya era plano:
+   píldoras violetas punteadas, cajas con glow de 36px, títulos de 1.8rem. Se la lleva al
+   mismo lenguaje que Summary; el fondo violeta de la página igual se ve por detrás. */
+.history-title { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+.history-subtitle { font-size: 0.85rem; }
+
+.history-meta {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  padding: 0.6rem 0.9rem;
+}
+.history-meta__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+.history-meta__value {
+  font-family: var(--rp-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.history-filters {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+}
+.history-filter-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.history-filter-group input {
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+  font-family: var(--rp-mono);
+  font-size: 0.85rem;
+  color: var(--text-main);
+  padding: 0.45rem 0.7rem;
+}
+
+/* Los atajos eran píldoras punteadas violetas — lo más ruidoso de la pestaña. Botones
+   normales: el borde punteado sugería "editable" cuando en realidad son acciones. */
+.history-quick-btn {
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.42rem 0.85rem;
+  box-shadow: none;
+}
+.history-quick-btn:hover { background: #f6f7f9; border-color: #c8ccd4; border-style: solid; }
+
+.history-empty, .history-loading, .history-error {
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  box-shadow: none;
+}
+.history-empty {
+  background: #fff;
+  border: 1px dashed var(--card-border);
+  color: var(--text-muted);
+}
+.history-loading { background: #fff; border: 1px solid var(--card-border); color: var(--text-muted); }
+.history-error   { background: #fff0f3; border: 1px solid #f3c3ce; color: #a13460; }
+
+.history-card__label { font-size: 0.92rem; font-weight: 700; color: var(--text-main); }
+.history-card__description { font-size: 0.78rem; color: var(--text-muted); }
+.history-card__value {
+  font-family: var(--rp-mono);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+.history-card__meta-label { font-size: 0.68rem; letter-spacing: 0.1em; }
+.history-card__trend {
+  font-family: var(--rp-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: #fff;
+}
+.history-card__trend.is-up { color: #3f9142; }
+.history-card__trend.is-down { color: #d0304f; }
+.history-card__trend.is-neutral { color: var(--text-muted); }
+
+/* Spotlights y tabla del history: los últimos dos que quedaban con radio 20-26px y sombras
+   de 70px. Mismo marco que todo lo demás. */
+.history-spotlight,
+.history-table-card {
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+.history-table-card { padding: 1.1rem 1.25rem; }
+.history-spotlight__label { font-size: 0.68rem; letter-spacing: 0.1em; }
+.history-spotlight__value {
+  font-family: var(--rp-mono);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+.history-spotlight__meta { font-size: 0.78rem; color: var(--text-muted); }
+
+.history-table { font-size: 0.84rem; }
+.history-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--card-border);
+}
+.history-table td {
+  border-bottom: 1px solid var(--rp-line-2);
+  color: var(--text-main);
+}
+/* Los números de la tabla en monoespaciada: es una tabla de cifras y así se comparan
+   columna a columna. La primera celda es el mes, que es texto. */
+.history-table td + td { font-family: var(--rp-mono); }
+
+.history-tooltip {
+  background: rgba(14, 17, 22, 0.94);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(16, 17, 22, 0.25);
+  font-family: var(--rp-mono);
+  font-size: 0.76rem;
+}
+
+/* ---- Correcciones de layout de la pestaña Historic trends ----
+
+   1) Los botones de las pestañas se movían al cambiar de pestaña. La toolbar es
+      `justify-content: space-between`, así que las pestañas van pegadas al borde derecho:
+      cuando Summary (alta, 16 cards) mostraba la barra de scroll y Historic trends (corta)
+      no, el ancho del viewport cambiaba y las pestañas saltaban. Reservando el hueco del
+      scroll SIEMPRE, el ancho es constante y quedan quietas.
+
+   2) .history-panel tenía `max-width:1200px; margin:0 auto`, así que esta pestaña se
+      dibujaba más angosta y centrada mientras Summary iba de lado a lado. Al alternar, todo
+      cambiaba de ancho y de posición. Ahora las dos ocupan lo mismo.
+
+   3) En este proyecto NO hay un `box-sizing: border-box` global. `.history-empty` y sus
+      hermanas son `width:100%` + `padding:0 1rem`, así que se desbordaban 2rem por fuera de
+      su contenedor — es el recuadro punteado que se salía de la tarjeta. */
+
+html { scrollbar-gutter: stable; }
+
+.history-panel { max-width: none; margin: 0; }
+
+.history-empty,
+.history-loading,
+.history-error,
+.history-filters,
+.history-table-card,
+.history-spotlight,
+.history-card { box-sizing: border-box; }
+
+/* La caja de filtros venía con el padding y el radio del estilo viejo. */
+.history-filters {
+  border-radius: 16px;
+  padding: 0.9rem 1.1rem;
+  gap: 0.8rem 1rem;
+  align-items: flex-end;
+}
+.history-filter-group { gap: 0.35rem; }
+.history-quick-actions { gap: 0.5rem; }
+
+/* El panel respiraba de más entre bloques (1.5rem heredado) y con la pestaña vacía quedaba
+   un hueco enorme entre los filtros y el cartel. */
+.history-panel { gap: 1.1rem; }
+.history-empty { padding: 1.4rem 1rem; }
+
+/* ---- Aire y ancho en Historic trends ----
+   Con 4 tarjetas por fila cada gráfico quedaba en ~320px para 20 meses de datos: las barras
+   se amontonaban y las etiquetas del eje se pisaban. Con un mínimo más alto entran 3 por
+   fila en pantalla ancha y cada gráfico tiene el doble de lugar. */
+.history-grid {
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1.25rem;
+}
+.history-card { padding: 1.15rem 1.25rem; }
+/* El gráfico necesita margen propio: pegado al texto de arriba y al pie de abajo se leía
+   todo como un bloque. */
+.history-chart { margin: 0.9rem 0 0.2rem; }
+.history-card__header { gap: 0.75rem; align-items: flex-start; }
+.history-card__metrics { margin-top: 0.35rem; gap: 1.5rem; }
+
+.history-spotlights { gap: 1.25rem; }
+.history-spotlight { padding: 0.9rem 1.1rem; }
+
+/* Márgenes de la página: 4rem contra el borde con el sidebar al lado dejaba las tarjetas
+   muy al filo. */
+.metrics-page { padding: 1.4rem 2.5rem 3.5rem; gap: 1.6rem; }
+@media (min-width: 1500px) {
+  .metrics-page { padding-left: 3.5rem; padding-right: 3.5rem; }
+}
+
+/* El eje se lee mejor en la tinta neutra de la página que en el lila viejo. */
+.history-axis__label { fill: var(--text-muted); font-size: 0.62rem; }
+
+/* ---- El contenedor de la pestaña es transparente ----
+   Explícito y no sólo "sin regla": arriba hay un `.history-panel` de la hoja original y
+   conviene que se lea que esto es a propósito. */
+.history-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* ---- Que nada fuerce scroll horizontal ----
+   `minmax(380px, 1fr)` obliga a 380px de ancho mínimo: por debajo de eso (panel lateral,
+   ventana angosta, mobile) las tarjetas se salían y los títulos quedaban cortados. Con
+   min() la pista se achica hasta el ancho disponible en vez de desbordar. */
+.history-grid { grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); }
+.history-spotlights { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.metrics-cards > .metric-card { flex: 1 1 min(220px, 100%); }
+
+/* El SVG se escala solo; sin esto se sale de su tarjeta en anchos chicos. */
+.history-chart svg { max-width: 100%; height: auto; display: block; }
+
+/* Márgenes que se achican con la pantalla, en vez de 2.5rem fijos que en angosto se comen
+   el poco ancho que hay. */
+@media (max-width: 900px) {
+  .metrics-page { padding-left: 1.25rem; padding-right: 1.25rem; }
+}
+@media (max-width: 560px) {
+  .metrics-page { padding-left: 0.85rem; padding-right: 0.85rem; }
+  .history-card, .cvq-card, .history-filters { padding: 0.9rem 1rem; }
+  .metrics-title { font-size: 1.25rem; }
+  .history-title { font-size: 1.1rem; }
+}

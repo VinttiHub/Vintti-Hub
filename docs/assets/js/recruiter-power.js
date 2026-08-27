@@ -1,4 +1,11 @@
-const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+// Misma detección que cv-review.js (assets/js/cv-review.js:13). Sin esto la página abierta
+// en local le pega igual al backend DEPLOYADO, así que cualquier endpoint que todavía no esté
+// en producción se ve vacío y parece un bug de la pantalla — que es exactamente lo que pasó
+// con la pestaña CV quality.
+const API_BASE =
+  (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:5000"
+    : "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
 // 🔸 Correos que NO deben aparecer nunca en el dropdown
 const EXCLUDED_EMAILS = new Set([
@@ -1988,6 +1995,8 @@ function populateDropdown() {
     const hrLeadEmail = ev.target.value;
     metricsState.selectedLead = hrLeadEmail;
     updateCardsForLead(hrLeadEmail);
+    // No re-fetchea: los datos ya están por recruiter, sólo cambia cuál se pinta.
+    renderCvQuality();
   };
 
   if (shouldRefreshCards) {
@@ -2475,6 +2484,13 @@ function wireRangePicker() {
 
     await fetchMetrics(start, end);
 
+    // La ventana cambió, así que lo cargado quedó viejo. Se re-pide sólo si la pestaña está
+    // a la vista; si no, se invalida y la carga perezosa lo resuelve al abrirla.
+    cvQualityState.loaded = false;
+    if (metricsState.activeTab === "cvquality") {
+      await fetchCvQuality();
+    }
+
     const sel = document.getElementById("hrLeadSelect");
     if (sel && sel.value) updateCardsForLead(sel.value);
     if (!sel || !sel.value) {
@@ -2852,6 +2868,12 @@ function setupTabs() {
       refreshHistoryPanel();
     } else {
       hideHistoryTooltip();
+    }
+    // Perezoso: es otro endpoint y la mayoría de las visitas no abren esta pestaña.
+    if (target === "cvquality" && !cvQualityState.loaded) {
+      // Las etiquetas primero: si llegan después, la tarjeta de totales muestra los códigos
+      // crudos ("english_level") hasta el siguiente render.
+      fetchReasonLabels().then(fetchCvQuality);
     }
   };
 
@@ -3563,11 +3585,15 @@ function renderAxis(ticks, width, chartHeight) {
         .map(
           (tick) => `
         <line class="history-axis__tick" x1="${tick.x}" y1="${chartHeight}" x2="${tick.x}" y2="${chartHeight + 5}"></line>
-        <text class="history-axis__label" x="${tick.x}" y="${chartHeight + 16}">${tick.label}</text>`
+        <text class="history-axis__label" x="${tick.x}" y="${chartHeight + 16}" text-anchor="${tick.anchor || "middle"}">${tick.label}</text>`
         )
         .join("")}
     </g>`;
 }
+
+// Separación mínima entre dos etiquetas del eje, en unidades del viewBox. Una etiqueta como
+// "Jul 2026" mide ~46 a 0.65rem, así que por debajo de esto se pisan.
+const AXIS_LABEL_MIN_GAP = 52;
 
 function buildAxisTicks(points = [], width) {
   if (!points.length) return [];
@@ -3584,9 +3610,27 @@ function buildAxisTicks(points = [], width) {
     ticks.push({
       x,
       label: simplifyAxisLabel(point.label || point.key || ""),
+      // Las de las puntas se anclan hacia adentro; centradas se cortan contra el borde del
+      // SVG. Es lo que hacía que el primer y el último mes salieran mochos ("2025", "2021").
+      anchor: index === 0 ? "start" : (index === total - 1 ? "end" : "middle"),
     });
   });
-  return ticks;
+
+  if (ticks.length < 3) return ticks;
+
+  // `step` reparte parejo, pero los dos bordes entran SIEMPRE, así que el anteúltimo puede
+  // quedar pegado al último (con 20 meses y paso 3 caían en 18 y 19) y las etiquetas se
+  // montaban. Pasada codiciosa: se conserva la primera, después sólo las que estén al menos
+  // AXIS_LABEL_MIN_GAP de la última conservada, y la última siempre — sacando las que le
+  // hayan quedado demasiado cerca. Las puntas son las que dan contexto, así que ganan ellas.
+  const kept = [ticks[0]];
+  for (let i = 1; i < ticks.length - 1; i++) {
+    if (ticks[i].x - kept[kept.length - 1].x >= AXIS_LABEL_MIN_GAP) kept.push(ticks[i]);
+  }
+  const last = ticks[ticks.length - 1];
+  while (kept.length > 1 && last.x - kept[kept.length - 1].x < AXIS_LABEL_MIN_GAP) kept.pop();
+  kept.push(last);
+  return kept;
 }
 
 function simplifyAxisLabel(label) {
@@ -3788,6 +3832,216 @@ function computeHistoryTrend(latest, previous, goodWhenHigher, formatter) {
     label: `${arrow} ${formattedDiff}`,
     className: improvement ? "is-up" : "is-down",
   };
+}
+
+
+/* ==========================================================================
+   CV quality (pestaña "CV quality")
+
+   Viene de /cv_reviews/metrics, NO de /recruiter-metrics: otro endpoint, otro
+   denominador y otra ventana de datos. Se mantiene aparte a propósito en vez de
+   mezclarlo en metricsState.byLead, porque las dos fuentes agregan por columnas
+   distintas — /recruiter-metrics por opportunity.opp_hr_lead y ésta por
+   cv_reviews.recruiter_email (quien ARMÓ el CV). Normalmente coinciden, pero no
+   son la misma columna y no se puede asumir que toda recruiter esté en las dos.
+   ========================================================================== */
+
+const cvQualityState = {
+  byRecruiter: {},   // { email: row }
+  totals: null,
+  meta: null,
+  raw: null,         // la respuesta cruda: la tarjeta necesita by_reason para el total
+  reasonLabels: {},  // code -> etiqueta, de GET /cv_review_reasons
+  loaded: false,
+  error: null,
+};
+
+// La lista de razones vive en el backend (utils/cv_review_ai.REJECT_REASONS) y se sirve por
+// GET /cv_review_reasons, igual que en cv-review.js. No hardcodearla acá: sería la tercera
+// copia y la que se olvida de actualizar.
+async function fetchReasonLabels() {
+  try {
+    const resp = await fetch(`${API_BASE}/cv_review_reasons`, { headers: cvqHeaders() });
+    if (!resp.ok) return;
+    const d = await resp.json();
+    (d.reasons || []).forEach((x) => { cvQualityState.reasonLabels[x.code] = x.label; });
+  } catch (err) {
+    // Sin etiquetas la tarjeta muestra el código crudo; no vale romper la pestaña por esto.
+  }
+}
+
+// Mismo header que usa cv-review.js: de ahí saca el backend quién pregunta. El fallback a
+// localStorage no es de más — currentUserEmail queda vacío en el arranque sin user_id.
+function cvqHeaders() {
+  const email = (metricsState.currentUserEmail
+    || localStorage.getItem("user_email")
+    || sessionStorage.getItem("user_email")
+    || "").trim();
+  return email ? { "X-User-Email": email } : {};
+}
+
+async function fetchCvQuality() {
+  cvQualityState.error = null;
+  try {
+    const url = new URL(`${API_BASE}/cv_reviews/metrics`);
+    // window_bounds() del backend toma desde/hasta, no start/end.
+    if (metricsState.rangeStart) url.searchParams.set("desde", metricsState.rangeStart);
+    if (metricsState.rangeEnd) url.searchParams.set("hasta", metricsState.rangeEnd);
+
+    const resp = await fetch(url.toString(), { headers: cvqHeaders(), credentials: "include" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    cvQualityState.byRecruiter = {};
+    (data.rows || []).forEach((row) => {
+      const key = String(row.recruiter_email || "").trim().toLowerCase();
+      if (key) cvQualityState.byRecruiter[key] = row;
+    });
+    cvQualityState.totals = data.totals || null;
+    cvQualityState.meta = data.meta || null;
+    cvQualityState.raw = data;
+    cvQualityState.loaded = true;
+  } catch (err) {
+    cvQualityState.loaded = false;
+    cvQualityState.error = err.message || String(err);
+  }
+  renderCvQuality();
+}
+
+// La tarjeta por recruiter: la MISMA que la sección "Per recruiter" de CV Review. El marcado
+// lo emite window.CvReviewCards (assets/js/cv-review-cards.js) — no reimplementarlo acá, o
+// las dos páginas terminan diciendo cosas distintas del mismo recruiter.
+function renderCvqCard(row, isTotal) {
+  const box = document.getElementById("cvqCards");
+  if (!box) return;
+  if (!window.CvReviewCards) {
+    box.innerHTML = "";
+    return;
+  }
+  if (!row) { box.innerHTML = ""; return; }
+  box.innerHTML = window.CvReviewCards.card(row, isTotal);
+}
+
+const cvqPct = (v) => (v === null || v === undefined ? "–" : `${v}%`);
+
+
+function renderCvQuality() {
+  // cvqBars existe siempre que la pestaña esté en la página; cvCleanValue se eliminó al
+  // pasar la tarjeta a las clases de Hirex y este guard se quedaba con un id fantasma,
+  // devolviendo temprano y dejando la pestaña vacía.
+  if (!document.getElementById("cvqBars")) return;
+
+  const selected = (metricsState.selectedLead || "").trim().toLowerCase();
+  // Sin recruiter elegida se muestran los totales que YA calcula el backend, incluido el
+  // promedio de calidad ponderado por n. Recalcularlo acá sería otra copia de la misma
+  // regla, y la que se desincroniza es siempre la copia.
+  const row = selected ? cvQualityState.byRecruiter[selected] : cvQualityState.totals;
+
+  const info = document.getElementById("cvqInfo");
+  if (cvQualityState.error) {
+    if (info) info.textContent = `Could not load CV quality: ${cvQualityState.error}`;
+  } else if (info) {
+    const meta = cvQualityState.meta || {};
+    const scope = meta.scoped_to_self ? " Showing only your own CVs." : "";
+    if (!cvQualityState.loaded) {
+      info.textContent = "";
+    } else if (meta.window_empty) {
+      // El período elegido termina antes de que estas métricas empiecen. Decirlo así y no
+      // pintar la ventana, que en este caso sale invertida y parece un bug.
+      info.textContent = `The selected period ends before ${meta.metrics_from}, which is when`
+        + ` these metrics start. Pick a range that reaches ${meta.metrics_from} or later.`;
+    } else {
+      // Si el backend recortó el arranque hay que DECIRLO: si no, un rango elegido a mano que
+      // devuelve poco se lee como que la pantalla está rota.
+      const floor = meta.window_clamped
+        ? ` These only count CVs sent from ${meta.metrics_from} onwards — anything before that`
+          + ` predates the checklist and the current scoring rubric.`
+        : "";
+      info.textContent = `Window: ${meta.desde} — ${meta.hasta}.${scope}${floor}`;
+    }
+  }
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
+
+  if (!row) {
+    setText("cvCleanDen", "—");
+    setText("cvCleanHelper", "—");
+    setHTML("cvCleanRing", "");
+    setHTML("cvqChips", "");
+    renderCvqBars([]);
+    renderCvqCard(null);
+    return;
+  }
+
+  // Con el dropdown vacío la tarjeta es la de "All recruiters", que necesita by_reason
+  // sumado — eso lo arma totalsRow() a partir de la respuesta cruda.
+  if (selected) {
+    renderCvqCard(row, false);
+  } else if (cvQualityState.raw) {
+    renderCvqCard(
+      window.CvReviewCards
+        ? window.CvReviewCards.totalsRow(cvQualityState.raw, cvQualityState.reasonLabels)
+        : null,
+      true,
+    );
+  }
+
+  const checklisted = row.profiles_checklisted || 0;
+  const decided = row.profiles_decided || 0;
+
+  setText("cvCleanDen", String(checklisted));
+  // El mismo anillo que "JD coverage" en la otra tarjeta, con el mismo semáforo: es lo que
+  // hace que las dos tarjetas rimen en vez de parecer de pantallas distintas.
+  setHTML("cvCleanRing", (window.CvReviewCards && row.clean_pct !== null && row.clean_pct !== undefined)
+    ? window.CvReviewCards.ringHtml(Math.round(row.clean_pct), "cvr-cov--lg")
+    : '<span class="cvr-cov--lg cvr-cov-empty">—</span>');
+  setText("cvCleanHelper", checklisted
+    ? `${row.profiles_clean || 0} of ${checklisted} checklisted CVs`
+    : "no CV was checklisted in this window");
+
+  // Las salvedades como chips, igual que "pending" / "old rubric" de la otra tarjeta.
+  const chips = [];
+  const sinChecklist = decided - checklisted;
+  if (sinChecklist > 0) {
+    chips.push(`<span class="cvr-mchip" title="Decided before the checklist existed, or `
+      + `written straight into the database. They are excluded from everything on this card.">`
+      + `<b>${sinChecklist}</b> not checklisted</span>`);
+  }
+  setHTML("cvqChips", chips.join(""));
+
+  renderCvqBars(row.checklist || []);
+}
+
+function renderCvqBars(items) {
+  const box = document.getElementById("cvqBars");
+  const empty = document.getElementById("cvqEmpty");
+  if (!box) return;
+
+  if (!items.length) {
+    box.innerHTML = "";
+    if (empty) empty.hidden = false;
+    return;
+  }
+  if (empty) empty.hidden = true;
+
+  // La barra se escala contra el ítem MÁS marcado, no contra 100: con defectos en el 5-15
+  // por ciento todas las barras quedarían invisibles y no se podrían comparar entre sí.
+  const max = Math.max(...items.map((i) => i.profiles || 0), 1);
+  box.innerHTML = items.map((item) => {
+    const width = Math.max(2, Math.round(((item.profiles || 0) / max) * 100));
+    return `
+      <div class="cvq-row">
+        <span class="cvq-label">${escapeAttribute(item.item_label || item.item_code)}</span>
+        <span class="cvq-track"><span class="cvq-fill" style="width:${width}%"></span></span>
+        <span class="cvq-count">${item.profiles || 0}</span>
+        <span class="cvq-pct">${cvqPct(item.pct)}</span>
+      </div>`;
+  }).join("");
 }
 
 document.addEventListener("DOMContentLoaded", () => {

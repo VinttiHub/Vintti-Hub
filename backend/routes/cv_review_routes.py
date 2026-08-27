@@ -25,7 +25,7 @@ import logging
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from threading import Lock
 
 import psycopg2
@@ -74,7 +74,8 @@ _SELECT_COLS = """
     r.review_id, r.candidate_id, r.opportunity_id, r.round, r.status,
     r.recruiter_email, r.hr_lead_email, r.sales_lead_email, r.reviewed_by,
     r.requested_at, r.reviewed_at, r.reject_other, r.reviewer_comment,
-    r.recruiter_note, r.ai_score, r.ai_analyzed_at, r.ai_error, r.resume_hash
+    r.recruiter_note, r.ai_score, r.ai_analyzed_at, r.ai_error, r.resume_hash,
+    r.checklist_done
 """
 
 
@@ -214,7 +215,7 @@ def _within(ts, seconds):
         return False
 
 
-def _serialize(row, *, reasons=None, analysis=None, live_hash=None):
+def _serialize(row, *, reasons=None, checklist=None, analysis=None, live_hash=None):
     out = {
         "review_id": row["review_id"],
         "candidate_id": row["candidate_id"],
@@ -234,6 +235,10 @@ def _serialize(row, *, reasons=None, analysis=None, live_hash=None):
         "ai_analyzed_at": _iso(row.get("ai_analyzed_at")),
         "ai_error": row.get("ai_error"),
         "reasons": list(reasons or []),
+        # Los defectos del documento. Van SIEMPRE, no sólo en los rechazos: el caso que esto
+        # existe para capturar es el CV aprobado al que igual le faltaba la educación.
+        "checklist": list(checklist or []),
+        "checklist_done": bool(row.get("checklist_done")),
     }
     # La cobertura de la JD también le sirve a la recruiter: es lo que tiene que arreglar.
     # Va sólo esa parte y no el ai_analysis entero, que pesa varios KB por ronda y el
@@ -290,13 +295,36 @@ def _load_reasons(cur, review_ids):
     return out
 
 
-# --- razones (una sola fuente para el frontend) -----------------------------
+def _load_checklist(cur, review_ids):
+    """Los ítems tildados, en lote. Mismo motivo que _load_reasons: la cola pinta decenas de
+    filas y un query por fila la vuelve inusable."""
+    if not review_ids:
+        return {}
+    cur.execute(
+        "SELECT review_id, item_code FROM cv_review_checklist WHERE review_id = ANY(%s)",
+        (list(review_ids),),
+    )
+    out = {}
+    for row in cur.fetchall():
+        out.setdefault(row["review_id"], []).append(row["item_code"])
+    return out
+
+
+# --- razones y checklist (una sola fuente para el frontend) -----------------
 
 @bp.route("/cv_review_reasons", methods=["GET"])
 def list_reject_reasons():
     """Para que la lista no quede hardcodeada dos veces (Python y JS)."""
     return jsonify({
         "reasons": [{"code": c, "label": l} for c, l in cv_review_ai.REJECT_REASONS],
+    })
+
+
+@bp.route("/cv_review_checklist_items", methods=["GET"])
+def list_checklist_items():
+    """Igual que las razones: la lista se pinta en la UI en ESTE orden y no se duplica en JS."""
+    return jsonify({
+        "items": [{"code": c, "label": l} for c, l in cv_review_ai.CHECKLIST_ITEMS],
     })
 
 
@@ -822,7 +850,9 @@ def list_candidate_cv_reviews(candidate_id):
             tuple(params),
         )
         rows = cur.fetchall()
-        reasons = _load_reasons(cur, [r["review_id"] for r in rows])
+        review_ids = [r["review_id"] for r in rows]
+        reasons = _load_reasons(cur, review_ids)
+        checklist = _load_checklist(cur, review_ids)
 
         cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (candidate_id,))
         live = cur.fetchone()
@@ -832,7 +862,8 @@ def list_candidate_cv_reviews(candidate_id):
         conn.close()
 
     return jsonify({
-        "reviews": [_serialize(r, reasons=reasons.get(r["review_id"]), live_hash=live_hash)
+        "reviews": [_serialize(r, reasons=reasons.get(r["review_id"]),
+                              checklist=checklist.get(r["review_id"]), live_hash=live_hash)
                     for r in rows],
         "live_resume_hash": live_hash,
     })
@@ -902,13 +933,16 @@ def list_cv_reviews():
             params,
         )
         rows = cur.fetchall()
-        reasons = _load_reasons(cur, [r["review_id"] for r in rows])
+        review_ids = [r["review_id"] for r in rows]
+        reasons = _load_reasons(cur, review_ids)
+        checklist = _load_checklist(cur, review_ids)
     finally:
         cur.close()
         conn.close()
 
     return jsonify({
-        "reviews": [_serialize(r, reasons=reasons.get(r["review_id"])) for r in rows],
+        "reviews": [_serialize(r, reasons=reasons.get(r["review_id"]),
+                              checklist=checklist.get(r["review_id"])) for r in rows],
         "total": total,
     })
 
@@ -977,6 +1011,7 @@ def get_cv_review(review_id):
         if not row:
             return jsonify({"error": "review not found"}), 404
         reasons = _load_reasons(cur, [review_id]).get(review_id)
+        checklist = _load_checklist(cur, [review_id]).get(review_id)
 
         cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (row["candidate_id"],))
         live = cur.fetchone()
@@ -1008,7 +1043,8 @@ def get_cv_review(review_id):
         cur.close()
         conn.close()
 
-    payload = _serialize(row, reasons=reasons, analysis=row.get("ai_analysis"), live_hash=live_hash)
+    payload = _serialize(row, reasons=reasons, checklist=checklist,
+                         analysis=row.get("ai_analysis"), live_hash=live_hash)
     payload["resume_snapshot"] = row.get("resume_snapshot")
     payload["jd_changed"] = jd_changed
     payload["jd_checked"] = jd_checked
@@ -1065,6 +1101,25 @@ def decide_cv_review(review_id):
     reason_other = (data.get("reason_other") or "").strip() or None
     comment = (data.get("reviewer_comment") or data.get("comment") or "").strip() or None
 
+    # La checklist va en las TRES decisiones, no sólo en el rechazo. Las razones son sobre el
+    # candidato; esto es sobre lo que la recruiter escribió mal, y el caso que hay que poder
+    # registrar es justamente el CV que se APRUEBA teniendo la educación sin cargar.
+    checklist = [str(c).strip().lower() for c in (data.get("checklist") or []) if str(c).strip()]
+    checklist = list(dict.fromkeys(checklist))
+    unknown_items = [c for c in checklist if c not in cv_review_ai.CHECKLIST_ITEM_CODES]
+    if unknown_items:
+        return jsonify({"error": f"unknown checklist item(s): {', '.join(unknown_items)}",
+                        "code": "bad_checklist_item"}), 422
+    # Tildar un ítem ya prueba que el reviewer la miró; el flag explícito existe para el caso
+    # contrario, el CV limpio. Sin él, "0 defectos" y "nadie la abrió" serían la misma fila y la
+    # métrica terminaría midiendo qué tan prolijo es el reviewer en vez de la recruiter — por eso
+    # es el denominador y por eso es obligatorio.
+    checklist_done = bool(data.get("checklist_done")) or bool(checklist)
+    if not checklist_done:
+        return jsonify({"error": "Go through the checklist before deciding: tick what the "
+                                 "recruiter got wrong, or mark the CV as clean.",
+                        "code": "no_checklist"}), 422
+
     if decision == "rejected":
         unknown = [r for r in reasons if r not in cv_review_ai.REJECT_REASON_CODES]
         if unknown:
@@ -1104,10 +1159,11 @@ def decide_cv_review(review_id):
             """
             UPDATE cv_reviews
                SET status = %s, reviewed_by = %s, reviewed_at = NOW(),
-                   reviewer_comment = %s, reject_other = %s, updated_at = NOW()
+                   reviewer_comment = %s, reject_other = %s, checklist_done = %s,
+                   updated_at = NOW()
              WHERE review_id = %s AND status = 'pending'
             RETURNING """ + _SELECT_COLS.replace("r.", ""),
-            (decision, actor, comment, reason_other, review_id),
+            (decision, actor, comment, reason_other, checklist_done, review_id),
         )
         row = cur.fetchone()
         if not row:
@@ -1130,6 +1186,13 @@ def decide_cv_review(review_id):
                 "INSERT INTO cv_review_reasons (review_id, reason_code) VALUES (%s, %s) "
                 "ON CONFLICT DO NOTHING",
                 [(review_id, code) for code in reasons],
+            )
+
+        if checklist:
+            cur.executemany(
+                "INSERT INTO cv_review_checklist (review_id, item_code) VALUES (%s, %s) "
+                "ON CONFLICT DO NOTHING",
+                [(review_id, code) for code in checklist],
             )
 
         batch_synced = False
@@ -1168,7 +1231,7 @@ def decide_cv_review(review_id):
 
     email_sent = _notify_decided(review_id)
     return jsonify({
-        "review": _serialize(row, reasons=reasons),
+        "review": _serialize(row, reasons=reasons, checklist=checklist),
         "batch_synced": batch_synced,
         "email_sent": bool(email_sent),
     })
@@ -1204,7 +1267,8 @@ def reopen_cv_review(review_id):
             """
             UPDATE cv_reviews
                SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL,
-                   reviewer_comment = NULL, reject_other = NULL, updated_at = NOW()
+                   reviewer_comment = NULL, reject_other = NULL, checklist_done = FALSE,
+                   updated_at = NOW()
              WHERE review_id = %s AND status = 'rejected'
             RETURNING """ + _SELECT_COLS.replace("r.", ""),
             (review_id,),
@@ -1226,6 +1290,10 @@ def reopen_cv_review(review_id):
         # Las razones eran de un rechazo que se está deshaciendo. Si quedaran, seguirían
         # contando en el donut de "por qué las rechazan" de una decisión que ya no existe.
         cur.execute("DELETE FROM cv_review_reasons WHERE review_id = %s", (review_id,))
+        # Lo mismo con la checklist. El flag se baja arriba, en el mismo UPDATE que el resto del
+        # veredicto: la ronda vuelve a 'pending', así que nadie la chequeó todavía, y si quedara
+        # en TRUE el perfil entraría al denominador de "CVs limpios" sin que nadie lo mirara.
+        cur.execute("DELETE FROM cv_review_checklist WHERE review_id = %s", (review_id,))
         conn.commit()
     except psycopg2.Error as exc:
         conn.rollback()
@@ -1388,6 +1456,23 @@ def analyze_cv_review(review_id):
 # "La calidad de la recruiter" es el score de la PRIMERA ronda. La ronda 2 es calidad
 # después del coaching; puntuar eso borraría justo lo que se quiere medir.
 
+# ---------------------------------------------------------------------------
+# PISO DE LAS MÉTRICAS. Nada anterior a esta fecha cuenta en /cv_reviews/metrics.
+#
+# Por qué existe: la checklist y la rúbrica de coverage llegaron después de que la feature
+# ya estuviera en uso. Todo lo decidido antes no tiene checklist (era imposible tenerla) y
+# fue scoreado con rúbricas viejas. Mezclarlo con lo nuevo hunde los números de todas las
+# recruiters por igual y hace que la métrica mida CUÁNDO se usó la herramienta en vez de
+# cómo trabaja cada una.
+#
+# Se aplica clampeando el piso de la ventana, NO como un filtro aparte: así el scope, las
+# razones de rechazo y la checklist quedan consistentes entre sí sin poder desincronizarse.
+# Afecta las DOS pantallas que consumen este endpoint (el panel "Per recruiter" de CV Review
+# y la pestaña CV quality de Recruiter Power), que es lo que se decidió.
+#
+# PARA MOVERLA: cambiá esta sola línea. Si algún día no hace falta más, poné date(1900, 1, 1).
+METRICS_FROM = date(1900, 1, 1)
+
 _METRICS_CTES = """
 live AS (
     -- Las rondas canceladas nunca pasaron.
@@ -1409,7 +1494,13 @@ first_sub AS (
 first_dec AS (
     -- La primera ronda que efectivamente recibió un veredicto.
     SELECT DISTINCT ON (candidate_id, opportunity_id)
-           candidate_id, opportunity_id, review_id AS decided_review_id, status, reviewed_at
+           candidate_id, opportunity_id, review_id AS decided_review_id, status, reviewed_at,
+           checklist_done,
+           -- El EXISTS va ACÁ y no como JOIN en el agregado a propósito: un perfil con dos
+           -- ítems tildados tiene que sumar UNO al denominador, no dos. Colapsarlo a un
+           -- booleano por perfil antes de agregar es lo que lo garantiza.
+           EXISTS (SELECT 1 FROM cv_review_checklist ck
+                    WHERE ck.review_id = live.review_id) AS flagged
     FROM live
     -- "changes_requested" cierra la ronda igual que las otras dos, así que cuenta como
     -- decidido: si no, un perfil devuelto para corregir quedaría para siempre en
@@ -1442,7 +1533,14 @@ def _pct(numerator, denominator):
 
 @bp.route("/cv_reviews/metrics", methods=["GET"])
 def cv_review_metrics():
-    denied = _require_reviewer()
+    """Las métricas también las mira la recruiter en Recruiter Power, no sólo el sales lead.
+
+    Por eso el gate es _require_actor y no _require_reviewer: quien NO es reviewer queda
+    acotado a SU propia fila en el servidor, ignorando el ?recruiter= que haya mandado. En
+    Recruiter Power eso ya pasa, pero sólo en el cliente (isRestrictedEmail en
+    recruiter-power.js); acá queda hecho donde no se puede saltear con la consola.
+    """
+    denied = _require_actor()
     if denied:
         return denied
 
@@ -1452,14 +1550,31 @@ def cv_review_metrics():
     from dashboards.datasets._recruiters import RECRUITERS_CTE
 
     lo, hi = window_bounds(request.args.to_dict())
+    # El piso gana siempre, aunque pidan un rango que empiece antes.
+    clamped = lo < METRICS_FROM
+    if clamped:
+        lo = METRICS_FROM
+    # El rango pedido termina ANTES del piso: no hay nada que medir. La query devuelve 0 igual
+    # (lo > hi no matchea nada), pero sin este flag el meta reporta una ventana invertida
+    # —"2026-09-01 → 2026-08-27"— y la UI la pinta tal cual, que se lee como un bug.
+    window_empty = lo > hi
     # `mine=1` acota a las oportunidades de quien mira, igual que en la cola, para que la
     # métrica y la lista de abajo no cuenten universos distintos.
     sales_lead = (request.args.get("sales_lead") or "").strip().lower()
     if request.args.get("mine") == "1":
         sales_lead = _user_email() or sales_lead
+
+    recruiter = (request.args.get("recruiter") or "").strip().lower()
+    me = _user_email()
+    is_reviewer = me in REVIEW_OVERRIDE_EMAILS or me in _sales_lead_emails()
+    if not is_reviewer:
+        # Se PISA el parámetro, no se valida: así no hay forma de pedir la fila de otra.
+        recruiter = me or ""
+        sales_lead = ""
+
     params = {
         "w_lo": lo, "w_hi": hi,
-        "recruiter": (request.args.get("recruiter") or "").strip().lower(),
+        "recruiter": recruiter,
         "sales_lead": sales_lead,
         # ->> devuelve texto, así que la versión viaja como texto.
         "ai_version": str(cv_review_ai.ANALYSIS_VERSION),
@@ -1480,6 +1595,12 @@ def cv_review_metrics():
                 COUNT(*) FILTER (WHERE d.status = 'approved')  AS approved_first_try,
                 COUNT(*) FILTER (WHERE d.status = 'changes_requested')
                                                                AS changes_first_try,
+                -- Denominador de TODO lo de checklist. No es profiles_decided: los perfiles
+                -- decididos antes de que la checklist existiera tienen checklist_done=false y
+                -- quedan afuera, que es lo correcto — nadie los chequeó. La UI muestra el n.
+                COUNT(*) FILTER (WHERE d.checklist_done)        AS profiles_checklisted,
+                COUNT(*) FILTER (WHERE d.checklist_done AND NOT d.flagged)
+                                                               AS profiles_clean,
                 -- Dos exclusiones del promedio de calidad, por la misma razón: mezclar
                 -- escalas distintas corrompe el número.
                 --   1) los scores parciales (sin JD, así que jd_alignment, que pesa 30
@@ -1533,6 +1654,23 @@ def cv_review_metrics():
             params,
         )
         reason_rows = [dict(r) for r in cur.fetchall()]
+
+        # Calcada de la de razones: una fila por (perfil, ítem), garantizado por el PK de
+        # cv_review_checklist. A diferencia de aquélla NO se filtra por status — un CV se
+        # aprueba con defectos y ése es justo el caso que hay que contar.
+        cur.execute(
+            "WITH " + RECRUITERS_CTE + ", " + _METRICS_CTES + """
+            SELECT s.recruiter_email, ck.item_code, COUNT(*) AS profiles
+            FROM scope s
+            JOIN first_dec d            ON d.candidate_id = s.candidate_id
+                                       AND d.opportunity_id = s.opportunity_id
+            JOIN cv_review_checklist ck ON ck.review_id = d.decided_review_id
+            GROUP BY 1, 2
+            ORDER BY 1, 3 DESC
+            """,
+            params,
+        )
+        checklist_rows = [dict(r) for r in cur.fetchall()]
     finally:
         cur.close()
         conn.close()
@@ -1546,12 +1684,27 @@ def cv_review_metrics():
             "profiles": r["profiles"],
         })
 
+    item_labels = dict(cv_review_ai.CHECKLIST_ITEMS)
+    checklist_by_recruiter = {}
+    for r in checklist_rows:
+        checklist_by_recruiter.setdefault(r["recruiter_email"], []).append({
+            "item_code": r["item_code"],
+            "item_label": item_labels.get(r["item_code"], r["item_code"]),
+            "profiles": r["profiles"],
+        })
+
     out_rows = []
     for r in rows:
         decided = r["profiles_decided"]
         reasons = by_recruiter.get(r["recruiter_email"], [])
         for item in reasons:
             item["pct"] = _pct(item["profiles"], decided)
+        # Los ítems van sobre profiles_checklisted, NO sobre decided: mezclarlos daría un
+        # porcentaje diluido por los perfiles que nadie chequeó.
+        checklisted = r["profiles_checklisted"]
+        checklist = checklist_by_recruiter.get(r["recruiter_email"], [])
+        for item in checklist:
+            item["pct"] = _pct(item["profiles"], checklisted)
         out_rows.append({
             **r,
             "quality_avg": float(r["quality_avg"]) if r["quality_avg"] is not None else None,
@@ -1559,6 +1712,12 @@ def cv_review_metrics():
             "approved_first_try_pct": _pct(r["approved_first_try"], decided),
             "changes_first_try_pct": _pct(r["changes_first_try"], decided),
             "reasons": reasons,
+            "checklist": checklist,
+            "clean_pct": _pct(r["profiles_clean"], checklisted),
+            # Cobertura de la checklist. Se reporta SIEMPRE por el mismo motivo que
+            # stale_version_profiles: sin esto, "80 por ciento limpios (n=5)" esconde que
+            # había 40 perfiles decididos y 35 sin chequear.
+            "checklisted_pct": _pct(checklisted, decided),
         })
 
     totals = {
@@ -1570,11 +1729,29 @@ def cv_review_metrics():
         "changes_first_try": sum(r["changes_first_try"] for r in rows),
         "quality_n": sum(r["quality_n"] for r in rows),
         "stale_version_profiles": sum(r["stale_version_profiles"] for r in rows),
+        "profiles_checklisted": sum(r["profiles_checklisted"] for r in rows),
+        "profiles_clean": sum(r["profiles_clean"] for r in rows),
     }
     weighted = sum(
         float(r["quality_avg"]) * r["quality_n"] for r in rows if r["quality_avg"] is not None
     )
     totals["quality_avg"] = round(weighted / totals["quality_n"], 1) if totals["quality_n"] else None
+    totals["clean_pct"] = _pct(totals["profiles_clean"], totals["profiles_checklisted"])
+    totals["checklisted_pct"] = _pct(totals["profiles_checklisted"], totals["profiles_decided"])
+    # El desglose global se suma de las filas en vez de re-consultarse: es la misma agregación
+    # y así no puede divergir de lo que ve cada recruiter.
+    totals_checklist = {}
+    for r in checklist_rows:
+        entry = totals_checklist.setdefault(r["item_code"], {
+            "item_code": r["item_code"],
+            "item_label": item_labels.get(r["item_code"], r["item_code"]),
+            "profiles": 0,
+        })
+        entry["profiles"] += r["profiles"]
+    for entry in totals_checklist.values():
+        entry["pct"] = _pct(entry["profiles"], totals["profiles_checklisted"])
+    totals["checklist"] = sorted(totals_checklist.values(),
+                                 key=lambda e: e["profiles"], reverse=True)
     totals["rejected_first_try_pct"] = _pct(totals["rejected_first_try"], totals["profiles_decided"])
     totals["approved_first_try_pct"] = _pct(totals["approved_first_try"], totals["profiles_decided"])
     totals["changes_first_try_pct"] = _pct(totals["changes_first_try"], totals["profiles_decided"])
@@ -1590,6 +1767,19 @@ def cv_review_metrics():
             # de 100. La UI TIENE que decirlo o el primero que los sume abre un bug.
             "reasons_are_not_exclusive": True,
             "denominator": "profiles_decided",
+            # Un CV puede tener tres defectos, así que estos porcentajes también suman más de
+            # 100. Y su denominador NO es el mismo que el de las razones: hay que decir las dos
+            # cosas o el primero que los sume abre un bug.
+            "checklist_is_not_exclusive": True,
+            "checklist_denominator": "profiles_checklisted",
+            # Para que la UI pueda decir "estás viendo sólo lo tuyo" en vez de dejar creer
+            # que la recruiter está mirando al equipo entero.
+            "scoped_to_self": not is_reviewer,
+            # Sin esto, "0 sent" en un rango que el usuario eligió a mano se lee como que la
+            # pantalla está rota, en vez de como que no hay datos todavía.
+            "metrics_from": METRICS_FROM.isoformat(),
+            "window_clamped": clamped,
+            "window_empty": window_empty,
             # La calidad promedio SÓLO cuenta análisis de esta versión del prompt. Las
             # razones de rechazo no se filtran: son decisiones humanas y no dependen de
             # la IA.

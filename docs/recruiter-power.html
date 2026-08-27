@@ -14,7 +14,9 @@
     rel="stylesheet"
   />
 <link rel="stylesheet" href="./assets/css/sidebar.css" />
-  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=18" />
+  <!-- Tarjeta por recruiter, la MISMA que pinta docs/cv-review.html -->
+  <link rel="stylesheet" href="./assets/css/cv-review-cards.css?v=20260827-shared" />
+  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=27" />
   <style>
     .metric-card[data-metric-detail] {
       cursor: pointer;
@@ -195,6 +197,9 @@
       </button>
       <button type="button" class="metrics-tab" data-tab-target="history">
         Historic trends
+      </button>
+      <button type="button" class="metrics-tab" data-tab-target="cvquality">
+        CV quality
       </button>
     </div>
     </div><!-- /.metrics-toolbar -->
@@ -493,6 +498,64 @@
       </section>
     </section>
 
+    <!-- Calidad del CV que arma la recruiter, medida en el gate de CV Review.
+         DOS tarjetas y no cinco bloques sueltos: antes convivían tres estilos distintos
+         (la tarjeta de Hirex, una metric-card gigante y un panel de barras) y no parecían
+         de la misma pantalla. Ahora las dos usan el mismo marco que el resto de la página. -->
+    <section class="metrics-tabpanel" data-tab-panel="cvquality" id="cvQualityTab">
+
+      <div class="cvq-layout" aria-live="polite">
+
+        <div class="metric-group">
+          <div class="metric-group__head"><span class="metric-group__icon">📇</span><span class="metric-group__label">Review summary</span><span class="metric-group__rule"></span></div>
+          <!-- La MISMA tarjeta que la sección "Per recruiter" de CV Review: el marcado lo
+               emite assets/js/cv-review-cards.js. Acá sólo se le cambia la piel para que
+               hable el idioma de esta página; los números salen del mismo código. -->
+          <div id="cvqCards" class="cvq-cards"></div>
+        </div>
+
+        <div class="metric-group">
+          <div class="metric-group__head"><span class="metric-group__icon">✍️</span><span class="metric-group__label">CV quality</span><span class="metric-group__rule"></span></div>
+          <!-- Se usan las MISMAS clases que la tarjeta de la izquierda (.cvr-mcard,
+               .cvr-mcard-head, .cvr-mcard-hero, .cvr-reasons-cap, .cvr-mchips) en vez de
+               clases propias: así las dos se ven iguales por construcción y no por haber
+               copiado valores a mano, que es lo que se desincroniza. Lo único propio son
+               las barras. -->
+          <article class="cvr-mcard cvq-card">
+            <div class="cvr-mcard-head">
+              <h3>Clean CVs</h3>
+              <span class="cvr-mcard-sent"><b id="cvCleanDen">—</b> checklisted</span>
+            </div>
+
+            <div class="cvr-mcard-hero">
+              <span id="cvCleanRing"></span>
+              <div class="cvr-hero-txt">
+                <div class="cvr-hero-l">Nothing flagged</div>
+                <div class="cvr-hero-s" id="cvCleanHelper">—</div>
+              </div>
+            </div>
+
+            <p class="cvr-reasons-cap">What reviewers flag</p>
+            <div id="cvqBars" class="cvq-bars"></div>
+            <p class="cvq-empty" id="cvqEmpty" hidden>No CV was checklisted in this window.</p>
+
+            <!-- Las salvedades van como chips, igual que "pending" / "old rubric" en la otra
+                 tarjeta. Antes esto era un recuadro amarillo que gritaba; en este lenguaje
+                 las salvedades se dicen bajito. -->
+            <div class="cvr-mchips" id="cvqChips"></div>
+
+            <p class="cvq-note">A CV can have several of these at once, so the percentages add
+              up to more than 100. Each one is the share of checklisted CVs with that defect.</p>
+          </article>
+        </div>
+
+      </div>
+
+      <section class="meta-footer">
+        <p id="cvqInfo" class="meta-text"></p>
+      </section>
+    </section>
+
     <section class="metrics-tabpanel" data-tab-panel="history" id="historyTab">
       <section class="history-panel" id="historyPanel" aria-live="polite">
         <header class="history-header">
@@ -598,7 +661,8 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/recruiter-power.js"></script>
+  <script src="./assets/js/cv-review-cards.js?v=20260827-shared"></script>
+  <script src="./assets/js/recruiter-power.js?v=20260827-hirex"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

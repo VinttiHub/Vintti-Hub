@@ -59,17 +59,13 @@
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   }
 
-  // Clase del semáforo para un score 0-100.
-  const qCls = (s) => (s === null || s === undefined) ? 'cvr-q-none'
-    : s >= 75 ? 'cvr-q-good' : s >= 50 ? 'cvr-q-mid' : 'cvr-q-low';
+  // Estos cuatro viven en assets/js/cv-review-cards.js, compartidos con recruiter-power.html
+  // para que las dos páginas pinten la MISMA tarjeta. Acá quedan como alias para no tocar
+  // los call sites de esta página.
+  const CARDS = window.CvReviewCards;
+  const qCls = CARDS.qCls;
 
-  // Con n chico el porcentaje engaña: 1 de 20 es 5 por ciento, y "5%" solo parece una
-  // tendencia. Siempre se muestra el conteo al lado.
-  function fmtRate(count, total, pct) {
-    if (!total) return '—';
-    const p = (pct === null || pct === undefined) ? Math.round(1000 * count / total) / 10 : pct;
-    return `${count}/${total} · ${p}%`;
-  }
+  const fmtRate = CARDS.fmtRate;
 
   // Los análisis guardados antes de la v7 dicen "the source": el prompt viejo se lo
   // enseñaba al modelo. Esos reviews ya están decididos y nadie los va a re-correr, así
@@ -81,6 +77,8 @@
     (m[0] === 'T' ? "The" : "the") + " candidate's own CV or LinkedIn");
 
   let reasonLabels = {};
+  let checklistLabels = {};
+  let modeFootHint = '';
   let currentReview = null;
   let queueRows = [];
 
@@ -93,20 +91,7 @@
 
   /* ---------------------------------------------------------------- métricas */
 
-  // Anillo de coverage. Lo comparten la cola y las tarjetas: es la misma medida, así que
-  // tiene que verse igual en los dos lados. pathLength="100" deja escribir el dasharray
-  // directo en porcentaje, sin calcular la circunferencia.
-  function ringHtml(score, modCls) {
-    const pct = Math.max(0, Math.min(100, Number(score) || 0));
-    return `<span class="cvr-cov ${modCls || ''}">
-        <svg class="cvr-ring ${qCls(score)}" viewBox="0 0 36 36" aria-hidden="true">
-          <circle class="cvr-ring-t" cx="18" cy="18" r="16" pathLength="100"></circle>
-          <circle class="cvr-ring-p" cx="18" cy="18" r="16" pathLength="100"
-                  stroke-dasharray="${pct} 100"></circle>
-        </svg>
-        <span class="cvr-cov-n">${score}</span>
-      </span>`;
-  }
+  const ringHtml = CARDS.ringHtml;
 
   function renderMetrics(data) {
     const box = $('cvrMetrics');
@@ -114,10 +99,14 @@
     const totals = data.totals || {};
     const meta = data.meta || {};
 
-    $('cvrMetricsWindow').textContent =
-      (meta.desde ? `${meta.desde} → ${meta.hasta}` : '')
-      + (meta.sales_lead ? '  ·  your opportunities' : '')
-      + (meta.ai_version ? `  ·  scoring v${meta.ai_version}` : '');
+    // Ventana invertida = el período elegido termina antes del piso de las métricas. Se
+    // dice con palabras en vez de pintar "2026-09-01 → 2026-08-27", que se lee como un bug.
+    $('cvrMetricsWindow').textContent = meta.window_empty
+      ? `nothing here yet — these metrics start on ${meta.metrics_from}`
+      : (meta.desde ? `${meta.desde} → ${meta.hasta}` : '')
+        + (meta.sales_lead ? '  ·  your opportunities' : '')
+        + (meta.ai_version ? `  ·  scoring v${meta.ai_version}` : '')
+        + (meta.window_clamped ? `  ·  from ${meta.metrics_from} onwards` : '');
 
     // Resumen para leer la sección SIN abrirla: plegada tiene que decir algo igual.
     const sum = [];
@@ -135,99 +124,12 @@
     }
     show($('cvrMetricsEmpty'), false);
 
-    const card = (r, isTotal) => {
-      const q = r.quality_avg;
-      const hasQ = q !== null && q !== undefined;
+    const card = (r, isTotal) => CARDS.card(r, isTotal);
 
-      // Aprobado y rechazado en primera son las dos mitades de lo MISMO (lo que ya
-      // decidiste), así que van en una sola barra partida en vez de dos porcentajes
-      // sueltos que el ojo tiene que sumar.
-      const dec = r.profiles_decided || 0;
-      const ap = r.approved_first_try_pct;
-      const rj = r.rejected_first_try_pct;
-      // Tres tramos, no dos: "devuelto para corregir" no es ni aprobado ni rechazado, y
-      // sumarlo a cualquiera de los dos miente en la dirección que más importa — el
-      // rechazo es sobre el candidato, la corrección es sobre el documento.
-      // El tramo va siempre (0 % es ancho 0) pero la leyenda sólo si hubo alguno: una
-      // línea que dice "0% needs changes" en cada tarjeta es ruido.
-      const ch = r.changes_first_try_pct || 0;
-      const split = dec
-        ? `<div class="cvr-split" role="img"
-                aria-label="${ap} per cent approved on the first try, ${ch} per cent sent back for changes, ${rj} per cent rejected">
-             <i class="cvr-split-a" style="width:${ap}%"></i>
-             <i class="cvr-split-c" style="width:${ch}%"></i>
-             <i class="cvr-split-r" style="width:${rj}%"></i>
-           </div>
-           <div class="cvr-split-legend">
-             <span class="cvr-lg-a"><b>${ap}%</b> approved 1st try</span>
-             ${ch ? `<span class="cvr-lg-c"><b>${ch}%</b> needs changes</span>` : ''}
-             <span class="cvr-lg-r"><b>${rj}%</b> rejected</span>
-           </div>
-           <p class="cvr-split-base">over ${dec} decided profile${dec === 1 ? '' : 's'}</p>`
-        : `<p class="cvr-split-base cvr-split-base--empty">Nothing decided yet in this period.</p>`;
-
-      const reasons = (r.reasons || []).map(x =>
-        `<li><span>${esc(x.reason_label)}</span>
-             <b>${fmtRate(x.profiles, r.profiles_decided, x.pct)}</b></li>`).join('');
-
-      // Las salvedades eran cuatro renglones de gris repetidos en cada tarjeta. Van como
-      // chips con el porqué en el tooltip: se ven de un vistazo y se leen si te importan.
-      const chip = (n, label, why) => n
-        ? `<span class="cvr-mchip" title="${esc(why)}"><b>${n}</b> ${esc(label)}</span>` : '';
-      const chips = [
-        chip(r.profiles_pending, 'pending',
-             'Still waiting on your decision. The rates only count profiles you already decided.'),
-        chip(r.stale_version_profiles, 'old rubric',
-             'Scored under the old rubric, which measured the writing instead of JD coverage. Excluded from the coverage average.'),
-        chip(r.unscored_profiles, 'unscored',
-             'No AI score: the vacancy had no job description, or the scoring failed.'),
-      ].filter(Boolean).join('');
-
-      return `
-      <article class="cvr-mcard ${isTotal ? 'cvr-mcard--total' : ''}">
-        <div class="cvr-mcard-head">
-          <h3>${esc(isTotal ? 'All recruiters' : (r.recruiter_label || r.recruiter_email))}</h3>
-          <span class="cvr-mcard-sent"><b>${r.profiles_sent}</b> sent</span>
-        </div>
-
-        <div class="cvr-mcard-hero">
-          ${hasQ ? ringHtml(q, 'cvr-cov--lg') : '<span class="cvr-cov--lg cvr-cov-empty">—</span>'}
-          <div class="cvr-hero-txt">
-            <div class="cvr-hero-l">JD coverage</div>
-            <div class="cvr-hero-s">${hasQ
-              ? `average of ${r.quality_n} first-round CV${r.quality_n === 1 ? '' : 's'}`
-              : 'no scored CVs in this period'}</div>
-          </div>
-        </div>
-
-        <div class="cvr-mcard-split">${split}</div>
-
-        ${reasons ? `<p class="cvr-reasons-cap">Why they were rejected</p>
-                     <ul class="cvr-reasons-list">${reasons}</ul>` : ''}
-        ${chips ? `<div class="cvr-mchips">${chips}</div>` : ''}
-      </article>`;
-    };
-
-    const totalRow = {
-      ...totals,
-      recruiter_label: 'All recruiters',
-      reasons: aggregateReasons(data.by_reason || [], totals.profiles_decided),
-    };
+    const totalRow = CARDS.totalsRow(data, reasonLabels);
     box.innerHTML = card(totalRow, true) + rows.map(r => card(r, false)).join('');
   }
 
-  function aggregateReasons(byReason, decided) {
-    const acc = {};
-    byReason.forEach(r => { acc[r.reason_code] = (acc[r.reason_code] || 0) + r.profiles; });
-    return Object.entries(acc)
-      .sort((a, b) => b[1] - a[1])
-      .map(([code, profiles]) => ({
-        reason_code: code,
-        reason_label: reasonLabels[code] || code,
-        profiles,
-        pct: decided ? Math.round(1000 * profiles / decided) / 10 : null,
-      }));
-  }
 
   /* ------------------------------------------------------------------- cola */
 
@@ -1750,6 +1652,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     box.innerHTML = reviews.sort((a, b) => b.round - a.round).map(r => {
       const [label, cls] = STATUS[r.status] || [r.status, ''];
       const reasons = (r.reasons || []).map(c => esc(reasonLabels[c] || c)).join(', ');
+      const flags = (r.checklist || []).map(c => esc(checklistLabels[c] || c)).join(', ');
       return `
       <div class="cvr-round">
         <div class="cvr-round-head">
@@ -1760,6 +1663,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         </div>
         ${r.recruiter_note ? `<p class="cvr-round-line"><b>Recruiter:</b> ${esc(r.recruiter_note)}</p>` : ''}
         ${reasons ? `<p class="cvr-round-line"><b>Reasons:</b> ${reasons}</p>` : ''}
+        ${flags ? `<p class="cvr-round-line"><b>Checklist:</b> ${flags}</p>` : ''}
         ${r.reject_other ? `<p class="cvr-round-line"><b>Other:</b> ${esc(r.reject_other)}</p>` : ''}
         ${r.reviewer_comment ? `<p class="cvr-round-comment">${esc(r.reviewer_comment)}</p>` : ''}
       </div>`;
@@ -1781,11 +1685,14 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     show($('cvrRejectToggle'), !on);
     show($('cvrChangesToggle'), !on);
     show($('cvrApprove'), !on);
-    $('cvrFootHint').textContent = rej
+    modeFootHint = rej
       ? 'This takes the candidate out of this opening. To ask for a rewrite, use Request changes.'
       : chg
         ? 'The comment is the only thing the recruiter gets, so say what to change.'
         : '';
+    // El hint lo escribe syncChecklistGate: si la checklist falta, ese mensaje gana, porque
+    // es el que explica por qué los botones están grises.
+    syncChecklistGate();
     if (on) {
       // Llevar el ojo al formulario: en un CV largo queda debajo del iframe.
       $(rej ? 'cvrRejectForm' : 'cvrChangesForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1795,6 +1702,9 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
   function openDrawer(reviewId) {
     $('cvrDrawerError').textContent = '';
     setDecisionMode(null);
+    // Los tildes son de la review anterior. Sin esto, abrir una y después otra arrastraría
+    // los defectos de la primera y se guardarían contra la recruiter equivocada.
+    resetChecklist();
     // Los dos footers se apagan ANTES del fetch. Sin esto, abrir un rechazo y después uno
     // aprobado mostraba el footer de reabrir durante el "Loading…", sobre otra review.
     show($('cvrReopenFoot'), false);
@@ -1868,6 +1778,13 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         // Sólo sobre un rechazo: es el único veredicto que traba a la recruiter.
         show($('cvrReopenFoot'), r.status === 'rejected');
 
+        if (r.status === 'pending') {
+          // Arranca deshabilitando: el gate se abre recién cuando el reviewer tilda algo.
+          syncChecklistGate();
+        } else {
+          paintChecklistReadonly(r);
+        }
+
         loadOpps(r);
 
         return fetch(`${API}/candidates/${r.candidate_id}/cv_reviews?opportunity_id=${r.opportunity_id}`,
@@ -1910,9 +1827,87 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     });
   }
 
+  function renderChecklistChecks() {
+    $('cvrChecklist').innerHTML = Object.entries(checklistLabels).map(([code, label]) => `
+      <label class="cvr-check">
+        <input type="checkbox" value="${esc(code)}" />
+        <span>${esc(label)}</span>
+      </label>`).join('');
+    // Exclusión mutua con "Nothing to flag": son respuestas incompatibles a la misma
+    // pregunta, y dejarlas convivir manda un "está limpio" junto con dos defectos.
+    $('cvrChecklist').addEventListener('change', () => {
+      if (checklistPicks().length) $('cvrChecklistClean').checked = false;
+      syncChecklistGate();
+    });
+    $('cvrChecklistClean').addEventListener('change', () => {
+      if ($('cvrChecklistClean').checked) {
+        $('cvrChecklist').querySelectorAll('input:checked').forEach(i => { i.checked = false; });
+      }
+      syncChecklistGate();
+    });
+  }
+
+  const checklistPicks = () =>
+    Array.from($('cvrChecklist').querySelectorAll('input:checked')).map(i => i.value);
+
+  // "El reviewer pasó por la checklist". Tildar un ítem ya lo prueba; el checkbox de limpio
+  // existe para el caso contrario. Sin esto, "0 defectos" y "nadie la miró" serían la misma
+  // fila y la métrica mediría al reviewer en vez de a la recruiter.
+  const checklistDone = () => !!checklistPicks().length || $('cvrChecklistClean').checked;
+
+  function resetChecklist() {
+    $('cvrChecklist').querySelectorAll('input').forEach(i => {
+      i.checked = false;
+      i.disabled = false;
+    });
+    const clean = $('cvrChecklistClean');
+    clean.checked = false;
+    clean.disabled = false;
+    $('cvrChecklistSection').classList.remove('is-missing');
+  }
+
+  // Una ronda ya decidida se muestra como registro, no como formulario.
+  function paintChecklistReadonly(review) {
+    const picks = new Set(review.checklist || []);
+    $('cvrChecklist').querySelectorAll('input').forEach(i => {
+      i.checked = picks.has(i.value);
+      i.disabled = true;
+    });
+    const clean = $('cvrChecklistClean');
+    clean.checked = review.checklist_done && !picks.size;
+    clean.disabled = true;
+  }
+
+  function syncChecklistGate() {
+    // Sólo aplica mientras se puede decidir; en una ronda cerrada los botones no están.
+    if (!currentReview || currentReview.status !== 'pending') return;
+    const ready = checklistDone();
+    [$('cvrApprove'), $('cvrRejectConfirm'), $('cvrChangesConfirm')].forEach(b => {
+      b.disabled = !ready;
+    });
+    $('cvrFootHint').textContent = ready
+      ? modeFootHint
+      : 'Go through the checklist above before deciding.';
+    if (ready) $('cvrChecklistSection').classList.remove('is-missing');
+  }
+
+  // El botón gris no se explica solo: la columna scrollea y la checklist puede haber quedado
+  // fuera de la vista, así que hay que llevar el ojo hasta ella.
+  function flagChecklistMissing() {
+    const sec = $('cvrChecklistSection');
+    sec.open = true;
+    sec.classList.add('is-missing');
+    sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('cvrDrawerError').textContent = 'Go through the checklist first: tick what the recruiter '
+      + 'got wrong, or mark the CV as clean.';
+  }
+
   function decide(decision) {
     if (!currentReview) return;
-    const body = { decision };
+    if (!checklistDone()) { flagChecklistMissing(); return; }
+    // Va en las TRES decisiones, no sólo en el rechazo: el caso que esto existe para
+    // registrar es el CV que se APRUEBA con la educación sin cargar.
+    const body = { decision, checklist: checklistPicks(), checklist_done: true };
     if (decision === 'rejected') {
       body.reasons = Array.from($('cvrReasons').querySelectorAll('input:checked')).map(i => i.value);
       body.reason_other = $('cvrReasonOther').value.trim();
@@ -1941,6 +1936,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         $('cvrChangesComment').value = '';
         $('cvrReasonOther').value = '';
         $('cvrReasons').querySelectorAll('input:checked').forEach(i => { i.checked = false; });
+        resetChecklist();
         closeDrawer();
         refresh();
         if (out.batch_synced) {
@@ -1952,7 +1948,12 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         $('cvrDrawerError').textContent = err.body?.error || err.message;
         if (err.body?.code === 'already_decided') refresh();
       })
-      .finally(() => { buttons.forEach(b => { b.disabled = false; }); });
+      .finally(() => {
+        buttons.forEach(b => { b.disabled = false; });
+        // El re-enable de arriba es ciego: sin esto, un error de red dejaría los botones de
+        // confirmar prendidos aunque la checklist esté vacía.
+        syncChecklistGate();
+      });
   }
 
   /* ------------------------------------------------------------------ carga */
@@ -2035,6 +2036,14 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     .then(d => {
       (d.reasons || []).forEach(x => { reasonLabels[x.code] = x.label; });
       renderReasonChecks();
+    })
+    .catch(() => {});
+
+  const loadChecklistItems = () => fetch(`${API}/cv_review_checklist_items`, { headers: headers() })
+    .then(r => r.ok ? r.json() : { items: [] })
+    .then(d => {
+      (d.items || []).forEach(x => { checklistLabels[x.code] = x.label; });
+      renderChecklistChecks();
     })
     .catch(() => {});
 
@@ -2183,7 +2192,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       if ($('cvrDrawer').classList.contains('is-open')) closeDrawer();
     });
 
-    Promise.all([loadReasons(), loadRecruiters()]).then(() => {
+    Promise.all([loadReasons(), loadChecklistItems(), loadRecruiters()]).then(() => {
       refresh();
       // openDrawer se trae el review por su id, así que no espera a la cola.
       if (deepReviewId) openDrawer(deepReviewId);

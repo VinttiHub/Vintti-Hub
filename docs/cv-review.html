@@ -20,7 +20,10 @@
   <!-- El sistema de diseño de Hirex: tokens, topbar, toolbar, tabla, drawer, estados.
        Esta página lo reusa entero en vez de inventar un segundo lenguaje visual. -->
   <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260825-tools4" />
+  <!-- Tarjeta por recruiter, compartida con recruiter-power.html. Va ANTES de
+       cv-review.css para que esa pueda pisar algo si hiciera falta. -->
+  <link rel="stylesheet" href="./assets/css/cv-review-cards.css?v=20260827-shared" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260827-checklist" />
 </head>
 
 <body class="light-mode">
@@ -251,6 +254,25 @@
               </div>
             </details>
 
+            <!-- La checklist va FUERA de los formularios de decisión y siempre visible: un CV
+                 se aprueba con defectos, y ése es justamente el caso que antes no quedaba
+                 registrado. Abierta por defecto porque es obligatoria para decidir. -->
+            <details class="hx-section" id="cvrChecklistSection" open>
+              <summary>Checklist <em class="hx-hint">required</em></summary>
+              <div class="cvr-section-body">
+                <p class="cvr-field-label">Tick anything the recruiter got wrong. This feeds
+                  her quality metrics.</p>
+                <div id="cvrChecklist" class="cvr-checklist"></div>
+                <label class="cvr-checklist-clean">
+                  <input type="checkbox" id="cvrChecklistClean" />
+                  <span>Nothing to flag — the CV is clean</span>
+                </label>
+                <p class="cvr-checklist-note" id="cvrChecklistNote">This is what a CV gets
+                  measured on, so it is not the same as rejecting the candidate: tick the
+                  defects even when you approve.</p>
+              </div>
+            </details>
+
             <details class="hx-section" id="cvrRoundsSection">
               <summary>Previous rounds</summary>
               <div class="cvr-section-body"><div id="cvrRounds" class="cvr-rounds"></div></div>
@@ -342,6 +364,8 @@
   </main>
 
   <script src="./assets/js/sidebar.js?v=20260813-badge" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260825-tools4" defer></script>
+  <!-- defer preserva el orden, así que CvReviewCards ya existe cuando corre cv-review.js -->
+  <script src="./assets/js/cv-review-cards.js?v=20260827-shared" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260827-shared" defer></script>
 </body>
 </html>
