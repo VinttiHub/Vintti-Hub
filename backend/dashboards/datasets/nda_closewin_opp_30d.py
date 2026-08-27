@@ -32,89 +32,76 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # NDA → Close Win — PER CLIENT, ANCLA POR FECHA DE CIERRE (spec Bahía p.3:
-    # "de todos los Clientes que pasaron a sourcing cuantos fueron closed win
-    #  sobre los que fueron closed lost").
-    #
-    # Cohorte: los clientes que CERRARON en la ventana (opp_close_date), sin importar
-    # cuándo entraron como SQL ni cuándo firmaron el NDA. Es el ancla natural de una
-    # métrica de resultado: "de lo que se definió este mes, cuánto ganamos".
-    # Al anclar por cierre, "los que ya se definieron" es automático — todos lo están.
-    #
-    # Filtro de etapa: la opp tiene que haber pasado por sourcing (NDA firmado). Esa
-    # es la única diferencia con sql_to_clientwin_30d, que no lo exige.
-    #
-    # DEDUPE per client: un cliente con Close Win Y Closed Lost cuenta como GANADO —
-    # basta un CW para haber ganado al cliente. La versión por deal está en
-    # nda_closewin_opp_30d.
-    #
-    # M+B por opp_sales_lead (NO account_manager: al ganar se reasigna al AM post-venta
-    # y filtrar por ahí borraría todas las wins — ver _sales_scope).
+    # NDA Signed → Closed Win — PER OPPORTUNITY (spec Bahía 2026-08-25, punto 5).
+    # Es la card 3 (nda_to_clientwin_30d) SIN dedupe por cuenta: acá 20 opps de un
+    # mismo cliente cuentan 20. Va debajo del funnel per client, como métrica de deals.
+    # Denominador: opps con NDA firmado que ya decidieron (Close Win / Closed Lost),
+    #              con opp_close_date en la ventana.
+    # Numerador:   las Close Win.
+    # M+B por opp_sales_lead (la unidad es la opp, y la opp tiene su propio sales lead).
     win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH cur AS (
           SELECT
-            o.account_id,
             CASE
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
               ELSE 'marketing'
             END AS channel,
-            BOOL_OR(TRIM(o.opp_stage) = 'Close Win') AS won
+            (TRIM(o.opp_stage) = 'Close Win') AS won
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
-          WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
-            AND NULLIF(o.nda_signature_or_start_date::text, '')::date IS NOT NULL
+          WHERE NULLIF(o.nda_signature_or_start_date::text, '')::date IS NOT NULL
+            AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
             AND NULLIF(o.opp_close_date::text, '')::date
                 BETWEEN %(win_ini)s::date AND %(win_fin)s::date
             AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
-          GROUP BY o.account_id, a.where_come_from
         )
         SELECT
-          COUNT(*) FILTER (WHERE channel='sales')::int                  AS sales_nda,
+          COUNT(*) FILTER (WHERE channel='sales')::int                  AS sales_opps,
           COUNT(*) FILTER (WHERE channel='sales' AND won)::int          AS sales_win,
           ROUND(COUNT(*) FILTER (WHERE channel='sales' AND won)::numeric * 100.0
                 / NULLIF(COUNT(*) FILTER (WHERE channel='sales'), 0), 1) AS sales_pct,
 
-          COUNT(*) FILTER (WHERE channel='marketing')::int                  AS mkt_nda,
+          COUNT(*) FILTER (WHERE channel='marketing')::int                  AS mkt_opps,
           COUNT(*) FILTER (WHERE channel='marketing' AND won)::int          AS mkt_win,
           ROUND(COUNT(*) FILTER (WHERE channel='marketing' AND won)::numeric * 100.0
                 / NULLIF(COUNT(*) FILTER (WHERE channel='marketing'), 0), 1) AS mkt_pct,
 
-          COUNT(*) FILTER (WHERE channel='referrals')::int                  AS ref_nda,
+          COUNT(*) FILTER (WHERE channel='referrals')::int                  AS ref_opps,
           COUNT(*) FILTER (WHERE channel='referrals' AND won)::int          AS ref_win,
           ROUND(COUNT(*) FILTER (WHERE channel='referrals' AND won)::numeric * 100.0
                 / NULLIF(COUNT(*) FILTER (WHERE channel='referrals'), 0), 1) AS ref_pct,
 
-          COUNT(*)::int                     AS total_nda,
-          COUNT(*) FILTER (WHERE won)::int  AS total_win,
+          COUNT(*)::int                           AS total_opps,
+          COUNT(*) FILTER (WHERE won)::int        AS total_win,
           ROUND(COUNT(*) FILTER (WHERE won)::numeric * 100.0
-                / NULLIF(COUNT(*), 0), 1)   AS total_pct
+                / NULLIF(COUNT(*), 0), 1)         AS total_pct
         FROM cur;
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin, "corte": corte, "desde": desde, "hasta": hasta}
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {
-    "key": "nda_to_clientwin_30d",
-    "label": "NDA (Sourcing) → Close Win por canal, per client (30d, AE)",
+    "key": "nda_closewin_opp_30d",
+    "label": "NDA Signed → Closed Win por canal, per opportunity (30d, AE)",
     "dimensions": [],
     "measures": [
-        {"key": "sales_nda", "label": "Sales · Clientes cerrados", "type": "number"},
+        {"key": "sales_opps", "label": "Sales · Opps decididas", "type": "number"},
         {"key": "sales_win", "label": "Sales · Close Win", "type": "number"},
         {"key": "sales_pct", "label": "Sales · NDA→Win %", "type": "percent"},
-        {"key": "mkt_nda", "label": "Marketing · Clientes cerrados", "type": "number"},
+        {"key": "mkt_opps", "label": "Marketing · Opps decididas", "type": "number"},
         {"key": "mkt_win", "label": "Marketing · Close Win", "type": "number"},
         {"key": "mkt_pct", "label": "Marketing · NDA→Win %", "type": "percent"},
-        {"key": "ref_nda", "label": "Referrals · Clientes cerrados", "type": "number"},
+        {"key": "ref_opps", "label": "Referrals · Opps decididas", "type": "number"},
         {"key": "ref_win", "label": "Referrals · Close Win", "type": "number"},
         {"key": "ref_pct", "label": "Referrals · NDA→Win %", "type": "percent"},
-        {"key": "total_nda", "label": "Total · Clientes cerrados en la ventana", "type": "number"},
+        {"key": "total_opps", "label": "Total · Opps decididas", "type": "number"},
         {"key": "total_win", "label": "Total · Close Win", "type": "number"},
         {"key": "total_pct", "label": "Total · NDA→Win %", "type": "percent"},
     ],

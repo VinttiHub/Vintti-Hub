@@ -4267,6 +4267,17 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   .funnel-row > .card,
   .funnel-row > .card:nth-of-type(4) { grid-column: auto; }
 }
+/* Fila de una sola card (NDA Signed → Closed Win per opportunity): mismo grid de 4
+   columnas que el funnel, así la card conserva el ancho de las de arriba. */
+.funnel-row--single { margin-top: 16px; }
+
+/* Calificador dentro del título de la card ("per Opportunity", "per Client"): mismo
+   tamaño que el título pero sin peso, para que no compita con el nombre de la métrica. */
+.card__title-qual {
+  font-weight: 400;
+  opacity: .62;
+}
+
 .wrchan-bar__val {
   display: flex;
   flex-direction: column;

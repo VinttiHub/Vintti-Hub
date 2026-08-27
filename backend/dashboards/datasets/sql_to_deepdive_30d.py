@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from ._now import today_ar
 
-from ._periods import window_bounds
+from ._periods import prev_window_bounds, window_bounds
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -38,6 +38,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Window = fecha de creación de la account (cohorte). Delta vs los 30d previos.
     # M+B: account.account_manager ∈ (mariano, bahia) — owner a nivel account.
     win_ini, win_fin = window_bounds(filters)
+    prev_ini, prev_fin = prev_window_bounds(filters)
     sql = """
         WITH acc AS (
           -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
@@ -57,7 +58,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM account a
           WHERE a.sql_meeting_date IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
-            AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+            -- Solo clientes NUEVOS: el funnel mide adquisición, no expansión. Una
+            -- cuenta que ya era cliente antes de este evento (Elevate Clinics, 42 CW)
+            -- abriendo otra posición NO es una venta nueva. Sin este filtro entraban
+            -- 11 clientes existentes y el denominador casi se duplicaba.
+            AND NOT EXISTS (
+                  SELECT 1 FROM opportunity o3
+                  WHERE o3.account_id = a.account_id
+                    AND TRIM(o3.opp_stage) = 'Close Win'
+                    AND NULLIF(o3.opp_close_date::text,'')::date < a.sql_meeting_date
+              )
+            AND (
+                  TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+                OR EXISTS (
+                       SELECT 1 FROM opportunity o2
+                       WHERE o2.account_id = a.account_id
+                         AND TRIM(LOWER(o2.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
+                   )
+            )
             AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)
         ),
@@ -70,8 +88,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(*) FILTER (WHERE reached_dd)::numeric * 100.0 / NULLIF(COUNT(*), 0), 1
           ) AS prev_total_pct
           FROM acc
-          WHERE sql_d BETWEEN (%(corte)s::date - INTERVAL '59 days')::date
-                          AND (%(corte)s::date - INTERVAL '30 days')::date
+          WHERE sql_d BETWEEN %(prev_ini)s::date AND %(prev_fin)s::date
         )
         SELECT
           COUNT(*) FILTER (WHERE channel='sales')::int                       AS sales_sqls,
@@ -104,7 +121,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
+        "win_ini": win_ini, "win_fin": win_fin,
+        "prev_ini": prev_ini, "prev_fin": prev_fin, "corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

@@ -140,6 +140,8 @@ RESET_CHART_KEYS = {
         "sa_table_nda_to_clientwin_30d_detail",
         "sa_kpi_sql_to_clientwin_30d",
         "sa_table_sql_to_clientwin_30d_detail",
+        "sa_kpi_nda_closewin_opp_30d",
+        "sa_table_nda_closewin_opp_30d_detail",
         "sa_kpi_days_to_close_win_30d",
         "sa_table_days_to_close_win_30d_detail",
         "sa_kpi_ae_candidate_churn",
@@ -1664,7 +1666,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_deepdive_to_nda_30d",
         "tab_key": "sales",
-        "title": "Deep Dive → NDA Signed por canal - 30d",
+        "title": "Deep Dive → NDA Signed por canal, per client - 30d",
         "type": "kpi",
         "dataset_key": "deepdive_to_nda_30d",
         "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
@@ -1688,7 +1690,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_nda_to_clientwin_30d",
         "tab_key": "sales",
-        "title": "NDA Signed → Client Win por canal - 30d",
+        "title": "NDA (Sourcing) → Close Win por canal, per client - 30d",
         "type": "kpi",
         "dataset_key": "nda_to_clientwin_30d",
         "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
@@ -1712,7 +1714,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_sql_to_clientwin_30d",
         "tab_key": "sales",
-        "title": "SQL → Close Win (funnel completo) - 30d",
+        "title": "SQL → Closed Win por canal, per client - 30d",
         "type": "kpi",
         "dataset_key": "sql_to_clientwin_30d",
         "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
@@ -1732,6 +1734,30 @@ MAIN_CHARTS = [
         },
         "position": {"x": 4, "y": 44, "w": 8, "h": 5},
         "sort_order": 90.8,
+    },
+    {
+        "chart_key": "sa_kpi_nda_closewin_opp_30d",
+        "tab_key": "sales",
+        "title": "NDA Signed → Closed Win (per Opportunity) - 30d",
+        "type": "kpi",
+        "dataset_key": "nda_closewin_opp_30d",
+        "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
+        "position": {"x": 0, "y": 49, "w": 4, "h": 4},
+        "sort_order": 90.9,
+    },
+    {
+        "chart_key": "sa_table_nda_closewin_opp_30d_detail",
+        "tab_key": "sales",
+        "title": "NDA Signed → Closed Win (per Opportunity) - Detalle opps 30d",
+        "type": "table",
+        "dataset_key": "nda_closewin_opp_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "nda_date", "channel", "client_name", "opp_position_name", "estado"],
+            },
+        },
+        "position": {"x": 4, "y": 49, "w": 8, "h": 5},
+        "sort_order": 91.0,
     },
     {
         "chart_key": "sa_kpi_days_to_close_win_30d",

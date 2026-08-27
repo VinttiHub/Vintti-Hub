@@ -54,7 +54,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM account a
         WHERE a.sql_meeting_date IS NOT NULL
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
-          AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+          -- Solo clientes NUEVOS: el funnel mide adquisición, no expansión. Una
+          -- cuenta que ya era cliente antes de este evento (Elevate Clinics, 42 CW)
+          -- abriendo otra posición NO es una venta nueva. Sin este filtro entraban
+          -- 11 clientes existentes y el denominador casi se duplicaba.
+          AND NOT EXISTS (
+                SELECT 1 FROM opportunity o3
+                WHERE o3.account_id = a.account_id
+                  AND TRIM(o3.opp_stage) = 'Close Win'
+                  AND NULLIF(o3.opp_close_date::text,'')::date < a.sql_meeting_date
+            )
+          AND (
+                TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+              OR EXISTS (
+                     SELECT 1 FROM opportunity o2
+                     WHERE o2.account_id = a.account_id
+                       AND TRIM(LOWER(o2.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
+                 )
+          )
           AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
           AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)

@@ -32,50 +32,54 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # Una fila por opp con NDA firmado en la ventana, con su canal y si llegó a Client Win.
+    # Una fila por CLIENTE que cerró en la ventana (ancla: opp_close_date), igual que
+    # la card. Dedupe: un cliente con CW y CL aparece como Close Win.
+    # Solo clientes que pasaron por sourcing: la opp tiene NDA firmado.
     win_ini, win_fin = window_bounds(filters)
     sql = """
         SELECT
-          TO_CHAR(NULLIF(o.nda_signature_or_start_date::text,'')::date, 'YYYY-MM-DD') AS nda_date,
+          TO_CHAR(MAX(NULLIF(o.opp_close_date::text, '')::date), 'YYYY-MM-DD') AS close_date,
+          TO_CHAR(MIN(NULLIF(o.nda_signature_or_start_date::text, '')::date), 'YYYY-MM-DD') AS nda_date,
           CASE
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'Sales'
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'Referrals'
             ELSE 'Marketing'
           END AS channel,
           a.client_name,
-          o.opp_position_name,
-          CASE
-            WHEN TRIM(o.opp_stage) = 'Close Win'   THEN 'Client Win'
-            WHEN TRIM(o.opp_stage) = 'Closed Lost' THEN 'Closed Lost'
-            ELSE 'En proceso · ' || TRIM(o.opp_stage)
-          END AS estado
+          COUNT(*)::int AS opps,
+          CASE WHEN BOOL_OR(TRIM(o.opp_stage) = 'Close Win')
+               THEN 'Close Win' ELSE 'Closed Lost' END AS estado
         FROM opportunity o
         JOIN account a ON a.account_id = o.account_id
-        WHERE NULLIF(o.nda_signature_or_start_date::text,'')::date IS NOT NULL
+        WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
+          AND NULLIF(o.nda_signature_or_start_date::text, '')::date IS NOT NULL
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
-          AND NULLIF(o.nda_signature_or_start_date::text,'')::date
+          AND NULLIF(o.opp_close_date::text, '')::date
               BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-          AND (%(desde)s::date IS NULL OR NULLIF(o.nda_signature_or_start_date::text,'')::date >= %(desde)s::date)
-          AND (%(hasta)s::date IS NULL OR NULLIF(o.nda_signature_or_start_date::text,'')::date <= %(hasta)s::date)
-        ORDER BY channel, estado, nda_date DESC;
+          AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
+          AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
+        GROUP BY a.account_id, a.client_name, a.where_come_from
+        ORDER BY estado, channel, close_date DESC;
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
+        "win_ini": win_ini, "win_fin": win_fin, "corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {
     "key": "nda_to_clientwin_30d_detail",
-    "label": "NDA → Client Win — Detalle NDAs (30d, AE)",
+    "label": "NDA → Close Win — Detalle de clientes cerrados en la ventana",
     "dimensions": [
-        {"key": "nda_date", "label": "NDA date", "type": "date"},
+        {"key": "close_date", "label": "Última close", "type": "date"},
+        {"key": "nda_date", "label": "NDA firmado", "type": "date"},
         {"key": "channel", "label": "Canal", "type": "string"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
-        {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "estado", "label": "Estado", "type": "string"},
     ],
-    "measures": [],
+    "measures": [
+        {"key": "opps", "label": "Opps cerradas", "type": "number"},
+    ],
     "default_filters": {},
     "query": query,
 }
