@@ -121,6 +121,29 @@ _CHECKLIST_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS cv_review_checklist_code_idx ON cv_review_checklist (item_code)"
 )
 
+# Veredicto técnico/soft de cada bullet de JD, cacheado por texto. NO es una tabla de
+# performance: es lo que hace que la clasificación sea ESTABLE. El kind decide si un
+# requisito entra al denominador del score, así que si el modelo contestara distinto entre
+# corridas, dos candidatos de la MISMA vacante — o dos rondas del mismo candidato — se
+# puntuarían contra denominadores distintos sin que nadie hubiera cambiado nada. Con el
+# cache, el primer veredicto sobre un texto es el veredicto para siempre.
+#
+# La clave es el hash del texto NORMALIZADO (utils/cv_review_ai._norm_for_match), no del
+# texto crudo: el modelo transcribe el mismo bullet con o sin punto final y con distinto
+# espaciado, y eso no puede abrir una entrada nueva.
+#
+# Sin FK a nada y sin borrado: son un puñado de bytes por bullet y el valor está justamente
+# en que sobrevivan a los reviews que los originaron.
+_KIND_CACHE_DDL = """
+CREATE TABLE IF NOT EXISTS cv_review_requirement_kind (
+    text_hash   TEXT        PRIMARY KEY,
+    requirement TEXT        NOT NULL,
+    kind        TEXT        NOT NULL CHECK (kind IN ('technical','soft')),
+    why         TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
+"""
+
 # --- migraciones sobre una tabla que YA existe -------------------------------------------
 # El camino rápido de _ensure_locked() no corre DDL cuando las tablas están, que es el caso
 # de producción. Así que un valor nuevo de `status` no entra por el CREATE TABLE: hay que
@@ -183,6 +206,31 @@ def _migrate_checklist(conn) -> None:
             cur.execute(stmt)
     conn.commit()
     logging.info("cv_reviews: checklist migrada (cv_review_checklist + checklist_done)")
+
+
+def _kind_cache_is_current(cur) -> bool:
+    """¿Está la tabla de cache de técnico/soft? Catálogo puro, sin locks.
+
+    Mismo requisito que las otras dos: corre en CADA arranque, así que no puede tomar un
+    solo lock o volvemos al problema que documenta _tables_exist().
+    """
+    cur.execute("SELECT to_regclass('public.cv_review_requirement_kind') IS NOT NULL")
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def _migrate_kind_cache(conn) -> None:
+    """Crea cv_review_requirement_kind. Mismos timeouts que el resto del DDL.
+
+    Tabla nueva: el CREATE no toca cv_reviews y no compite por su ACCESS EXCLUSIVE. Si aun
+    así no consigue el lock en _LOCK_TIMEOUT se rinde y lo reintenta el próximo arranque.
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SET LOCAL lock_timeout = '{_LOCK_TIMEOUT}'")
+        cur.execute(f"SET LOCAL statement_timeout = '{_STATEMENT_TIMEOUT}'")
+        cur.execute(_KIND_CACHE_DDL)
+    conn.commit()
+    logging.info("cv_reviews: cache de kind migrado (cv_review_requirement_kind)")
 
 
 def _status_check_is_current(cur) -> bool:
@@ -281,11 +329,14 @@ def _ensure_locked() -> bool:
                 # dejar la transacción abierta mientras se toma un ACCESS EXCLUSIVE.
                 status_ok = _status_check_is_current(cur)
                 checklist_ok = _checklist_is_current(cur)
+                kind_cache_ok = _kind_cache_is_current(cur)
                 conn.commit()
                 if not status_ok:
                     _migrate_status_check(conn)
                 if not checklist_ok:
                     _migrate_checklist(conn)
+                if not kind_cache_ok:
+                    _migrate_kind_cache(conn)
                 _TABLE_READY = True
                 _LAST_FAILURE_TS = 0.0
                 return True
@@ -304,6 +355,7 @@ def _ensure_locked() -> bool:
             cur.execute(_REASONS_INDEX_DDL)
             cur.execute(_CHECKLIST_DDL)
             cur.execute(_CHECKLIST_INDEX_DDL)
+            cur.execute(_KIND_CACHE_DDL)
         conn.commit()
         _TABLE_READY = True
         _LAST_FAILURE_TS = 0.0
@@ -320,6 +372,78 @@ def _ensure_locked() -> bool:
             except Exception:
                 pass
         return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+# --- cache de técnico/soft -----------------------------------------------------------------
+# Las dos funciones NUNCA levantan: la clasificación tiene que poder seguir sin base (se cae
+# a preguntarle al modelo, que es lo que hacía antes de existir el cache). Un fallo acá
+# encarece la corrida, no la rompe.
+
+
+def get_requirement_kinds(hashes):
+    """{text_hash: (kind, why)} para los hashes que ya estén clasificados.
+
+    Recibe hashes y no textos a propósito: la normalización vive en utils/cv_review_ai
+    (_norm_for_match), que es el mismo lugar donde se decide qué cuenta como "el mismo
+    requisito". Dos implementaciones de eso se desincronizan.
+    """
+    keys = sorted({str(h) for h in (hashes or []) if h})
+    if not keys or not ensure_cv_review_tables():
+        return {}
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT text_hash, kind, why FROM cv_review_requirement_kind "
+                "WHERE text_hash = ANY(%s)", (keys,))
+            rows = cur.fetchall()
+        conn.commit()
+        return {r[0]: (r[1], r[2] or "") for r in rows}
+    except Exception:
+        logging.exception("cv_reviews: no se pudo leer el cache de kind")
+        return {}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def save_requirement_kinds(rows) -> None:
+    """Guarda (text_hash, requirement, kind, why). El PRIMER veredicto manda.
+
+    ON CONFLICT DO NOTHING y no DO UPDATE: el punto entero del cache es que el mismo texto
+    no cambie de lado nunca. Si el modelo contesta distinto la próxima vez, gana lo que ya
+    está guardado — que es lo que hace que el score sea reproducible.
+    """
+    clean = [(str(h), str(t)[:2000], str(k), str(w or "")[:500])
+             for h, t, k, w in (rows or [])
+             if h and t and k in ("technical", "soft")]
+    if not clean or not ensure_cv_review_tables():
+        return
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cv_review_requirement_kind (text_hash, requirement, kind, why) "
+                "VALUES (%s, %s, %s, %s) ON CONFLICT (text_hash) DO NOTHING", clean)
+        conn.commit()
+    except Exception:
+        logging.exception("cv_reviews: no se pudo guardar el cache de kind")
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     finally:
         if conn is not None:
             try:

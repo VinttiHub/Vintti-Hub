@@ -14,9 +14,10 @@ documento, y no se pudo arreglar por prompt en tres intentos.
 
 El modelo REPORTA (transcribe los requisitos, decide el status de cada uno con una cita
 verbatim, marca invenciones y eco de la JD). La aritmética es NUESTRA: mismas entradas,
-mismo número, y explicable renglón por renglón en pantalla. Las reglas que clasifican
-—técnico/soft, y qué se da por sentado— también son nuestras y determinísticas, porque
-preguntándoselas al modelo contestaba distinto entre corridas.
+mismo número, y explicable renglón por renglón en pantalla. La clasificación técnico/soft
+la deciden primero nuestras reglas y, sólo para lo que ellas no cubren, una llamada
+dedicada que se cachea por texto de requisito — así el mismo bullet de JD da siempre el
+mismo veredicto (ver apply_requirement_kinds).
 
 El material fuente (el CV propio del candidato, su LinkedIn) NO puntúa nada. Se lee sólo
 para avisar de lo que el CV afirma sin respaldo y para que los "fixes" no pidan inventar.
@@ -41,6 +42,25 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 13: la clasificación técnico/soft deja de ser sólo regex. La regla vieja detectaba lo
+# soft con un catálogo de fórmulas y mandaba TODO LO DEMÁS a técnico, así que cualquier
+# soft skill escrita de una forma que no estuviera en la lista entraba al denominador del
+# score. En la JD de Ronaldo Ramírez entraron dos: "Ability to coordinate across creative
+# teams and stakeholders while maintaining organization and project momentum" (la lista
+# tenía "ability to" sólo seguido de learn/adapt/adjust/pick up) y "Professional demeanor
+# and strong ethical standards" (no matcheaba nada). Con 5 requisitos puntuables cada uno
+# valía 20 puntos. Es la tercera vez que llega el mismo feedback, y agrandar la lista es
+# whack-a-mole: lo soft es infinito en su redacción aunque sea un puñado de ideas.
+# Ahora deciden, en este orden: (1) nuestras reglas duras — años/título = técnico, idioma =
+# soft, las ~40 fórmulas ya validadas = soft; (2) para lo que quede, una llamada dedicada
+# que no habla de otra cosa. Misma división que la v11 con los años: la decisión que el
+# prompt grande hacía mal se muda a un prompt que hace UNA cosa.
+# La objeción original a preguntarle al modelo (contestaba distinto entre corridas, y esto
+# mueve un número que se guarda) se responde con cache: cv_review_requirement_kind guarda el
+# veredicto por texto normalizado, ON CONFLICT DO NOTHING. El primer veredicto sobre un
+# bullet es el veredicto para siempre, para todos los candidatos de la vacante y para todas
+# las rondas. Si la llamada falla, se cae a "technical" — el comportamiento de hoy — y se
+# loguea: sacar un requisito del denominador SUBE el score en silencio, que es el error caro.
 # 12: se agrega el chequeo de JOB HOPPING, la segunda y última cosa que se evalúa fuera de
 # la checklist de requisitos. Permanencia de menos de un año = job hopping; si el CV explica
 # por qué terminó, no pasa nada; si no lo explica, −10. Tres decisiones que importan:
@@ -93,7 +113,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 12
+ANALYSIS_VERSION = 13
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -987,7 +1007,7 @@ _REQ_LANGUAGE = re.compile(r"""
 """, re.I | re.X)
 
 
-def no_score_reason(text: str) -> str:
+def no_score_reason(text: str, ai_kind: Optional[str] = None) -> str:
     """Por qué un requisito no puntúa, o "" si puntúa.
 
     Un solo campo en vez de un booleano por motivo: la lista va a crecer, y tres flags que
@@ -998,19 +1018,53 @@ def no_score_reason(text: str) -> str:
         return "language"
     if _REQ_ASSUMED.search(t):
         return "assumed"
-    if classify_requirement(t) == "soft":
+    if classify_requirement(t, ai_kind) == "soft":
         return "soft"
     return ""
 
 
-def classify_requirement(text: str) -> str:
-    """técnico o soft, por reglas nuestras. Mismo texto -> misma respuesta, siempre."""
+def _rule_kind(text: str) -> Optional[str]:
+    """Lo que deciden NUESTRAS reglas, o None cuando ninguna aplica.
+
+    Existe como función aparte para que haya UN solo lugar donde se sabe si las reglas
+    alcanzan: `classify_requirement` la usa para responder, `apply_requirement_kinds` para
+    no gastar una llamada preguntando lo que ya sabemos, y `_kind_source` para poder decir
+    en pantalla quién decidió. Tres copias de este `if` se desincronizan.
+    """
     t = str(text or "")
     if _REQ_TECHNICAL_OVERRIDE.search(t):
         return "technical"
+    # El idioma es soft por decisión de la owner, y va ANTES de _REQ_SOFT porque no toda
+    # forma de pedirlo ("Bilingual", "Native speaker") está en aquella lista.
+    if _REQ_LANGUAGE.search(t):
+        return "soft"
     if _REQ_SOFT.search(t):
         return "soft"
-    return "technical"
+    return None
+
+
+def classify_requirement(text: str, ai_kind: Optional[str] = None) -> str:
+    """técnico o soft. Nuestras reglas primero; el modelo sólo donde ellas no llegan.
+
+    `ai_kind` es lo que devolvió la llamada dedicada (ver apply_requirement_kinds). No
+    puede pisar una regla: si la frase pide años o un título, es técnica aunque el modelo
+    la vea blanda, y si pide inglés es soft aunque el modelo la vea técnica.
+
+    Sin `ai_kind` — análisis viejos, o la llamada falló — se cae a "technical", que es lo
+    que hacía la v12. Es el lado seguro: un soft que se cuela baja el score y se ve en
+    pantalla; un técnico que se cae del denominador lo SUBE y no se nota.
+    """
+    ruled = _rule_kind(text)
+    if ruled:
+        return ruled
+    return "soft" if str(ai_kind or "").strip().lower() == "soft" else "technical"
+
+
+def _kind_source(text: str, ai_kind: Optional[str] = None) -> str:
+    """Quién decidió el kind: "rule", "ai" o "fallback". Sólo para poder auditarlo."""
+    if _rule_kind(text):
+        return "rule"
+    return "ai" if str(ai_kind or "").strip().lower() in ("technical", "soft") else "fallback"
 
 
 def _quote_in_cv(quote: str, cv_norm: str) -> bool:
@@ -1148,8 +1202,11 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
         in_source = str(item.get("in_source") or "").strip().lower()
         if in_source not in ("yes", "no", "unclear"):
             in_source = "unclear"
-        kind = classify_requirement(text)
-        reason = no_score_reason(text)
+        # Lo que decidió la llamada dedicada, si corrió. Ver apply_requirement_kinds.
+        # Sólo pesa donde nuestras reglas no llegan: no puede pisar años, título ni idioma.
+        ai_kind = str(item.get("kind_final") or "").strip().lower() or None
+        kind = classify_requirement(text, ai_kind)
+        reason = no_score_reason(text, ai_kind)
         assumed = reason == "assumed"
 
         # Los años NO los opina el modelo: los tenemos en las fechas del CV. Se pisa su
@@ -1214,8 +1271,13 @@ def _clean_requirements(raw: Any, jd_text: Any = None, cv_text: Any = None,
         out.append({
             "requirement": text,
             "kind": kind,
-            # Lo que dijo el modelo, sólo para poder auditar la regla contra su criterio.
+            # Lo que dijo el juez principal en su prompt grande, sólo para poder auditar
+            # la regla contra su criterio. NO es lo que decide: eso es `kind_source`.
             "kind_model": "soft" if kind_model == "soft" else "technical",
+            # Quién decidió el kind y por qué. "rule" = nuestras regex, "ai" = la llamada
+            # dedicada, "fallback" = la llamada no corrió o falló y se cayó a técnico.
+            "kind_source": _kind_source(text, ai_kind),
+            "kind_why": str(item.get("kind_why") or "").strip(),
             # Eje aparte de `kind`, no un tercer valor: "Windows" ES técnico, lo que pasa es
             # que no puntúa. Un tercer valor rompería en silencio los dos lugares del panel
             # que chequean `kind === 'soft'` y `summary.technical`.
@@ -2348,6 +2410,194 @@ def apply_years_roles(parsed: Dict[str, Any], snapshot: Dict[str, Any]) -> None:
                          by_index[idx][:60], before, sorted(set(keep)))
 
 
+# --- técnico vs soft: la llamada dedicada ---------------------------------------------------
+# Por qué una llamada aparte y no el campo "kind" que el juez principal ya devuelve: es la
+# misma historia que la v11 con los años. Adentro del prompt grande — que además le pide
+# transcribir la JD, buscar citas verbatim, marcar invenciones y detectar eco — esta
+# decisión sale distinta entre corridas. En un prompt que no habla de otra cosa, sale igual.
+#
+# Y sólo se le pregunta por lo que nuestras reglas NO deciden (ver _rule_kind): años y
+# títulos son técnicos por regla, el idioma es soft por decisión de la owner, y las ~40
+# fórmulas blandas ya validadas contra producción son soft. Eso deja al modelo exactamente
+# el bucket donde estaba el bug — el "todo lo demás = técnico" de la v12 — y nada de lo que
+# hoy contesta bien puede regresionar.
+_KIND_SYSTEM = """You sort job-posting requirements into two buckets. That is the ONLY thing
+you do here. You are not judging a candidate, and you are not reading a CV.
+
+TECHNICAL — the requirement names something a résumé can evidence on its own:
+- a tool, platform, system, software or programming language ("QuickBooks Online", "Excel",
+  "Salesforce", "Figma", "Python", "SAP")
+- a named method, framework or process ("GAAP", "Scrum", "SEO", "month-end close",
+  "payroll processing", "accounts receivable", "media buying")
+- a field of work, a discipline or an industry ("B2B SaaS", "healthcare", "logistics",
+  "paid media", "financial reporting", "e-commerce")
+- a degree, licence or certification
+- having done a specific kind of work, or years of it
+
+SOFT — the requirement describes THE PERSON rather than work they can show:
+- a character trait, an attitude, a way of carrying oneself ("professional demeanor",
+  "strong ethical standards", "positive attitude", "hungry to grow", "trustworthy")
+- an interpersonal or organizational quality ("excellent communication", "team player",
+  "ability to coordinate across teams", "keeps projects moving", "attention to detail",
+  "juggles competing priorities")
+- a disposition ("self-starter", "adaptable", "eager to learn", "thrives under pressure")
+- a logistics condition ("available during EST hours", "reliable internet", "own laptop",
+  "willing to travel")
+- language fluency
+
+THE TEST — apply it to every single one:
+    "Two candidates with the same tools and the same job history: could they differ on this?"
+If the only way to tell them apart is by meeting the person, working with them or
+interviewing them, it is SOFT. If you could tell from the résumé alone, it is TECHNICAL.
+
+A requirement can MENTION work and still be SOFT, when what it asks for is the quality:
+- "Ability to coordinate across creative teams and stakeholders while maintaining
+  organization and project momentum." -> SOFT. It names teams and projects, but what it
+  asks for is coordination and organization. That is the person, not the toolkit.
+- "Professional demeanor and strong ethical standards." -> SOFT.
+- "Comfortable working in a fast-paced, deadline-driven environment." -> SOFT.
+And a requirement can sound soft and still be TECHNICAL, when it asks for the work:
+- "7+ years managing SEM campaigns across Google Ads and Microsoft/Bing Ads." -> TECHNICAL.
+- "Experience owning month-end close for a multi-entity company." -> TECHNICAL.
+- "Experience managing a team of 5+ direct reports." -> TECHNICAL: a CV shows it.
+
+WHEN IN DOUBT, ANSWER TECHNICAL. Calling a real requirement soft quietly drops it from what
+we measure and nobody sees it. Calling a soft one technical is visible and gets corrected.
+
+Return JSON and nothing else:
+{"requirements":[{"i":<the number in brackets>,
+                  "kind":"technical"|"soft",
+                  "why":"<one short line, under 12 words>"}]}
+Exactly one entry per requirement you were given."""
+
+
+def _requirement_key(text: str) -> str:
+    """La clave del cache: el texto normalizado y sin puntuación de borde.
+
+    El mismo bullet vuelve del modelo con o sin punto final y con distinto espaciado entre
+    corridas. Sin normalizar, cada variante abriría una entrada nueva y el cache no
+    serviría para lo único que existe: que el veredicto no se mueva.
+    """
+    return _norm_for_match(text).strip(" .;:,")
+
+
+def _requirement_hash(text: str) -> str:
+    return hashlib.sha1(_requirement_key(text).encode("utf-8")).hexdigest()
+
+
+def apply_requirement_kinds(parsed: Dict[str, Any]) -> None:
+    """Escribe "kind_final"/"kind_why" en los requisitos que las reglas no deciden.
+
+    Muta `parsed` in place y NO levanta: cualquier fallo deja los items sin "kind_final",
+    y `classify_requirement` se cae a "technical", que es el comportamiento de la v12.
+    """
+    items = parsed.get("jd_requirements")
+    if not isinstance(items, list):
+        return
+
+    # Sólo lo que nuestras reglas no resuelven. Dedupe por clave: una JD repite el mismo
+    # bullet más seguido de lo que parece, y pagar dos veces por la misma frase además
+    # abriría la puerta a que las dos respuestas no coincidan.
+    targets: Dict[str, List[int]] = {}
+    text_of: Dict[str, str] = {}
+    for i, it in enumerate(items):
+        if not isinstance(it, dict):
+            continue
+        text = str(it.get("requirement") or "").strip()
+        if not text or _rule_kind(text):
+            continue
+        key = _requirement_key(text)
+        if not key:
+            continue
+        targets.setdefault(key, []).append(i)
+        text_of.setdefault(key, text)
+    if not targets:
+        return
+
+    def stamp(key: str, kind: str, why: str) -> None:
+        for i in targets.get(key, ()):
+            items[i]["kind_final"] = kind
+            items[i]["kind_why"] = why
+
+    # 1) El cache manda. Un texto ya clasificado no se vuelve a preguntar NUNCA — es lo que
+    #    hace que dos candidatos de la misma vacante se puntúen contra el mismo denominador.
+    hashes = {_requirement_hash(t): k for k, t in text_of.items()}
+    pending = dict(text_of)
+    try:
+        from cv_review_store import get_requirement_kinds
+        for h, (kind, why) in (get_requirement_kinds(list(hashes)) or {}).items():
+            key = hashes.get(h)
+            if key and kind in ("technical", "soft"):
+                stamp(key, kind, why)
+                pending.pop(key, None)
+        if len(pending) < len(text_of):
+            logging.info("cv_review: kind desde cache para %s de %s requisitos",
+                         len(text_of) - len(pending), len(text_of))
+    except Exception:
+        logging.exception("cv_review: no se pudo leer el cache de kind; se pregunta todo")
+
+    if not pending:
+        return
+
+    # 2) Lo que queda, al modelo. Numerado para que la respuesta se pueda mapear de vuelta
+    #    sin depender de que devuelva el texto igual.
+    order = sorted(pending)
+    prompt = "REQUIREMENTS\n" + "\n".join(
+        f"[{n}] {pending[key]}" for n, key in enumerate(order, start=1))
+    try:
+        from ai_routes import call_openai_with_retry
+        resp = call_openai_with_retry(
+            MODEL,
+            [{"role": "system", "content": _KIND_SYSTEM},
+             {"role": "user", "content": prompt[:CV_TEXT_LIMIT]}],
+            temperature=0, max_tokens=1200,
+            response_format={"type": "json_object"},
+        )
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            logging.warning("cv_review: la clasificación técnico/soft salió truncada; "
+                            "%s requisito(s) se quedan en technical", len(pending))
+            return
+        data = parse_json(resp.choices[0].message.content or "")
+    except Exception:
+        logging.exception("cv_review: falló la clasificación técnico/soft; %s requisito(s) "
+                          "se quedan en technical", len(pending))
+        return
+    if not isinstance(data, dict):
+        return
+
+    fresh = []
+    for entry in _as_list(data.get("requirements")):
+        n = _role_number(entry.get("i"))
+        if n is None or not 1 <= n <= len(order):
+            continue
+        kind = str(entry.get("kind") or "").strip().lower()
+        if kind not in ("technical", "soft"):
+            continue
+        key = order[n - 1]
+        if key not in pending:
+            continue
+        why = str(entry.get("why") or "").strip()[:200]
+        stamp(key, kind, why)
+        fresh.append((_requirement_hash(pending[key]), pending[key], kind, why))
+        if kind == "soft":
+            logging.info("cv_review: no puntúa (soft, por el modelo): %r — %s",
+                         pending[key][:80], why[:60])
+        pending.pop(key, None)
+
+    if pending:
+        logging.warning("cv_review: el modelo no clasificó %s requisito(s); se quedan en "
+                        "technical: %s", len(pending),
+                        "; ".join(t[:60] for t in pending.values()))
+
+    # 3) Al cache, para que este veredicto sea el veredicto de acá en más.
+    if fresh:
+        try:
+            from cv_review_store import save_requirement_kinds
+            save_requirement_kinds(fresh)
+        except Exception:
+            logging.exception("cv_review: no se pudo guardar el cache de kind")
+
+
 def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
              fingerprint: str) -> Tuple[Optional[int], Optional[Dict[str, Any]], Optional[str]]:
     """Corre el juez. Devuelve (score, analysis, error_code).
@@ -2387,6 +2637,8 @@ def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
 
     # Qué roles cuentan para un requisito de años se decide aparte. Ver apply_years_roles.
     apply_years_roles(parsed, snapshot)
+    # Y si un requisito es técnico o soft, también. Ver apply_requirement_kinds.
+    apply_requirement_kinds(parsed)
 
     analysis = finalize(parsed, snapshot, len(source_text or ""), fingerprint,
                         jd_text=jd_block)

@@ -1099,7 +1099,7 @@
     const CREDIT = { described: 1, listed_only: 0.5, missing: 0 };
     const reqFace = r => {
       if (!r.counts) {
-        const why = {
+        let why = {
           assumed: { label: "Doesn't count — taken for granted", tag: 'taken for granted',
                      tip: 'Everyone in the running meets this, so counting it would flatter '
                         + 'every candidate equally. It is listed because the client asked '
@@ -1112,6 +1112,12 @@
                   tip: 'Soft skills are listed because the client asked for them, but they '
                      + 'do not score: any CV can claim them.' },
         }[r.no_score_reason] || { label: "Doesn't count", tag: '', tip: '' };
+        // Cuando quien decidió que es soft fue el modelo y no una regla nuestra, se muestra
+        // su razón. Sin esto, un requisito que se cae del score no tiene forma de discutirse:
+        // el reviewer ve que no cuenta y no sabe por qué justo ése.
+        if (r.kind_source === 'ai' && r.kind_why) why = Object.assign({}, why, {
+          tip: (why.tip ? why.tip + ' ' : '') + 'Why this one: ' + r.kind_why,
+        });
         return Object.assign({ cls: 'nocount' }, why);
       }
       // Un requisito de AÑOS no se arregla escribiendo mejor: o los años están o no están.
