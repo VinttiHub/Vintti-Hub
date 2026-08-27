@@ -101,6 +101,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model = 'Recruiting'
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND o.opp_close_date IS NOT NULL
+            -- Mismos gates que recruiting_window_summary (la card "New FTEs
+            -- placed"), si no la tabla cuenta de más: candidatos que quedaron
+            -- cargados en hire_opportunity de opps que después se perdieron, y
+            -- finalistas duplicados de una misma opp ganada.
+            AND TRIM(o.opp_stage) = 'Close Win'
+            AND (ho.carga_active IS NOT NULL OR NULLIF(ho.start_date::text, '') IS NOT NULL)
         ),
         first_close_per_account AS (
           SELECT account_id, MIN(close_d) AS first_close_d

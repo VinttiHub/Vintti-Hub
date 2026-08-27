@@ -84,6 +84,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model = 'Recruiting'
             AND ho.candidate_id IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
+            AND TRIM(o.opp_stage) = 'Close Win'
         )
         SELECT
           candidate_name,

@@ -80,6 +80,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Recruiting'
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
+            -- Solo opps ganadas: una Closed Lost con start date cargado por error
+            -- no puede colarse como FTE.
+            AND TRIM(o.opp_stage) = 'Close Win'
             -- Solo cuentan los que realmente arrancaron: deben tener start date
             -- (carga_active o start_date). Aplica a FTEs, revenue, new clients y activos.
             AND (ho.carga_active IS NOT NULL OR NULLIF(ho.start_date::text, '') IS NOT NULL)
