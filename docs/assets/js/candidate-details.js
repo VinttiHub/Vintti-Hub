@@ -2939,6 +2939,7 @@ function getDefaultReferenceQuestions(candidateName) {
     `When did ${label} stop working with your company?`,
     `Would you rehire or work with ${label} again? Why or why not?`,
     `Are there any areas where you feel ${label} might need additional support or development?`,
+    `Is ${label} receptive to feedback? Have you ever given ${label} feedback and did ${label} actually implement it, or does ${label} tend not to take it into account?`,
     `Is there anything else you'd like to share about ${label}'s work style or personality?`,
   ];
 }
