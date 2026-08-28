@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260821-recruiter8" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260827-cvbrand" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -677,6 +677,38 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== Client Version / Talent Drop: ¿para qué vacante? =====
+         La marca del CV (Vintti azul vs vintti.ai oscuro) sale de la cuenta de la
+         vacante elegida, NO del candidato: la misma persona puede estar en un proceso
+         de Vintti AI y en otro de Vintti normal, y cada CV tiene que salir con la marca
+         del cliente al que se lo mandás. Sólo aparece cuando hay 2+ vacantes; con una
+         sola, el link se arma solo. Lo maneja candidate-details.js. -->
+    <div id="cv-brand-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="cv-brand-title">
+      <div class="cv-review-dialog">
+        <button class="cv-brand-close modal-close" aria-label="Close">&times;</button>
+
+        <div class="cv-review-hero">
+          <div id="cv-brand-kicker" class="cv-review-kicker">Client Version</div>
+          <h3 id="cv-brand-title">Which vacancy is this CV for?</h3>
+          <p class="cv-review-subtitle">
+            The CV is branded after the account of the vacancy you pick: Vintti.ai for
+            Vintti AI accounts, regular Vintti for everyone else.
+          </p>
+        </div>
+
+        <div class="cv-review-content">
+          <div class="cv-review-card">
+            <div id="cv-brand-options" class="cv-brand-options"></div>
+            <div id="cv-brand-note" class="cv-review-note"></div>
+          </div>
+        </div>
+
+        <div class="cv-review-footer">
+          <a id="cv-brand-open" class="generate-btn" target="_blank" rel="noopener">Open CV &rarr;</a>
+        </div>
+      </div>
+    </div>
     <div id="resume" class="tab-content" role="tabpanel" aria-labelledby="resume">
       <div class="cv-container">
         <!-- About -->
@@ -1253,7 +1285,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260827-refq9"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260827-cvbrand"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

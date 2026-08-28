@@ -887,7 +887,11 @@ def get_opportunity_by_id(opportunity_id):
                 a.website AS account_website,
                 a.mail AS account_mail,
                 a.comments AS account_about,
-                a.timezone AS account_timezone
+                a.timezone AS account_timezone,
+                -- Con qué marca sale el CV de esta vacante (Vintti vs vintti.ai). Lo lee
+                -- el popup de "Send Candidates for Approval" para avisar antes de mandar
+                -- y para firmar el mail con el equipo correcto.
+                COALESCE(a.vintti_ai, FALSE) AS vintti_ai
             FROM opportunity o
             LEFT JOIN account a ON o.account_id = a.account_id
             WHERE o.opportunity_id = %s

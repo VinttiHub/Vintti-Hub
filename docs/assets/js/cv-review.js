@@ -1739,7 +1739,10 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
         // El CV TAL COMO SE ENVIÓ, no el actual: se juzga lo que la recruiter mandó, y
         // así las frases que cita el análisis existen seguro en lo que se está viendo.
         // resume-readonly.js lo pide a /cv_reviews/<id>/resume cuando ve review_id.
-        const url = `resume-readonly.html?id=${r.candidate_id}&review_id=${r.review_id}`;
+        // opportunity_id define la marca del CV (Vintti vs vintti.ai): sale de la
+        // cuenta de ESTA vacante, no de todos los procesos del candidato.
+        const url = `resume-readonly.html?id=${r.candidate_id}&review_id=${r.review_id}` +
+          (r.opportunity_id ? `&opportunity_id=${r.opportunity_id}` : '');
         // El onload va ANTES del src: es el que dispara la búsqueda de las citas.
         const frame = $('cvrFrame');
         frame.onload = () => { if (currentReview) hlAttach(); };

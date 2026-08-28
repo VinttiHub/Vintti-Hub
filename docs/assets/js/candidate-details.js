@@ -4719,7 +4719,9 @@ if (drop) {
 }
 
 })();
-// configura el link del client version (solo lectura)
+// configura el link del client version (solo lectura). El href definitivo lo termina de
+// armar wireResumeBrandPicker(), que le agrega la vacante; esto es el fallback por si
+// las oportunidades no cargan.
 if (clientBtn && candidateId) {
   clientBtn.href = `resume-readonly.html?id=${candidateId}`;
 }
@@ -4850,6 +4852,174 @@ if (clientBtn && candidateId) {
 if (talentDropBtn && candidateId) {
   talentDropBtn.href = `resume-readonly.html?id=${candidateId}&view=talent-drop`;
 }
+
+/* ===== Qué vacante = qué marca del CV ==================================================
+   El CV client-version sale con la marca de vintti.ai o con la de Vintti según la cuenta
+   de la vacante, y la misma persona puede estar en las dos aguas (un proceso de Vintti AI
+   y otro de Vintti normal). Antes el link no llevaba vacante y el backend miraba TODOS
+   los procesos del candidato, así que a alguien mezclado se le mandaba siempre el CV con
+   marca AI. Ahora el link lleva ?opportunity_id= y la marca sale de esa cuenta.
+
+   El picker sólo aparece cuando las vacantes del candidato están MEZCLADAS (alguna de
+   cuenta AI y alguna que no): es el único caso en que la elección cambia algo. Si todas
+   son del mismo tipo —o hay una sola— el href se arma solo y el click abre directo.
+   El botón de abrir es un <a> real y no window.open() para que ningún bloqueador de
+   popups se coma el click. */
+(function wireResumeBrandPicker(){
+  if (!candidateId || (!clientBtn && !talentDropBtn)) return;
+
+  const popup    = document.getElementById('cv-brand-popup');
+  const listEl   = document.getElementById('cv-brand-options');
+  const noteEl   = document.getElementById('cv-brand-note');
+  const kickerEl = document.getElementById('cv-brand-kicker');
+  const openEl   = document.getElementById('cv-brand-open');
+  const closeEl  = popup?.querySelector('.cv-brand-close');
+  if (!popup || !listEl || !openEl) return;
+
+  let opps = [];
+  let mode = 'client';   // 'client' | 'talent-drop'
+
+  const isAiOpp = (opp) =>
+    opp?.vintti_ai === true || opp?.vintti_ai === 1 ||
+    ['true', 't', '1', 'yes'].includes(String(opp?.vintti_ai ?? '').toLowerCase().trim());
+
+  function buildUrl(oppId, which){
+    const qs = new URLSearchParams({ id: String(candidateId) });
+    if (which === 'talent-drop') qs.set('view', 'talent-drop');
+    if (oppId) qs.set('opportunity_id', String(oppId));
+    return `resume-readonly.html?${qs.toString()}`;
+  }
+
+  // Mismo formato que el picker del AI Assistant: el "#id" desambigua cuando el candidato
+  // está en dos batches del mismo rol y cliente.
+  function optionLabel(opp){
+    const fmt = window.formatCandidatePipelineStage;
+    const stage = (typeof fmt === 'function')
+      ? fmt(opp?.candidate_stage || opp?.opp_stage || '')
+      : String(opp?.candidate_stage || opp?.opp_stage || '');
+    const parts = [
+      (opp.opp_position_name || 'Untitled position').trim(),
+      (opp.client_name || '').trim(),
+      stage
+    ].filter(Boolean);
+    return `${parts.join(' · ')} (#${opp.opportunity_id})`;
+  }
+
+  function selectedOppId(){
+    return listEl.querySelector('input[name="cv-brand-opp"]:checked')?.value || '';
+  }
+
+  function paint(){
+    const id  = selectedOppId();
+    const opp = opps.find(o => String(o.opportunity_id) === String(id));
+
+    // Este diálogo sólo aparece cuando las vacantes están mezcladas, así que cada una da
+    // una marca distinta y "no elegir" no es una respuesta: hasta que haya una marcada el
+    // botón queda apagado, en vez de abrir el CV con una marca que nadie eligió.
+    if (!id) {
+      openEl.removeAttribute('href');
+      openEl.setAttribute('aria-disabled', 'true');
+      if (noteEl) noteEl.textContent = 'Pick the vacancy this CV is going to.';
+      return;
+    }
+    openEl.href = buildUrl(id, mode);
+    openEl.removeAttribute('aria-disabled');
+    if (!noteEl) return;
+    const client = (opp?.client_name || '').trim();
+    noteEl.textContent = isAiOpp(opp)
+      ? `${client || 'This account'} is a Vintti AI account — the CV goes out with the vintti.ai branding.`
+      : `${client || 'This account'} is a regular Vintti account — the CV goes out with the Vintti branding.`;
+  }
+
+  function render(){
+    listEl.innerHTML = '';
+    // Preselección conservadora, igual que el picker del AI Assistant: sólo la vacante del
+    // hire, si es una de éstas. Si no, no se marca nada y hay que elegir — quien no elige
+    // no se lleva un CV con la marca del cliente equivocado en silencio.
+    const preselect = (window.__currentOppId &&
+      opps.some(o => String(o.opportunity_id) === String(window.__currentOppId)))
+        ? String(window.__currentOppId) : '';
+
+    opps.forEach(opp => {
+      const ai  = isAiOpp(opp);
+      const row = document.createElement('label');
+      row.className = `cv-brand-option${ai ? ' cv-brand-option--ai' : ''}`;
+
+      const radio = document.createElement('input');
+      radio.type  = 'radio';
+      radio.name  = 'cv-brand-opp';
+      radio.value = String(opp.opportunity_id);
+      if (preselect && preselect === String(opp.opportunity_id)) radio.checked = true;
+
+      const txt = document.createElement('span');
+      txt.className = 'cv-brand-option-label';
+      txt.textContent = optionLabel(opp);   // textContent: viene del backend
+
+      row.appendChild(radio);
+      row.appendChild(txt);
+      if (ai) {
+        const badge = document.createElement('span');
+        badge.className = 'cv-brand-badge';
+        badge.textContent = 'vintti.ai';
+        row.appendChild(badge);
+      }
+      listEl.appendChild(row);
+    });
+
+    paint();
+  }
+
+  function closePicker(){ popup.classList.add('hidden'); }
+  function openPicker(which){
+    mode = which;
+    if (kickerEl) kickerEl.textContent = which === 'talent-drop' ? 'Talent Drop' : 'Client Version';
+    render();
+    popup.classList.remove('hidden');
+  }
+
+  listEl.addEventListener('change', paint);
+  closeEl?.addEventListener('click', closePicker);
+  popup.addEventListener('click', (e) => { if (e.target === popup) closePicker(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !popup.classList.contains('hidden')) closePicker();
+  });
+  openEl.addEventListener('click', () => closePicker());
+
+  // Estado por defecto: los links siguen andando aunque el fetch falle.
+  let needsPicker = false;
+
+  function wire(btn, which){
+    if (!btn) return;
+    btn.addEventListener('click', (e) => {
+      if (!needsPicker) return;      // 0 o 1 vacante: el href ya es el correcto
+      e.preventDefault();
+      openPicker(which);
+    });
+  }
+  wire(clientBtn, 'client');
+  wire(talentDropBtn, 'talent-drop');
+
+  fetchCandidateOpportunities(candidateId)
+    .then(list => {
+      opps = Array.isArray(list) ? list : [];
+      // El picker existe sólo para resolver la ambigüedad de marca. Si todas las vacantes
+      // caen del mismo lado —todas de cuentas AI o ninguna— la marca es la misma elija lo
+      // que elija: preguntar sería fricción con una sola respuesta posible, y la mayoría
+      // de los candidatos están en varias vacantes de Vintti normal. Sólo se pregunta
+      // cuando hay mezcla, que es el caso que traía el CV con la marca equivocada.
+      const mixed = opps.length > 1 && opps.some(isAiOpp) && !opps.every(isAiOpp);
+      if (mixed) { needsPicker = true; return; }
+      // Sin mezcla se fija la vacante en el href y el click abre directo. Cualquiera de
+      // ellas da la misma marca, así que alcanza con la primera.
+      const pick = opps.length ? opps[0].opportunity_id : '';
+      if (clientBtn)     clientBtn.href     = buildUrl(pick, 'client');
+      if (talentDropBtn) talentDropBtn.href = buildUrl(pick, 'talent-drop');
+    })
+    .catch(err => {
+      // Sin la lista, el link queda como estaba: el backend cae a su fallback conservador.
+      console.warn('⚠️ Client Version: could not load opportunities', err);
+    });
+})();
 
 // muéstralos solo cuando la pestaña activa sea "resume"
 document.querySelectorAll('.tab').forEach(tab => {

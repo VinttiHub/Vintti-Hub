@@ -4467,6 +4467,22 @@ function approvalDetectedLeads() {
   return approvalRecipients().filter(e => approvalReviewers.has(e));
 }
 
+// Con qué marca salen los CVs que lleva este mail. La decide la cuenta de ESTA opportunity,
+// no el candidato: la misma persona puede estar en un proceso de Vintti AI y en éste, y por
+// eso cada link viaja con ?opportunity_id=. Se avisa antes de apretar Send porque el mail
+// no muestra la marca por ningún lado — está adentro del CV que abre el cliente.
+function approvalBrandNote() {
+  const ctx = window.__approvalCtx || {};
+  const account = escapeHtmlLite(ctx.accountName || 'This account');
+  return ctx.vinttiAi
+    ? `<span class="approval-mode-brand approval-mode-brand--ai">
+         📄 The CVs go out with the <b>vintti.ai</b> branding — ${account} is a Vintti AI account.
+       </span>`
+    : `<span class="approval-mode-brand">
+         📄 The CVs go out with the <b>Vintti</b> branding — ${account} is a regular Vintti account.
+       </span>`;
+}
+
 function approvalMode() {
   const ctx = window.__approvalCtx || {};
   if (ctx.modeOverride) return ctx.modeOverride;
@@ -4501,6 +4517,7 @@ function renderApprovalMode() {
            send to the client separately.
          </span>` : ''}
          ${manual}
+         ${approvalBrandNote()}
        </div>
        <button type="button" class="approval-mode-switch" id="approval-mode-switch">
          Send to client instead
@@ -4510,6 +4527,7 @@ function renderApprovalMode() {
          Only the email goes out — no reviews, no AI score.
          ${leads.length ? '' : 'No sales lead among the recipients.'}
          ${manual}
+         ${approvalBrandNote()}
        </div>
        <button type="button" class="approval-mode-switch" id="approval-mode-switch">
          Send for review instead
@@ -4663,6 +4681,13 @@ await loadApprovalReviewers();
     batchNumber: batchInfo.batch_number,
     candidateCount: batchCandidates.length,
     salesLead,
+    // La cuenta de la opp es la que decide la marca de los CVs y la firma del mail.
+    // Viene de GET /opportunities/<id>; el backend lo devuelve como booleano, pero se
+    // normaliza igual que en candidate-details.js por si algún día llega como texto.
+    vinttiAi: ['true', 't', '1', 'yes'].includes(
+      String(opportunityInfo.vintti_ai ?? '').toLowerCase().trim()
+    ) || opportunityInfo.vintti_ai === true || opportunityInfo.vintti_ai === 1,
+    accountName: opportunityInfo.account_name || '',
     modeOverride: null,   // null = lo decide la detección
   };
 
@@ -4673,12 +4698,19 @@ await loadApprovalReviewers();
     ccSelect.addEventListener(ev, renderApprovalMode);
   });
 
-  const yourName = localStorage.getItem('nickname') || 'The Vintti Team';
+  // El fallback de la firma sigue a la cuenta: un cliente de Vintti AI no debería recibir
+  // un mail firmado por "The Vintti Team" con un CV que dice vintti.ai. Si la persona tiene
+  // su nickname configurado, ese gana igual que antes.
+  const yourName = localStorage.getItem('nickname')
+    || (window.__approvalCtx.vinttiAi ? 'The Vintti AI Team' : 'The Vintti Team');
 
 let candidateBlocks = '';
 
 for (let c of batchCandidates) {
-  const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}`;
+  // La vacante va en el link porque es la que define la marca del CV (Vintti vs
+  // vintti.ai): el mismo candidato puede estar en un proceso de Vintti AI y en éste, y
+  // este mail es el que ve el cliente.
+  const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}&opportunity_id=${opportunityId}`;
   // Acá había un fetch a /resumes/<id> cuyo resultado no se usaba nunca: un round-trip
   // serie y bloqueante por candidato, parte de por qué el popup tardaba en abrir.
   candidateBlocks += `

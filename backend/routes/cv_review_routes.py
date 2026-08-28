@@ -1801,7 +1801,10 @@ def _review_email_context(review_id):
             "SELECT " + _SELECT_COLS + """,
                    r.ai_analysis,
                    c.name AS candidate_name,
-                   o.opp_position_name, COALESCE(a.client_name, 'Client') AS client_name
+                   o.opp_position_name, COALESCE(a.client_name, 'Client') AS client_name,
+                   -- Con qué marca sale el CV de esta vacante: el sales lead que aprueba y
+                   -- reenvía tiene que saber qué va a ver el cliente al abrir el link.
+                   COALESCE(a.vintti_ai, FALSE) AS vintti_ai
             FROM cv_reviews r
             LEFT JOIN candidates c  ON c.candidate_id   = r.candidate_id
             LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id
@@ -1835,7 +1838,10 @@ def _review_email_contexts(review_ids):
             "SELECT " + _SELECT_COLS + """,
                    r.ai_analysis,
                    c.name AS candidate_name,
-                   o.opp_position_name, COALESCE(a.client_name, 'Client') AS client_name
+                   o.opp_position_name, COALESCE(a.client_name, 'Client') AS client_name,
+                   -- Con qué marca sale el CV de esta vacante: el sales lead que aprueba y
+                   -- reenvía tiene que saber qué va a ver el cliente al abrir el link.
+                   COALESCE(a.vintti_ai, FALSE) AS vintti_ai
             FROM cv_reviews r
             LEFT JOIN candidates c  ON c.candidate_id   = r.candidate_id
             LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id
@@ -1849,6 +1855,21 @@ def _review_email_contexts(review_ids):
         cur.close()
         conn.close()
     return [by_id[rid] for rid in review_ids if rid in by_id]
+
+
+def _brand_chip(row):
+    """Chip 'Vintti AI' al lado del cliente en los mails internos.
+
+    El CV que abre el cliente sale con la marca de la cuenta de esta vacante, y el mismo
+    candidato puede estar en un proceso de Vintti AI y en otro de Vintti normal. Quien
+    aprueba y reenvía el borrador necesita saber qué va a ver el cliente; sin esto, el
+    mail no lo dice por ningún lado. Violeta de marca (#5c6af7), igual que el CV.
+    """
+    if not (row or {}).get("vintti_ai"):
+        return ""
+    return ('<span style="display:inline-block;margin-left:8px;padding:2px 9px;'
+            'border-radius:999px;background:#eceefe;color:#2f3a86;'
+            'font-weight:700;font-size:11px;">Vintti AI</span>')
 
 
 def _review_cta_block(review_id, title, body):
@@ -2023,7 +2044,7 @@ def _notify_submitted(review_id):
       <h2 style="margin:0 0 12px;">CV ready for your review</h2>
       <p style="margin:0 0 6px;"><b>Candidate:</b> {_escape_html(row['candidate_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['opp_position_name'] or '—')}</p>
-      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}{_brand_chip(row)}</p>
       <p style="margin:0 0 6px;"><b>Recruiter:</b> {_escape_html(row['recruiter_email'] or '—')}</p>
       <p style="margin:0 0 16px;"><b>Round:</b> {row['round']} &nbsp; {_score_pill(row.get('ai_score'), (row.get('ai_analysis') or {}).get('_requirements_summary'), (row.get('ai_analysis') or {}).get('_score_basis'), row.get('ai_error'))}</p>
       {orphan_note}
@@ -2165,7 +2186,11 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
             flagged += 1
         if a.get("jd_echo"):
             echoed += 1
+        # La vacante define la marca del CV (Vintti vs vintti.ai): sale de la cuenta de
+        # ESTA review, no de todos los procesos del candidato.
         url = f"https://vinttihub.vintti.com/resume-readonly.html?id={r['candidate_id']}"
+        if r.get('opportunity_id'):
+            url += f"&opportunity_id={r['opportunity_id']}"
         blocks.append(f"""
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #e4ebfb;">
@@ -2227,7 +2252,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
       <h2 style="margin:0 0 12px;">{len(rows)} CV{'s' if len(rows) != 1 else ''} ready for your review</h2>
       <p style="margin:0 0 6px;"><b>Batch:</b> #{batch_number}</p>
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(first['opp_position_name'] or '—')}</p>
-      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(first['client_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(first['client_name'] or '—')}{_brand_chip(first)}</p>
       <p style="margin:0 0 16px;"><b>Recruiter:</b> {_escape_html(first['recruiter_email'] or '—')}</p>
       {orphan_note}
       {no_score_note}
@@ -2288,7 +2313,7 @@ def _notify_decided(review_id):
       {banner}
       <p style="margin:0 0 6px;"><b>Candidate:</b> {_escape_html(row['candidate_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['opp_position_name'] or '—')}</p>
-      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}{_brand_chip(row)}</p>
       <p style="margin:0 0 16px;"><b>Reviewed by:</b> {_escape_html(row.get('reviewed_by') or '—')}
          &nbsp;·&nbsp; Round {row['round']}</p>
       {f'<p style="margin:0 0 6px;"><b>Reasons:</b></p><ul>{reasons_html}</ul>' if reasons_html else ''}

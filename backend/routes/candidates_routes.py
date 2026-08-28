@@ -1203,10 +1203,66 @@ def delete_candidate_test(candidate_id):
 @bp.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):
     try:
+        # Marca del CV client-version (resume-readonly). La decide LA VACANTE, no el
+        # candidato: la misma persona puede estar en un proceso de Vintti AI y en uno de
+        # Vintti normal, y el CV tiene que salir con la marca de la cuenta a la que se lo
+        # está mandando. Por eso ?opportunity_id= manda cuando viene.
+        scope_opp = request.args.get('opportunity_id', type=int)
+        if scope_opp:
+            vintti_ai_sql = """
+                COALESCE((
+                  SELECT a_ai.vintti_ai
+                  FROM opportunity o_ai
+                  JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+                  WHERE o_ai.opportunity_id = %s
+                ), FALSE) AS vintti_ai"""
+            head_params = (scope_opp,)
+        else:
+            # Sin vacante en la URL (links viejos ya enviados, Account Overview) no hay a
+            # quién preguntarle: AI sólo si TODOS los vínculos del candidato son con
+            # cuentas AI. Mezclado → Vintti, porque mandarle marca AI a un cliente que no
+            # es de AI es el error caro. (GET /candidates sigue con el OR de siempre: ahí
+            # el flag es para el filtro Workspace del listado, no para el branding.)
+            vintti_ai_sql = """
+                (
+                  (
+                    EXISTS (
+                      SELECT 1
+                      FROM opportunity_candidates oc_ai
+                      JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
+                      JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+                      WHERE oc_ai.candidate_id = c.candidate_id
+                        AND COALESCE(a_ai.vintti_ai, FALSE)
+                    ) OR EXISTS (
+                      SELECT 1
+                      FROM hire_opportunity h_ai
+                      JOIN account a_ai ON a_ai.account_id = h_ai.account_id
+                      WHERE h_ai.candidate_id = c.candidate_id
+                        AND COALESCE(a_ai.vintti_ai, FALSE)
+                    )
+                  ) AND NOT (
+                    EXISTS (
+                      SELECT 1
+                      FROM opportunity_candidates oc_no
+                      JOIN opportunity o_no ON o_no.opportunity_id = oc_no.opportunity_id
+                      JOIN account a_no ON a_no.account_id = o_no.account_id
+                      WHERE oc_no.candidate_id = c.candidate_id
+                        AND NOT COALESCE(a_no.vintti_ai, FALSE)
+                    ) OR EXISTS (
+                      SELECT 1
+                      FROM hire_opportunity h_no
+                      JOIN account a_no ON a_no.account_id = h_no.account_id
+                      WHERE h_no.candidate_id = c.candidate_id
+                        AND NOT COALESCE(a_no.vintti_ai, FALSE)
+                    )
+                  )
+                ) AS vintti_ai"""
+            head_params = ()
+
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 c.name,
                 c.country,
@@ -1252,25 +1308,9 @@ def get_candidate_by_id(candidate_id):
                 c.reference_2_linkedin,
                 bl.blacklist_id,
                 COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted,
-                -- Workspace del candidato: TRUE si está ligado (proceso o hire) a una
-                -- cuenta Vintti AI. Lo consume el CV client-version (resume-readonly)
-                -- para elegir el branding. Misma lógica que GET /candidates.
-                (
-                  EXISTS (
-                    SELECT 1
-                    FROM opportunity_candidates oc_ai
-                    JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
-                    JOIN account a_ai ON a_ai.account_id = o_ai.account_id
-                    WHERE oc_ai.candidate_id = c.candidate_id
-                      AND COALESCE(a_ai.vintti_ai, FALSE)
-                  ) OR EXISTS (
-                    SELECT 1
-                    FROM hire_opportunity h_ai
-                    JOIN account a_ai ON a_ai.account_id = h_ai.account_id
-                    WHERE h_ai.candidate_id = c.candidate_id
-                      AND COALESCE(a_ai.vintti_ai, FALSE)
-                  )
-                ) AS vintti_ai
+                -- Marca del CV: la arma el bloque de arriba, según venga o no
+                -- ?opportunity_id=. Lo consume resume-readonly.js.
+                {vintti_ai_sql}
             FROM candidates c
             LEFT JOIN LATERAL (
                 SELECT b.blacklist_id
@@ -1279,7 +1319,7 @@ def get_candidate_by_id(candidate_id):
                 LIMIT 1
             ) bl ON TRUE
             WHERE c.candidate_id = %s
-        """, (candidate_id,))
+        """, head_params + (candidate_id,))
 
         candidate = cursor.fetchone()
         if not candidate:
@@ -1522,6 +1562,9 @@ def get_opportunities_by_candidate(candidate_id):
                 ) AS candidate_stage,
                 a.client_name,
                 a.client_name AS account_name,
+                -- Para que el picker de "Client Version" pueda marcar cuáles vacantes
+                -- salen con la marca vintti.ai antes de abrir el CV.
+                COALESCE(a.vintti_ai, FALSE) AS vintti_ai,
                 b.batch_id,
                 b.batch_number,
                 cb.status AS batch_status

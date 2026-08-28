@@ -379,7 +379,10 @@ body[data-vintti-ai="true"] .cv-footer a {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* El ámbar va como RGB además de hex porque todos los glows lo usan con alpha y así
+     la variante AI repinta el widget entero cambiando sólo estos tres tokens. */
   --rating-accent: #f59e0b;
+  --rating-accent-rgb: 245, 158, 11;
   --rating-accent-soft: rgba(245, 158, 11, 0.18);
 }
 
@@ -388,8 +391,8 @@ body[data-vintti-ai="true"] .cv-footer a {
   border-radius: 999px;
   padding: 11px 18px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 243, 224, 0.85));
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 12px 26px rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(var(--rating-accent-rgb), 0.45);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 12px 26px rgba(var(--rating-accent-rgb), 0.18);
   backdrop-filter: blur(18px) saturate(160%);
   color: #0f172a;
   font-size: 12px;
@@ -453,8 +456,8 @@ body[data-vintti-ai="true"] .cv-footer a {
   padding: 20px 22px;
   border-radius: 24px;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.86), rgba(232, 241, 255, 0.65));
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.18), 0 20px 45px rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(var(--rating-accent-rgb), 0.2);
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.18), 0 20px 45px rgba(var(--rating-accent-rgb), 0.12);
   backdrop-filter: blur(24px) saturate(170%);
   color: #111827;
   gap: 14px;
@@ -595,6 +598,47 @@ body[data-vintti-ai="true"] .cv-footer a {
   color: #0f766e;
 }
 
+/* --- Rating sobre la banda oscura de Vintti AI ---------------------------------------
+   En la variante AI el header es una banda a todo el ancho que arranca en y=0 y el pill
+   (fixed, top:22px) le queda encima: el vidrio blanco con glow ámbar sobre el negro se
+   leía como un error de la página, no como un botón. La posición no se toca —así queda
+   centrado en la banda (22px + 39px de alto sobre 74px) y la burbuja cae justo debajo—,
+   sólo cambia la paleta. */
+body[data-vintti-ai="true"] .resume-rating {
+  --rating-accent: #5c6af7;
+  --rating-accent-rgb: 92, 106, 247;
+  --rating-accent-soft: rgba(92, 106, 247, 0.24);
+}
+
+/* El vidrio oscuro va SÓLO cuando el pill está sobre la banda. Más abajo cae al flujo,
+   sobre el gris claro, y ahí el vidrio oscuro con texto blanco no se lee. */
+@media (min-width: 1500px) {
+  body[data-vintti-ai="true"] .resume-rating-toggle {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(92, 106, 247, 0.3));
+    border-color: rgba(169, 178, 251, 0.55);
+    color: #f8fafc;
+  }
+}
+
+/* El pill es fixed y mide ~240px; el contenido de la banda es una caja de 900px centrada.
+   Por debajo de ~1500px de viewport el gutter ya no da y el pill le pasa por encima al
+   wordmark — o sea, le tapa la marca al cliente. Antes de eso, baja al flujo: justo
+   debajo de la banda y alineado con la tarjeta del CV, donde no choca con nada. */
+@media (max-width: 1499px) {
+  body[data-vintti-ai="true"] .resume-rating {
+    position: static;
+    top: auto;
+    left: auto;
+    align-items: flex-start;
+    width: min(1000px, calc(100vw - 48px));
+    margin: 18px auto 0;
+  }
+
+  body[data-vintti-ai="true"] .cv-container {
+    margin-top: 18px;
+  }
+}
+
 body[data-exporting="true"] .resume-rating,
 body[data-pdf-export="true"] .resume-rating {
   display: none;
@@ -614,11 +658,11 @@ body[data-pdf-export="true"] .resume-rating {
 @keyframes rating-pulse {
   0%,
   100% {
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 10px 22px rgba(245, 158, 11, 0.14);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14), 0 10px 22px rgba(var(--rating-accent-rgb), 0.14);
     transform: translateY(0);
   }
   50% {
-    box-shadow: 0 22px 46px rgba(15, 23, 42, 0.16), 0 14px 32px rgba(245, 158, 11, 0.26);
+    box-shadow: 0 22px 46px rgba(15, 23, 42, 0.16), 0 14px 32px rgba(var(--rating-accent-rgb), 0.26);
     transform: translateY(-1px);
   }
 }

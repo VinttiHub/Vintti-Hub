@@ -5704,6 +5704,28 @@ input:checked + .slider::before {
   opacity: .7;
 }
 
+/* Con qué marca salen los CVs de este mail. No va como letra chica (.approval-mode-note
+   tiene opacity .7): es lo único del envío que el cliente ve con marca, vive adentro del
+   CV que abre por el link, y no hay forma de revisarlo después de mandar. */
+#approvalEmailPopup .approval-mode-brand {
+  display: block;
+  margin-top: 7px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #d7e0f5;
+  background: #ffffff;
+  color: #172036;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* Violeta de marca de vintti.ai (#5c6af7), la misma del CV. */
+#approvalEmailPopup .approval-mode-brand--ai {
+  border-color: #c7ccff;
+  background: #eceefe;
+  color: #2f3a86;
+}
+
 /* No es un matiz del aviso de al lado: dice que alguien NO va a recibir el correo. Va con
    fondo propio y sin opacidad para que no se lea como letra chica. */
 #approvalEmailPopup .approval-mode-warn {

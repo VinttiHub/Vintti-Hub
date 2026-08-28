@@ -7,6 +7,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // lead juzga lo que la recruiter mandó, y además así las frases que cita el análisis
   // existen seguro en lo que está viendo.
   const reviewId = urlParams.get("review_id");
+  // Vacante para la que se está mandando este CV. Es lo que decide la marca
+  // (ver el bloque "Marca del CV" más abajo): la misma persona puede estar en un
+  // proceso de Vintti AI y en uno de Vintti normal.
+  const brandOppId = urlParams.get("opportunity_id");
   // Detección de local, igual que candidatesApiBase() en candidate-details.js: sin esto,
   // corriendo el sitio en local se le pediría el snapshot a producción, que todavía no
   // tiene ese endpoint.
@@ -60,9 +64,14 @@ document.addEventListener("DOMContentLoaded", async () => {
      y azul #5c6af7 como acento. El cuerpo queda claro a propósito, para que el
      texto largo siga siendo legible y el PDF, imprimible.
 
-     El flag lo calcula el backend en GET /candidates/:id cruzando procesos y
-     hires contra account.vintti_ai, así que el link que se le manda al cliente
-     es el mismo de siempre — no hay que elegir botón ni pasar nada por la URL.
+     La marca la decide LA VACANTE, no el candidato: alguien puede estar en un
+     proceso de Vintti AI y en otro de Vintti normal, y su CV tiene que salir con
+     la marca de la cuenta a la que se lo está mandando. Por eso el link lleva
+     ?opportunity_id=<vacante> y el backend resuelve el flag contra la cuenta de
+     esa vacante (GET /candidates/:id?opportunity_id=).
+
+     Sin ese parámetro (links viejos ya enviados) el backend cae a un fallback
+     conservador: AI sólo si TODOS los vínculos del candidato son con cuentas AI.
 
      Se resuelve ANTES de pintar nada para que el hero del PDF ya salga bien. */
   const VINTTI_BRAND = {
@@ -104,16 +113,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   let candidateMeta = null;
   if (candidateId) {
     try {
-      const metaRes = await fetch(`${API_BASE}/candidates/${candidateId}`);
+      const metaUrl = brandOppId
+        ? `${API_BASE}/candidates/${candidateId}?opportunity_id=${encodeURIComponent(brandOppId)}`
+        : `${API_BASE}/candidates/${candidateId}`;
+      const metaRes = await fetch(metaUrl);
       candidateMeta = await metaRes.json();
     } catch (_) {
       candidateMeta = null;
     }
   }
 
-  // ?brand=ai | ?brand=vintti fuerza la marca, para previsualizar la variante
-  // antes de que el candidato esté ligado a una cuenta AI. Sin el parámetro
-  // manda siempre el flag de la base.
+  // ?brand=ai | ?brand=vintti fuerza la marca a mano, por encima de la vacante.
+  // Escape hatch para previsualizar la variante o para un caso puntual; sin el
+  // parámetro manda el flag que devolvió el backend.
   const brandOverride = String(urlParams.get("brand") || "").toLowerCase();
   const isVinttiAi = brandOverride === "ai"
     ? true

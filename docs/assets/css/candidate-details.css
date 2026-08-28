@@ -6115,7 +6115,8 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .cv-review-chip--approved { background: #c1ff72; color: #3a6b00; }
 .cv-review-chip--rejected { background: #ffe0e7; color: #a4103a; }
 
-#cv-review-popup {
+#cv-review-popup,
+#cv-brand-popup {
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -6127,7 +6128,8 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   -webkit-backdrop-filter: blur(10px) saturate(1.05);
   font-family: 'Onest', sans-serif;
 }
-#cv-review-popup.hidden { display: none; }
+#cv-review-popup.hidden,
+#cv-brand-popup.hidden { display: none; }
 
 .cv-review-dialog {
   position: relative;
@@ -6142,7 +6144,8 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   box-shadow: 0 40px 120px rgba(12, 5, 28, 0.32);
 }
 
-.cv-review-close { position: absolute; top: 16px; right: 20px; z-index: 2; }
+.cv-review-close,
+.cv-brand-close { position: absolute; top: 16px; right: 20px; z-index: 2; }
 
 .cv-review-hero {
   padding: 30px 34px 20px;
@@ -6327,7 +6330,8 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .cv-review-footer .generate-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 @media (max-width: 600px) {
-  #cv-review-popup { padding: 10px; }
+  #cv-review-popup,
+  #cv-brand-popup { padding: 10px; }
   .cv-review-dialog { width: 100%; max-height: calc(100vh - 20px); }
   .cv-review-hero, .cv-review-content, .cv-review-footer { padding-left: 18px; padding-right: 18px; }
   .cv-review-footer { flex-direction: column; align-items: stretch; }
@@ -6451,4 +6455,61 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   font-size: 11.5px;
   line-height: 1.45;
   color: #6b4700;
+}
+
+
+/* --- Picker de vacante para el CV client-version -------------------------------------
+   Qué vacante se elige define la MARCA del CV (Vintti vs vintti.ai), así que la fila
+   tiene que dejar ver de un vistazo cuáles son cuentas de Vintti AI: de ahí el chip
+   oscuro. Reusa el shell de .cv-review-dialog; sólo la lista es propia. */
+.cv-brand-options { display: flex; flex-direction: column; gap: 8px; }
+
+.cv-brand-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dbe6ff;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #172036;
+  line-height: 1.35;
+}
+.cv-brand-option:hover { border-color: #6c38ff; }
+/* width:auto explícito: las reglas anchas de inputs de esta hoja estiran el radio y
+   rompen la fila. */
+.cv-brand-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: #6c38ff;
+}
+.cv-brand-option-label { flex: 1 1 auto; }
+.cv-brand-option--ai { border-color: #c7ccff; background: #f7f8ff; }
+
+.cv-brand-badge {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #0d1117;
+  color: #a9b2fb;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+
+.cv-brand-empty { font-size: 13.5px; color: #50607f; }
+
+/* El botón de abrir es un <a> (link nativo = nada de bloqueadores de popups). */
+.cv-review-footer a.generate-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.cv-review-footer a.generate-btn[aria-disabled="true"] {
+  opacity: .5;
+  pointer-events: none;
 }

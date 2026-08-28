@@ -1136,8 +1136,12 @@ function buildCandidateCard(candidate, batch) {
   const card = document.createElement("article");
   card.className = "candidate-card";
   const initials = getInitials(candidate?.name || "");
+  // La vacante define la marca del CV (Vintti vs vintti.ai): sale de la cuenta de ESTA
+  // oportunidad, no de todos los procesos en los que está el candidato.
+  const brandOppId = panelState.opportunityId || candidate?.opportunity_id || batch?.opportunity_id || "";
   const resumeUrl = candidate?.candidate_id
-    ? `resume-readonly.html?id=${encodeURIComponent(candidate.candidate_id)}`
+    ? `resume-readonly.html?id=${encodeURIComponent(candidate.candidate_id)}` +
+      (brandOppId ? `&opportunity_id=${encodeURIComponent(brandOppId)}` : "")
     : "#";
   const linkedinUrl = normalizeLinkedin(candidate?.linkedin);
   const salaryLabel = candidate?.salary_range ? `$${candidate.salary_range}` : "—";
