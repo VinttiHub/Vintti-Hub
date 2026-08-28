@@ -2588,6 +2588,13 @@ if (save){
 
 })(); 
 
+  // Los mails de CV review linkean a #resume para caer directo en la pestaña del CV,
+  // que es donde se hacen los cambios que pidió el sales lead.
+  const _hashTab = (window.location.hash || '').replace('#', '');
+  if (/^[a-z][a-z0-9_-]*$/i.test(_hashTab) && _hashTab !== 'hire') {
+    document.querySelector(`.tab[data-tab="${_hashTab}"]`)?.click();
+  }
+
   // Si llegaste con #hire desde Close Win → mensaje
   if (window.location.hash === '#hire') {
     const hireTab = document.querySelector('.tab[data-tab="hire"]');

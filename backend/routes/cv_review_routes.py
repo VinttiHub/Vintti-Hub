@@ -1872,6 +1872,33 @@ def _brand_chip(row):
             'font-weight:700;font-size:11px;">Vintti AI</span>')
 
 
+def _candidate_profile_block(candidate_id, title, body, anchor="",
+                             label="Open candidate profile \u2192"):
+    """Link al perfil del candidato en los mails de veredicto.
+
+    Sin esto el mail dice el nombre y nada m\u00e1s: la recruiter que tiene que corregir el CV
+    (o entender de qui\u00e9n le est\u00e1n hablando) termina busc\u00e1ndolo a mano en la lista.
+    `anchor` permite caer directo en la pesta\u00f1a Resume cuando lo que hay que hacer es editar.
+    """
+    from routes.public_reference_feedback_routes import _escape_html, candidate_profile_url
+    if not candidate_id:
+        return ""
+    url = candidate_profile_url(candidate_id) + (anchor or "")
+    return f"""
+    <div style="margin:0 0 20px;padding:18px 20px;border-radius:16px;
+                background:#eef2ff;border:1px solid #c7d2fe;">
+      <div style="font-size:16px;font-weight:800;color:#312e81;margin-bottom:6px;">
+        {_escape_html(title)}
+      </div>
+      <div style="color:#3730a3;margin-bottom:14px;">{_escape_html(body)}</div>
+      <a href="{url}" style="display:inline-block;padding:11px 20px;border-radius:12px;
+         background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;">
+        {_escape_html(label)}
+      </a>
+    </div>
+    """
+
+
 def _review_cta_block(review_id, title, body):
     """profile_cta_block apunta al perfil del candidato; el reviewer necesita la cola."""
     from routes.public_reference_feedback_routes import _escape_html
@@ -2277,7 +2304,9 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
 
 
 def _notify_decided(review_id):
-    from routes.public_reference_feedback_routes import _escape_html, _send_email
+    from routes.public_reference_feedback_routes import (
+        _escape_html, _send_email, candidate_profile_url,
+    )
     row, reasons = _review_email_context(review_id)
     if not row:
         return False
@@ -2307,11 +2336,34 @@ def _notify_decided(review_id):
                   '❌ Rejected — this candidate is not going to the client for this opening. '
                   'The reasons below are for the next search, not for another round.</p>')
 
+    # El nombre solo obligaba a buscar al candidato a mano: acá se abre de un click, y si
+    # lo que hay que hacer es corregir el CV se cae directo en la pestaña Resume.
+    cid = row.get("candidate_id")
+    if status == "changes_requested":
+        cta = _candidate_profile_block(
+            cid, "✏️ Fix the CV here",
+            "Open the Resume tab, apply what the comment asks for, and send it back for "
+            "another round.",
+            anchor="#resume", label="Open the CV →")
+    elif status == "approved":
+        cta = _candidate_profile_block(
+            cid, "📄 The candidate's profile",
+            "Grab the client version of the CV or check anything you need before sending it.")
+    else:
+        cta = _candidate_profile_block(
+            cid, "👤 The candidate's profile",
+            "Open it to see the full history of this candidate.")
+
+    name_html = _escape_html(row['candidate_name'] or '—')
+    if cid:
+        name_html = (f'<a href="{candidate_profile_url(cid)}" '
+                     f'style="color:#0028ff;">{name_html}</a>')
+
     html = f"""
     <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
       <h2 style="margin:0 0 12px;">Your CV review is back</h2>
       {banner}
-      <p style="margin:0 0 6px;"><b>Candidate:</b> {_escape_html(row['candidate_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Candidate:</b> {name_html}</p>
       <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['opp_position_name'] or '—')}</p>
       <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}{_brand_chip(row)}</p>
       <p style="margin:0 0 16px;"><b>Reviewed by:</b> {_escape_html(row.get('reviewed_by') or '—')}
@@ -2319,6 +2371,7 @@ def _notify_decided(review_id):
       {f'<p style="margin:0 0 6px;"><b>Reasons:</b></p><ul>{reasons_html}</ul>' if reasons_html else ''}
       {f'<p style="margin:0 0 6px;"><b>Other:</b> {_escape_html(row["reject_other"])}</p>' if row.get('reject_other') else ''}
       {f'<p style="margin:0 0 16px;"><b>{"What to change" if status == "changes_requested" else "Comment"}:</b> {_escape_html(row["reviewer_comment"])}</p>' if row.get('reviewer_comment') else ''}
+      {cta}
     </div>
     """
     subject = {"approved": "CV approved",
