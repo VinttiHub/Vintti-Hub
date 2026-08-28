@@ -52,6 +52,28 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # rodante terminando en el corte (igual que el resto de las cards de 30d).
     win_ini, win_fin = window_bounds(filters)
 
+    # R16 (2026-08-28): la métrica se redefinió. Antes medía "de los enviados al
+    # cliente, cuántos llegaron a entrevista CON EL CLIENTE" (via candidates_batches.status),
+    # que es el paso siguiente del embudo y no lo que dice el título. Ahora mide el paso
+    # que pidió la owner: de los candidatos que Vintti entrevistó internamente
+    # (opportunity.cantidad_entrevistados, cargado a mano o vía "Traer de Apriora"),
+    # qué fracción se terminó enviando al cliente.
+    # Revierte la deprecación de R8: que cantidad_entrevistados sea ~3x los enviados no
+    # es un dato incomparable, es lo esperado (entrevistamos muchos, enviamos una terna).
+    # El error de aquellos datasets era numerador con ventana + denominador all-time.
+    # Reglas de la owner: el ratio se capa al 100 por opp antes de sumar (hay opps con el
+    # campo desactualizado donde enviados > entrevistados, que es imposible).
+    # Las opps SIN el campo cargado NO se excluyen de la cohorte (decisión de la owner:
+    # el dato siempre debería estar, así que el hueco tiene que verse para que alguien lo
+    # cargue). Cuentan en total_opps y se reportan aparte en opps_sin_dato, pero no pueden
+    # entrar en el porcentaje porque no hay denominador que dividir: SUM/AVG ignoran los
+    # NULL, así que el % sale sólo de las opps con dato. Apenas alguien carga el número,
+    # la opp entra sola en el cálculo.
+    # OJO con el cap: LEAST() en Postgres IGNORA los NULL (LEAST(9, NULL) = 9, no NULL),
+    # así que sin el CASE explícito los enviados de las opps sin dato se colaban en el
+    # numerador y inflaban el porcentaje.
+    # Las keys de las measures NO cambian, para no romper los data-field del HTML ni
+    # obligar a re-seed (mismo criterio que R5 con upsells_lara).
     sql = """
         WITH ventana AS (
           SELECT
@@ -61,11 +83,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         base AS (
           SELECT
             o.opportunity_id,
-            o.opp_model,
-            TRIM(o.opp_stage) AS opp_stage,
-            a.client_name,
-            cb.candidate_id,
-            COALESCE(NULLIF(TRIM(cb.status), ''), 'Client interviewing/testing') AS status_norm
+            NULLIF(o.cantidad_entrevistados, 0)::numeric AS entrevistados,
+            cb.candidate_id
           FROM candidates_batches cb
           JOIN batch b ON b.batch_id = cb.batch_id
           JOIN opportunity o ON o.opportunity_id = b.opportunity_id
@@ -84,41 +103,34 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         por_opp AS (
           SELECT
             opportunity_id,
-            COUNT(DISTINCT candidate_id) AS enviados,
-            COUNT(DISTINCT CASE
-              WHEN status_norm IN (
-                'Client interviewing/testing',
-                'Client rejected after interviewing',
-                'Client hired'
-              )
-              THEN candidate_id
-            END) AS entrevistados,
-            CASE
-              WHEN COUNT(DISTINCT candidate_id) = 0 THEN 0::numeric
-              ELSE
-                (COUNT(DISTINCT CASE
-                  WHEN status_norm IN (
-                    'Client interviewing/testing',
-                    'Client rejected after interviewing',
-                    'Client hired'
-                  )
-                  THEN candidate_id
-                END)::numeric * 100.0)
-                / COUNT(DISTINCT candidate_id)
-            END AS entrevistados_sobre_enviados_pct
+            entrevistados,
+            COUNT(DISTINCT candidate_id) AS enviados
           FROM base
-          GROUP BY 1
+          GROUP BY 1, 2
+        ),
+        capped AS (
+          SELECT
+            opportunity_id,
+            entrevistados,
+            CASE
+              WHEN entrevistados IS NULL THEN NULL
+              ELSE LEAST(enviados, entrevistados)
+            END AS enviados_cap
+          FROM por_opp
         )
         SELECT
-          ROUND(AVG(entrevistados_sobre_enviados_pct), 2)::float AS promedio_pct_por_opportunity,
+          ROUND(AVG((enviados_cap * 100.0) / NULLIF(entrevistados, 0)), 2)::float
+                                                AS promedio_pct_por_opportunity,
           ROUND(
-            (SUM(entrevistados)::numeric * 100.0) / NULLIF(SUM(enviados), 0),
+            (SUM(enviados_cap)::numeric * 100.0) / NULLIF(SUM(entrevistados), 0),
             2
           )::float                              AS pct_ponderado_total,
-          SUM(enviados)::float                  AS total_enviados,
+          SUM(enviados_cap)::float              AS total_enviados,
           SUM(entrevistados)::float             AS total_entrevistados,
-          COUNT(*)::int                         AS total_opps
-        FROM por_opp;
+          COUNT(*)::int                         AS total_opps,
+          COUNT(*) FILTER (WHERE entrevistados IS NULL)::int
+                                                AS opps_sin_dato
+        FROM capped;
     """
 
     return sql, {
@@ -132,14 +144,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "interviewed_sent_30d_summary",
-    "label": "Entrevistados vs Enviados en Clientes — Ventana 30 días (global)",
+    "label": "Entrevistados → Enviados al cliente — Ventana 30 días (global)",
     "dimensions": [],
     "measures": [
         {"key": "promedio_pct_por_opportunity", "label": "Promedio % por opp", "type": "percent"},
-        {"key": "pct_ponderado_total", "label": "Conversión global %", "type": "percent"},
-        {"key": "total_enviados", "label": "Total enviados", "type": "number"},
-        {"key": "total_entrevistados", "label": "Total entrevistados", "type": "number"},
+        {"key": "pct_ponderado_total", "label": "Enviados sobre entrevistados % (ponderado)", "type": "percent"},
+        {"key": "total_enviados", "label": "Total enviados al cliente", "type": "number"},
+        {"key": "total_entrevistados", "label": "Total entrevistados por Vintti", "type": "number"},
         {"key": "total_opps", "label": "Total opps", "type": "number"},
+        {"key": "opps_sin_dato", "label": "Opps sin el dato cargado", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+from ._periods import window_bounds
+
 
 def _parse_date(value) -> date | None:
     if not value:
@@ -45,22 +47,29 @@ def _resolve_resultado(filters: dict) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _resolve_modelo(filters)
     resultado = _resolve_resultado(filters)
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or _parse_date(filters.get("mes"))
-    )
+    # R16: usar la MISMA ventana que la card summary y que el detail. Antes esto tenía
+    # la ventana hardcodeada (corte - 29 días, con fallback a CURRENT_DATE en vez de
+    # today_ar) e interpretaba un filtro `mes` como fecha de corte en vez de mes
+    # calendario → con cualquier filtro de período la gráfica no cuadraba con la card.
+    win_ini, win_fin = window_bounds(filters)
 
+    # R16: misma redefinición que interviewed_sent_30d_summary — el denominador es
+    # opportunity.cantidad_entrevistados (entrevistas de Vintti/Apriora) y el numerador
+    # son los candidatos enviados al cliente, capado al 100 por opp. La measure sigue
+    # llamándose `entrevistados_sobre_enviados_pct` (el HTML la usa en data-y y el seed en
+    # mapping.y); su significado ahora es enviados / entrevistados.
+    # Las opps SIN el campo cargado se listan igual (decisión de la owner: el hueco tiene
+    # que verse para que alguien lo cargue), con ratio_label = "sin dato".
+    # OJO con el tipo del pct: se devuelve como TEXTO. Si fuera NULL, el renderer hace
+    # `+r[yKey]` y `+null === 0` → dibujaría esas opps como 0 por ciento. Un texto no
+    # numérico da NaN, y projectPoints lo marca valid:false y no dibuja el punto
+    # (control-dashboard.js:136-141), que es justo lo que queremos: la opp aparece en la
+    # lista del drawer pero no inventa un valor en la gráfica.
     sql = """
-        WITH cutoff_sel AS (
-          SELECT COALESCE(%(corte)s::date, CURRENT_DATE)::date AS cutoff_d
-        ),
-        ventana AS (
+        WITH ventana AS (
           SELECT
-            (c.cutoff_d - INTERVAL '29 day')::date AS win_ini,
-            c.cutoff_d::date                       AS win_fin
-          FROM cutoff_sel c
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         base AS (
           SELECT
@@ -68,75 +77,95 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             a.client_name,
             o.opp_position_name,
             TRIM(o.opp_stage) AS opp_stage,
-            o.opp_model,
-            cb.candidate_id,
-            COALESCE(NULLIF(TRIM(cb.status), ''), 'Client interviewing/testing') AS status_norm,
-            NULLIF(o.opp_close_date::text,'')::date AS close_d
+            NULLIF(o.cantidad_entrevistados, 0)::numeric AS entrevistados,
+            cb.candidate_id
           FROM candidates_batches cb
           JOIN batch b ON b.batch_id = cb.batch_id
           JOIN opportunity o ON o.opportunity_id = b.opportunity_id
           JOIN account a ON a.account_id = o.account_id
+          CROSS JOIN ventana v
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(b.presentation_date::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            AND NULLIF(o.opp_close_date::text,'')::date >= v.win_ini
+            AND NULLIF(o.opp_close_date::text,'')::date <  (v.win_fin + INTERVAL '1 day')
+            AND (%(modelo)s = 'Total' OR o.opp_model = %(modelo)s)
+            AND (%(resultado)s = 'Total' OR TRIM(o.opp_stage) = %(resultado)s)
+        ),
+        por_opp AS (
+          SELECT
+            opportunity_id,
+            client_name,
+            opp_position_name,
+            opp_stage,
+            entrevistados,
+            COUNT(DISTINCT candidate_id) AS enviados
+          FROM base
+          GROUP BY 1, 2, 3, 4, 5
+        ),
+        capped AS (
+          SELECT
+            opportunity_id,
+            client_name,
+            opp_position_name,
+            opp_stage,
+            entrevistados,
+            enviados AS enviados_raw,
+            -- LEAST() ignora los NULL (LEAST(9, NULL) = 9), así que el CASE es necesario
+            -- para que las opps sin dato no queden "capadas" a su propio total.
+            CASE
+              WHEN entrevistados IS NULL THEN NULL
+              ELSE LEAST(enviados, entrevistados)
+            END AS enviados_cap
+          FROM por_opp
         )
         SELECT
-          b.opportunity_id::text                  AS opportunity_id,
-          b.client_name,
-          b.opp_position_name,
-          b.opp_stage                             AS resultado,
-          COUNT(DISTINCT b.candidate_id)::float   AS candidatos_enviados,
-          COUNT(DISTINCT CASE
-            WHEN b.status_norm IN (
-              'Client interviewing/testing',
-              'Client rejected after interviewing',
-              'Client hired'
-            )
-            THEN b.candidate_id
-          END)::float                             AS candidatos_entrevistados,
-          ROUND(
-            CASE
-              WHEN COUNT(DISTINCT b.candidate_id) = 0 THEN NULL
-              ELSE
-                COUNT(DISTINCT CASE
-                  WHEN b.status_norm IN (
-                    'Client interviewing/testing',
-                    'Client rejected after interviewing',
-                    'Client hired'
-                  )
-                  THEN b.candidate_id
-                END)::numeric
-                / COUNT(DISTINCT b.candidate_id)
-                * 100
-            END
-          , 2)::float                              AS entrevistados_sobre_enviados_pct
-        FROM base b
-        CROSS JOIN ventana v
-        WHERE (%(modelo)s = 'Total' OR b.opp_model = %(modelo)s)
-          AND b.close_d >= v.win_ini
-          AND b.close_d <  (v.win_fin + INTERVAL '1 day')
-          AND (%(resultado)s = 'Total' OR b.opp_stage = %(resultado)s)
-        GROUP BY 1,2,3,4
-        ORDER BY candidatos_enviados DESC;
+          opportunity_id::text                    AS opportunity_id,
+          client_name,
+          opp_position_name,
+          opp_stage                               AS resultado,
+          COALESCE(enviados_cap, enviados_raw)::float
+                                                  AS candidatos_enviados,
+          entrevistados::float                    AS candidatos_entrevistados,
+          CASE
+            WHEN entrevistados IS NULL THEN 'sin dato'
+            ELSE ROUND((enviados_cap * 100.0) / entrevistados, 2)::text
+          END                                     AS entrevistados_sobre_enviados_pct,
+          CASE
+            WHEN entrevistados IS NULL
+              THEN ROUND(enviados_raw)::int::text || ' enviado'
+                   || CASE WHEN ROUND(enviados_raw)::int = 1 THEN '' ELSE 's' END
+                   || ' · sin dato de entrevistados'
+            ELSE ROUND(enviados_cap)::int::text || ' / ' || ROUND(entrevistados)::int::text
+                 || ' · ' || ROUND((enviados_cap * 100.0) / entrevistados)::int::text || '%%'
+          END                                     AS ratio_label
+        FROM capped
+        ORDER BY (entrevistados IS NULL), candidatos_enviados DESC;
     """
 
-    return sql, {"modelo": modelo, "resultado": resultado, "corte": corte}
+    return sql, {
+        "modelo": modelo,
+        "resultado": resultado,
+        "win_ini": win_ini,
+        "win_fin": win_fin,
+    }
 
 
 DATASET = {
     "key": "interviewed_sent_30d_history",
-    "label": "Entrevistados vs Enviados en Clientes — Ventana 30 días por opp",
+    "label": "Entrevistados → Enviados al cliente — Ventana 30 días por opp",
     "dimensions": [
         {"key": "opportunity_id", "label": "Opportunity ID", "type": "string"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "resultado", "label": "Resultado", "type": "string"},
+        {"key": "ratio_label", "label": "Enviados / Entrevistados", "type": "string"},
     ],
     "measures": [
-        {"key": "candidatos_enviados", "label": "Enviados", "type": "number"},
-        {"key": "candidatos_entrevistados", "label": "Entrevistados", "type": "number"},
-        {"key": "entrevistados_sobre_enviados_pct", "label": "Entrevistados / Enviados %", "type": "percent"},
+        {"key": "candidatos_enviados", "label": "Enviados al cliente", "type": "number"},
+        {"key": "candidatos_entrevistados", "label": "Entrevistados por Vintti", "type": "number"},
+        {"key": "entrevistados_sobre_enviados_pct", "label": "Enviados / Entrevistados %", "type": "percent"},
     ],
     "default_filters": {},
     "query": query,

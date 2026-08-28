@@ -3073,7 +3073,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "op_line_interviewed_sent_30d",
         "tab_key": "operations",
-        "title": "Entrevistados vs Enviados en Clientes — Ventana 30 días",
+        "title": "Entrevistados → Enviados al cliente — Ventana 30 días por opp",
         "type": "line",
         "dataset_key": "interviewed_sent_30d_history",
         "config": {
@@ -3097,7 +3097,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "op_table_interviewed_sent_30d_detail",
         "tab_key": "operations",
-        "title": "Entrevistados vs Enviados en Clientes — Detalle por candidato",
+        "title": "Entrevistados → Enviados al cliente — Detalle por candidato enviado",
         "type": "table",
         "dataset_key": "interviewed_sent_30d_detail",
         "config": {
@@ -3119,7 +3119,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "op_kpi_interviewed_sent_30d",
         "tab_key": "operations",
-        "title": "Conversión global Entrevistados → Enviados — Ventana 30 días",
+        "title": "Enviados sobre entrevistados por Vintti — Ventana 30 días (global)",
         "type": "kpi",
         "dataset_key": "interviewed_sent_30d_summary",
         "config": {

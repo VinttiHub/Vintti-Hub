@@ -66,6 +66,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # R12: usar la MISMA ventana que la card summary (window_bounds → 30d rolling
     # por default, o Mes/Desde-Hasta si hay filtro). Antes el detalle usaba mes
     # calendario por default → no cuadraba con la card de 30d.
+    # R16: lista TODOS los candidatos enviados de la cohorte, incluidas las opps sin
+    # cantidad_entrevistados cargado (decisión de la owner: no ocultarlas). Ojo: el total
+    # de filas de acá es el de enviados SIN capar, así que puede ser mayor que el
+    # total_enviados de la card, que capa al 100 por opp y sólo suma opps con dato.
     desde, hasta = window_bounds(filters)
 
     sql = """
@@ -128,7 +132,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "interviewed_sent_30d_detail",
-    "label": "Entrevistados vs Enviados en Clientes — Detalle por candidato",
+    "label": "Entrevistados → Enviados al cliente — Detalle por candidato enviado",
     "dimensions": [
         {"key": "opportunity_id", "label": "Opportunity ID", "type": "string"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
