@@ -2824,6 +2824,30 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .cw-pill.cw-yes { background: rgba(193,255,114,0.45); color: #3a6b00; }
 .cw-pill.cw-no  { background: rgba(13,18,30,0.06);    color: var(--ink-3, #6b7280); }
 
+/* Estado de una posición (Position Lifetime · Management Dashboard). Paleta de
+   marca: lima = viva, cyan = buscando reemplazo, violeta = buyout, gris = cerrada.
+   El lima es demasiado claro para texto, así que el label va en verde oscuro. */
+.pos-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.pos-pill.pos-activa  { background: rgba(193,255,114,0.45); color: #3a6b00; }
+.pos-pill.pos-repl    { background: rgba(75,169,255,0.16);  color: #0b5fa8; }
+.pos-pill.pos-buyout  { background: rgba(108,56,255,0.12);  color: #4a1fd0; }
+.pos-pill.pos-cerrada { background: rgba(13,18,30,0.06);    color: var(--ink-3, #6b7280); }
+
+/* Encabezados clickeables de las dtables con data-sortable. */
+.dtable th.dtable-th--sort {
+  cursor: pointer;
+  user-select: none;
+}
+.dtable th.dtable-th--sort:hover { color: var(--c-violet, #6c38ff); }
+
 /* dtable con scroll vertical interno + encabezado fijo (data-scroll) */
 .dtable-scroll {
   max-height: 60vh;

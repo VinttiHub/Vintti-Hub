@@ -2026,7 +2026,7 @@
     const c = chipColor(s);
     return `<span class="origin-chip" style="background:${c.bg};color:${c.fg}">${esc(s)}</span>`;
   }
-  const isNumFmt = (f) => f && f !== 'raw' && f !== 'date' && f !== 'chip';
+  const isNumFmt = (f) => f && f !== 'raw' && f !== 'date' && f !== 'chip' && f !== 'posst';
 
   /* ---------- dtable (generic data table from data-cols="field|Label|fmt,...") ---------- */
   function renderDtable(el, rows) {
@@ -2146,8 +2146,46 @@
         `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(empty)}</td></tr></tbody></table>`);
       return;
     }
+    // Orden por click en el encabezado. Opt-in con data-sortable: sin el atributo,
+    // las dtables existentes renderizan exactamente igual que antes.
+    const sortable = 'sortable' in el.dataset;
+    let sortState = null;
+    if (sortable) {
+      try { sortState = JSON.parse(el.dataset.sortState || 'null'); } catch (_e) { sortState = null; }
+      const sc = sortState && cols.find(c => c.field === sortState.field);
+      if (sc) {
+        const dir = sortState.dir === 'asc' ? 1 : -1;
+        const num = isNumFmt(sc.fmt);
+        viewRows = viewRows.slice().sort((a, b) => {
+          const av = a[sc.field], bv = b[sc.field];
+          if (num) return dir * ((+av || 0) - (+bv || 0));
+          return dir * String(av == null ? '' : av)
+            .localeCompare(String(bv == null ? '' : bv), undefined, { numeric: true });
+        });
+      }
+      if (!el._sortBound) {
+        el._sortBound = true;
+        el.addEventListener('click', (ev) => {
+          const th = ev.target.closest('th[data-sort-field]');
+          if (!th) return;
+          const f = th.getAttribute('data-sort-field');
+          let st = null;
+          try { st = JSON.parse(el.dataset.sortState || 'null'); } catch (_e) { st = null; }
+          // Primer click: descendente (lo más largo/alto arriba). Segundo: ascendente.
+          const dir = (st && st.field === f && st.dir === 'desc') ? 'asc' : 'desc';
+          el.dataset.sortState = JSON.stringify({ field: f, dir });
+          renderDtable(el, el._dtableRows || []);
+        });
+      }
+    }
     const head = cols.map(c => {
-      return `<th${isNumFmt(c.fmt) ? ' class="num"' : ''}>${esc(c.label)}</th>`;
+      const cls = [isNumFmt(c.fmt) ? 'num' : '', sortable ? 'dtable-th--sort' : '']
+        .filter(Boolean).join(' ');
+      const clsAttr = cls ? ` class="${cls}"` : '';
+      if (!sortable) return `<th${clsAttr}>${esc(c.label)}</th>`;
+      const on = sortState && sortState.field === c.field;
+      const caret = on ? (sortState.dir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
+      return `<th${clsAttr} data-sort-field="${esc(c.field)}"${on ? ' aria-sort="' + (sortState.dir === 'asc' ? 'ascending' : 'descending') + '"' : ''}>${esc(c.label)}${caret}</th>`;
     }).join('');
     // Drill por fila: si data-row-drill-field está, cada <tr> lleva el valor de esa
     // columna para filtrar otra tabla al hacer click (ver listener abajo).
@@ -2166,6 +2204,16 @@
           const v = String(r[c.field] == null ? '' : r[c.field]);
           const cls = (v === 'Sí' || v === 'Si') ? 'cw-yes' : 'cw-no';
           return `<td><span class="cw-pill ${cls}">${esc(v || '—')}</span></td>`;
+        }
+        if (c.fmt === 'posst') {
+          const v = String(r[c.field] == null ? '' : r[c.field]);
+          const cls = {
+            'Activa': 'pos-activa',
+            'En reemplazo': 'pos-repl',
+            'Buyout': 'pos-buyout',
+            'Cerrada': 'pos-cerrada'
+          }[v] || '';
+          return `<td><span class="pos-pill ${cls}">${esc(v || '—')}</span></td>`;
         }
         const f = fmt.pick(c.fmt);
         const isNum = isNumFmt(c.fmt);
@@ -3701,7 +3749,22 @@
     bindDrawerWindowControls();
     bindFunnelDetailToggles();
 
-    const openDrawer = (panelKey) => {
+    // Un panel puede traer varios heroes, uno por tile que lo abre (ej. Position
+    // Lifetime: promedio / mediana / % reemplazos comparten panel). El botón elige
+    // cuál con data-drawer-hero; si no matchea ninguno, queda el primero.
+    const applyDrawerHero = (panel, variant) => {
+      const heroes = panel.querySelectorAll('[data-drawer-hero-variant]');
+      if (!heroes.length) return;
+      let shown = false;
+      heroes.forEach(h => {
+        const match = h.getAttribute('data-drawer-hero-variant') === variant;
+        h.style.display = match ? '' : 'none';
+        if (match) shown = true;
+      });
+      if (!shown) heroes.forEach((h, i) => { h.style.display = i === 0 ? '' : 'none'; });
+    };
+
+    const openDrawer = (panelKey, heroVariant) => {
       const panels = drawer.querySelectorAll('[data-kpi-detail-panel]');
       let activePanel = null;
       panels.forEach(p => {
@@ -3710,6 +3773,7 @@
         if (isActive) activePanel = p;
       });
       if (!activePanel) return;
+      applyDrawerHero(activePanel, heroVariant);
       drawer.classList.add('is-open');
       drawer.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
@@ -3901,7 +3965,7 @@
         // doesn't also trigger the ancestor's drawer.
         e.stopPropagation();
         const panelKey = btn.getAttribute('data-kpi-detail-open');
-        openDrawer(panelKey);
+        openDrawer(panelKey, btn.dataset.drawerHero);
         // If the tile declares which window the drawer should start on
         // (e.g. clicking the "Last week" card opens the drawer with the
         // Last week tile already highlighted + table filtered), trigger it

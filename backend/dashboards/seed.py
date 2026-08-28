@@ -309,6 +309,8 @@ RESET_CHART_KEYS = {
         "gr_table_new_opps_am_detail",
         "gr_kpi_sql_to_nda_30d",
         "gr_table_sql_to_nda_30d_detail",
+        "gr_kpi_position_lifetime",
+        "gr_table_position_lifetime_detail",
         # AE Metrics tab (Mariano + Bahia)
         "ae_kpi_revenue_card",
         "ae_kpi_revenue_window",
@@ -3269,6 +3271,43 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "pct_percent", "label": "%", "formatter": "percent"}},
         "position": {"x": 6, "y": 96, "w": 6, "h": 4},
         "sort_order": 410,
+    },
+    # Position Lifetime — cuánto vive el ASIENTO, más allá de quién lo ocupe.
+    # La cadena de reemplazos la arma datasets/_position_chains.py.
+    {
+        "chart_key": "gr_kpi_position_lifetime",
+        "tab_key": "growth",
+        "title": "Position Lifetime — vida promedio de la posición",
+        "type": "kpi",
+        "dataset_key": "position_lifetime_summary",
+        "config": {"mapping": {"value": "avg_months", "label": "meses", "formatter": "number"}},
+        "position": {"x": 0, "y": 100, "w": 6, "h": 4},
+        "sort_order": 415,
+    },
+    {
+        "chart_key": "gr_table_position_lifetime_detail",
+        "tab_key": "growth",
+        "title": "Position Lifetime — detalle por posición",
+        "type": "table",
+        "dataset_key": "position_lifetime_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "position_name",
+                    "estado",
+                    "start_date",
+                    "end_date",
+                    "months",
+                    "n_contractors",
+                    "n_replacements",
+                    "contractors",
+                    "close_date",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 100, "w": 12, "h": 6},
+        "sort_order": 416,
     },
     {
         "chart_key": "gr_kpi_active_pipeline",
