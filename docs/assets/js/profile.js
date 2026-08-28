@@ -221,6 +221,20 @@ document.addEventListener("click", (e)=>{
     }
   }
 
+  const adminColorOption = t.closest?.("#adminColorChoice .admin-color-option");
+  if (adminColorOption){
+    e.preventDefault();
+    setAdminCreateColor(adminColorOption.getAttribute("data-color-value"));
+    return;
+  }
+
+  const adminColorBtn = t.closest?.("[data-admin-color]");
+  if (adminColorBtn){
+    e.preventDefault();
+    onAdminSetColor(adminColorBtn);
+    return;
+  }
+
   const adminResendBtn = t.closest?.("[data-admin-resend]");
   if (adminResendBtn){
     e.preventDefault();
@@ -453,8 +467,11 @@ function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false 
     !isRoot && isLeader ? "is-leader" : "",
     !isRoot && isLeaf ? "is-leaf" : ""
   ].filter(Boolean).join(" ");
+  // El color de equipo se lee por el anillo del avatar y el borde de la tarjeta;
+  // el puntito de la esquina quedaba de más.
+  const teamColor = normalizeTeamColor(user?.color);
   return `
-    <article class="${cardClasses}" data-uid="${escapeHtml(id || "")}" role="button" tabindex="0" aria-label="Open profile for ${name}">
+    <article class="${cardClasses}"${teamColorAttr(teamColor)} data-uid="${escapeHtml(id || "")}" role="button" tabindex="0" aria-label="Open profile for ${name}">
       ${avatarMarkup}
       <h3 class="org-person-name">${name}</h3>
       <div class="org-person-role">${role}</div>
@@ -711,6 +728,13 @@ const TEAM_GLOBAL_EMAILS = new Set([
   "lara@vintti.com",
 ]);
 const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
+// Quien puede abrir la pestaña Admin puede asignar el color de equipo.
+// Esto vale porque ADMIN_ALLOWED_EMAILS de backend/admin_access.py contiene a
+// LEADER_ACCESS_EMAILS; si se rompe ese invariante, el selector aparece y el
+// PATCH devuelve 403.
+function canAssignTeamColor(){
+  return ADMIN_ALLOWED_EMAILS.has(currentProfileEmail());
+}
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
 const ADMIN_GLOBAL_EMAILS = new Set([
@@ -898,6 +922,7 @@ function renderTeamPtoTable(users){
     return `
       <div class="row" data-uid="${u.user_id || ''}">
         <div class="cell cell--name">
+          ${teamColorDot(u.color)}
           <button class="name-link" data-uid="${u.user_id || ''}" type="button" title="View profile">${escapeHtml(name)}</button>
         </div>
 
@@ -1021,9 +1046,13 @@ function renderApprovalsCalendarFromRows(rows){
   for (const r of approved){
     const key = String(r.user_id);
     if (!byPerson.has(key)){
+      // El chip del calendario sigue usando personColor(): son 3 colores de
+      // equipo contra N personas, así que el equipo entra sólo como puntito
+      // en la leyenda y el calendario mantiene un color por persona.
       const color = personColor(key || r.user_name || r.user_email);
-      byPerson.set(key, { name: r.user_name || "—", color });
-      people.push({ id: key, name: r.user_name || "—", color });
+      const teamColor = normalizeTeamColor(r.color);
+      byPerson.set(key, { name: r.user_name || "—", color, teamColor });
+      people.push({ id: key, name: r.user_name || "—", color, teamColor });
     }
   }
   // legend
@@ -1031,7 +1060,7 @@ function renderApprovalsCalendarFromRows(rows){
   if (leg){
     leg.innerHTML = people
       .sort((a,b)=> a.name.localeCompare(b.name))
-      .map(p=> `<span class="leg"><span class="dot" style="background:${p.color}"></span>${p.name}</span>`)
+      .map(p=> `<span class="leg"${teamColorAttr(p.teamColor)}><span class="dot" style="background:${p.color}"></span>${p.name}${teamColorDot(p.teamColor, "team-dot--sm")}</span>`)
       .join("") || `<span class="leg">No approved PTO yet.</span>`;
   }
 
@@ -1127,6 +1156,61 @@ function renderApprovalsCalendarFromRows(rows){
   next?.addEventListener("click", ()=>{ view.setMonth(view.getMonth()+1); draw(); });
 
   draw();
+}
+
+/* ===========================================================
+   Team color (Azul / Rojo / Amarillo)
+   Fuente de verdad: users.color. Sólo el admin lo asigna
+   (PATCH /admin/users/<id>/color).
+   =========================================================== */
+const TEAM_COLORS = {
+  azul:     { key: "azul",     label: "Team Azul" },
+  rojo:     { key: "rojo",     label: "Team Rojo" },
+  amarillo: { key: "amarillo", label: "Team Amarillo" },
+};
+const TEAM_COLOR_KEYS = ["azul", "rojo", "amarillo"];
+
+function normalizeTeamColor(value){
+  if (!value) return "";
+  let v = String(value).trim().toLowerCase();
+  v = v.normalize ? v.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : v;
+  if (v.startsWith("team ")) v = v.slice(5).trim();
+  return TEAM_COLORS[v] ? v : "";
+}
+
+function teamColorLabel(value){
+  const key = normalizeTeamColor(value);
+  return key ? TEAM_COLORS[key].label : "";
+}
+
+/** Atributo listo para interpolar dentro de plantillas de innerHTML. */
+function teamColorAttr(value){
+  const key = normalizeTeamColor(value);
+  return key ? ` data-team-color="${key}"` : "";
+}
+
+/** Puntito de color. Devuelve "" si la persona todavía no tiene equipo. */
+function teamColorDot(value, extraClass){
+  const key = normalizeTeamColor(value);
+  if (!key) return "";
+  const cls = ["team-dot", extraClass].filter(Boolean).join(" ");
+  return `<span class="${cls}" data-team-color="${key}" title="${TEAM_COLORS[key].label}" aria-label="${TEAM_COLORS[key].label}"></span>`;
+}
+
+/** Chip "Team Azul". Devuelve "" si no tiene equipo. */
+function teamColorChip(value){
+  const key = normalizeTeamColor(value);
+  if (!key) return "";
+  return `<span class="team-chip" data-team-color="${key}">${teamColorDot(key)}${TEAM_COLORS[key].label}</span>`;
+}
+
+/** Aplica / limpia data-team-color sobre un nodo ya renderizado. */
+function applyTeamColor(el, value){
+  if (!el) return "";
+  const key = normalizeTeamColor(value);
+  if (key) el.setAttribute("data-team-color", key);
+  else el.removeAttribute("data-team-color");
+  return key;
 }
 
 function resolveProfileAvatarSource({ avatar_url, email_vintti, user_id }){
@@ -1295,6 +1379,16 @@ function renderUserQuick(u){
   }
   renderHobbyChips(u.hobbies);
 
+  // Color de equipo: tiñe la tarjeta entera (collage + avatar) y agrega el chip.
+  const quickColor = normalizeTeamColor(u.color);
+  applyTeamColor(document.querySelector("#userQuickModal .quick-card--collage"), quickColor);
+  applyTeamColor(document.querySelector("#userQuickModal .quick-avatar"), quickColor);
+  const quickChip = $("#uqTeamChip");
+  if (quickChip){
+    quickChip.innerHTML = teamColorChip(quickColor);
+    quickChip.hidden = !quickColor;
+  }
+
   setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
 }
 
@@ -1315,6 +1409,15 @@ function renderUserPtoQuick(u){
   $("#upqVacTotal").textContent = String(vac.avail);
   $("#upqVdTotal").textContent = String(vd.avail);
   $("#upqHolTotal").textContent = String(hol.avail);
+
+  const ptoColor = normalizeTeamColor(u.color);
+  applyTeamColor(document.querySelector("#userPtoModal .pto-quick-card"), ptoColor);
+  applyTeamColor(document.querySelector("#userPtoModal .pto-quick-avatar"), ptoColor);
+  const ptoChip = $("#upqTeamChip");
+  if (ptoChip){
+    ptoChip.innerHTML = teamColorChip(ptoColor);
+    ptoChip.hidden = !ptoColor;
+  }
 
   setPtoQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
 }
@@ -1435,6 +1538,7 @@ async function loadTeamPto(){
       ingreso_vintti_date: u.ingreso_vintti_date,
       avatar_url: u.avatar_url,
       initials: u.initials,
+      color: u.color,
 
       // Vacation
       vacaciones_acumuladas: u.vacaciones_acumuladas,
@@ -1571,17 +1675,18 @@ const headerHistory = `
     });
   }
 
-  function avatarMarkup(name, avatarUrl, initials, email, userId){
+  function avatarMarkup(name, avatarUrl, initials, email, userId, color){
     const fallback = resolveInitials(name || "", initials);
+    const tc = teamColorAttr(color);
     const resolvedUrl = resolveProfileAvatarSource({ avatar_url: avatarUrl, email_vintti: email, user_id: userId });
     if (!resolvedUrl){
-      return `<div class="avatar-min">${esc(fallback)}</div>`;
+      return `<div class="avatar-min"${tc}>${esc(fallback)}</div>`;
     }
     const safeUrl = esc(resolvedUrl);
     const safeName = esc(name || "User avatar");
     const safeInitials = esc(fallback);
     return `
-      <div class="avatar-min">
+      <div class="avatar-min"${tc}>
         <img data-avatar-img class="avatar-img" src="${safeUrl}" alt="${safeName}" loading="lazy" />
         <span class="avatar-fallback" aria-hidden="true" style="display:none;">${safeInitials}</span>
       </div>
@@ -1589,7 +1694,7 @@ const headerHistory = `
   }
 
 function buildRow(r, withActions){
-  const avatar = avatarMarkup(r.user_name, r.avatar_url, r.initials, r.email_vintti, r.user_id);
+  const avatar = avatarMarkup(r.user_name, r.avatar_url, r.initials, r.email_vintti, r.user_id, r.color);
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
@@ -1622,6 +1727,7 @@ function buildRow(r, withActions){
         ${avatar}
         <div class="uinfo">
           <div class="uname">
+            ${teamColorDot(r.color, "team-dot--sm")}
             ${r.user_name || "—"}
             ${noteBtn}
           </div>
@@ -1980,6 +2086,7 @@ async function onAdminCreateSubmit(ev){
   const typedLeader = (leaderInput?.value || "").trim();
   const leaderId = Number(leaderIdInput?.value) || null;
   const leaderOfIds = Array.from(ADMIN_LEADER_OF_SELECTED.keys());
+  const newColor = normalizeTeamColor(document.getElementById("adminColor")?.value);
 
   if (!fullName){
     setAdminStatus("Enter the person's full name.", false);
@@ -2009,7 +2116,8 @@ async function onAdminCreateSubmit(ev){
     leader_of_user_ids: leaderOfIds.length ? leaderOfIds : undefined,
     roles: roleTags.length ? roleTags : undefined,
     is_recruiter: isRecruiter,
-    is_sales_lead: isSalesLead
+    is_sales_lead: isSalesLead,
+    color: newColor || undefined
   };
 
   if (submitBtn) submitBtn.disabled = true;
@@ -2031,6 +2139,7 @@ async function onAdminCreateSubmit(ev){
     document.getElementById("adminSendInvite").checked = true;
     document.getElementById("adminIsRecruiter").checked = false;
     document.getElementById("adminIsSalesLead").checked = false;
+    setAdminCreateColor("");
     if (leaderIdInput) leaderIdInput.value = "";
     if (leaderInput) leaderInput.value = "";
     syncAdminLeaderSelection();
@@ -2096,11 +2205,21 @@ function renderAdminUsers(users){
     const row = document.createElement("div");
     row.className = "admin-user-row";
 
+    const rowColor = normalizeTeamColor(user?.color);
+    applyTeamColor(row, rowColor);
+
     const meta = document.createElement("div");
     meta.className = "admin-user-meta";
     const name = document.createElement("div");
     name.className = "admin-user-name";
     name.textContent = (user?.user_name || "Unnamed user").trim() || "Unnamed user";
+    if (rowColor){
+      const dot = document.createElement("span");
+      dot.className = "team-dot";
+      dot.setAttribute("data-team-color", rowColor);
+      dot.title = teamColorLabel(rowColor);
+      name.prepend(dot);
+    }
     const details = document.createElement("div");
     details.className = "admin-user-details";
     const email = (user?.email_vintti || "").trim();
@@ -2125,6 +2244,10 @@ function renderAdminUsers(users){
 
     const actions = document.createElement("div");
     actions.className = "admin-user-actions";
+
+    // Color de equipo: se puede asignar al crear al usuario o —lo habitual—
+    // días después, cuando el equipo ya está definido.
+    if (canAssignTeamColor()) actions.appendChild(buildAdminColorPicker(user, rowColor));
 
     // Invitación pendiente: nunca seteó password. El link dura 48h y no hay forma
     // de reenviarlo creando el usuario de nuevo (da 409 por email duplicado).
@@ -2169,6 +2292,115 @@ function renderAdminUsers(users){
     frag.appendChild(row);
   });
   host.appendChild(frag);
+}
+
+/** Deja el selector de color del formulario de alta en un valor dado. */
+function setAdminCreateColor(value){
+  const key = normalizeTeamColor(value);
+  const hidden = document.getElementById("adminColor");
+  if (hidden) hidden.value = key;
+  document.querySelectorAll("#adminColorChoice .admin-color-option").forEach((btn)=>{
+    const isActive = normalizeTeamColor(btn.getAttribute("data-color-value")) === key;
+    btn.classList.toggle("is-active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+/** Selector de color de equipo para una fila de "Manage teammates". */
+function buildAdminColorPicker(user, activeColor){
+  const uid = String(user?.user_id || "");
+  const box = document.createElement("div");
+  box.className = "admin-user-color";
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", "Team color");
+
+  TEAM_COLOR_KEYS.forEach((key)=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "admin-color-swatch";
+    btn.setAttribute("data-team-color", key);
+    btn.setAttribute("data-admin-color", uid);
+    btn.setAttribute("data-color-value", key);
+    btn.title = TEAM_COLORS[key].label;
+    btn.setAttribute("aria-label", TEAM_COLORS[key].label);
+    btn.setAttribute("aria-pressed", String(activeColor === key));
+    if (activeColor === key) btn.classList.add("is-active");
+    box.appendChild(btn);
+  });
+
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "admin-color-swatch is-clear";
+  clear.setAttribute("data-admin-color", uid);
+  clear.setAttribute("data-color-value", "");
+  clear.textContent = "×";
+  clear.title = "No color yet";
+  clear.setAttribute("aria-label", "No color yet");
+  clear.setAttribute("aria-pressed", String(!activeColor));
+  if (!activeColor) clear.classList.add("is-active");
+  box.appendChild(clear);
+
+  return box;
+}
+
+async function onAdminSetColor(btn){
+  const userId = Number(btn.getAttribute("data-admin-color"));
+  if (!userId || btn.disabled) return;
+  const color = normalizeTeamColor(btn.getAttribute("data-color-value"));
+  const cached = ADMIN_USERS_CACHE.find((u)=> Number(u?.user_id) === userId);
+  if (normalizeTeamColor(cached?.color) === color) return;
+
+  const box = btn.closest(".admin-user-color");
+  const swatches = box ? [...box.querySelectorAll(".admin-color-swatch")] : [];
+  swatches.forEach((el)=> { el.disabled = true; });
+
+  try{
+    const res = await api(`/admin/users/${encodeURIComponent(userId)}/color`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color: color || null })
+    });
+    const data = await res.json().catch(()=> null);
+    if (!res.ok || !data?.ok){
+      throw new Error(data?.error || data?.message || "Could not save that color.");
+    }
+
+    const saved = normalizeTeamColor(data.color);
+    if (cached) cached.color = saved || null;
+
+    // Repintamos la fila en el lugar, sin recargar toda la lista.
+    const row = btn.closest(".admin-user-row");
+    applyTeamColor(row, saved);
+    const nameEl = row?.querySelector(".admin-user-name");
+    if (nameEl){
+      nameEl.querySelector(".team-dot")?.remove();
+      if (saved){
+        const dot = document.createElement("span");
+        dot.className = "team-dot";
+        dot.setAttribute("data-team-color", saved);
+        dot.title = teamColorLabel(saved);
+        nameEl.prepend(dot);
+      }
+    }
+    swatches.forEach((el)=>{
+      const isActive = normalizeTeamColor(el.getAttribute("data-color-value")) === saved;
+      el.classList.toggle("is-active", isActive);
+      el.setAttribute("aria-pressed", String(isActive));
+    });
+
+    const who = (cached?.user_name || "").trim();
+    setAdminUsersStatus(
+      saved
+        ? `${who || "User"} is now ${TEAM_COLORS[saved].label}.`
+        : `${who || "User"} has no team color.`,
+      true
+    );
+  }catch(err){
+    console.error("admin set color error:", err);
+    setAdminUsersStatus(err?.message || "Could not save that color.", false);
+  }finally{
+    swatches.forEach((el)=> { el.disabled = false; });
+  }
 }
 
 async function loadAdminUsersList(){
@@ -3290,6 +3522,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       favorite_food: payload.favorite_food,
       fun_fact: payload.fun_fact,
       avatar_url: payload.avatar_url,
+      color: PROFILE_CACHE?.color || null,
       initials: resolveInitials(payload.user_name)
     };
     setAvatarFieldValue(payload.avatar_url || "", payload.avatar_url ? "Profile photo saved." : "No custom photo selected.");
@@ -3397,6 +3630,28 @@ function renderProfileView(me){
     }
   }
 
+  // Color de equipo: fondo pastel en la header card + anillo del avatar + chip.
+  const myColor = normalizeTeamColor(me.color);
+  applyTeamColor(document.querySelector("#profileView .header-card"), myColor);
+  applyTeamColor($("#avatar"), myColor);
+  const myChip = $("#v_team_color");
+  if (myChip){
+    myChip.innerHTML = teamColorChip(myColor);
+    myChip.hidden = !myColor;
+  }
+  // Las dos pestañas que hablan sólo de mí heredan el color desde el panel:
+  // así se tiñen las tarjetas y los títulos sin tocar los badges de tipo
+  // (Vacation / Vintti Day / Public Holidays), que son colores de otra cosa.
+  applyTeamColor($("#panel-profile"), myColor);
+  applyTeamColor($("#panel-timeoff"), myColor);
+  // El CTA flotante de mobile vive fuera del panel, hay que marcarlo aparte.
+  applyTeamColor($("#btnOpenTimeoffMobile"), myColor);
+  const timeoffChip = $("#timeoffTeamChip");
+  if (timeoffChip){
+    timeoffChip.innerHTML = teamColorChip(myColor);
+    timeoffChip.hidden = !myColor;
+  }
+
   // Avatar
   setAvatar({
     user_name: me.user_name,
@@ -3442,6 +3697,7 @@ async function loadMe(uid){
     favorite_food: me.favorite_food || "",
     fun_fact: me.fun_fact || "",
     avatar_url: me.avatar_url || null,
+    color: me.color || null,
     initials: resolveInitials(me.user_name, me.initials)
   };
 

@@ -5,7 +5,7 @@
   <title>My Profile • Vintti Hub</title>
   <script src="./assets/js/auth-guard.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="./assets/css/profile.css?v=20260817-policylink" rel="stylesheet" />
+  <link href="./assets/css/profile.css?v=20260828-teamcolor3" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=14" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -113,6 +113,7 @@
               <h2 id="v_user_name" class="name">—</h2>
               <div id="v_role" class="muted">—</div>
               <div id="v_location" class="muted" hidden>—</div>
+              <div id="v_team_color" class="profile-team" hidden></div>
             </div>
           </div>
           <div class="header-right">
@@ -275,7 +276,7 @@
       </div>
       <section class="requests">
         <header class="requests-head">
-          <h2 class="list-title">My Requests</h2>
+          <h2 class="list-title">My Requests <span class="team-chip" id="timeoffTeamChip" hidden></span></h2>
           <div class="requests-head-right">
             <a class="policy-link"
                href="https://app.notion.com/p/vintti/Vacations-Holidays-Policy-2026-2c710f11b98b802eae8cc961365b0720?source=copy_link"
@@ -593,6 +594,22 @@
           <datalist id="adminLeaderOptions"></datalist>
         </label>
         <label class="field field-span">
+          <span class="label">Team color (optional)</span>
+          <div class="admin-color-choice" id="adminColorChoice" role="group" aria-label="Team color">
+            <button type="button" class="admin-color-option" data-team-color="azul" data-color-value="azul">
+              <span class="team-dot" data-team-color="azul"></span>Team Azul
+            </button>
+            <button type="button" class="admin-color-option" data-team-color="rojo" data-color-value="rojo">
+              <span class="team-dot" data-team-color="rojo"></span>Team Rojo
+            </button>
+            <button type="button" class="admin-color-option" data-team-color="amarillo" data-color-value="amarillo">
+              <span class="team-dot" data-team-color="amarillo"></span>Team Amarillo
+            </button>
+            <button type="button" class="admin-color-option is-active" data-color-value="">Not yet</button>
+          </div>
+          <input type="hidden" id="adminColor" name="color" value="" />
+        </label>
+        <label class="field field-span">
           <span class="label">Leads (optional)</span>
           <div class="admin-multiselect" id="adminLeaderOfBox">
             <div id="adminLeaderOfTags" class="admin-multiselect__tags" aria-live="polite"></div>
@@ -686,6 +703,7 @@
           <div class="quick-meta quick-meta--soft" id="uqLocationWrap" hidden>
             <span id="uqLocation">—</span>
           </div>
+          <div class="quick-team" id="uqTeamChip" hidden></div>
         </div>
       </div>
 
@@ -743,6 +761,7 @@
           <span class="dot">•</span>
           <span id="upqTeam">—</span>
         </div>
+        <div class="pto-quick-team" id="upqTeamChip" hidden></div>
 
         <div class="pto-address-row">
           <div class="pto-field pto-field--address"><span class="label">Address</span><span id="upqAddress">—</span></div>
@@ -804,7 +823,7 @@
 <script src="./assets/js/avatar-map.js?v=20260630-1" defer></script>
 <script src="./assets/js/monthly-mood.js?v=14" defer></script>
 <script src="./assets/js/main.js?v=20260805-hire1" defer></script>
-<script src="./assets/js/profile.js?v=20260807-resendinvite" defer></script>
+<script src="./assets/js/profile.js?v=20260828-teamcolor4" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

@@ -38,6 +38,73 @@
   --total-green-100:    #EEFFCB;
   --total-green-50:     #F7FFE8;
   --total-green-border: #97d550d8;
+
+  /* ---------- Team colors (Azul / Rojo / Amarillo) ---------- */
+  --team-azul:          #003bff;
+  --team-azul-soft:     #e8edff;
+  --team-azul-ink:      #00227a;
+
+  --team-rojo:          #e5484d;
+  --team-rojo-soft:     #ffe9ea;
+  --team-rojo-ink:      #8f1d21;
+
+  --team-amarillo:      #f5b301;
+  --team-amarillo-soft: #fff4d4;
+  --team-amarillo-ink:  #7a5600;
+}
+
+/* =========================================================
+   Team color — un solo lugar resuelve el trío de variables.
+   Todo lo demás consume --tc / --tc-soft / --tc-ink.
+   Sin [data-team-color] no cambia nada: los estilos previos mandan.
+   ========================================================= */
+[data-team-color="azul"]{
+  --tc:      var(--team-azul);
+  --tc-soft: var(--team-azul-soft);
+  --tc-ink:  var(--team-azul-ink);
+}
+[data-team-color="rojo"]{
+  --tc:      var(--team-rojo);
+  --tc-soft: var(--team-rojo-soft);
+  --tc-ink:  var(--team-rojo-ink);
+}
+[data-team-color="amarillo"]{
+  --tc:      var(--team-amarillo);
+  --tc-soft: var(--team-amarillo-soft);
+  --tc-ink:  var(--team-amarillo-ink);
+}
+
+/* Puntito de equipo */
+.team-dot{
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--tc, #cbd5e1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc, #cbd5e1) 22%, #fff);
+  vertical-align: middle;
+}
+.team-dot--sm{ width: 7px; height: 7px; }
+
+/* Chip "Team Azul" */
+.team-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--tc-soft, #f1f5f9);
+  color: var(--tc-ink, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--tc, #94a3b8) 32%, #fff);
+}
+.team-chip .team-dot{
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc, #cbd5e1) 30%, #fff);
 }
 
 /* ---------- Base / Reset ---------- */
@@ -397,6 +464,84 @@ input:focus, select:focus, textarea:focus{
   color:var(--muted);
   padding:6px 0;
 }
+
+/* ---------- Team color — Access Manager ---------- */
+.admin-user-row[data-team-color]{
+  border-left: 5px solid var(--tc);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tc-soft) 85%, #fff) 0%, #fff 34%);
+}
+.admin-user-name .team-dot{
+  margin-right: 7px;
+}
+
+/* Selector por fila: 3 swatches + "sin color" */
+.admin-user-color{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 6px;
+  margin-right:4px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:#fff;
+}
+.admin-color-swatch{
+  width:20px;
+  height:20px;
+  padding:0;
+  border-radius:50%;
+  border:2px solid transparent;
+  background: var(--tc, #e2e8f0);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+  color:#94a3b8;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.admin-color-swatch:hover:not(:disabled){ transform: scale(1.14); }
+.admin-color-swatch:disabled{ opacity:.55; cursor:progress; }
+.admin-color-swatch.is-active{
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--tc, #94a3b8);
+}
+.admin-color-swatch.is-clear{
+  background:#f1f5f9;
+  border-color:#e2e8f0;
+}
+.admin-color-swatch.is-clear.is-active{
+  box-shadow: 0 0 0 2px #94a3b8;
+  border-color:#fff;
+}
+
+/* Selector del formulario de alta */
+.admin-color-choice{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.admin-color-option{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 14px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#fff;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted);
+  cursor:pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.admin-color-option:hover{ border-color: color-mix(in srgb, var(--tc, #94a3b8) 45%, #fff); }
+.admin-color-option.is-active{
+  background: var(--tc-soft, rgba(15,23,42,0.06));
+  border-color: color-mix(in srgb, var(--tc, #94a3b8) 42%, #fff);
+  color: var(--tc-ink, var(--text));
+}
 .btn.danger{
   background:#fee2e2;
   border-color:#fca5a5;
@@ -579,6 +724,90 @@ input:focus, select:focus, textarea:focus{
   margin: 30px;
 }
 .header-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin: 30px;}
+
+/* ---------- Team color — mi propio perfil ---------- */
+.header-card[data-team-color]{
+  background: linear-gradient(135deg, var(--tc-soft) 0%, #ffffff 62%);
+  border-color: color-mix(in srgb, var(--tc) 26%, #fff);
+}
+.avatar[data-team-color]{
+  background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--tc) 72%, #fff) 0%, var(--tc) 100%);
+  border: 3px solid color-mix(in srgb, var(--tc) 55%, #fff);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--tc) 26%, transparent);
+}
+.avatar[data-team-color="amarillo"] span{ color: var(--team-amarillo-ink); }
+.profile-team{ margin-top: 8px; }
+
+/* =========================================================
+   Team color — pestañas Profile y Request Time Off
+   Las dos hablan sólo de mí, así que el color va en el "chrome"
+   (tarjetas, títulos, botón) y NO en los datos: los badges de
+   Vacation / Vintti Day / Public Holidays son colores de TIPO
+   de licencia y tienen que seguir distinguiéndose entre sí.
+   ========================================================= */
+
+/* Barrita de color antes de cada título de sección */
+#panel-profile[data-team-color] .card-head .title::before,
+#panel-timeoff[data-team-color] .list-title::before,
+#panel-timeoff[data-team-color] .balances-title::before{
+  content:"";
+  display:inline-block;
+  width:6px;
+  height:1em;
+  margin-right:10px;
+  border-radius:999px;
+  background: var(--tc);
+  vertical-align:-1px;
+}
+
+/* Tarjetas con un lavado pastel muy suave */
+#panel-profile[data-team-color] .card,
+#panel-timeoff[data-team-color] .requests,
+#panel-timeoff[data-team-color] .balances{
+  border-color: color-mix(in srgb, var(--tc) 20%, #fff);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tc-soft) 55%, #fff) 0%, #ffffff 220px);
+}
+/* La header card ya tiene su propio degradado más marcado */
+#panel-profile[data-team-color] .card.header-card{
+  background: linear-gradient(135deg, var(--tc-soft) 0%, #ffffff 62%);
+}
+
+/* Cabeceras: la línea punteada toma el color */
+#panel-timeoff[data-team-color] .requests-head{
+  border-bottom-color: color-mix(in srgb, var(--tc) 28%, #fff);
+}
+
+/* Etiquetas de campo del perfil */
+#panel-profile[data-team-color] .info-field .label{
+  color: color-mix(in srgb, var(--tc-ink) 42%, var(--muted));
+}
+
+/* "Take a Break": el elemento protagonista de la pestaña */
+#panel-timeoff[data-team-color] .btn.fun,
+.btn.fun[data-team-color]{
+  background: linear-gradient(135deg, var(--tc-soft), color-mix(in srgb, var(--tc-soft) 45%, #fff));
+  border-color: color-mix(in srgb, var(--tc) 34%, #fff);
+  color: var(--tc-ink);
+  font-weight: 800;
+}
+#panel-timeoff[data-team-color] .btn.fun:hover{
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tc) 22%, #fff), var(--tc-soft));
+}
+
+/* Chip de equipo dentro del título "My Requests" */
+.list-title .team-chip{
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 11.5px;
+}
+
+/* Fila de request: acento del lado izquierdo */
+#panel-timeoff[data-team-color] .requests-table .row:hover > .cell:first-child{
+  box-shadow: inset 3px 0 0 var(--tc);
+}
+
+
 .header-left { display:flex; align-items:center; gap:16px; }
 .who .name { margin:0; font-size:22px; font-weight:700; color:#111827; }
 .muted { color:#6b7280; font-size:14px; }
@@ -793,6 +1022,7 @@ input:focus, select:focus, textarea:focus{
 }
 
 .org-person{
+  position: relative;
   width: 88px;
   min-height: 0;
   padding: 6px 3px 7px;
@@ -938,6 +1168,22 @@ input:focus, select:focus, textarea:focus{
 
 .org-avatar.is-fallback .org-avatar-fallback{
   display: grid;
+}
+
+/* ---------- Team color en el organigrama ----------
+   El gradiente azul/gris sigue marcando la jerarquía (root / leader / leaf);
+   el color de equipo entra como puntito + anillo del avatar para no pisarla. */
+.org-person[data-team-color]{
+  border-color: color-mix(in srgb, var(--tc) 45%, rgba(255,255,255,.35));
+}
+
+.org-person[data-team-color] .org-avatar{
+  border: 2px solid var(--tc);
+  box-shadow: 0 3px 10px rgba(2,6,23,.18), 0 0 0 1px rgba(255,255,255,.5);
+}
+
+.org-person[data-team-color]:hover{
+  box-shadow: 0 14px 28px rgba(15,23,42,.14), 0 0 0 2px color-mix(in srgb, var(--tc) 38%, transparent);
 }
 
 @media (max-width: 900px){
@@ -1540,6 +1786,20 @@ input:focus, select:focus, textarea:focus{
   background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
   color:white; font-weight:800; display:grid; place-items:center; letter-spacing:.5px;
 }
+/* ---------- Team color — Approvals / Team PTO ---------- */
+.avatar-min[data-team-color]{
+  background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--tc) 72%, #fff) 0%, var(--tc) 100%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc) 38%, #fff);
+}
+.avatar-min[data-team-color] .avatar-img{
+  border: 2px solid var(--tc);
+}
+.avatar-min[data-team-color="amarillo"]{ color: var(--team-amarillo-ink); }
+
+.uinfo .uname .team-dot{ margin-right:6px; }
+.cell--name .team-dot{ margin-right:7px; }
+.cal-legend .leg .team-dot{ margin-left:6px; }
+
 .uinfo .uname{ font-weight:700; }
 .uinfo .uteam{ font-size:12px; color:var(--muted); }
 
@@ -1740,6 +2000,83 @@ input:focus, select:focus, textarea:focus{
   box-shadow: 0 18px 40px rgba(37,99,235,.16);
 }
 #upqAvatarImg{ width:100%; height:100%; object-fit:cover; display:none; }
+
+/* =========================================================
+   Team color — quick profile modals
+   El collage era amarillo fijo; ahora deriva del equipo de la persona.
+   Sin [data-team-color] queda exactamente como antes.
+   ========================================================= */
+.quick-card--collage[data-team-color]{
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--tc) 26%, transparent), transparent 26%),
+    radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--tc) 15%, transparent), transparent 26%),
+    radial-gradient(circle at 20% 80%, color-mix(in srgb, var(--tc) 12%, transparent), transparent 24%),
+    linear-gradient(180deg, var(--tc-soft), #ffffff 46%, color-mix(in srgb, var(--tc-soft) 60%, #fff) 100%);
+}
+
+.quick-card--collage[data-team-color] .quick-panel--hero{
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--tc) 20%, transparent), transparent 38%),
+    linear-gradient(135deg, var(--tc-soft) 0%, #ffffff 50%, color-mix(in srgb, var(--tc-soft) 55%, #fff) 100%);
+}
+
+.quick-card--collage[data-team-color] .quick-panel--story,
+.quick-card--collage[data-team-color] .quick-panel--chips,
+.quick-card--collage[data-team-color] .quick-panel--fact{
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--tc) 14%, transparent), transparent 42%),
+    #ffffff;
+}
+
+.quick-card--collage[data-team-color] .quick-kicker{
+  background: linear-gradient(135deg, var(--tc), color-mix(in srgb, var(--tc) 72%, #fff));
+  color: #fff;
+  box-shadow: 0 10px 18px color-mix(in srgb, var(--tc) 22%, transparent);
+}
+/* El amarillo es demasiado claro para texto blanco */
+.quick-card--collage[data-team-color="amarillo"] .quick-kicker{
+  color: var(--team-amarillo-ink);
+}
+
+.quick-card--collage[data-team-color] .quick-main::before{
+  background: linear-gradient(90deg, var(--tc), color-mix(in srgb, var(--tc) 45%, #fff));
+}
+
+.quick-card--collage[data-team-color] .quick-chip{
+  background: linear-gradient(135deg, var(--tc-soft), color-mix(in srgb, var(--tc-soft) 70%, #fff));
+  border-color: color-mix(in srgb, var(--tc) 24%, #fff);
+  color: var(--tc-ink);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--tc) 12%, transparent);
+}
+
+.quick-card--collage[data-team-color] .qfield--accent{
+  background: linear-gradient(180deg, var(--tc-soft), color-mix(in srgb, var(--tc-soft) 45%, #fff));
+  border-color: color-mix(in srgb, var(--tc) 30%, #fff);
+}
+
+.quick-avatar[data-team-color],
+.pto-quick-avatar[data-team-color]{
+  background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--tc) 78%, #fff) 0%, var(--tc) 100%);
+  border: 3px solid color-mix(in srgb, var(--tc) 55%, #fff);
+  box-shadow: 0 22px 44px color-mix(in srgb, var(--tc) 22%, transparent);
+}
+.quick-avatar[data-team-color="amarillo"] #uqAvatarInitials,
+.pto-quick-avatar[data-team-color="amarillo"] #upqAvatarInitials{
+  color: var(--team-amarillo-ink);
+}
+
+.pto-quick-card[data-team-color]{
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--tc) 16%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--tc-soft), #ffffff 40%);
+}
+
+.quick-team,
+.pto-quick-team{
+  margin-top: 10px;
+}
+.quick-team .team-chip{ font-size: 12px; padding: 5px 13px 5px 9px; }
+
 #upqAvatarInitials{ font-size:48px; font-weight:800; color:white; letter-spacing:.8px; }
 .pto-quick-main{
   border:1px solid rgba(148,163,184,.18);
@@ -4920,6 +5257,13 @@ input:focus, select:focus, textarea:focus{
       radial-gradient(circle at top center, rgba(255,212,59,.14), transparent 36%) !important;
   }
 
+  /* El bloque mobile usa !important, así que el color de equipo lo repite acá */
+  .quick-card--collage[data-team-color]{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.96)),
+      radial-gradient(circle at top center, color-mix(in srgb, var(--tc) 16%, transparent), transparent 36%) !important;
+  }
+
   .quick-collage{
     gap: 14px !important;
   }
@@ -4939,6 +5283,11 @@ input:focus, select:focus, textarea:focus{
     padding: 12px !important;
     background:
       linear-gradient(135deg, #fff7dc 0%, #ffffff 58%, #eef4ff 100%) !important;
+  }
+
+  .quick-card--collage[data-team-color] .quick-panel--hero{
+    background:
+      linear-gradient(135deg, var(--tc-soft) 0%, #ffffff 60%, color-mix(in srgb, var(--tc-soft) 55%, #fff) 100%) !important;
   }
 
   .quick-avatar--feature{

@@ -6,6 +6,11 @@ from typing import Optional, Set
 
 from db import get_connection
 
+# Quiénes pueden usar el Access Manager: crear usuarios, desactivarlos, reenviar
+# invitaciones y asignar el color de equipo.
+# INVARIANTE: este set tiene que contener a LEADER_ACCESS_EMAILS de
+# docs/assets/js/profile.js, que es quien ve la pestaña Admin. Si alguien aparece
+# allá y no acá, ve los controles y el guardado le devuelve 403.
 ADMIN_ALLOWED_EMAILS: Set[str] = {
     "agustin@vintti.com",
     "lara@vintti.com",
@@ -13,6 +18,7 @@ ADMIN_ALLOWED_EMAILS: Set[str] = {
     "agostina@vintti.com",
     "bahia@vintti.com",
     "mariano@vintti.com",
+    "justo@vintti.com",
     "lucia@vintti.com",
     "camila@vintti.com",
     "mia@vintti.com",

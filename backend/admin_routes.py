@@ -14,7 +14,7 @@ from admin_access import (
     ADMIN_ALLOWED_EMAILS,
     normalize_email,
 )
-from db import get_connection
+from db import get_connection, mark_users_color_present, users_has_color
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Email, Mail
 
@@ -140,6 +140,40 @@ def _canonical_role_slug(value: Optional[str]) -> Optional[str]:
     return None
 
 
+TEAM_COLORS = {"azul", "rojo", "amarillo"}
+
+
+def _ensure_user_color_column(cur):
+    """Crea users.color si falta. Sólo desde los endpoints de escritura del admin.
+
+    Un ADD COLUMN toma ACCESS EXCLUSIVE sobre `users`; corrido en cada request de
+    lectura (que es como estaba) dos llamadas concurrentes se deadlockean contra
+    admin_user_access. Acá se ejecuta a lo sumo una vez por proceso y sólo cuando
+    la columna realmente no existe: lo normal es que ya la haya creado
+    backend/sql/20260828_add_user_color.sql.
+    """
+    if users_has_color(cur):
+        return
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS color TEXT")
+    mark_users_color_present()
+
+
+def _canonical_color(value) -> Optional[str]:
+    """'Azul' / ' ROJO ' -> 'azul' / 'rojo'. Devuelve None si viene vacío."""
+    if value is None:
+        return None
+    cleaned = str(value).strip().lower()
+    if not cleaned:
+        return None
+    cleaned = (
+        cleaned.replace("á", "a").replace("é", "e").replace("í", "i")
+        .replace("ó", "o").replace("ú", "u")
+    )
+    if cleaned.startswith("team "):
+        cleaned = cleaned[5:].strip()
+    return cleaned if cleaned in TEAM_COLORS else ""
+
+
 def _detect_user_roles(payload: dict) -> Set[str]:
     detected: Set[str] = set()
     roles_field = payload.get("roles")
@@ -193,6 +227,7 @@ def create_hub_user():
     send_invite = _as_bool(payload.get("send_invite"), True)
     is_active = _as_bool(payload.get("is_active"), True)
     ingreso_vintti_date = payload.get("ingreso_vintti_date") or payload.get("start_date") or None
+    team_color = _canonical_color(payload.get("color") or payload.get("team_color"))
     leader_value = payload.get("leader_user_id") or payload.get("leader_id") or payload.get("lider")
     leader_user_id = _int_or_none(leader_value)
     raw_reports = (
@@ -221,6 +256,8 @@ def create_hub_user():
         return _friendly_error("Full name is required.")
     if not candidate_email or not EMAIL_RE.match(candidate_email):
         return _friendly_error("Please enter a valid email address.")
+    if team_color == "":
+        return _friendly_error("Team color must be azul, rojo or amarillo.")
 
     conn = get_connection()
     requester = None
@@ -239,6 +276,8 @@ def create_hub_user():
             requester_email = normalize_email(requester.get("email_vintti"))
             if requester_email not in ADMIN_ALLOWED_EMAILS:
                 return _friendly_error("You do not have access to this tool.", 403)
+
+            _ensure_user_color_column(cur)
 
             cur.execute(
                 "SELECT user_id FROM users WHERE LOWER(email_vintti) = %s",
@@ -288,7 +327,8 @@ def create_hub_user():
                     vacaciones_habiles,
                     vacaciones_consumidas,
                     vintti_days_consumidos,
-                    feriados_consumidos
+                    feriados_consumidos,
+                    color
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
@@ -300,9 +340,10 @@ def create_hub_user():
                     %s,
                     %s,
                     %s,
+                    %s,
                     %s
                 )
-                RETURNING user_id, user_name, email_vintti, role
+                RETURNING user_id, user_name, email_vintti, role, color
                 """,
                 (
                     next_user_id,
@@ -316,7 +357,8 @@ def create_hub_user():
                     _prorated_vacation_days_for_year(ingreso_vintti_date),
                     DEFAULT_VACACIONES_CONSUMIDAS,
                     DEFAULT_VINTTI_DAYS_CONSUMIDOS,
-                    DEFAULT_FERIADOS_CONSUMIDOS
+                    DEFAULT_FERIADOS_CONSUMIDOS,
+                    team_color or None
                 ),
             )
             new_user = cur.fetchone()
@@ -388,6 +430,7 @@ def create_hub_user():
                     "user_name": new_user["user_name"],
                     "email_vintti": new_user["email_vintti"],
                     "role": new_user.get("role"),
+                    "color": new_user.get("color"),
                     "is_active": is_active,
                 },
                 "invite_sent": bool(invite_sent),
@@ -484,6 +527,58 @@ def delete_hub_user(user_id: int):
     # Ya NO hace hard delete: ahora es un soft delete (deactivate). Se mantiene el
     # verbo DELETE por compatibilidad, pero el efecto es desactivar, no borrar.
     return _deactivate_endpoint(user_id)
+
+
+@bp.patch("/users/<int:user_id>/color")
+def set_hub_user_color(user_id: int):
+    """Asigna (o limpia) el color de equipo de un usuario. Sólo admins.
+
+    Vive acá y no en el PATCH /users/<id> de profile_routes porque aquel se
+    autentica con el user_id que declara el cliente: cualquiera podría cambiarse
+    su propio equipo. El color lo asigna el admin.
+    """
+    requester_id = _current_user_id()
+    if not requester_id:
+        return _friendly_error("Please log in again to continue.", 401)
+
+    payload = request.get_json(silent=True) or {}
+    raw_color = payload.get("color", payload.get("team_color"))
+    color = _canonical_color(raw_color)
+    if color == "":
+        return _friendly_error("Team color must be azul, rojo or amarillo.")
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _, error = _load_admin_requester(cur, requester_id)
+            if error:
+                return error
+
+            _ensure_user_color_column(cur)
+
+            cur.execute(
+                """
+                UPDATE users
+                   SET color = %s,
+                       updated_at = NOW()::date
+                 WHERE user_id = %s
+             RETURNING user_id, user_name, color
+                """,
+                (color, user_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                return _friendly_error("That user no longer exists.", 404)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception("Failed to update team color for user %s", user_id)
+        return _friendly_error("We could not save that color right now.", 500)
+    finally:
+        conn.close()
+
+    return jsonify({"ok": True, "user_id": int(row["user_id"]), "color": row.get("color")}), 200
 
 
 @bp.get("/users/invite-status")

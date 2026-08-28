@@ -27,3 +27,37 @@ def get_connection():
         # cubren este caso porque corren DESPUÉS de tener la conexión.
         connect_timeout=int(os.environ.get("RDS_CONNECT_TIMEOUT", "10")),
     )
+
+
+# ---------------------------------------------------------------------------
+# users.color (color de equipo: azul / rojo / amarillo)
+# ---------------------------------------------------------------------------
+# La columna la crea backend/sql/20260828_add_user_color.sql, que se corre a mano.
+# NO hacemos el "ALTER TABLE ... ADD COLUMN IF NOT EXISTS" dentro de las rutas de
+# lectura: un ADD COLUMN toma ACCESS EXCLUSIVE sobre `users`, y hecho en cada
+# request dos llamadas concurrentes terminan deadlockeándose contra
+# admin_user_access (una tiene users y quiere aua, la otra al revés).
+# Esto sólo consulta el catálogo —lectura barata— y cachea el resultado por proceso.
+_USERS_HAS_COLOR = None
+
+
+def users_has_color(cur) -> bool:
+    """True si `users.color` ya existe. Se cachea por proceso."""
+    global _USERS_HAS_COLOR
+    if _USERS_HAS_COLOR is None:
+        cur.execute(
+            """
+            SELECT 1
+              FROM information_schema.columns
+             WHERE table_name = 'users' AND column_name = 'color'
+             LIMIT 1
+            """
+        )
+        _USERS_HAS_COLOR = cur.fetchone() is not None
+    return _USERS_HAS_COLOR
+
+
+def mark_users_color_present() -> None:
+    """Invalida el cache tras crear la columna (lo usa el path de admin)."""
+    global _USERS_HAS_COLOR
+    _USERS_HAS_COLOR = True

@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
-from db import get_connection
+from db import get_connection, users_has_color
 
 bp = Blueprint('users_basic', __name__)
+
 
 HIDDEN_USER_EMAILS = {
     'agustina.barbero@vintti.com',
@@ -90,11 +91,17 @@ def users_list_or_by_email():
                   COALESCE(pto_usage.approved_holidays, 0) AS feriados_consumidos,
                   u.team,
                   u.lider,
+                  u.color,
                   COALESCE(aua.is_active, TRUE) AS is_active
                 FROM users u
                 LEFT JOIN pto_usage ON pto_usage.user_id = u.user_id
                 LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
             """
+
+            # Antes de correr la migración la columna no existe: devolvemos NULL
+            # en su lugar para no romper toda la página.
+            if not users_has_color(cur):
+                base_select = base_select.replace("u.color,", "NULL::text AS color,")
 
             if email:
                 # Lookup puntual: devuelve el usuario aunque esté inactivo.
@@ -135,8 +142,9 @@ def users_by_leader():
     try:
         conn = get_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            color_col = "u.color" if users_has_color(cur) else "NULL::text"
             cur.execute(
-                """
+                f"""
                 SELECT
                   u.user_id,
                   u.user_name,
@@ -145,7 +153,8 @@ def users_by_leader():
                   u.role,
                   u.avatar_url,
                   u.team,
-                  u.lider
+                  u.lider,
+                  {color_col} AS color
                 FROM users u
                 LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
                 WHERE u.lider = %s

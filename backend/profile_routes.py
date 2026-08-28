@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Set, Tuple
 from flask import Blueprint, request, jsonify, g, redirect
 from psycopg2.extras import RealDictCursor
-from db import get_connection
+from db import get_connection, users_has_color
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, Cc
@@ -496,7 +496,7 @@ def get_user(user_id: int):
       user_id, user_name, nickname, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
       country, city, address, about_me, hobbies, favorite_food, fun_fact,
-      team, lider,
+      team, lider, color,
       COALESCE(vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
       COALESCE(vacaciones_habiles, 0)       AS vacaciones_habiles,
       COALESCE(vacaciones_consumidas, 0)    AS vacaciones_consumidas,
@@ -509,6 +509,8 @@ def get_user(user_id: int):
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
         _maybe_apply_current_year_vacation_rollover(cur)
+        if not users_has_color(cur):
+            q = q.replace(" color,", " NULL::text AS color,")
         cur.execute(q, (user_id,))
         row = cur.fetchone()
         if row:
@@ -596,11 +598,12 @@ def me():
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
-        cur.execute("""
+        color_col = "color" if users_has_color(cur) else "NULL::text"
+        cur.execute(f"""
             SELECT user_id, user_name, email_vintti, role, emergency_contact,
                 ingreso_vintti_date, fecha_nacimiento, avatar_url,
                 country, city, address, about_me, hobbies, favorite_food, fun_fact,
-                team
+                team, {color_col} AS color
             FROM users WHERE user_id = %s
         """, (user_id,))
         row = cur.fetchone()
@@ -743,6 +746,7 @@ def leader_list_timeoff():
         if not _is_allowed_leader(cur, leader_id):
             return jsonify({"error":"forbidden"}), 403
 
+
         # Are you leader of anyone?
         cur.execute("""
             SELECT COUNT(*) AS cnt FROM users WHERE lider = %s
@@ -752,7 +756,8 @@ def leader_list_timeoff():
             return jsonify({"error":"forbidden (not a leader of anyone)"}), 403
 
         # Pull requests from your direct reports
-        cur.execute("""
+        color_col = "u.color" if users_has_color(cur) else "NULL::text"
+        cur.execute(f"""
             SELECT
               r.id,
               r.user_id,
@@ -760,6 +765,7 @@ def leader_list_timeoff():
               u.email_vintti AS user_email,
               u.avatar_url,
               u.team,
+              {color_col} AS color,
               r.kind,
               r.start_date,
               r.end_date,
