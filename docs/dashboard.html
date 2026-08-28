@@ -4701,25 +4701,7 @@
           </div>
       </div>
 
-      <!-- Hero row 2 · Sent → Hired / Interviewed → Sent / Interview conversion -->
-
-      <!-- Sent → Hired 30d (side detail) -->
-      <div class="hero-kpi s-4">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Sent → Hired<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-kpi-detail-open="op-sent-hired" aria-label="Ver detalle Sent → Hired">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_contratados" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_enviados" data-reduce="first" data-fmt="int">—</span> contratados ·
-                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_opps_close_win" data-reduce="first" data-fmt="int">—</span> opps
-              </div>
-            </div>
-          </div>
-      </div>
+      <!-- Hero row 2 · Interviewed → Sent / Sent → Hired (en orden de embudo) -->
 
       <!-- Interviewed → Sent 30d (side detail) -->
       <div class="hero-kpi s-4">
@@ -4735,6 +4717,24 @@
                 <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="total_entrevistados" data-reduce="first" data-fmt="int">—</span> entrevistados ·
                 <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="total_opps" data-reduce="first" data-fmt="int">—</span> opps ·
                 <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="opps_sin_dato" data-reduce="first" data-fmt="int">—</span> sin dato
+              </div>
+            </div>
+          </div>
+      </div>
+
+      <!-- Sent → Hired 30d (side detail) -->
+      <div class="hero-kpi s-4">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Sent → Hired<br/>· <span data-window-label>30d</span></div>
+              <button type="button" class="hero-kpi__icon" data-kpi-detail-open="op-sent-hired" aria-label="Ver detalle Sent → Hired">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_contratados" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_enviados" data-reduce="first" data-fmt="int">—</span> contratados ·
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_opps_close_win" data-reduce="first" data-fmt="int">—</span> opps
               </div>
             </div>
           </div>

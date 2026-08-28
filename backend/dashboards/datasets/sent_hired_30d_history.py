@@ -90,6 +90,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           WHERE ho.opportunity_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
+            -- R17: excluir hires fantasma (filas del formulario público de referencias,
+            -- sin carga_active ni start_date). Ver sent_hired_30d_summary.
+            AND (
+              ho.carga_active IS NOT NULL
+              OR NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+            )
           GROUP BY 1
         )
         SELECT

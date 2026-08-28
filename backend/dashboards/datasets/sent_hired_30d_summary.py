@@ -50,6 +50,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
 
     win_ini, win_fin = window_bounds(filters)
+    # R17 (2026-08-28): el CTE `hired` contaba CUALQUIER fila de hire_opportunity. Esa
+    # tabla también junta filas de candidatos que sólo compitieron por la vacante — las
+    # inserta el formulario público de referencias para colgar ahí reference_1_*/2_* — y
+    # esas filas nacen sin carga_active ni start_date. En la ventana de 30d eran 8 de 24
+    # "contrataciones" (la card marcaba 23 por ciento en vez de 15).
+    # El resto del dashboard ya define contratado = fila CON start_date; este trío se
+    # había quedado afuera de esa convención. Ver la nota sobre hires fantasma: NUNCA
+    # borrar filas de hire_opportunity, sólo filtrarlas.
     sql = """
         WITH ventana AS (
           SELECT
@@ -86,6 +94,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           WHERE ho.opportunity_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
+            AND (
+              ho.carga_active IS NOT NULL
+              OR NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+            )
           GROUP BY 1
         ),
         agg AS (

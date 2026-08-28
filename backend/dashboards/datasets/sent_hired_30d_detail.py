@@ -116,9 +116,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           LEFT JOIN candidates c ON c.candidate_id = cb.candidate_id
         ),
         hired_any AS (
-          SELECT DISTINCT ho.candidate_id
+          -- R17: dos arreglos. (1) excluir hires fantasma (filas del formulario público
+          -- de referencias, sin carga_active ni start_date). (2) scopear por opp: antes
+          -- era DISTINCT candidate_id sin opportunity_id, así que un candidato contratado
+          -- en CUALQUIER otra opp figuraba como "Sí" acá y el detalle no cuadraba con la
+          -- card. Ver sent_hired_30d_summary.
+          SELECT DISTINCT ho.candidate_id, ho.opportunity_id
           FROM hire_opportunity ho
           WHERE ho.candidate_id IS NOT NULL
+            AND ho.opportunity_id IS NOT NULL
+            AND (
+              ho.carga_active IS NOT NULL
+              OR NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+            )
         )
         SELECT
           sd.opportunity_id::text                    AS opportunity_id,
@@ -135,6 +145,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           ON o.opportunity_id = sd.opportunity_id
         LEFT JOIN hired_any ha
           ON ha.candidate_id = sd.candidate_id
+         AND ha.opportunity_id = sd.opportunity_id
         WHERE (%(opportunity_id)s::int IS NULL OR sd.opportunity_id = %(opportunity_id)s)
         ORDER BY sd.sent_date ASC, sd.candidate_name;
     """
