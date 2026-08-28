@@ -32,7 +32,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           END                                                               AS has_pc,
           COALESCE(ho.setup_fee, 0)::float                                  AS setup_fee
         FROM opportunity o
-        JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
+        JOIN (
+               -- R17: sólo hires reales. hire_opportunity también junta filas que
+               -- crea el formulario público de referencias para candidatos que sólo
+               -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+               SELECT * FROM hire_opportunity
+               WHERE carga_active IS NOT NULL
+                  OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+             ) ho ON ho.opportunity_id = o.opportunity_id
         LEFT JOIN account a      ON a.account_id   = o.account_id
         LEFT JOIN candidates c   ON c.candidate_id = ho.candidate_id
         WHERE o.opp_model = 'Staffing'

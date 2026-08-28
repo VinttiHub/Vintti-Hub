@@ -55,7 +55,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                  CASE WHEN w.model = 'Recruiting' THEN COALESCE(ho.revenue,0)
                       ELSE COALESCE(ho.salary,0)+COALESCE(ho.fee,0) END), 0)::bigint AS revenue
         FROM wins w
-        LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+        LEFT JOIN (
+               -- R17: sólo hires reales. hire_opportunity también junta filas que
+               -- crea el formulario público de referencias para candidatos que sólo
+               -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+               SELECT * FROM hire_opportunity
+               WHERE carga_active IS NOT NULL
+                  OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+             ) ho ON ho.opportunity_id = w.opportunity_id
         WHERE w.close_d IS NOT NULL AND w.close_d >= %(win_ini)s::date AND w.close_d <= %(win_fin)s::date
         GROUP BY w.client_name, w.model, w.opp_position_name, w.close_d
         ORDER BY revenue DESC, w.client_name;

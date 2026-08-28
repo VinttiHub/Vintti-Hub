@@ -69,7 +69,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ho.opportunity_id,
             MIN(ho.candidate_id)::text AS new_candidate_id,
             MIN(c.name) AS candidate_name
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id
           WHERE ho.opportunity_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL

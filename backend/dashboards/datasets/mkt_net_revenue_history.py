@@ -86,7 +86,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(SUM(CASE WHEN w.opp_model = 'Recruiting' THEN COALESCE(ho.revenue, 0)
                               ELSE COALESCE(ho.fee, 0) END), 0)::numeric AS net_rev
           FROM wins w
-          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+          LEFT JOIN (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho ON ho.opportunity_id = w.opportunity_id
           GROUP BY w.opportunity_id, w.origin, w.close_d
         ),
         bucketed AS (

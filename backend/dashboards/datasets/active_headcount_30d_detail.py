@@ -89,7 +89,14 @@ _BASE_CTES = """
             END AS end_d,
             LOWER(TRIM(o.opp_model)) AS model,
             o.opp_close_date::date AS close_d
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           JOIN account a     ON a.account_id     = ho.account_id
           LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id

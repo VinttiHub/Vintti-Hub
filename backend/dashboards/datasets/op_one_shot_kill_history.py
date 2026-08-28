@@ -71,7 +71,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         scored AS (
           SELECT w.opportunity_id, w.mes, BOOL_OR(fb.batch_num = 1) AS one_shot
           FROM wins w
-          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+          LEFT JOIN (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho ON ho.opportunity_id = w.opportunity_id
           LEFT JOIN firstbatch fb
             ON fb.opportunity_id = ho.opportunity_id AND fb.candidate_id = ho.candidate_id
           GROUP BY w.opportunity_id, w.mes

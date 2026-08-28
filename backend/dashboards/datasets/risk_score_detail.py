@@ -67,7 +67,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               ELSE ho.end_date::date
             END AS end_d,
             TRIM(o.opp_type) AS opp_type
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           LEFT JOIN account a ON a.account_id = ho.account_id
           WHERE o.opp_model = 'Staffing'

@@ -73,7 +73,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(SUM(ho.setup_fee), 0)::float                      AS setup_fee,
             BOOL_OR(LOWER(TRIM(COALESCE(ho.computer, ''))) = 'yes')    AS has_pc_bool
           FROM ae_wins w
-          JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+          JOIN (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho ON ho.opportunity_id = w.opportunity_id
           LEFT JOIN candidates    c  ON c.candidate_id   = ho.candidate_id
           WHERE ho.candidate_id IS NOT NULL
           GROUP BY w.opportunity_id, w.account_id, w.opp_sales_lead, w.opp_position_name, w.close_d

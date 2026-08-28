@@ -64,7 +64,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ho.candidate_id,
             MIN(ho.carga_active) AS hire_date,
             fb.batch_num
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           LEFT JOIN firstbatch fb
             ON fb.opportunity_id = ho.opportunity_id AND fb.candidate_id = ho.candidate_id
           GROUP BY ho.opportunity_id, ho.candidate_id, fb.batch_num

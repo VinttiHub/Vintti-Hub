@@ -33,7 +33,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               ELSE FALSE
             END AS has_pc
           FROM opportunity o
-          JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
+          JOIN (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho ON ho.opportunity_id = o.opportunity_id
           LEFT JOIN account a ON a.account_id = o.account_id
           WHERE o.opp_model = 'Staffing'
             AND COALESCE(a.vintti_internal, FALSE) = FALSE

@@ -64,7 +64,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             ho.candidate_id::text AS old_candidate_id,
             MAX(NULLIF(ho.end_date::text, '')::date) AS old_end_date
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           GROUP BY ho.candidate_id::text
         ),
         new_start AS (
@@ -72,7 +79,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ho.opportunity_id,
             MIN(NULLIF(ho.start_date::text, '')::date) AS new_start_date,
             MIN(ho.candidate_id)::text AS new_candidate_id
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           GROUP BY ho.opportunity_id
         )
         SELECT

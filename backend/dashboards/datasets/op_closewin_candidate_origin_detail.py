@@ -18,7 +18,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                  COALESCE(ca.name, '—') AS candidate_name,
                  COALESCE(a.client_name, '—') AS client_name,
                  COALESCE(op.opp_position_name, '—') AS opp_position_name
-          FROM hire_opportunity ho
+          FROM (
+                 -- R17: sólo hires reales. hire_opportunity también junta filas que
+                 -- crea el formulario público de referencias para candidatos que sólo
+                 -- compitieron; nacen sin carga_active ni start_date. Nunca borrarlas.
+                 SELECT * FROM hire_opportunity
+                 WHERE carga_active IS NOT NULL
+                    OR NULLIF(TRIM(CAST(start_date AS TEXT)), '') IS NOT NULL
+               ) ho
           JOIN opportunity op ON op.opportunity_id = ho.opportunity_id
             AND TRIM(op.opp_stage) = 'Close Win'
           JOIN candidates ca  ON ca.candidate_id = ho.candidate_id
