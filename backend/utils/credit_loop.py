@@ -12,7 +12,6 @@ TEAM_EMAILS = [
     "agustin@vintti.com",
     "jazmin@vintti.com",
     "lara@vintti.com",
-    "pgonzales@vintti.com",
 ]
 
 

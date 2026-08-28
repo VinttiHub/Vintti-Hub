@@ -334,7 +334,7 @@ def reference_feedback_recipients(ctx, include_sales_lead=False):
     full picture, not half of it.
     """
     hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
-    recipients = ['pgonzales@vintti.com', 'agostina@vintti.com']
+    recipients = ['agostina@vintti.com']
     if hr_lead:
         recipients.insert(0, hr_lead)
     if include_sales_lead:

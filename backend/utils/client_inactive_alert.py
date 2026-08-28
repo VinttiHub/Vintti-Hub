@@ -33,7 +33,6 @@ CLIENT_INACTIVE_EMAIL_RECIPIENTS = [
     'agustin@vintti.com',
     'lara@vintti.com',
     'jazmin@vintti.com',
-    'pgonzales@vintti.com',
 ]
 
 # Texto del disparador, para que el mail diga por qué se cayó la cuenta.

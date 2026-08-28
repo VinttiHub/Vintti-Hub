@@ -48,12 +48,10 @@ _REJECTED_BATCH_STATUSES = {
     'client rejected after interviewing',
 }
 _REJECTION_ALERT_THRESHOLD = 5
-_REJECTION_ALERT_EMAIL = 'pgonzales@vintti.com'
 CHURN_EMAIL_RECIPIENTS = [
     'agustin@vintti.com',
     'lara@vintti.com',
     'agostina@vintti.com',
-    'pgonzales@vintti.com',
 ]
 # Se dispara cuando la baja de un contractor deja a la cuenta SIN ningún activo.
 # Lista distinta (y a propósito) de CHURN_EMAIL_RECIPIENTS: perder al cliente
@@ -63,7 +61,6 @@ CLIENT_INACTIVE_EMAIL_RECIPIENTS = [
     'agustin@vintti.com',
     'lara@vintti.com',
     'jazmin@vintti.com',
-    'pgonzales@vintti.com',
 ]
 _REFERENCE_CANDIDATE_FIELDS = [
     'references_notes',
@@ -397,10 +394,16 @@ def _send_rejection_threshold_email(context, rejected_total):
         context.get("opportunity_id"),
         rejected_total,
     )
-    recipients = [_REJECTION_ALERT_EMAIL]
+    # La supervisión salió de esta alerta a pedido de la owner: va sólo al hr lead.
+    # Sin hr lead no hay a quién mandarla; con la lista vacía /send_email fallaría.
+    recipients = []
     hr_lead_email = (context.get("hr_lead_email") or "").strip().lower()
-    if hr_lead_email and hr_lead_email not in recipients:
+    if hr_lead_email:
         recipients.append(hr_lead_email)
+    if not recipients:
+        logging.info("Rejection alert skipped: no hr lead for opportunity %s",
+                     context.get("opportunity_id"))
+        return False
 
     payload = {"to": recipients, "subject": subject, "body": body}
     try:

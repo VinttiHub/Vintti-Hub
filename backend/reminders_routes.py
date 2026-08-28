@@ -23,8 +23,8 @@ BAHIA_EMAIL = "bahia@vintti.com"
 MIA_EMAIL = "mia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 PGONZALES_EMAIL = "pgonzales@vintti.com"
-CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]
-CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS = [JAZ_EMAIL, PGONZALES_EMAIL]
+CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL]
+CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS = [JAZ_EMAIL]
 
 
 def _fetch_opportunity_type(opportunity_id: int, cur) -> str:
@@ -418,7 +418,7 @@ def press_and_send(candidate_id):
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL, AGUS_EMAIL]  # hire reminders activos
+        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]  # hire reminders activos
         # Lucia desactivada para hire reminders.
         # to_list = [JAZ_EMAIL, LAR_EMAIL, LUCIA_EMAIL, PGONZALES_EMAIL]
 
@@ -755,7 +755,7 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
     price_type = (hire_for_opp or {}).get("price_type")
     computer = (hire_for_opp or {}).get("computer")
 
-    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL, PGONZALES_EMAIL])
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL])
     ok = _send_email(
         subject=f"🎉 Close Win: {ctx.get('candidate_name') or f'Candidate #{candidate_id}'} — Start {start_date or '—'}",
         html_body=_close_win_email_html(
@@ -787,7 +787,7 @@ def _send_closed_lost_email(cur, opportunity_id: int) -> Dict[str, Any]:
     if not _is_stage_closed_lost(ctx.get("opp_stage")):
         return {"sent": False, "reason": "stage_not_closed_lost", "opportunity_id": opportunity_id}
 
-    recipients = [AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL, PGONZALES_EMAIL]
+    recipients = [AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL]
     if (
         str(ctx.get("motive_close_lost") or "").strip().lower() == "vinttis fault"
         and str(ctx.get("opp_sales_lead") or "").strip().lower() == "mariano@vintti.com"
@@ -1255,7 +1255,7 @@ def _send_hr_lead_signed_resig_ref_email(cur, opportunity_id: int, *, force: boo
         except Exception:
             pass
 
-    to_list = _dedupe_emails([hr_email, PGONZALES_EMAIL])
+    to_list = _dedupe_emails([hr_email])
     ok = _send_email(
         subject=_hr_lead_resig_ref_subject(ctx.get("client_name"), ctx.get("opp_position_name")),
         html_body=_hr_lead_resig_ref_email_html(ctx.get("client_name"), ctx.get("opp_position_name")),
