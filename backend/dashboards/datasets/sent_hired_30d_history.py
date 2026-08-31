@@ -81,6 +81,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM batch b
           JOIN candidates_batches cb ON cb.batch_id = b.batch_id
           WHERE NULLIF(b.presentation_date::text,'') IS NOT NULL
+            -- 2026-08-31 (owner): los candidatos que sales frenó nunca llegaron al
+            -- cliente, así que no son "enviados". Mismo criterio que la card
+            -- Interviewed → Sent. El valor guardado es 'Rejected By Sales', pero la
+            -- columna tiene casing inconsistente ('Client rejected CV' /
+            -- 'Client Rejected CV'), así que se compara en LOWER(TRIM(...)); el
+            -- COALESCE deja pasar los status NULL, que son un envío sin decisión.
+            AND COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
           GROUP BY 1
         ),
         hired AS (

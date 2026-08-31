@@ -114,6 +114,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM candidates_batches cb
           JOIN b ON b.batch_id = cb.batch_id
           LEFT JOIN candidates c ON c.candidate_id = cb.candidate_id
+          -- 2026-08-31 (owner): los rechazados por sales no cuentan como enviados en la
+          -- card, así que tampoco se listan acá. Ver sent_hired_30d_summary.
+          WHERE COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
         ),
         hired_any AS (
           -- R17: dos arreglos. (1) excluir hires fantasma (filas del formulario público
