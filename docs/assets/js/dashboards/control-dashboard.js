@@ -1915,9 +1915,13 @@
     // Badge de valor opcional (ej. candidatos por turbo): verde/violeta si >0, gris si 0.
     const valField  = el.dataset.listValue || '';
     const valSuffix = el.dataset.listValueSuffix || '';
+    // data-list-value-fmt: formatea el badge con fmt.pick (currency, int, ...).
+    // Sin él el valor se imprime crudo, que es el comportamiento histórico.
+    const valFmt    = el.dataset.listValueFmt ? fmt.pick(el.dataset.listValueFmt) : null;
+    const emptyText = el.dataset.emptyText || 'No data';
     const limit     = parseInt(el.dataset.limit || '500', 10);
     if (!rows.length) {
-      el.innerHTML = '<div class="dlist__empty">No data</div>';
+      el.innerHTML = `<div class="dlist__empty">${esc(emptyText)}</div>`;
       return;
     }
     const items = rows.slice(0, limit);
@@ -1930,7 +1934,8 @@
         const raw = r[valField];
         const n = Number(raw);
         const pos = isFinite(n) && n > 0;
-        const txt = (raw == null || raw === '') ? '—' : `${raw}${valSuffix ? ' ' + valSuffix : ''}`;
+        const shown = valFmt ? valFmt(raw) : raw;
+        const txt = (raw == null || raw === '') ? '—' : `${shown}${valSuffix ? ' ' + valSuffix : ''}`;
         val = `<span class="dlist__val ${pos ? 'dlist__val--pos' : 'dlist__val--zero'}">${esc(txt)}</span>`;
       }
       const right = (val || date) ? `<div class="dlist__right">${val}${date}</div>` : '';

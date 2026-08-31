@@ -253,6 +253,7 @@ RESET_CHART_KEYS = {
         "am_table_candidate_churn_detail",
         "am_kpi_candidate_churn_30d",
         "am_table_candidate_churn_30d_detail",
+        "am_table_buyouts_detail",
         "am_line_candidate_churn_window",
         "am_table_candidate_churn_window_detail",
         "am_kpi_candidate_churn_window",
@@ -796,6 +797,23 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 15, "w": 6, "h": 5},
         "sort_order": 80,
+    },
+    {
+        "chart_key": "am_table_buyouts_detail",
+        "tab_key": "account-management",
+        "title": "Details - Buyouts - ventana",
+        "type": "table",
+        "dataset_key": "buyouts_window_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "win_ini", "client_name", "candidate_name", "buyout_mes",
+                    "buyout_dolar", "gmrr", "start_d", "end_d", "estado",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 15, "w": 6, "h": 5},
+        "sort_order": 81,
     },
     {
         "chart_key": "am_line_candidate_churn_window",
