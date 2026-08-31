@@ -1,0 +1,511 @@
+/* =====================================================================
+   Staffing — reemplazo del Google Sheet "Candidate Success VINTTI".
+
+   El look es el de las tablas cohort del Dashboard Control. Ese CSS vive en
+   control-dashboard-retro.css, que sólo se carga en dashboard.html (página
+   standalone, sin sidebar): traer 3.400 líneas acá para usar 150 no tiene
+   sentido, así que el bloque relevante está portado con prefijo `stf-`.
+   Si cambia el look de cohort, este archivo hay que actualizarlo a mano.
+   ===================================================================== */
+
+:root {
+  --stf-violet: #6c38ff;
+  --stf-lime:   #c1ff72;
+  --stf-cyan:   #4ba9ff;
+  --stf-mag:    #ff1fdb;
+  --stf-blue:   #003bff;
+
+  --stf-card:      #ffffff;
+  --stf-card-soft: #f6f7fb;
+  --stf-rule:      rgba(13, 18, 30, 0.08);
+  --stf-ink:       #0e1117;
+  --stf-ink-2:     #4d5363;
+  --stf-ink-3:     #8a90a0;
+}
+
+.stf-page,
+.stf-drawer {
+  font-family: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--stf-ink);
+}
+.stf-page { padding: 28px 32px 60px; }
+
+.stf-page *, .stf-page *::before, .stf-page *::after,
+.stf-drawer *, .stf-drawer *::before, .stf-drawer *::after { box-sizing: border-box; }
+/* El <datalist> del filtro de cliente ocupa alto y desalinea su etiqueta. */
+datalist { display: none; }
+
+/* ---------- Encabezado ---------- */
+.stf-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.stf-head__title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.stf-head__sub { margin: 0; font-size: 13px; color: var(--stf-ink-3); }
+.stf-head__actions { display: flex; gap: 10px; align-items: center; }
+
+.stf-btn {
+  appearance: none;
+  border: 1px solid var(--stf-rule);
+  background: var(--stf-card);
+  color: var(--stf-ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+.stf-btn:hover { border-color: rgba(108, 56, 255, .35); color: var(--stf-ink); }
+.stf-btn--primary {
+  background: var(--stf-violet);
+  border-color: var(--stf-violet);
+  color: #fff;
+}
+.stf-btn--primary:hover { background: #5b2ce6; border-color: #5b2ce6; color: #fff; }
+
+/* ---------- Sub-pestañas ---------- */
+.stf-tabs {
+  display: inline-flex;
+  background: var(--stf-card-soft);
+  border: 1px solid var(--stf-rule);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 20px;
+}
+.stf-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--stf-ink-3);
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.stf-tab:hover { color: var(--stf-ink); }
+.stf-tab.is-active {
+  background: #fff;
+  color: var(--stf-ink);
+  box-shadow: 0 1px 3px rgba(13, 18, 30, .08);
+}
+
+.stf-panel { display: none; }
+.stf-panel.is-active { display: block; }
+
+/* ---------- Strip de KPIs ---------- */
+.stf-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stf-kpi {
+  background: var(--stf-card);
+  border: 1px solid var(--stf-rule);
+  border-radius: 14px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.stf-kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--stf-accent, var(--stf-violet));
+}
+.stf-kpi--violet { --stf-accent: var(--stf-violet); }
+.stf-kpi--lime   { --stf-accent: var(--stf-lime); }
+.stf-kpi--cyan   { --stf-accent: var(--stf-cyan); }
+.stf-kpi--mag    { --stf-accent: var(--stf-mag); }
+.stf-kpi--blue   { --stf-accent: var(--stf-blue); }
+.stf-kpi__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+  margin-bottom: 6px;
+}
+.stf-kpi__value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stf-kpi__hint { font-size: 11px; color: var(--stf-ink-3); margin-top: 3px; }
+/* Para KPIs cuyo valor es texto y no un número. */
+.stf-kpi__value--text { font-size: 15px; font-weight: 600; line-height: 1.35; white-space: normal; }
+
+/* ---------- Tarjeta + filtros ---------- */
+.stf-card {
+  background: var(--stf-card);
+  border: 1px solid var(--stf-rule);
+  border-radius: 18px;
+  padding: 20px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 1px 2px rgba(13, 18, 30, .04);
+}
+.stf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+}
+.stf-filter { display: inline-flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.stf-filter__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--stf-ink-3);
+}
+.stf-filter__select,
+.stf-filter__input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--stf-card-soft);
+  border: 1px solid var(--stf-rule);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--stf-ink);
+  height: 38px;
+  transition: border-color .14s ease;
+}
+/* Flechita propia. Todo <select> de la página tiene que llevarla junto con
+   `appearance: none`, o el navegador dibuja el control nativo (en Safari/macOS
+   es un recuadro gris con doble flecha que rompe el diseño). */
+.stf-filter__select,
+.stf-field select {
+  padding-right: 32px;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--stf-ink-3) 50%),
+    linear-gradient(135deg, var(--stf-ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.stf-filter__select:hover,
+.stf-filter__input:hover { border-color: rgba(108, 56, 255, .30); }
+.stf-filter__select:focus,
+.stf-filter__input:focus {
+  outline: none;
+  border-color: rgba(108, 56, 255, .55);
+  box-shadow: 0 0 0 3px rgba(108, 56, 255, .12);
+}
+.stf-filter__input::placeholder { color: var(--stf-ink-3); }
+.stf-filters__spacer { flex: 1 1 auto; }
+.stf-count { font-size: 12px; color: var(--stf-ink-3); align-self: flex-end; padding-bottom: 10px; }
+
+/* ---------- Tabla (portada de .cohort-table) ---------- */
+.stf-scroll {
+  width: 100%;
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--stf-rule);
+  border-radius: 14px;
+}
+.stf-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.stf-table th,
+.stf-table td {
+  padding: 12px 14px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--stf-ink);
+  border-bottom: 1px solid var(--stf-rule);
+  white-space: nowrap;
+}
+.stf-table thead th {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--stf-ink-3);
+  background: var(--stf-card);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--stf-rule);
+}
+.stf-table thead .stf-th-name { z-index: 4; }
+.stf-table th.stf-th-name,
+.stf-table td.stf-td-name { text-align: left; }
+.stf-th-name,
+.stf-td-name {
+  position: sticky;
+  left: 0;
+  background: var(--stf-card);
+  box-shadow: 1px 0 0 var(--stf-rule);
+}
+.stf-th-name { z-index: 3; }
+.stf-td-name { z-index: 2; min-width: 240px; }
+.stf-table tbody tr { cursor: pointer; }
+.stf-table tbody tr:hover { background: rgba(108, 56, 255, .04); }
+/* La columna sticky tiene que quedar opaca en hover o los chips se filtran por debajo. */
+.stf-table tbody tr:hover .stf-td-name { background: var(--stf-card); }
+.stf-td-name__primary {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stf-td-name__sub { font-size: 11px; color: var(--stf-ink-3); margin-top: 2px; }
+.stf-td--muted { color: var(--stf-ink-3); }
+.stf-table tfoot td {
+  background: #0e1117;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  border-bottom: 0;
+  padding-top: 15px;
+  padding-bottom: 15px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.stf-table tfoot .stf-td-name {
+  z-index: 4;
+  background: #0e1117;
+  color: #fff;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+/* ---------- Chips, dots y badges ---------- */
+.stf-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+.stf-dot--active     { background: rgba(34, 197, 94, .95); }
+.stf-dot--onboarding { background: rgba(245, 158, 11, .95); }
+.stf-dot--inactive   { background: rgba(239, 68, 68, .95); }
+
+.stf-money {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12.5px;
+  min-width: 62px;
+  text-align: center;
+  background: rgba(108, 56, 255, .10);
+  color: var(--stf-ink);
+}
+.stf-money--solid { background: rgba(108, 56, 255, .85); color: #fff; }
+.stf-money--soft  { background: var(--stf-card-soft); color: var(--stf-ink-2); }
+
+.stf-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--stf-card-soft);
+  color: var(--stf-ink-2);
+}
+.stf-badge--good  { background: rgba(193, 255, 114, .45); color: #3a6b00; }
+.stf-badge--warn  { background: rgba(245, 158, 11, .16); color: #96590b; }
+.stf-badge--bad   { background: rgba(239, 68, 68, .12); color: #b3261e; }
+.stf-badge--info  { background: rgba(75, 169, 255, .16); color: #12558f; }
+.stf-badge--ghost { background: transparent; color: var(--stf-ink-3); border: 1px dashed var(--stf-rule); }
+
+.stf-note-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--stf-ink-3);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ---------- Estados ---------- */
+.stf-empty,
+.stf-error {
+  padding: 48px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--stf-ink-3);
+}
+.stf-error { color: #b3261e; }
+
+/* ---------- Drawer de edición ---------- */
+.stf-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.stf-drawer.is-open { opacity: 1; pointer-events: auto; }
+.stf-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 17, 23, .38);
+  backdrop-filter: blur(2px);
+}
+.stf-drawer__panel {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: min(500px, 100%);
+  background: var(--stf-card);
+  box-shadow: -12px 0 40px rgba(13, 18, 30, .18);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .32s cubic-bezier(.2, .7, .2, 1);
+}
+.stf-drawer.is-open .stf-drawer__panel { transform: translateX(0); }
+.stf-drawer__head {
+  position: relative;
+  padding: 26px 26px 18px;
+  border-bottom: 1px solid var(--stf-rule);
+}
+.stf-drawer__eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+}
+.stf-drawer__title { font-size: 22px; font-weight: 700; margin: 6px 0 4px; letter-spacing: -0.02em; }
+.stf-drawer__sub { font-size: 13px; color: var(--stf-ink-3); margin: 0; }
+.stf-drawer__close {
+  position: absolute;
+  top: 18px; right: 18px;
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(14, 17, 23, .06);
+  color: var(--stf-ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+.stf-drawer__close:hover { background: rgba(14, 17, 23, .12); }
+.stf-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 26px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stf-drawer__foot {
+  padding: 16px 26px;
+  border-top: 1px solid var(--stf-rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.stf-drawer__status { font-size: 12px; color: var(--stf-ink-3); }
+
+.stf-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+  margin-bottom: -6px;
+}
+.stf-field { display: flex; flex-direction: column; gap: 5px; }
+.stf-field > label { font-size: 12px; font-weight: 600; color: var(--stf-ink-2); }
+.stf-field select,
+.stf-field input[type="text"],
+.stf-field input[type="date"],
+.stf-field input[type="number"],
+.stf-field textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  /* background-color, NO el shorthand `background`: éste resetea background-image
+     y le borra la flecha al <select> (la regla del chevron está más arriba). */
+  background-color: var(--stf-card-soft);
+  border: 1px solid var(--stf-rule);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--stf-ink);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.stf-field select:hover,
+.stf-field input:hover,
+.stf-field textarea:hover { border-color: rgba(108, 56, 255, .30); }
+/* Safari le mete su propio calendario y spinners; sin esto quedan desalineados. */
+.stf-field input[type="date"] { min-height: 38px; }
+.stf-field input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .55; }
+.stf-field input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+.stf-field input[type="number"]::-webkit-outer-spin-button,
+.stf-field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stf-field textarea { min-height: 84px; resize: vertical; }
+.stf-field select:focus,
+.stf-field input:focus,
+.stf-field textarea:focus {
+  outline: none;
+  border-color: rgba(108, 56, 255, .55);
+  box-shadow: 0 0 0 3px rgba(108, 56, 255, .12);
+}
+
+/* Los campos que manda la base se muestran, pero no se editan acá. */
+.stf-readonly {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  background: var(--stf-card-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+}
+.stf-readonly dt { color: var(--stf-ink-3); }
+.stf-readonly dd { margin: 0; font-weight: 600; text-align: right; }
+.stf-readonly__note {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--stf-ink-3);
+  font-weight: 400;
+  text-align: left;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+.stf-readonly__note a { color: var(--stf-violet); }
+
+@media (max-width: 900px) {
+  .stf-page { padding: 20px 16px 48px; }
+  .stf-td-name { position: static; box-shadow: none; }
+  .stf-th-name { position: static; }
+}

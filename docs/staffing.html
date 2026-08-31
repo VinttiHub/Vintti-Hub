@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staffing · Vintti Hub</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260831-staffing" />
+  <link rel="stylesheet" href="./assets/css/staffing.css?v=11" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content page stf-page">
+    <header class="stf-head">
+      <div>
+        <h1 class="stf-head__title">Staffing</h1>
+      </div>
+      <div class="stf-head__actions">
+        <a class="stf-btn" id="stfExportCsv" href="#" download>
+          <i class="fa-solid fa-file-arrow-down"></i> Export CSV
+        </a>
+      </div>
+    </header>
+
+    <div class="stf-tabs" role="tablist">
+      <button type="button" class="stf-tab is-active" data-tab="database" role="tab">Staffing Database</button>
+      <button type="button" class="stf-tab" data-tab="churn" role="tab">Churn</button>
+      <button type="button" class="stf-tab" data-tab="bonos" role="tab">Bonuses</button>
+    </div>
+
+    <!-- ============================ Database ============================ -->
+    <section class="stf-panel is-active" data-panel="database">
+      <div class="stf-kpis" id="stfKpisDatabase"></div>
+
+      <div class="stf-card">
+        <div class="stf-filters">
+          <label class="stf-filter">
+            <span class="stf-filter__label">Status</span>
+            <select class="stf-filter__select" data-filter="db-status">
+              <option value="">All</option>
+              <option value="vigentes">Active (incl. Onboarding)</option>
+              <option value="Active">Active only</option>
+              <option value="Onboarding">Onboarding only</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Client</span>
+            <input type="text" class="stf-filter__input" data-filter="db-client"
+                   list="stfClientOptions" placeholder="Search client…" autocomplete="off">
+            <datalist id="stfClientOptions"></datalist>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Country</span>
+            <select class="stf-filter__select" data-filter="db-country"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Recruiter</span>
+            <select class="stf-filter__select" data-filter="db-recruiter"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Platform</span>
+            <select class="stf-filter__select" data-filter="db-platform"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Search</span>
+            <input type="text" class="stf-filter__input" data-filter="db-search" placeholder="Name or email…" autocomplete="off">
+          </label>
+          <button type="button" class="stf-btn" data-clear="database">Clear</button>
+          <span class="stf-filters__spacer"></span>
+          <span class="stf-count" id="stfCountDatabase"></span>
+        </div>
+        <div id="stfTableDatabase"></div>
+      </div>
+    </section>
+
+    <!-- ============================== Churn ============================= -->
+    <section class="stf-panel" data-panel="churn">
+      <div class="stf-kpis" id="stfKpisChurn"></div>
+
+      <div class="stf-card">
+        <div class="stf-filters">
+          <label class="stf-filter">
+            <span class="stf-filter__label">Year</span>
+            <select class="stf-filter__select" data-filter="ch-year"><option value="all">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Exit type</span>
+            <select class="stf-filter__select" data-filter="ch-exit">
+              <option value="">All</option>
+              <option value="Terminated">Terminated</option>
+              <option value="Resigned">Resigned</option>
+            </select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Reason</span>
+            <select class="stf-filter__select" data-filter="ch-reason"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Recruiter</span>
+            <select class="stf-filter__select" data-filter="ch-recruiter"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Churn M3</span>
+            <select class="stf-filter__select" data-filter="ch-m3">
+              <option value="">All</option>
+              <option value="si">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <button type="button" class="stf-btn" data-clear="churn">Clear</button>
+          <span class="stf-filters__spacer"></span>
+          <span class="stf-count" id="stfCountChurn"></span>
+        </div>
+        <div id="stfTableChurn"></div>
+      </div>
+    </section>
+
+    <!-- ============================== Bonos ============================= -->
+    <section class="stf-panel" data-panel="bonos">
+      <div class="stf-kpis" id="stfKpisBonos"></div>
+
+      <div class="stf-card">
+        <div class="stf-filters">
+          <label class="stf-filter">
+            <span class="stf-filter__label">Year</span>
+            <select class="stf-filter__select" data-filter="bo-year"><option value="all">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Invoice (client)</span>
+            <select class="stf-filter__select" data-filter="bo-invoice"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Paid to candidate</span>
+            <select class="stf-filter__select" data-filter="bo-candidate"><option value="">All</option></select>
+          </label>
+          <label class="stf-filter">
+            <span class="stf-filter__label">Search</span>
+            <input type="text" class="stf-filter__input" data-filter="bo-search" placeholder="Candidate or client…" autocomplete="off">
+          </label>
+          <button type="button" class="stf-btn" data-clear="bonos">Clear</button>
+          <span class="stf-filters__spacer"></span>
+          <span class="stf-count" id="stfCountBonos"></span>
+        </div>
+        <div id="stfTableBonos"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== Drawer ============================== -->
+  <div class="stf-drawer" id="stfDrawer" aria-hidden="true">
+    <div class="stf-drawer__backdrop" data-drawer-close></div>
+    <aside class="stf-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="stfDrawerTitle">
+      <header class="stf-drawer__head">
+        <span class="stf-drawer__eyebrow" id="stfDrawerEyebrow">Contractor</span>
+        <h2 class="stf-drawer__title" id="stfDrawerTitle">—</h2>
+        <p class="stf-drawer__sub" id="stfDrawerSub"></p>
+        <button type="button" class="stf-drawer__close" data-drawer-close aria-label="Close">&times;</button>
+      </header>
+      <div class="stf-drawer__body" id="stfDrawerBody"></div>
+      <footer class="stf-drawer__foot">
+        <span class="stf-drawer__status" id="stfDrawerStatus"></span>
+        <button type="button" class="stf-btn stf-btn--primary" id="stfDrawerSave">Save</button>
+      </footer>
+    </aside>
+  </div>
+
+  <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260831-staffing" defer></script>
+  <script src="./assets/js/staffing.js?v=11" defer></script>
+  <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
+</body>
+</html>

@@ -58,6 +58,7 @@ from routes.hirex_opportunity_routes import bp as hirex_opp_bp
 from routes.hirex_sourcing_routes import bp as hirex_sourcing_bp
 from routes.hirex_people_routes import bp as hirex_people_bp
 from routes.hirex_chat_routes import bp as hirex_chat_bp
+from routes.staffing_routes import bp as staffing_bp
 
 
 
@@ -138,6 +139,7 @@ def create_app() -> Flask:
     app.register_blueprint(hirex_sourcing_bp)
     app.register_blueprint(hirex_people_bp)
     app.register_blueprint(hirex_chat_bp)
+    app.register_blueprint(staffing_bp)
 
     # Solo en local: cualquier puerto de loopback. Se activa con VINTTI_LOCAL_DEV=1
     # en backend/.env (gitignored); App Runner nunca tiene esa variable, así que

@@ -147,6 +147,13 @@
       'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
     ]).has(email));
 
+    // Staffing (reemplazo del Sheet "Candidate Success VINTTI"). Esto es sólo
+    // cosmético: el gate real es STAFFING_ALLOWED en backend/routes/staffing_routes.py,
+    // y las dos listas se mantienen en sincronía a mano.
+    setDisplay('staffingLink', new Set([
+      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+    ]).has(email));
+
     // Summary link
     const summaryLink = document.getElementById('summaryLink');
     const allowedEmails = new Set([
