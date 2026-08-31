@@ -95,6 +95,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(b.presentation_date::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
+            -- 2026-08-31 (owner): los rechazados por sales no se cuentan como enviados,
+            -- así que tampoco se listan acá. Casing inconsistente en la columna → LOWER().
+            AND COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
             AND (%(opportunity_id)s::int IS NULL OR b.opportunity_id = %(opportunity_id)s)
         )
         SELECT

@@ -72,6 +72,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # OJO con el cap: LEAST() en Postgres IGNORA los NULL (LEAST(9, NULL) = 9, no NULL),
     # así que sin el CASE explícito los enviados de las opps sin dato se colaban en el
     # numerador y inflaban el porcentaje.
+    # 2026-08-31 (owner): los candidatos con candidates_batches.status = 'Rejected By
+    # Sales' NO cuentan como enviados. La métrica es "cuántos de los que entrevistamos
+    # mandamos al cliente y sales NO rechazó" — un candidato que sales frenó nunca llegó
+    # al cliente. Se filtra en el numerador (COUNT ... FILTER) y no en el WHERE a
+    # propósito: si TODOS los presentados de una opp fueron rechazados por sales, la opp
+    # tiene que quedarse en la cohorte con enviados = 0, no desaparecer y llevarse sus
+    # entrevistados del denominador.
+    # El valor guardado es 'Rejected By Sales' con esas mayúsculas, pero el resto de la
+    # columna tiene casing inconsistente ('Client rejected CV' / 'Client Rejected CV'),
+    # así que se compara en LOWER(TRIM(...)). Los status NULL sobreviven al filtro
+    # (NULL = 'x' da NULL, y COALESCE(NULL, FALSE) = FALSE).
     # Las keys de las measures NO cambian, para no romper los data-field del HTML ni
     # obligar a re-seed (mismo criterio que R5 con upsells_lara).
     sql = """
@@ -84,7 +95,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             o.opportunity_id,
             NULLIF(o.cantidad_entrevistados, 0)::numeric AS entrevistados,
-            cb.candidate_id
+            cb.candidate_id,
+            (LOWER(TRIM(cb.status)) = 'rejected by sales') AS rechazado_por_sales
           FROM candidates_batches cb
           JOIN batch b ON b.batch_id = cb.batch_id
           JOIN opportunity o ON o.opportunity_id = b.opportunity_id
@@ -104,7 +116,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             opportunity_id,
             entrevistados,
-            COUNT(DISTINCT candidate_id) AS enviados
+            COUNT(DISTINCT candidate_id)
+              FILTER (WHERE NOT COALESCE(rechazado_por_sales, FALSE)) AS enviados
           FROM base
           GROUP BY 1, 2
         ),

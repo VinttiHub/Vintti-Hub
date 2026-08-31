@@ -58,6 +58,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # son los candidatos enviados al cliente, capado al 100 por opp. La measure sigue
     # llamándose `entrevistados_sobre_enviados_pct` (el HTML la usa en data-y y el seed en
     # mapping.y); su significado ahora es enviados / entrevistados.
+    # 2026-08-31 (owner): mismo filtro que la card — los candidatos con status
+    # 'Rejected By Sales' no cuentan como enviados (ver el comentario largo en
+    # interviewed_sent_30d_summary.py). Va en el numerador, no en el WHERE, para que una
+    # opp cuyos presentados fueron todos rechazados por sales siga apareciendo con 0.
     # Las opps SIN el campo cargado se listan igual (decisión de la owner: el hueco tiene
     # que verse para que alguien lo cargue), con ratio_label = "sin dato".
     # OJO con el tipo del pct: se devuelve como TEXTO. Si fuera NULL, el renderer hace
@@ -78,7 +82,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_position_name,
             TRIM(o.opp_stage) AS opp_stage,
             NULLIF(o.cantidad_entrevistados, 0)::numeric AS entrevistados,
-            cb.candidate_id
+            cb.candidate_id,
+            (LOWER(TRIM(cb.status)) = 'rejected by sales') AS rechazado_por_sales
           FROM candidates_batches cb
           JOIN batch b ON b.batch_id = cb.batch_id
           JOIN opportunity o ON o.opportunity_id = b.opportunity_id
@@ -100,7 +105,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             opp_position_name,
             opp_stage,
             entrevistados,
-            COUNT(DISTINCT candidate_id) AS enviados
+            COUNT(DISTINCT candidate_id)
+              FILTER (WHERE NOT COALESCE(rechazado_por_sales, FALSE)) AS enviados
           FROM base
           GROUP BY 1, 2, 3, 4, 5
         ),
