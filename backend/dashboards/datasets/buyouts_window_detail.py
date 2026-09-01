@@ -40,6 +40,11 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
         return prev_monday, prev_sunday
     if raw == "mtd":
         return corte.replace(day=1), corte
+    # YTD: del 1 de enero al corte. Corta acá a propósito — no delega en
+    # window_bounds, así el bloque "Año en curso" del drawer NO se mueve cuando el
+    # usuario carga Mes o Desde/Hasta en la barra de filtros.
+    if raw in ("ytd", "anio", "year"):
+        return corte.replace(month=1, day=1), corte
     if raw in ("month", "last_month", "last-month", "prev_month"):
         first_this = corte.replace(day=1)
         last_prev = first_this - timedelta(days=1)
@@ -126,10 +131,28 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND c.buyout_d IS NOT NULL
             AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
         ),
+        -- Ancla alternativa: el MES DE BUYOUT (buyout_daterange), no la fecha de baja.
+        -- Los dos no siempre coinciden: si el cliente compra el contrato meses después
+        -- de que el contractor salió de nuestra nómina (Alberto Ortiz: baja 10-2025,
+        -- buyout 01-2026), anclar por baja lo tira al año anterior. Para el acumulado
+        -- del año la dueña cuenta por mes de buyout, así que ese bloque pide
+        -- anchor=buyout; el card de 30d sigue anclando por baja (es composición de
+        -- churn y tiene que cerrar con `bajas_buyout`).
+        buyouts_por_mes AS (
+          SELECT c.*, v.win_ini, v.win_fin
+          FROM candidatos c
+          CROSS JOIN ventana v
+          WHERE c.buyout_d IS NOT NULL
+            AND c.end_d IS NOT NULL
+            AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
+            AND c.buyout_d BETWEEN DATE_TRUNC('month', v.win_ini) AND v.win_fin
+        ),
         all_rows AS (
-          SELECT * FROM buyouts_inicio
+          SELECT * FROM buyouts_inicio  WHERE %(anchor)s <> 'buyout'
           UNION ALL
-          SELECT * FROM buyouts_starts
+          SELECT * FROM buyouts_starts  WHERE %(anchor)s <> 'buyout'
+          UNION ALL
+          SELECT * FROM buyouts_por_mes WHERE %(anchor)s =  'buyout'
         ),
         -- Un candidato = una fila, igual que el COUNT(DISTINCT candidate_id) del
         -- card `bajas_buyout`: si tiene 2 hires con buyout gana el más reciente.
@@ -154,7 +177,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY end_d DESC NULLS LAST, client_name, candidate_name;
     """
 
-    return sql, {"win_ini": win_ini, "win_fin": win_fin}
+    anchor = str(filters.get("anchor") or "").strip().lower()
+    return sql, {"win_ini": win_ini, "win_fin": win_fin,
+                 "anchor": "buyout" if anchor == "buyout" else "baja"}
 
 
 DATASET = {

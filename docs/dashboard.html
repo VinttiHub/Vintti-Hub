@@ -6111,6 +6111,32 @@
                 </div>
               </div>
             </section>
+            <!-- Acumulado del año. Ventana propia ("ytd" en buyouts_window_detail):
+                 NO es month-aware ni sigue el Mes/Desde-Hasta de la barra, así el total
+                 del año no se mueve cuando drilleás un mes en la tendencia.
+                 anchor=buyout → cuenta por MES DE BUYOUT, no por fecha de baja: si el
+                 cliente compró el contrato meses después de la salida, el buyout es del
+                 año en que se compró (el card de 30d sigue anclando por baja porque es
+                 composición de churn). -->
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Año en curso (YTD)</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts en el año</span>
+                  <span class="kpi-drawer__stat__value"
+                        data-chart="am_table_buyouts_detail" data-override-window="ytd" data-override-anchor="buyout" data-bind="text"
+                        data-reduce="count" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">por mes de buyout, del 1 de enero al corte</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pagado en el año</span>
+                  <span class="kpi-drawer__stat__value"
+                        data-chart="am_table_buyouts_detail" data-override-window="ytd" data-override-anchor="buyout" data-bind="text"
+                        data-field="buyout_dolar" data-reduce="sum" data-fmt="currency">—</span>
+                  <span class="kpi-drawer__stat__sub">suma de los buyouts cobrados</span>
+                </div>
+              </div>
+            </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
               <div class="kpi-drawer__mini-chart">
