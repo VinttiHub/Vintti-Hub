@@ -12,7 +12,14 @@ from __future__ import annotations
 from datetime import date
 
 from ._now import today_ar
-from ._position_chains import CHAIN_CTES, WINDOW_FILTER, lifetime_window, scope_filter
+from ._position_chains import (
+    ACTIVE_MIN_MONTHS,
+    ACTIVE_YOUNG_SQL,
+    CHAIN_CTES,
+    WINDOW_FILTER,
+    lifetime_window,
+    scope_filter,
+)
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -45,7 +52,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # etiqueta y los números se desincronicen.
     scope_label = {
         "all": "Activas + cerradas",
-        "active": "Sólo activas",
+        "active": f"Sólo activas · {ACTIVE_MIN_MONTHS}+ meses",
         "closed": "Sólo cerradas",
     }[scope]
 
@@ -66,6 +73,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*)::int                                                   AS positions_total,
           COUNT(*) FILTER (WHERE estado IN ('Activa', 'En reemplazo'))::int AS positions_active,
           COUNT(*) FILTER (WHERE estado NOT IN ('Activa', 'En reemplazo'))::int AS positions_closed,
+          -- Activas que el piso de madurez deja afuera del scope 'active'. Sale de
+          -- `en_ventana` (pre-scope) para que el número exista en los tres scopes y
+          -- la card pueda decir cuántas nuevas no está promediando.
+          (SELECT COUNT(*) FROM en_ventana WHERE """ + ACTIVE_YOUNG_SQL + """)::int
+                                                                          AS positions_active_young,
           ROUND(AVG(months), 1)::float                                    AS avg_months,
           ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY months)::numeric, 1)::float
                                                                           AS median_months,
@@ -128,6 +140,7 @@ DATASET = {
         {"key": "positions_total", "label": "Posiciones", "type": "number"},
         {"key": "positions_active", "label": "Posiciones activas", "type": "number"},
         {"key": "positions_closed", "label": "Posiciones cerradas", "type": "number"},
+        {"key": "positions_active_young", "label": f"Activas con menos de {ACTIVE_MIN_MONTHS} meses (excluidas)", "type": "number"},
         {"key": "positions_with_replacement", "label": "Posiciones con reemplazo", "type": "number"},
         {"key": "positions_repl_1", "label": "Posiciones reemplazadas 1 vez", "type": "number"},
         {"key": "positions_repl_2plus", "label": "Posiciones reemplazadas 2+ veces", "type": "number"},

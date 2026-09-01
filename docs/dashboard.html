@@ -1085,18 +1085,22 @@
 
     <div class="grid skpi-grid" data-subtab="staffing">
 
-      <!-- Vida promedio · SÓLO ACTIVAS (el reloj sigue corriendo: es un piso, no la vida final) -->
+      <!-- Vida promedio · SÓLO ACTIVAS (el reloj sigue corriendo: es un piso, no la vida final).
+           Excluye las que arrancaron hace menos de 3 meses (_ACTIVE_MIN_MONTHS en
+           _position_chains.py): todavía no tuvieron tiempo de durar y tiraban el promedio abajo. -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">Vida promedio · Activas</span>
-          <span class="skpi-tile__tag">All-time</span>
+          <span class="skpi-tile__tag">All-time · 3+ meses</span>
         </div>
         <div class="skpi-tile__value"
              data-chart="gr_kpi_position_lifetime" data-override-pos-scope="active" data-bind="text"
              data-field="avg_months" data-reduce="first" data-fmt="months">—</div>
         <div class="skpi-tile__sub"><span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="active" data-bind="text"
                 data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
-          posiciones vivas · reloj corriendo</div>
+          posiciones vivas de 3+ meses · <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="active" data-bind="text"
+                data-field="positions_active_young" data-reduce="first" data-fmt="int">—</span>
+          más nuevas fuera del promedio</div>
         <button type="button" class="skpi-tile__detail-btn"
                 data-category-detail-open="position-lifetime" data-category-key="pos-scope" data-category-value="active"
                 aria-label="Ver detalle posiciones activas">Ver detalle</button>

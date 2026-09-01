@@ -170,6 +170,14 @@ WINDOW_FILTER = """
             AND (p.pos_end IS NULL OR p.pos_end >= %(win_ini)s::date)
 """
 
+# Piso de madurez para el scope "activas" (decisión de la dueña, 2026-09-01).
+# Una posición que arrancó hace 3 semanas entra al promedio con 0,7 meses y lo tira
+# abajo, pero no dice NADA sobre cuánto va a durar: todavía no tuvo tiempo de durar.
+# Con el corte en 3 meses el promedio de activas mide posiciones ya asentadas.
+# Sólo aplica a "activas": en cerradas un asiento de 1 mes SÍ es información real
+# (duró un mes de verdad), y el total queda como el universo completo sin recortes.
+_ACTIVE_MIN_MONTHS = 3
+
 # Scope de la sección Position Lifetime: todas / sólo activas / sólo cerradas.
 # "Activa" incluye "En reemplazo" (la silla sigue siendo nuestra); "cerrada" incluye
 # Buyout (el asiento terminó igual, aunque no sea churn real).
@@ -177,9 +185,19 @@ WINDOW_FILTER = """
 # total final — por eso el promedio de activas y el de cerradas no son comparables.
 _SCOPE_SQL = {
     "all": "",
-    "active": "          WHERE estado IN ('Activa', 'En reemplazo')\n",
+    "active": (
+        "          WHERE estado IN ('Activa', 'En reemplazo')\n"
+        f"            AND months >= {_ACTIVE_MIN_MONTHS}\n"
+    ),
     "closed": "          WHERE estado NOT IN ('Activa', 'En reemplazo')\n",
 }
+
+# SQL del recorte de madurez, para que el summary pueda contar cuántas activas quedan
+# afuera. Vive acá para que el umbral se toque en UN solo lugar.
+ACTIVE_YOUNG_SQL = (
+    f"estado IN ('Activa', 'En reemplazo') AND months < {_ACTIVE_MIN_MONTHS}"
+)
+ACTIVE_MIN_MONTHS = _ACTIVE_MIN_MONTHS
 
 _SCOPE_ALIASES = {
     "active": "active", "activa": "active", "activas": "active", "abiertas": "active",
