@@ -477,10 +477,15 @@
     return out;
   }
 
-  // Buscar un NOMBRE de herramienta. Es un port de _tool_needle() en
-  // backend/utils/cv_review_ai.py:1432 y tiene que encontrar exactamente lo mismo que el
-  // backend contó como "described": si divergen, un chip verde no llevaría a ninguna parte.
+  // Buscar un NOMBRE de herramienta. Es un port de _needle_from_tokens() en
+  // backend/utils/cv_review_ai.py y tiene que encontrar exactamente lo mismo que el backend
+  // contó como "described": si divergen, un chip verde no llevaría a ninguna parte.
   // SI TOCÁS UNO, TOCÁ EL OTRO.
+  //   · Ojo: el backend además busca por NÚCLEO ("QuickBooks Online" lo encuentra un rol que
+  //     dice "QuickBooks"). Eso NO está portado acá a propósito — dos implementaciones de esa
+  //     regla se separan al primer cambio. En su lugar el backend manda en `match_terms` el
+  //     texto que de verdad encontró, y el chip se registra con ÉSE. Así el salto aterriza en
+  //     el bullet sin que este archivo tenga que saber nada de núcleos.
   //   · Se parte en tokens con la MISMA regla, que separa camelCase: "Power BI" y "PowerBI"
   //     dan los dos ["power","bi"], así que cualquiera de las dos escrituras encuentra a la
   //     otra. Entre token y token se admiten hasta 2 caracteres que no sean alfanuméricos
@@ -999,18 +1004,24 @@
     // con la misma regla de tokens que usó el backend para contarlas — así un chip verde
     // aterriza justo en el bullet por el que se pintó de verde.
     const tc = a._tools_check || {};
-    const toolChip = (t, described) => `<li class="cvr-tool${described ? ' is-described' : ''}"
-        data-hl-title="${described
-          ? 'A role describes using it.'
-          : 'This CV lists it, but no role describes using it.'}"
-        ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
     // La lista de herramientas es el OTRO descuento fijo, así que se lee al lado del de
     // job hopping y con la misma caja — plegada en el fondo se la tomaba por un adorno.
     // El bloque responde UNA pregunta: de las herramientas que pidió el cliente, ¿cuáles
     // muestra la experiencia? Antes recorría la lista de tools del CV y descontaba por no
     // describir la agenda del candidato, que nadie había pedido (rev95).
+    //
+    // Cuando el backend la contó por su NÚCLEO — la vacante pide "QuickBooks Online" y el rol
+    // dice "Managed accounting operations using QuickBooks" —, `match_terms` trae cómo lo
+    // escribe el CV. El chip sigue diciendo el nombre de la vacante, que es el que el cliente
+    // va a leer, pero el tooltip muestra la diferencia (si el aflojado se equivoca alguna vez,
+    // el reviewer lo tiene que poder ver desde la pantalla) y el salto busca el texto que de
+    // verdad está en el bullet. Análisis viejos no traen el campo y caen al nombre, que es
+    // exactamente lo que buscaban antes.
+    const terms = tc.match_terms || {};
     const toolRow = (t, cls, note) => `<li class="cvr-tool ${cls}"
-        data-hl-title="${esc(note)}" ${hlRegister('tool', t, { term: true })}>${esc(t)}</li>`;
+        data-hl-title="${esc(note + (cls === 'is-described' && terms[t]
+          ? ` This CV writes it \u201C${terms[t]}\u201D.` : ''))}"
+        ${hlRegister('tool', terms[t] || t, { term: true })}>${esc(t)}</li>`;
     // `jd_tools` sólo existe desde este cambio. Un análisis guardado de antes tiene los
     // mismos nombres de campo con OTRO significado (las tools del CV, no las de la JD), y
     // pintarlo bajo este título diría algo falso. No se muestra hasta que se re-corra; su

@@ -42,6 +42,26 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 14: el chequeo de herramientas deja de leer el nombre al pie de la letra. La JD pedía
+# "QuickBooks Online" y el CV de Hammurabi Landaverde decía, en un bullet de un rol,
+# "Managed accounting operations using QuickBooks, including bank reconciliations, AP/AR,
+# accruals...". Es la misma herramienta: lo único que faltaba era la palabra "Online". La
+# aguja exigía TODOS los tokens en orden, así que el rol no matcheaba, la lista de Tools del
+# CV sí (ahí está escrita entera), la herramienta caía en listed_only, y como no quedaba
+# ninguna described se disparaba el umbral: −10. El mismo defecto al revés: la aguja "excel"
+# encuentra "Microsoft Excel", pero "microsoft excel" no encuentra un "Excel" pelado.
+# Ahora cada nombre tiene una SEGUNDA aguja, la de su núcleo: el nombre menos la edición del
+# producto (Online, Cloud, Desktop, Pro, 365) y menos el fabricante (Microsoft, Google, SAP).
+# Es determinística y no pasa por el modelo, por la misma razón de siempre — ver el bloque
+# de comentarios arriba de _TOOL_UNREMARKABLE.
+# LAS GUARDAS SON EL CAMBIO, no las listas. Un núcleo de menos de 4 caracteres o que sea una
+# palabra genérica NO genera segunda aguja: "SAP Portal" no puede volverse "portal" ni
+# "Google Ads" volverse "ads", porque entonces cualquier CV que hable de un portal o de
+# avisos pasaría el chequeo. Antes de agregar una palabra a _TOOL_EDITION_SUFFIX o a
+# _TOOL_VENDOR_PREFIX, preguntarse qué queda del otro lado.
+# Cuando la que cuenta es la aguja de núcleo, se guarda en match_terms cómo lo escribe el CV:
+# el chip sigue diciendo el nombre de la vacante, pero el tooltip muestra la diferencia y el
+# salto al iframe busca el texto que de verdad está en el bullet.
 # 13: la clasificación técnico/soft deja de ser sólo regex. La regla vieja detectaba lo
 # soft con un catálogo de fórmulas y mandaba TODO LO DEMÁS a técnico, así que cualquier
 # soft skill escrita de una forma que no estuviera en la lista entraba al denominador del
@@ -113,7 +133,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 13
+ANALYSIS_VERSION = 14
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -1722,19 +1742,110 @@ _TOOL_UNREMARKABLE = re.compile(r"""
 _TOOL_TOKENS = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z]+|[0-9]+")
 
 
-def _tool_needle(tool: str):
-    """Un patrón que encuentra la herramienta escrita de cualquier forma razonable.
+def _tool_tokens(tool: str) -> List[str]:
+    return [p.lower() for p in _TOOL_TOKENS.findall(str(tool or ""))]
 
-    "Power BI" tiene que encontrar tanto "power bi" como "powerbi", pero "Excel" NO puede
-    encontrarse dentro de "excellent communication" — de ahí los lookarounds. Devuelve None
-    para nombres de menos de 3 caracteres ("R", "Go", "C"): son imposibles de buscar sin
-    falsos positivos, y decir "R no se menciona" cuando no lo podemos verificar es peor que
-    no decir nada.
+
+def _needle_from_tokens(parts: List[str]):
+    """El patrón, ya dados los tokens en minúscula.
+
+    Entre token y token se admiten hasta 2 caracteres no alfanuméricos, así que "Power BI"
+    encuentra "power bi", "power-bi" y "powerbi". Los lookarounds son los que impiden que
+    "Excel" caiga adentro de "excellent communication". Devuelve None por debajo de 3
+    caracteres ("R", "Go", "C"): son imposibles de buscar sin falsos positivos, y decir "R no
+    se menciona" cuando no lo podemos verificar es peor que no decir nada.
+
+    Va con re.I y NO con el heno en minúscula a propósito: bajo IGNORECASE las clases
+    [a-z0-9] de los bordes cubren también las mayúsculas, y a cambio lo que devuelve el match
+    conserva la escritura original — "QuickBooks" y no "quickbooks", que es lo que después se
+    le muestra al reviewer.
     """
-    parts = [re.escape(p.lower()) for p in _TOOL_TOKENS.findall(str(tool or ""))]
     if not parts or len("".join(parts)) < 3:
         return None
-    return re.compile(r"(?<![a-z0-9])" + r"[^a-z0-9]{0,2}".join(parts) + r"(?![a-z0-9])")
+    esc = [re.escape(p) for p in parts]
+    return re.compile(r"(?<![a-z0-9])" + r"[^a-z0-9]{0,2}".join(esc) + r"(?![a-z0-9])", re.I)
+
+
+def _tool_needle(tool: str):
+    """La aguja EXACTA: la herramienta escrita de cualquier forma razonable, pero entera."""
+    return _needle_from_tokens(_tool_tokens(tool))
+
+
+# Palabras que acompañan al nombre y no lo identifican: la edición del producto (atrás) y el
+# fabricante (adelante). "QuickBooks Online" es "QuickBooks"; "Microsoft Excel" es "Excel".
+_TOOL_EDITION_SUFFIX = frozenset("""
+    online cloud desktop enterprise pro professional premier plus suite software platform
+    edition server 365
+""".split())
+_TOOL_VENDOR_PREFIX = frozenset("""
+    microsoft ms google adobe oracle sap intuit zoho salesforce ibm apache amazon aws meta
+""".split())
+# Núcleos que no distinguen nada. Ésta es la lista que hace que el aflojado sea seguro: si al
+# sacar fabricante y edición queda una de éstas, NO hay segunda aguja. "SAP Portal" buscando
+# "portal" le daría el punto a cualquier CV que mencione un portal, que es peor que el bug
+# que estamos arreglando.
+_TOOL_GENERIC_CORE = frozenset("""
+    portal books sheets forms docs drive mail meet ads analytics workspace office one hub app
+    cloud online tools data studio desk base flow board pay connect
+""".split())
+
+# Piso del núcleo. Tres caracteres alcanzan para un nombre entero ("SAP"), pero no para un
+# resto: "Google Ads" -> "ads" encontraría cualquier cosa.
+_TOOL_CORE_MIN_CHARS = 4
+
+
+def _tool_core_needles(tool: str) -> List[Any]:
+    """Las agujas RELAJADAS de un nombre, de la más específica a la menos.
+
+    Tres candidatos: sin la edición, sin el fabricante, y sin ninguno de los dos. Cada uno
+    tiene que sobrevivir las guardas — quedar con al menos `_TOOL_CORE_MIN_CHARS`
+    caracteres, no ser una sola palabra genérica y no ser el nombre completo — o se descarta.
+    Una lista vacía significa "este nombre se busca sólo entero", que es el default seguro.
+    """
+    parts = _tool_tokens(tool)
+    if len(parts) < 2:
+        return []
+
+    no_suffix = list(parts)
+    while len(no_suffix) > 1 and no_suffix[-1] in _TOOL_EDITION_SUFFIX:
+        no_suffix.pop()
+    no_prefix = list(parts)
+    while len(no_prefix) > 1 and no_prefix[0] in _TOOL_VENDOR_PREFIX:
+        no_prefix.pop(0)
+    both = list(no_suffix)
+    while len(both) > 1 and both[0] in _TOOL_VENDOR_PREFIX:
+        both.pop(0)
+
+    out, seen = [], set()
+    for core in (no_suffix, no_prefix, both):
+        key = tuple(core)
+        if key == tuple(parts) or key in seen:
+            continue
+        seen.add(key)
+        if len("".join(core)) < _TOOL_CORE_MIN_CHARS:
+            continue
+        if len(core) == 1 and core[0] in _TOOL_GENERIC_CORE:
+            continue
+        needle = _needle_from_tokens(core)
+        if needle is not None:
+            out.append(needle)
+    return out
+
+
+def _tool_find(tool: str, text: str) -> Optional[str]:
+    """Con qué texto literal nombra `text` a esta herramienta, o None.
+
+    Primero entera, después por núcleo. Devuelve lo que encontró — no un booleano — porque
+    la pantalla necesita saber CÓMO lo escribe el CV: es lo que le muestra al reviewer por
+    qué un chip que dice "QuickBooks Online" se pintó verde sobre un bullet que dice
+    "QuickBooks", y es el término con el que el chip salta adentro del iframe.
+    """
+    exact = _tool_needle(tool)
+    for needle in ([exact] if exact is not None else []) + _tool_core_needles(tool):
+        m = needle.search(text)
+        if m:
+            return m.group(0)
+    return None
 
 
 def tools_mentions(snapshot: Dict[str, Any],
@@ -1756,7 +1867,7 @@ def tools_mentions(snapshot: Dict[str, Any],
         hay_parts.append(str(entry.get("title") or ""))
         hay_parts.append(str(entry.get("company") or ""))
         hay_parts.extend(_bullets(entry.get("description")))
-    hay = " \n ".join(hay_parts).lower()
+    hay = " \n ".join(hay_parts)
 
     # Evidencia DÉBIL: el CV la nombra fuera de un rol. Dice que el candidato la reclama,
     # no que la haya usado. Sirve para separar "no la describe" de "no está en ningún lado".
@@ -1771,7 +1882,7 @@ def tools_mentions(snapshot: Dict[str, Any],
     for entry in _as_list(snapshot.get("education")):
         claimed_parts.append(str(entry.get("title") or ""))
         claimed_parts.extend(_bullets(entry.get("description")))
-    cv_tools_text = " \n ".join(p for p in claimed_parts if p).lower()
+    cv_tools_text = " \n ".join(p for p in claimed_parts if p)
 
     req_text = " ".join(r.get("requirement", "") for r in (requirements or [])).lower()
 
@@ -1797,14 +1908,21 @@ def tools_mentions(snapshot: Dict[str, Any],
         seen_keys.add(key)
         wanted.append(name)
 
+    # El match es por nombre entero O por núcleo (ver _tool_find): la vacante pide
+    # "QuickBooks Online" y el rol que dice "using QuickBooks" la está describiendo.
     described: List[str] = []
     listed_only: List[str] = []
     absent: List[str] = []
+    # Cómo lo escribe el CV, sólo cuando difiere de cómo lo escribe la vacante. Es lo que la
+    # pantalla muestra en el tooltip y con lo que el chip salta al bullet.
+    match_terms: Dict[str, str] = {}
     for name in wanted:
-        needle = _tool_needle(name)
-        if needle.search(hay):
+        hit = _tool_find(name, hay)
+        if hit:
             described.append(name)
-        elif needle.search(cv_tools_text):
+            if _tool_tokens(hit) != _tool_tokens(name):
+                match_terms[name] = hit
+        elif _tool_find(name, cv_tools_text):
             listed_only.append(name)
         else:
             absent.append(name)
@@ -1816,7 +1934,7 @@ def tools_mentions(snapshot: Dict[str, Any],
                     if t.lower() not in seen_keys
                     and _tool_needle(t) is not None
                     and not _TOOL_UNREMARKABLE.match(t)
-                    and not _tool_needle(t).search(hay)]
+                    and not _tool_find(t, hay)]
 
     checked = len(wanted)
     # El castigo es sobre lo que el CV AFIRMA y ningún rol respalda. Una herramienta que el
@@ -1836,6 +1954,7 @@ def tools_mentions(snapshot: Dict[str, Any],
         "checked": checked,
         "extra_listed": extra_listed[:6],
         "extra_listed_total": len(extra_listed),
+        "match_terms": match_terms,
         "skipped": 0,
         "penalty": penalty,
     }
