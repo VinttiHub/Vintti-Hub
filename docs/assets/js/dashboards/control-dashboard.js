@@ -2738,9 +2738,17 @@
   }
 
   /* ---------- selected month state (shared across detail panels + chart + Mes filter pill) ---------- */
-  const monthState = { selected: null, listeners: [] };
+  // `picked` = el usuario eligió un mes explícitamente (click en la tendencia, en un
+  // mes del chart, o en el pill Mes). Mientras sea false, los detalles marcados
+  // data-month-aware="on-demand" siguen la ventana de su card (30d) en vez del mes
+  // calendario en curso — si no, el día 1 del mes el detalle sale vacío mientras la
+  // card muestra el número de los últimos 30 días.
+  const monthState = { selected: null, picked: false, listeners: [] };
   function setSelectedMonth(m) {
-    if (!m || m === monthState.selected) return;
+    if (!m) return;
+    const firstPick = !monthState.picked;
+    monthState.picked = true;
+    if (m === monthState.selected && !firstPick) return;
     monthState.selected = m;
     // Sync the Mes filter pill UI (so the user sees the current month selection)
     const mesInput = document.querySelector('[data-filter-input="mes"]');
@@ -2798,6 +2806,9 @@
       // Skip elements that are currently locked to a por-ventana selection;
       // their refetch happens via setDrawerWindow() instead.
       if (el.dataset.activeWindow) return;
+      // Detalles on-demand: hasta que el usuario elija un mes, se quedan con la
+      // ventana de su card (la que trajo hydrate), no con el mes en curso.
+      if (el.dataset.monthAware === 'on-demand' && !monthState.picked) return;
       const overrides = readOverridesFor(el);
       overrides.corte = corte;
       const compKey = compKeyFor(chartKey, overrides);
@@ -3741,7 +3752,8 @@
   function syncMonthChips(month) {
     const txt = month ? formatMonthHuman(month) : '';
     document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
-      el.textContent = txt;
+      const fallback = el.dataset.chipFallback;
+      el.textContent = (fallback && !monthState.picked) ? fallback : txt;
     });
   }
 
@@ -4604,6 +4616,8 @@
         // 3) Reset month-detail selection back to current month
         const d = new Date();
         monthState.selected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthState.picked = false;
+        syncMonthChips(monthState.selected);
         // 4) Reset view-mode pills (Window / Grain) to defaults
         document.querySelectorAll('.view-mode').forEach(group => {
           const key = group.dataset.viewKey;

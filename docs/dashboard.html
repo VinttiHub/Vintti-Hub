@@ -6095,7 +6095,7 @@
             <div class="kpi-drawer__hero">
               <span class="kpi-drawer__hero__label">Buyouts · <span data-window-label>30d</span></span>
               <span class="kpi-drawer__hero__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
-              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate · <span data-chart="am_table_buyouts_detail" data-override-window="30d" data-bind="text" data-field="buyout_dolar" data-reduce="sum" data-fmt="currency" data-month-aware>—</span> pagado</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate · <span data-chart="am_table_buyouts_detail" data-override-window="30d" data-bind="text" data-field="buyout_dolar" data-reduce="sum" data-fmt="currency" data-month-aware="on-demand">—</span> pagado</span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Composición del churn (<span data-window-label>30d</span>)</h4>
@@ -6133,15 +6133,15 @@
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_buyouts_detail" data-override-window="30d" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_buyouts_detail" data-override-window="30d" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware="on-demand">—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip data-chip-fallback="Últimos 30d">—</span></h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_buyouts_detail" data-override-window="30d" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d" data-limit="60"
                    data-list-value="buyout_dolar" data-list-value-fmt="currency" data-list-value-suffix="pagado"
                    data-empty-text="Sin buyouts en el período"
-                   data-month-aware></div>
+                   data-month-aware="on-demand"></div>
             </section>
-            <p class="kpi-drawer__note">Buyout = el cliente compra el contrato directo al candidato; Churn real = baja sin buyout. Ambos cuentan como "salida" de headcount pero tienen tratamiento distinto en NRR y replacement coverage.</p>
+            <p class="kpi-drawer__note">El detalle arranca con la MISMA ventana que la card (<span data-window-label>30d</span>) — por eso el chip dice "Últimos 30d". Click en un mes de la tendencia para ver el detalle de ese mes (el chip pasa a mostrarlo).<br>Buyout = el cliente compra el contrato directo al candidato; Churn real = baja sin buyout. Ambos cuentan como "salida" de headcount pero tienen tratamiento distinto en NRR y replacement coverage.</p>
           </div>
         </div>
 
@@ -9688,7 +9688,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=148" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=149" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>
