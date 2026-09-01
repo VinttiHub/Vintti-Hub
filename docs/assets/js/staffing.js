@@ -98,13 +98,31 @@
 
   function dash(value) { return value == null || value === "" ? "—" : esc(value); }
 
-  // El backend cae al email del hr_lead cuando no encuentra el nombre en `users`.
-  function personName(value) {
-    if (!value) return "—";
-    if (value.indexOf("@") === -1) return esc(value);
-    return esc(value.split("@")[0].split(/[._-]/).filter(Boolean).map(function (part) {
+  // El backend cae al email del hr_lead cuando no encuentra el nombre en `users`
+  // (típicamente ex-empleados que ya no están en la tabla). Se muestra prolijo.
+  //
+  // Devuelve TEXTO PLANO a propósito: es el mismo valor que usan los filtros de
+  // columna, y si acá se escapara el HTML el desplegable mostraría el email crudo
+  // mientras la celda muestra el nombre.
+  function personText(value) {
+    if (!value) return "";
+    if (value.indexOf("@") === -1) return value;
+    return value.split("@")[0].split(/[._-]/).filter(Boolean).map(function (part) {
       return part.charAt(0).toUpperCase() + part.slice(1);
-    }).join(" "));
+    }).join(" ");
+  }
+
+  function personName(value) {
+    return value ? esc(personText(value)) : "—";
+  }
+
+  // Mismo criterio para el concepto del bono: el valor del filtro tiene que ser
+  // el texto que se ve, no el enum crudo ("one_time" vs "One time").
+  function bonusTypeText(row) {
+    if (row.reason) return row.reason;
+    if (!row.bonus_type) return "";
+    var t = row.bonus_type.replace(/_/g, " ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
   function pct(part, total) {
@@ -121,146 +139,473 @@
     churn: { rows: [], years: [] },
     bonos: { rows: [], years: [] },
     loaded: {},
-    editing: null
+    editing: null,
+    // Un filtro por columna, estilo Excel. text -> Set de valores elegidos;
+    // number/date -> {min, max}. Si la clave no está, la columna no filtra.
+    filters: { database: {}, churn: {}, bonos: {} },
+    sort: { database: null, churn: null, bonos: null },
+    search: { database: "", churn: "", bonos: "" }
   };
 
   var $ = function (sel) { return document.querySelector(sel); };
   var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
 
-  function filterValue(name) {
-    var el = document.querySelector('[data-filter="' + name + '"]');
-    return el ? el.value.trim() : "";
+  /* =====================================================================
+     Definición de columnas
+
+     Cada columna declara:
+       key    identificador del filtro
+       label  encabezado
+       type   'text' (lista de checkboxes) | 'number' | 'date' (rango desde/hasta)
+       value  valor crudo para filtrar y ordenar
+       cell   HTML de la celda (por defecto, el valor escapado)
+       total  suma en el pie de tabla
+     ===================================================================== */
+  function nameCell(row, sub) {
+    var dot = row.status
+      ? '<span class="stf-dot stf-dot--' +
+        (row.status === "Active" ? "active" : row.status === "Onboarding" ? "onboarding" : "inactive") +
+        '"></span>' : "";
+    var orphan = row.orphan ? ' <span class="stf-badge stf-badge--ghost">Sheet only</span>' : "";
+    var note = row.notes ? '<span class="stf-note-dot" title="' + esc(row.notes) + '"></span>' : "";
+    return '<div class="stf-td-name__primary">' + dot + esc(row.candidate_name) + orphan + note + "</div>" +
+      (sub ? '<div class="stf-td-name__sub">' + esc(sub) + "</div>" : "");
   }
 
-  // `fallback` es el valor que queda elegido la primera vez que se llena el select.
-  function fillSelect(name, values, fallback) {
-    var el = document.querySelector('[data-filter="' + name + '"]');
-    if (!el || el.dataset.filled === "1") return;
-    var current = el.value;
-    var first = el.querySelector("option");
-    var html = first ? first.outerHTML : "";
-    values.filter(Boolean).sort().forEach(function (value) {
-      html += '<option value="' + esc(value) + '">' + esc(value) + "</option>";
-    });
-    el.innerHTML = html;
-    // `current` es el primer <option> que el navegador auto-selecciona ("All"), no
-    // una elección del usuario: fillSelect corre una sola vez, antes de que nadie
-    // toque nada. Por eso el fallback tiene prioridad cuando existe entre los valores.
-    el.value = (fallback && values.indexOf(fallback) > -1) ? fallback : (current || fallback || "");
-    el.dataset.filled = "1";
+  function moneyCell(cls) {
+    return function (row, col) {
+      var v = Number(col.value(row) || 0);
+      if (!v) return '<span class="stf-td--muted">—</span>';
+      return '<span class="stf-money' + (cls ? " " + cls : "") + '">' + money(v) + "</span>";
+    };
   }
 
-  function uniq(rows, key) {
-    var seen = {};
-    rows.forEach(function (row) { if (row[key]) seen[row[key]] = true; });
-    return Object.keys(seen);
+  function yesNoCell(row, col) {
+    var v = col.value(row);
+    if (v === "Yes") return '<span class="stf-badge stf-badge--warn">Yes</span>';
+    if (v === "No") return '<span class="stf-badge">No</span>';
+    return "—";
+  }
+
+  var COLUMNS = {
+    database: [
+      { key: "candidate_name", label: "Contractor", type: "text", sticky: true,
+        value: function (r) { return r.candidate_name; },
+        cell: function (r) { return nameCell(r, r.position_name); } },
+      { key: "client_name", label: "Client", type: "text", align: "left",
+        value: function (r) { return r.client_name; } },
+      { key: "country", label: "Country", type: "text", align: "left",
+        value: function (r) { return r.country; } },
+      { key: "status", label: "Status", type: "text",
+        value: function (r) { return r.status; },
+        cell: function (r) { return statusBadge(r.status); } },
+      { key: "start_date", label: "Start", type: "date", muted: true,
+        value: function (r) { return r.start_date; },
+        cell: function (r) { return fmtDate(r.start_date); } },
+      { key: "end_date", label: "End", type: "date", muted: true,
+        value: function (r) { return r.end_date; },
+        cell: function (r) { return fmtDate(r.end_date); } },
+      { key: "salary", label: "Salary", type: "number", total: true,
+        value: function (r) { return r.salary; }, cell: moneyCell("") },
+      { key: "fee", label: "Fee", type: "number", total: true,
+        value: function (r) { return r.fee; }, cell: moneyCell("stf-money--soft") },
+      { key: "client_payment", label: "Client payment", type: "number", total: true,
+        value: function (r) { return r.client_payment; }, cell: moneyCell("stf-money--solid") },
+      { key: "platform", label: "Platform", type: "text",
+        value: function (r) { return r.platform; },
+        cell: function (r) {
+          return r.platform ? '<span class="stf-badge stf-badge--info">' + esc(r.platform) + "</span>" : "—";
+        } },
+      { key: "performance", label: "Performance", type: "text",
+        value: function (r) { return r.performance; },
+        cell: function (r) { return performanceBadge(r.performance); } },
+      { key: "equipment", label: "Equipment", type: "text", muted: true,
+        value: function (r) { return r.equipment; } },
+      { key: "provider", label: "Provider", type: "text", muted: true,
+        value: function (r) { return r.provider; } },
+      { key: "recruiter", label: "Recruiter", type: "text", muted: true,
+        value: function (r) { return personText(r.recruiter); } }
+    ],
+    churn: [
+      { key: "candidate_name", label: "Contractor", type: "text", sticky: true,
+        value: function (r) { return r.candidate_name; },
+        cell: function (r) { return nameCell(r, ""); } },
+      { key: "client_name", label: "Client", type: "text", align: "left",
+        value: function (r) { return r.client_name; } },
+      { key: "country", label: "Country", type: "text", align: "left",
+        value: function (r) { return r.country; } },
+      { key: "end_date", label: "End", type: "date", muted: true,
+        value: function (r) { return r.end_date; },
+        cell: function (r) { return fmtDate(r.end_date); } },
+      { key: "exit_type", label: "Exit type", type: "text",
+        value: function (r) { return r.exit_type; },
+        cell: function (r) {
+          if (!r.exit_type) return "—";
+          var cls = r.exit_type === "Terminated" ? "stf-badge--bad" : "stf-badge--info";
+          return '<span class="stf-badge ' + cls + '">' + esc(r.exit_type) + "</span>";
+        } },
+      { key: "inactive_reason", label: "Reason", type: "text", align: "left", muted: true,
+        value: function (r) { return r.inactive_reason || "No reason"; } },
+      { key: "vintti_fault", label: "Vintti's fault", type: "text",
+        value: function (r) { return r.vintti_fault === true ? "Yes" : (r.vintti_fault === false ? "No" : null); },
+        cell: function (r, col) {
+          var v = col.value(r);
+          if (v === "Yes") return '<span class="stf-badge stf-badge--bad">Yes</span>';
+          if (v === "No") return '<span class="stf-badge">No</span>';
+          return "—";
+        } },
+      { key: "churn_m3", label: "Churn M3", type: "text",
+        value: function (r) { return r.churn_m3 ? "Yes" : "No"; }, cell: yesNoCell },
+      { key: "recruiter", label: "Recruiter", type: "text", muted: true,
+        value: function (r) { return personText(r.recruiter); } }
+    ],
+    bonos: [
+      { key: "candidate_name", label: "Candidate", type: "text", sticky: true,
+        value: function (r) { return r.candidate_name; },
+        cell: function (r) {
+          var note = r.notes ? '<span class="stf-note-dot" title="' + esc(r.notes) + '"></span>' : "";
+          return '<div class="stf-td-name__primary">' + esc(r.candidate_name || "—") + note + "</div>";
+        } },
+      { key: "client_name", label: "Client", type: "text", align: "left",
+        value: function (r) { return r.client_name; } },
+      { key: "payout_date", label: "Date", type: "date", muted: true,
+        value: function (r) { return r.payout_date; },
+        cell: function (r) { return fmtDate(r.payout_date); } },
+      { key: "amount", label: "Amount", type: "number", total: true,
+        value: function (r) { return r.amount; }, cell: moneyCell("stf-money--solid") },
+      { key: "reason", label: "Concept", type: "text", align: "left", muted: true,
+        value: function (r) { return bonusTypeText(r); } },
+      { key: "invoice_status", label: "Invoice (client)", type: "text",
+        value: function (r) { return r.invoice_status; },
+        cell: function (r) { return payBadge(r.invoice_status); } },
+      { key: "candidate_status", label: "Paid to candidate", type: "text",
+        value: function (r) { return r.candidate_status; },
+        cell: function (r) { return payBadge(r.candidate_status); } }
+    ]
+  };
+
+  function rowsOf(tab) {
+    if (tab === "database") return state.database;
+    return state[tab].rows;
+  }
+
+  function colsOf(tab) { return COLUMNS[tab]; }
+
+  function findCol(tab, key) {
+    var cols = colsOf(tab);
+    for (var i = 0; i < cols.length; i++) if (cols[i].key === key) return cols[i];
+    return null;
   }
 
   /* =====================================================================
-     Staffing Database
+     Filtrado
      ===================================================================== */
-  function statusDot(status) {
-    var cls = status === "Active" ? "active" : (status === "Onboarding" ? "onboarding" : "inactive");
-    return '<span class="stf-dot stf-dot--' + cls + '"></span>';
+  var BLANK = "(Blank)";
+
+  function displayValue(col, row) {
+    var v = col.value(row);
+    if (v === null || v === undefined || v === "") return BLANK;
+    return String(v);
   }
 
-  function filterDatabase() {
-    var status = filterValue("db-status");
-    var client = filterValue("db-client").toLowerCase();
-    var country = filterValue("db-country");
-    var recruiter = filterValue("db-recruiter");
-    var platform = filterValue("db-platform");
-    var search = filterValue("db-search").toLowerCase();
+  function passesColumn(tab, col, row) {
+    var f = state.filters[tab][col.key];
+    if (!f) return true;
+    if (f.mode === "set") return f.values.indexOf(displayValue(col, row)) > -1;
+    var v = col.value(row);
+    if (col.type === "number") {
+      var n = Number(v || 0);
+      if (f.min !== "" && n < Number(f.min)) return false;
+      if (f.max !== "" && n > Number(f.max)) return false;
+      return true;
+    }
+    var d = v ? String(v).slice(0, 10) : "";
+    if (!d) return f.min === "" && f.max === "";
+    if (f.min !== "" && d < f.min) return false;
+    if (f.max !== "" && d > f.max) return false;
+    return true;
+  }
 
-    return state.database.filter(function (row) {
-      // "vigentes" = lo que la card Activos cuenta y lo que reconcilia con el GMRR
-      // del dashboard: los que ya trabajan MÁS los que firmaron y todavía no
-      // arrancaron. El valor "Active" a secas deja afuera a los onboarding.
-      if (status === "vigentes") {
-        if (row.status !== "Active" && row.status !== "Onboarding") return false;
-      } else if (status && row.status !== status) return false;
-      if (client && String(row.client_name || "").toLowerCase().indexOf(client) === -1) return false;
-      if (country && row.country !== country) return false;
-      if (recruiter && row.recruiter !== recruiter) return false;
-      if (platform && row.platform !== platform) return false;
-      if (search) {
-        var haystack = (row.candidate_name + " " + (row.mail || "")).toLowerCase();
-        if (haystack.indexOf(search) === -1) return false;
+  // El buscador de arriba: candidato o cliente, en cualquiera de las tres tablas.
+  function passesSearch(tab, row) {
+    var q = state.search[tab].trim().toLowerCase();
+    if (!q) return true;
+    return ((row.candidate_name || "") + " " + (row.client_name || "") + " " + (row.mail || ""))
+      .toLowerCase().indexOf(q) > -1;
+  }
+
+  // `exceptKey` deja fuera el filtro de esa columna: así el desplegable ofrece
+  // todos los valores que siguen siendo alcanzables, como hace Excel, y no se
+  // vacía a sí mismo cuando destildás uno.
+  function visibleRows(tab, exceptKey) {
+    var cols = colsOf(tab);
+    return rowsOf(tab).filter(function (row) {
+      if (!passesSearch(tab, row)) return false;
+      for (var i = 0; i < cols.length; i++) {
+        if (cols[i].key === exceptKey) continue;
+        if (!passesColumn(tab, cols[i], row)) return false;
       }
       return true;
     });
   }
 
-  function renderDatabase() {
-    var rows = filterDatabase();
-    var host = $("#stfTableDatabase");
-    $("#stfCountDatabase").textContent = rows.length + " of " + state.database.length + " contractors";
-
-    renderDatabaseKpis(rows);
-
-    if (!rows.length) {
-      host.innerHTML = '<div class="stf-empty">No contractors match these filters.</div>';
-      return;
-    }
-
-    var totals = { salary: 0, fee: 0, payment: 0 };
-    var body = rows.map(function (row, index) {
-      // Misma población que las cards: vigentes = trabajando + onboarding.
-      if (row.status === "Active" || row.status === "Onboarding") {
-        totals.salary += Number(row.salary || 0);
-        totals.fee += Number(row.fee || 0);
-        totals.payment += Number(row.client_payment || 0);
-      }
-      var orphan = row.orphan
-        ? ' <span class="stf-badge stf-badge--ghost">Sheet only</span>' : "";
-      return '<tr data-row="' + index + '">' +
-        '<td class="stf-td-name">' +
-          '<div class="stf-td-name__primary">' + statusDot(row.status) + esc(row.candidate_name) + orphan +
-            (row.notes ? '<span class="stf-note-dot" title="' + esc(row.notes) + '"></span>' : "") +
-          "</div>" +
-          '<div class="stf-td-name__sub">' + esc(row.client_name || "—") +
-            (row.country ? " · " + esc(row.country) : "") + "</div>" +
-        "</td>" +
-        "<td>" + statusBadge(row.status) + "</td>" +
-        '<td class="stf-td--muted">' + fmtDate(row.start_date) + "</td>" +
-        '<td class="stf-td--muted">' + fmtDate(row.end_date) + "</td>" +
-        '<td><span class="stf-money">' + money(row.salary) + "</span></td>" +
-        '<td><span class="stf-money stf-money--soft">' + money(row.fee) + "</span></td>" +
-        '<td><span class="stf-money stf-money--solid">' + money(row.client_payment) + "</span></td>" +
-        "<td>" + (row.platform ? '<span class="stf-badge stf-badge--info">' + esc(row.platform) + "</span>" : "—") + "</td>" +
-        "<td>" + performanceBadge(row.performance) + "</td>" +
-        '<td class="stf-td--muted">' + dash(row.equipment) + "</td>" +
-        '<td class="stf-td--muted">' + dash(row.provider) + "</td>" +
-        '<td class="stf-td--muted">' + personName(row.recruiter) + "</td>" +
-      "</tr>";
-    }).join("");
-
-    host.innerHTML =
-      '<div class="stf-scroll"><table class="stf-table">' +
-      "<thead><tr>" +
-        '<th class="stf-th-name">Contractor</th>' +
-        "<th>Status</th><th>Start</th><th>End</th>" +
-        "<th>Salary</th><th>Fee</th><th>Client payment</th>" +
-        "<th>Platform</th><th>Performance</th><th>Equipment</th><th>Provider</th><th>Recruiter</th>" +
-      "</tr></thead>" +
-      "<tbody>" + body + "</tbody>" +
-      "<tfoot><tr>" +
-        '<td class="stf-td-name">Active total</td>' +
-        "<td></td><td></td><td></td>" +
-        "<td>" + money(totals.salary) + "</td>" +
-        "<td>" + money(totals.fee) + "</td>" +
-        "<td>" + money(totals.payment) + "</td>" +
-        "<td></td><td></td><td></td><td></td><td></td>" +
-      "</tr></tfoot>" +
-      "</table></div>";
-
-    host.querySelectorAll("tbody tr").forEach(function (tr) {
-      tr.addEventListener("click", function () {
-        openDatabaseDrawer(rows[Number(tr.dataset.row)]);
-      });
+  function sortRows(tab, rows) {
+    var s = state.sort[tab];
+    if (!s) return rows;
+    var col = findCol(tab, s.key);
+    if (!col) return rows;
+    var dir = s.dir === "desc" ? -1 : 1;
+    return rows.slice().sort(function (a, b) {
+      var va = col.value(a), vb = col.value(b);
+      var ea = va === null || va === undefined || va === "";
+      var eb = vb === null || vb === undefined || vb === "";
+      if (ea && eb) return 0;
+      if (ea) return 1;          // los vacíos siempre al fondo
+      if (eb) return -1;
+      if (col.type === "number") return (Number(va) - Number(vb)) * dir;
+      return String(va).localeCompare(String(vb), "en", { numeric: true }) * dir;
     });
   }
 
+  function activeFilterCount(tab) {
+    var n = Object.keys(state.filters[tab]).length;
+    return state.search[tab].trim() ? n + 1 : n;
+  }
+
+  function clearFilters(tab) {
+    state.filters[tab] = {};
+    state.sort[tab] = null;
+    state.search[tab] = "";
+    var box = document.querySelector('[data-search="' + tab + '"]');
+    if (box) box.value = "";
+  }
+
+  /* =====================================================================
+     Render de la tabla
+     ===================================================================== */
+  function renderTable(tab, hostId, opts) {
+    var host = $(hostId);
+    if (!host) return [];
+    var cols = colsOf(tab);
+    var rows = sortRows(tab, visibleRows(tab));
+
+    if (!rows.length) {
+      host.innerHTML = '<div class="stf-empty">' + esc(opts.empty) + "</div>";
+      return rows;
+    }
+
+    var sort = state.sort[tab];
+    var head = cols.map(function (col) {
+      var active = !!state.filters[tab][col.key];
+      var arrow = sort && sort.key === col.key ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
+      return '<th class="' + (col.sticky ? "stf-th-name" : "") + (col.align === "left" ? " stf-th--left" : "") + '">' +
+        '<button type="button" class="stf-th__btn' + (active ? " is-active" : "") +
+        '" data-col="' + esc(col.key) + '">' +
+        '<span>' + esc(col.label) + esc(arrow) + "</span>" +
+        '<i class="fa-solid fa-filter stf-th__icon"></i>' +
+        "</button></th>";
+    }).join("");
+
+    var totals = {};
+    var body = rows.map(function (row, index) {
+      if (!opts.totalOf || opts.totalOf(row)) {
+        cols.forEach(function (col) {
+          if (col.total) totals[col.key] = (totals[col.key] || 0) + Number(col.value(row) || 0);
+        });
+      }
+      var cells = cols.map(function (col) {
+        var cls = col.sticky ? "stf-td-name" : (col.align === "left" ? "stf-td--left" : "");
+        if (col.muted) cls += " stf-td--muted";
+        var html = col.cell ? col.cell(row, col) : dash(col.value(row));
+        return '<td class="' + cls + '">' + html + "</td>";
+      }).join("");
+      return '<tr data-row="' + index + '">' + cells + "</tr>";
+    }).join("");
+
+    var foot = "";
+    if (opts.totalLabel) {
+      foot = "<tfoot><tr>" + cols.map(function (col, i) {
+        if (i === 0) return '<td class="stf-td-name">' + esc(opts.totalLabel) + "</td>";
+        return "<td>" + (col.total ? money(totals[col.key] || 0) : "") + "</td>";
+      }).join("") + "</tr></tfoot>";
+    }
+
+    host.innerHTML = '<div class="stf-scroll"><table class="stf-table">' +
+      "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody>" + foot + "</table></div>";
+
+    host.querySelectorAll("tbody tr").forEach(function (tr) {
+      tr.addEventListener("click", function () { opts.onRow(rows[Number(tr.dataset.row)]); });
+    });
+    // El popover se posiciona contra el documento: si la tabla scrollea en
+    // horizontal, el encabezado se mueve y quedaría flotando desanclado.
+    var scroller = host.querySelector(".stf-scroll");
+    if (scroller) scroller.addEventListener("scroll", closePopover);
+    host.querySelectorAll(".stf-th__btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openFilterPopover(tab, btn.dataset.col, btn);
+      });
+    });
+    return rows;
+  }
+
+  /* =====================================================================
+     Popover de filtro por columna
+     ===================================================================== */
+  var pop = null;
+
+  function closePopover() {
+    if (pop) { pop.remove(); pop = null; }
+  }
+
+  function openFilterPopover(tab, key, anchor) {
+    var wasOpen = pop && pop.dataset.col === key && pop.dataset.tab === tab;
+    closePopover();
+    if (wasOpen) return;
+
+    var col = findCol(tab, key);
+    if (!col) return;
+    var current = state.filters[tab][key];
+
+    pop = document.createElement("div");
+    pop.className = "stf-pop";
+    pop.dataset.col = key;
+    pop.dataset.tab = tab;
+
+    var sort = state.sort[tab];
+    var html = '<div class="stf-pop__sort">' +
+      '<button type="button" data-sort="asc"' + (sort && sort.key === key && sort.dir === "asc" ? ' class="is-active"' : "") + '>Sort A→Z</button>' +
+      '<button type="button" data-sort="desc"' + (sort && sort.key === key && sort.dir === "desc" ? ' class="is-active"' : "") + '>Sort Z→A</button>' +
+      "</div>";
+
+    if (col.type === "text") {
+      var values = {};
+      visibleRows(tab, key).forEach(function (r) { values[displayValue(col, r)] = true; });
+      var list = Object.keys(values).sort(function (a, b) {
+        if (a === BLANK) return 1;
+        if (b === BLANK) return -1;
+        return a.localeCompare(b, "en", { numeric: true });
+      });
+      var chosen = current ? current.values : list;
+      html += '<input type="text" class="stf-pop__search" placeholder="Search values…">' +
+        '<label class="stf-pop__opt stf-pop__opt--all">' +
+          '<input type="checkbox" data-all' + (chosen.length === list.length ? " checked" : "") + '>' +
+          "<span>Select all</span></label>" +
+        '<div class="stf-pop__list">' + list.map(function (v) {
+          return '<label class="stf-pop__opt"><input type="checkbox" value="' + esc(v) + '"' +
+            (chosen.indexOf(v) > -1 ? " checked" : "") + "><span>" + esc(v) + "</span></label>";
+        }).join("") + "</div>";
+    } else {
+      var isDate = col.type === "date";
+      var min = current ? current.min : "";
+      var max = current ? current.max : "";
+      html += '<div class="stf-pop__range">' +
+        '<label><span>From</span><input type="' + (isDate ? "date" : "number") + '" data-min value="' + esc(min) + '"></label>' +
+        '<label><span>To</span><input type="' + (isDate ? "date" : "number") + '" data-max value="' + esc(max) + '"></label>' +
+        "</div>";
+    }
+
+    html += '<div class="stf-pop__foot">' +
+      '<button type="button" data-reset>Clear</button>' +
+      '<button type="button" class="stf-pop__apply" data-apply>Apply</button></div>';
+    pop.innerHTML = html;
+    document.body.appendChild(pop);
+
+    var box = anchor.getBoundingClientRect();
+    var left = Math.min(box.left, window.innerWidth - pop.offsetWidth - 12);
+    pop.style.left = Math.max(12, left) + "px";
+    pop.style.top = (box.bottom + window.scrollY + 6) + "px";
+
+    var search = pop.querySelector(".stf-pop__search");
+    if (search) {
+      search.focus();
+      search.addEventListener("input", function () {
+        var q = search.value.trim().toLowerCase();
+        pop.querySelectorAll(".stf-pop__list .stf-pop__opt").forEach(function (el) {
+          el.style.display = el.textContent.toLowerCase().indexOf(q) > -1 ? "" : "none";
+        });
+      });
+    }
+    var all = pop.querySelector("[data-all]");
+    if (all) {
+      all.addEventListener("change", function () {
+        pop.querySelectorAll('.stf-pop__list input[type="checkbox"]').forEach(function (cb) {
+          if (cb.closest(".stf-pop__opt").style.display !== "none") cb.checked = all.checked;
+        });
+      });
+    }
+
+    pop.querySelectorAll("[data-sort]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        state.sort[tab] = { key: key, dir: btn.dataset.sort };
+        closePopover();
+        renderTab(tab);
+      });
+    });
+    pop.querySelector("[data-reset]").addEventListener("click", function () {
+      delete state.filters[tab][key];
+      closePopover();
+      renderTab(tab);
+    });
+    pop.querySelector("[data-apply]").addEventListener("click", function () {
+      if (col.type === "text") {
+        var picked = [];
+        pop.querySelectorAll('.stf-pop__list input[type="checkbox"]').forEach(function (cb) {
+          if (cb.checked) picked.push(cb.value);
+        });
+        var total = pop.querySelectorAll('.stf-pop__list input[type="checkbox"]').length;
+        if (picked.length === total) delete state.filters[tab][key];
+        else state.filters[tab][key] = { mode: "set", values: picked };
+      } else {
+        var mn = pop.querySelector("[data-min]").value;
+        var mx = pop.querySelector("[data-max]").value;
+        if (!mn && !mx) delete state.filters[tab][key];
+        else state.filters[tab][key] = { mode: "range", min: mn, max: mx };
+      }
+      closePopover();
+      renderTab(tab);
+    });
+    pop.addEventListener("click", function (e) { e.stopPropagation(); });
+  }
+
+  document.addEventListener("click", closePopover);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopover(); });
+  window.addEventListener("resize", closePopover);
+
+  /* =====================================================================
+     Las tres pestañas
+     ===================================================================== */
+  function renderDatabase() {
+    var rows = renderTable("database", "#stfTableDatabase", {
+      empty: "No contractors match these filters.",
+      totalLabel: "Active total",
+      totalOf: function (r) { return r.status === "Active" || r.status === "Onboarding"; },
+      onRow: openDatabaseDrawer
+    });
+    $("#stfCountDatabase").textContent = rows.length + " of " + state.database.length + " contractors";
+    renderDatabaseKpis(rows);
+  }
+
+  function renderChurn() {
+    var rows = renderTable("churn", "#stfTableChurn", {
+      empty: "No exits match these filters.",
+      onRow: openChurnDrawer
+    });
+    $("#stfCountChurn").textContent = rows.length + " exits";
+    renderChurnKpis(rows);
+  }
+
+  function renderBonos() {
+    var rows = renderTable("bonos", "#stfTableBonos", {
+      empty: "No bonuses match these filters.",
+      totalLabel: "Total",
+      onRow: openBonoDrawer
+    });
+    $("#stfCountBonos").textContent = rows.length + " bonuses";
+    renderBonosKpis(rows);
+  }
+
+  /* ---------- KPIs ---------- */
   function statusBadge(status) {
     if (status === "Active") return '<span class="stf-badge stf-badge--good">Active</span>';
     if (status === "Onboarding") return '<span class="stf-badge stf-badge--warn">Onboarding</span>';
@@ -273,10 +618,22 @@
     return '<span class="stf-badge ' + cls + '">' + esc(value) + "</span>";
   }
 
-  // "Activos" = los contratos vigentes, incluyendo a los que ya firmaron pero
-  // todavía no arrancaron. Es el mismo total que el KPI "Candidatos activos" del
-  // dashboard; si se contaran sólo los que ya están trabajando daría 7 menos y
-  // parecería que faltan personas. El desglose queda en la card de Onboarding.
+  function payBadge(value) {
+    if (!value) return "—";
+    var paid = String(value).toLowerCase() === "paid";
+    return '<span class="stf-badge ' + (paid ? "stf-badge--good" : "stf-badge--warn") + '">' + esc(value) + "</span>";
+  }
+
+  function kpi(label, value, hint, color) {
+    return '<div class="stf-kpi stf-kpi--' + color + '">' +
+      '<div class="stf-kpi__label">' + esc(label) + "</div>" +
+      '<div class="stf-kpi__value">' + esc(value) + "</div>" +
+      '<div class="stf-kpi__hint">' + esc(hint) + "</div>" +
+    "</div>";
+  }
+
+  // "Active" = los contratos vigentes, incluyendo a los que ya firmaron pero
+  // todavía no arrancaron. Es el mismo total que el KPI del dashboard.
   function renderDatabaseKpis(rows) {
     var trabajando = rows.filter(function (r) { return r.status === "Active"; });
     var onboarding = rows.filter(function (r) { return r.status === "Onboarding"; });
@@ -289,14 +646,12 @@
       byPlatform[key] = (byPlatform[key] || 0) + 1;
     });
     var withPlatform = vigentes.filter(function (r) { return r.platform; });
-    var platformHint = Object.keys(byPlatform).filter(function (k) {
-      return k !== "No platform";
-    }).sort(function (a, b) {
-      return byPlatform[b] - byPlatform[a];
-    }).map(function (k) { return k + " " + byPlatform[k]; }).join(" · ");
+    var platformHint = Object.keys(byPlatform).filter(function (k) { return k !== "No platform"; })
+      .sort(function (a, b) { return byPlatform[b] - byPlatform[a]; })
+      .map(function (k) { return k + " " + byPlatform[k]; }).join(" · ");
 
-    var payment = vigentes.reduce(function (acc, r) { return acc + Number(r.client_payment || 0); }, 0);
-    var fee = vigentes.reduce(function (acc, r) { return acc + Number(r.fee || 0); }, 0);
+    var payment = vigentes.reduce(function (a, r) { return a + Number(r.client_payment || 0); }, 0);
+    var fee = vigentes.reduce(function (a, r) { return a + Number(r.fee || 0); }, 0);
 
     $("#stfKpisDatabase").innerHTML = [
       kpi("Active", vigentes.length,
@@ -310,181 +665,24 @@
     ].join("");
   }
 
-  function kpi(label, value, hint, color) {
-    return '<div class="stf-kpi stf-kpi--' + color + '">' +
-      '<div class="stf-kpi__label">' + esc(label) + "</div>" +
-      '<div class="stf-kpi__value">' + esc(value) + "</div>" +
-      '<div class="stf-kpi__hint">' + esc(hint) + "</div>" +
-    "</div>";
-  }
-
-  /* =====================================================================
-     Churn
-     ===================================================================== */
-  function filterChurn() {
-    var exit = filterValue("ch-exit");
-    var reason = filterValue("ch-reason");
-    var recruiter = filterValue("ch-recruiter");
-    var m3 = filterValue("ch-m3");
-
-    return state.churn.rows.filter(function (row) {
-      if (exit && row.exit_type !== exit) return false;
-      if (reason && (row.inactive_reason || "No reason") !== reason) return false;
-      if (recruiter && row.recruiter !== recruiter) return false;
-      if (m3 === "si" && !row.churn_m3) return false;
-      if (m3 === "no" && row.churn_m3) return false;
-      return true;
-    });
-  }
-
-  function renderChurn() {
-    var rows = filterChurn();
-    var host = $("#stfTableChurn");
-    $("#stfCountChurn").textContent = rows.length + " exits";
-
-    renderChurnKpis(rows);
-
-    if (!rows.length) {
-      host.innerHTML = '<div class="stf-empty">No exits match these filters.</div>';
-      return;
-    }
-
-    var body = rows.map(function (row, index) {
-      var fault = row.vintti_fault === true
-        ? '<span class="stf-badge stf-badge--bad">Yes</span>'
-        : (row.vintti_fault === false ? '<span class="stf-badge">No</span>' : "—");
-      var exitCls = row.exit_type === "Terminated" ? "stf-badge--bad" : "stf-badge--info";
-      return '<tr data-row="' + index + '">' +
-        '<td class="stf-td-name">' +
-          '<div class="stf-td-name__primary"><span class="stf-dot stf-dot--inactive"></span>' + esc(row.candidate_name) +
-            (row.notes ? '<span class="stf-note-dot" title="' + esc(row.notes) + '"></span>' : "") +
-          "</div>" +
-          '<div class="stf-td-name__sub">' + esc(row.client_name || "—") +
-            (row.country ? " · " + esc(row.country) : "") + "</div>" +
-        "</td>" +
-        '<td class="stf-td--muted">' + fmtDate(row.end_date) + "</td>" +
-        "<td>" + (row.exit_type ? '<span class="stf-badge ' + exitCls + '">' + esc(row.exit_type) + "</span>" : "—") + "</td>" +
-        '<td class="stf-td--muted">' + dash(row.inactive_reason || "No reason") + "</td>" +
-        "<td>" + fault + "</td>" +
-        "<td>" + (row.churn_m3 ? '<span class="stf-badge stf-badge--warn">Yes</span>' : '<span class="stf-badge">No</span>') + "</td>" +
-        '<td class="stf-td--muted">' + personName(row.recruiter) + "</td>" +
-      "</tr>";
-    }).join("");
-
-    host.innerHTML =
-      '<div class="stf-scroll"><table class="stf-table">' +
-      "<thead><tr>" +
-        '<th class="stf-th-name">Contractor</th>' +
-        "<th>End</th><th>Exit type</th><th>Reason</th><th>Vintti's fault</th><th>Churn M3</th><th>Recruiter</th>" +
-      "</tr></thead><tbody>" + body + "</tbody></table></div>";
-
-    host.querySelectorAll("tbody tr").forEach(function (tr) {
-      tr.addEventListener("click", function () {
-        openChurnDrawer(rows[Number(tr.dataset.row)]);
-      });
-    });
-  }
-
   function renderChurnKpis(rows) {
     var total = rows.length;
-    var despidos = rows.filter(function (r) { return r.exit_type === "Terminated"; }).length;
-    var renuncias = rows.filter(function (r) { return r.exit_type === "Resigned"; }).length;
+    var terminated = rows.filter(function (r) { return r.exit_type === "Terminated"; }).length;
+    var resigned = rows.filter(function (r) { return r.exit_type === "Resigned"; }).length;
     var fault = rows.filter(function (r) { return r.vintti_fault === true; }).length;
     var m3 = rows.filter(function (r) { return r.churn_m3; }).length;
 
     $("#stfKpisChurn").innerHTML = [
       kpi("Exits", total, "in the selected period", "mag"),
-      kpi("Terminated", despidos, pct(despidos, total) + " of total", "mag"),
-      kpi("Resigned", renuncias, pct(renuncias, total) + " of total", "cyan"),
+      kpi("Terminated", terminated, pct(terminated, total) + " of total", "mag"),
+      kpi("Resigned", resigned, pct(resigned, total) + " of total", "cyan"),
       kpi("Vintti's fault", fault, pct(fault, total) + " of total", "violet"),
       kpi("Churn M3", m3, pct(m3, total) + " left within 3 months", "blue")
     ].join("");
   }
 
-  /* =====================================================================
-     Bonos
-     ===================================================================== */
-  function filterBonos() {
-    var invoice = filterValue("bo-invoice");
-    var candidateStatus = filterValue("bo-candidate");
-    var search = filterValue("bo-search").toLowerCase();
-
-    return state.bonos.rows.filter(function (row) {
-      if (invoice && row.invoice_status !== invoice) return false;
-      if (candidateStatus && row.candidate_status !== candidateStatus) return false;
-      if (search) {
-        var haystack = (row.candidate_name + " " + (row.client_name || "")).toLowerCase();
-        if (haystack.indexOf(search) === -1) return false;
-      }
-      return true;
-    });
-  }
-
-  // `reason` es el texto libre que describe el bono ("August Commission"); si está
-  // vacío se cae a `bonus_type`, que es el enum de la tabla ("one_time").
-  function bonusType(row) {
-    if (row.reason) return esc(row.reason);
-    if (!row.bonus_type) return "—";
-    var text = row.bonus_type.replace(/_/g, " ");
-    return esc(text.charAt(0).toUpperCase() + text.slice(1));
-  }
-
-  function payBadge(value) {
-    if (!value) return "—";
-    var paid = String(value).toLowerCase() === "paid";
-    return '<span class="stf-badge ' + (paid ? "stf-badge--good" : "stf-badge--warn") + '">' + esc(value) + "</span>";
-  }
-
-  function renderBonos() {
-    var rows = filterBonos();
-    var host = $("#stfTableBonos");
-    $("#stfCountBonos").textContent = rows.length + " bonuses";
-
-    renderBonosKpis(rows);
-
-    if (!rows.length) {
-      host.innerHTML = '<div class="stf-empty">No bonuses match these filters.</div>';
-      return;
-    }
-
-    var total = 0;
-    var body = rows.map(function (row, index) {
-      total += Number(row.amount || 0);
-      return '<tr data-row="' + index + '">' +
-        '<td class="stf-td-name">' +
-          '<div class="stf-td-name__primary">' + esc(row.candidate_name || "—") +
-            (row.notes ? '<span class="stf-note-dot" title="' + esc(row.notes) + '"></span>' : "") +
-          "</div>" +
-          '<div class="stf-td-name__sub">' + esc(row.client_name || "—") + "</div>" +
-        "</td>" +
-        '<td class="stf-td--muted">' + fmtDate(row.payout_date) + "</td>" +
-        '<td><span class="stf-money stf-money--solid">' + money(row.amount) + "</span></td>" +
-        '<td class="stf-td--muted">' + bonusType(row) + "</td>" +
-        "<td>" + payBadge(row.invoice_status) + "</td>" +
-        "<td>" + payBadge(row.candidate_status) + "</td>" +
-      "</tr>";
-    }).join("");
-
-    host.innerHTML =
-      '<div class="stf-scroll"><table class="stf-table">' +
-      "<thead><tr>" +
-        '<th class="stf-th-name">Candidate</th>' +
-        "<th>Date</th><th>Amount</th><th>Concept</th><th>Invoice (client)</th><th>Paid to candidate</th>" +
-      "</tr></thead><tbody>" + body + "</tbody>" +
-      '<tfoot><tr><td class="stf-td-name">Total</td><td></td><td>' + money(total) +
-      "</td><td></td><td></td><td></td></tr></tfoot></table></div>";
-
-    host.querySelectorAll("tbody tr").forEach(function (tr) {
-      tr.addEventListener("click", function () {
-        openBonoDrawer(rows[Number(tr.dataset.row)]);
-      });
-    });
-  }
-
   function renderBonosKpis(rows) {
-    var sum = function (list) {
-      return list.reduce(function (acc, r) { return acc + Number(r.amount || 0); }, 0);
-    };
+    var sum = function (list) { return list.reduce(function (a, r) { return a + Number(r.amount || 0); }, 0); };
     var paidByClient = rows.filter(function (r) { return String(r.invoice_status || "").toLowerCase() === "paid"; });
     var paidToCandidate = rows.filter(function (r) { return String(r.candidate_status || "").toLowerCase() === "paid"; });
     var pending = rows.filter(function (r) { return String(r.invoice_status || "").toLowerCase() !== "paid"; });
@@ -729,75 +927,64 @@
     if (host) host.innerHTML = '<div class="stf-error">' + esc(message) + "</div>";
   }
 
+  function yearValue(tab) {
+    var el = document.querySelector('[data-year="' + tab + '"]');
+    return el && el.dataset.filled === "1" ? el.value : "";
+  }
+
+  // Llena el <select> de año. El `current` que trae el elemento es el primer
+  // <option> que el navegador auto-selecciona, no una elección: por eso el
+  // fallback tiene prioridad si existe entre los valores.
+  function fillYears(tab, years, fallback) {
+    var el = document.querySelector('[data-year="' + tab + '"]');
+    if (!el || el.dataset.filled === "1") return;
+    var html = '<option value="all">All</option>';
+    years.filter(Boolean).forEach(function (y) {
+      html += '<option value="' + esc(y) + '">' + esc(y) + "</option>";
+    });
+    el.innerHTML = html;
+    el.value = (fallback && years.indexOf(fallback) > -1) ? fallback : "all";
+    el.dataset.filled = "1";
+  }
+
   function loadTab(tab, force) {
-    if (state.loaded[tab] && !force) {
-      renderTab(tab);
-      return Promise.resolve();
-    }
+    if (state.loaded[tab] && !force) { renderTab(tab); return Promise.resolve(); }
 
     if (tab === "database") {
       $("#stfTableDatabase").innerHTML = '<div class="stf-empty">Loading…</div>';
       return api("/staffing/database").then(function (rows) {
         state.database = rows;
         state.loaded.database = true;
-        fillSelect("db-country", uniq(rows, "country"));
-        fillSelect("db-recruiter", uniq(rows, "recruiter"));
-        fillSelect("db-platform", uniq(rows, "platform"));
-        var list = $("#stfClientOptions");
-        list.innerHTML = uniq(rows, "client_name").sort().map(function (name) {
-          return '<option value="' + esc(name) + '"></option>';
-        }).join("");
         renderDatabase();
-      }).catch(function (err) {
-        showError("#stfTableDatabase", err.message);
-      });
+      }).catch(function (err) { showError("#stfTableDatabase", err.message); });
     }
 
     if (tab === "churn") {
       $("#stfTableChurn").innerHTML = '<div class="stf-empty">Loading…</div>';
-      // Por defecto el año en curso. OJO: no se puede preguntar por el value del
-      // select para saber si el usuario eligió algo — el navegador auto-selecciona
-      // el primer <option> ("all"), que es truthy y se comía el default. La señal
-      // real es `dataset.filled`, que fillSelect pone recién en la primera carga.
-      var yearEl = document.querySelector('[data-filter="ch-year"]');
-      var chosen = (yearEl && yearEl.dataset.filled === "1") ? yearEl.value : "";
+      // Por defecto el año en curso; si todavía no hubo bajas, el más reciente.
+      var chosen = yearValue("churn");
       var year = chosen || CURRENT_YEAR;
       return api("/staffing/churn?year=" + encodeURIComponent(year)).then(function (data) {
         state.churn = data;
         state.loaded.churn = true;
-        // `data.years` viene completo aunque el fetch esté filtrado: si este año
-        // todavía no tuvo bajas, se cae al más reciente con un solo refetch.
         if (!chosen && data.years.length && data.years.indexOf(year) === -1) {
-          fillSelect("ch-year", data.years, data.years[0]);
-          if (yearEl) yearEl.value = data.years[0];
+          fillYears("churn", data.years, data.years[0]);
           state.loaded.churn = false;
           return loadTab("churn", true);
         }
-        fillSelect("ch-year", data.years, CURRENT_YEAR);
-        fillSelect("ch-recruiter", uniq(data.rows, "recruiter"));
-        // "Sin razón" es un bucket grande (muchas bajas viejas no tienen motivo
-        // cargado), así que tiene que poder filtrarse como cualquier otro.
-        var reasons = uniq(data.rows, "inactive_reason");
-        if (data.rows.some(function (r) { return !r.inactive_reason; })) reasons.push("No reason");
-        fillSelect("ch-reason", reasons);
+        fillYears("churn", data.years, CURRENT_YEAR);
         renderChurn();
-      }).catch(function (err) {
-        showError("#stfTableChurn", err.message);
-      });
+      }).catch(function (err) { showError("#stfTableChurn", err.message); });
     }
 
     $("#stfTableBonos").innerHTML = '<div class="stf-empty">Loading…</div>';
-    var boYear = filterValue("bo-year") || "all";
+    var boYear = yearValue("bonos") || "all";
     return api("/staffing/bonuses?year=" + encodeURIComponent(boYear)).then(function (data) {
       state.bonos = data;
       state.loaded.bonos = true;
-      fillSelect("bo-year", data.years, "all");
-      fillSelect("bo-invoice", uniq(data.rows, "invoice_status"));
-      fillSelect("bo-candidate", uniq(data.rows, "candidate_status"));
+      fillYears("bonos", data.years, "all");
       renderBonos();
-    }).catch(function (err) {
-      showError("#stfTableBonos", err.message);
-    });
+    }).catch(function (err) { showError("#stfTableBonos", err.message); });
   }
 
   function renderTab(tab) {
@@ -806,8 +993,8 @@
     return renderBonos();
   }
 
-  /* ---------- El filtro de año se resuelve en el server ---------- */
-  function reloadYearScoped(tab) {
+  // El filtro de año lo resuelve el server, así que hay que volver a pedir.
+  function reloadYear(tab) {
     state.loaded[tab] = false;
     loadTab(tab, true);
   }
@@ -824,9 +1011,7 @@
     drawer.status = $("#stfDrawerStatus");
     drawer.save = $("#stfDrawerSave");
 
-    $$("[data-drawer-close]").forEach(function (el) {
-      el.addEventListener("click", closeDrawer);
-    });
+    $$("[data-drawer-close]").forEach(function (el) { el.addEventListener("click", closeDrawer); });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && drawer.el.classList.contains("is-open")) closeDrawer();
     });
@@ -836,32 +1021,31 @@
       btn.addEventListener("click", function () {
         var tab = btn.dataset.tab;
         state.tab = tab;
+        closePopover();
         $$(".stf-tab").forEach(function (b) { b.classList.toggle("is-active", b === btn); });
-        $$(".stf-panel").forEach(function (p) {
-          p.classList.toggle("is-active", p.dataset.panel === tab);
-        });
+        $$(".stf-panel").forEach(function (p) { p.classList.toggle("is-active", p.dataset.panel === tab); });
         $("#stfExportCsv").style.display = tab === "database" ? "" : "none";
         loadTab(tab);
       });
     });
 
-    document.addEventListener("input", function (e) {
-      var el = e.target.closest && e.target.closest("[data-filter]");
-      if (!el) return;
-      var name = el.dataset.filter;
-      // Los filtros de año los resuelve el server, así que hay que refetchear.
-      if (name === "ch-year") return reloadYearScoped("churn");
-      if (name === "bo-year") return reloadYearScoped("bonos");
-      renderTab(state.tab);
+    $$("[data-search]").forEach(function (el) {
+      el.addEventListener("input", function () {
+        state.search[el.dataset.search] = el.value;
+        renderTab(el.dataset.search);
+      });
+    });
+
+    $$("[data-year]").forEach(function (el) {
+      el.addEventListener("change", function () { reloadYear(el.dataset.year); });
     });
 
     $$("[data-clear]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var panel = btn.closest(".stf-panel");
-        panel.querySelectorAll("[data-filter]").forEach(function (el) {
-          el.value = el.dataset.filter.endsWith("-year") ? "all" : "";
-        });
-        reloadYearScoped(btn.dataset.clear);
+        var tab = btn.dataset.clear;
+        clearFilters(tab);
+        closePopover();
+        renderTab(tab);
       });
     });
 
@@ -879,7 +1063,7 @@
       // La descarga necesita el header X-User-Email, así que se baja por fetch.
       fetch(API + "/staffing/database.csv", { headers: { "X-User-Email": userEmail() } })
         .then(function (res) {
-          if (!res.ok) throw new Error("No se pudo exportar (HTTP " + res.status + ")");
+          if (!res.ok) throw new Error("Could not export (HTTP " + res.status + ")");
           return res.blob();
         })
         .then(function (blob) {

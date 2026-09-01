@@ -113,6 +113,22 @@ def _ensure_schema(cur) -> None:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+# Gente que figura como `opportunity.opp_hr_lead` en búsquedas viejas pero que hoy
+# no cumple ese rol. Decisión de la owner (2026-09-01): no mostrarlas en la columna
+# Recruiter de esta página; esos contractors quedan sin recruiter asignado.
+#
+# NO se toca `opportunity.opp_hr_lead`: el dato histórico queda intacto y esto se
+# revierte sacando el mail de esta lista. Mismo criterio que la exclusión de
+# ex-recruiters en los datasets de recruiter power.
+FORMER_RECRUITERS = {
+    "bahia@vintti.com",            # Sales Lead — llevó búsquedas hasta 2025-12
+    "jazmin@vintti.com",           # HR Lead — llevó búsquedas hasta 2025-10
+    "agustina.barbero@vintti.com", # ya no está en `users`
+    "pilar.fernandez@vintti.com",  # ya no está en `users` — OJO: no confundir con
+                                   # pilar@vintti.com (Pilar Flores Levalle), que
+                                   # sí es recruiter activa y lleva 71 contractors
+}
+
 TRUEY = {"si", "sí", "yes", "y", "true", "t", "1"}
 FALSEY = {"no", "n", "false", "f", "0"}
 
@@ -372,6 +388,7 @@ PAIRS_SELECT = """
       NULLIF(TRIM(COALESCE(o.opp_position_name, '')), '')    AS position_name,
       COALESCE(NULLIF(TRIM(COALESCE(u.user_name, '')), ''),
                NULLIF(TRIM(COALESCE(o.opp_hr_lead, '')), '')) AS recruiter,
+      LOWER(NULLIF(TRIM(COALESCE(o.opp_hr_lead, '')), ''))    AS hr_lead_email,
       p.start_d::text                                        AS start_date,
       p.end_d::text                                          AS end_date,
       p.buyout_d::text                                       AS buyout_month,
@@ -426,6 +443,7 @@ ORPHANS_SQL = """
       COALESCE(se.client_name, '') AS client_name,
       NULL::text            AS position_name,
       NULL::text            AS recruiter,
+      NULL::text            AS hr_lead_email,
       NULL::text            AS start_date,
       NULL::text            AS end_date,
       NULL::text            AS buyout_month,
@@ -454,6 +472,8 @@ def _shape_row(raw: dict) -> dict:
     """Normaliza una fila cruda a la forma que consume el front."""
     row = dict(raw)
     row["orphan"] = row.get("candidate_id") is None
+    if (row.pop("hr_lead_email", None) or "") in FORMER_RECRUITERS:
+        row["recruiter"] = None
     row["equipment"] = {"yes": "Yes", "no": "No"}.get((row.pop("computer", None) or ""), None)
     row["vintti_fault"] = _tri_bool(row.pop("inactive_vinttierror", None))
     reason = row.get("inactive_reason")

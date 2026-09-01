@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260831-staffing" />
-  <link rel="stylesheet" href="./assets/css/staffing.css?v=11" />
+  <link rel="stylesheet" href="./assets/css/staffing.css?v=14" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -41,39 +41,12 @@
 
       <div class="stf-card">
         <div class="stf-filters">
-          <label class="stf-filter">
-            <span class="stf-filter__label">Status</span>
-            <select class="stf-filter__select" data-filter="db-status">
-              <option value="">All</option>
-              <option value="vigentes">Active (incl. Onboarding)</option>
-              <option value="Active">Active only</option>
-              <option value="Onboarding">Onboarding only</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Client</span>
-            <input type="text" class="stf-filter__input" data-filter="db-client"
-                   list="stfClientOptions" placeholder="Search client…" autocomplete="off">
-            <datalist id="stfClientOptions"></datalist>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Country</span>
-            <select class="stf-filter__select" data-filter="db-country"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Recruiter</span>
-            <select class="stf-filter__select" data-filter="db-recruiter"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Platform</span>
-            <select class="stf-filter__select" data-filter="db-platform"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
+          <label class="stf-filter stf-filter--wide">
             <span class="stf-filter__label">Search</span>
-            <input type="text" class="stf-filter__input" data-filter="db-search" placeholder="Name or email…" autocomplete="off">
+            <input type="text" class="stf-filter__input" data-search="database"
+                   placeholder="Candidate or client…" autocomplete="off">
           </label>
-          <button type="button" class="stf-btn" data-clear="database">Clear</button>
+          <button type="button" class="stf-btn" data-clear="database">Clear filters</button>
           <span class="stf-filters__spacer"></span>
           <span class="stf-count" id="stfCountDatabase"></span>
         </div>
@@ -89,33 +62,14 @@
         <div class="stf-filters">
           <label class="stf-filter">
             <span class="stf-filter__label">Year</span>
-            <select class="stf-filter__select" data-filter="ch-year"><option value="all">All</option></select>
+            <select class="stf-filter__select" data-year="churn"><option value="all">All</option></select>
           </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Exit type</span>
-            <select class="stf-filter__select" data-filter="ch-exit">
-              <option value="">All</option>
-              <option value="Terminated">Terminated</option>
-              <option value="Resigned">Resigned</option>
-            </select>
+          <label class="stf-filter stf-filter--wide">
+            <span class="stf-filter__label">Search</span>
+            <input type="text" class="stf-filter__input" data-search="churn"
+                   placeholder="Contractor or client…" autocomplete="off">
           </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Reason</span>
-            <select class="stf-filter__select" data-filter="ch-reason"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Recruiter</span>
-            <select class="stf-filter__select" data-filter="ch-recruiter"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Churn M3</span>
-            <select class="stf-filter__select" data-filter="ch-m3">
-              <option value="">All</option>
-              <option value="si">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </label>
-          <button type="button" class="stf-btn" data-clear="churn">Clear</button>
+          <button type="button" class="stf-btn" data-clear="churn">Clear filters</button>
           <span class="stf-filters__spacer"></span>
           <span class="stf-count" id="stfCountChurn"></span>
         </div>
@@ -131,21 +85,14 @@
         <div class="stf-filters">
           <label class="stf-filter">
             <span class="stf-filter__label">Year</span>
-            <select class="stf-filter__select" data-filter="bo-year"><option value="all">All</option></select>
+            <select class="stf-filter__select" data-year="bonos"><option value="all">All</option></select>
           </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Invoice (client)</span>
-            <select class="stf-filter__select" data-filter="bo-invoice"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
-            <span class="stf-filter__label">Paid to candidate</span>
-            <select class="stf-filter__select" data-filter="bo-candidate"><option value="">All</option></select>
-          </label>
-          <label class="stf-filter">
+          <label class="stf-filter stf-filter--wide">
             <span class="stf-filter__label">Search</span>
-            <input type="text" class="stf-filter__input" data-filter="bo-search" placeholder="Candidate or client…" autocomplete="off">
+            <input type="text" class="stf-filter__input" data-search="bonos"
+                   placeholder="Candidate or client…" autocomplete="off">
           </label>
-          <button type="button" class="stf-btn" data-clear="bonos">Clear</button>
+          <button type="button" class="stf-btn" data-clear="bonos">Clear filters</button>
           <span class="stf-filters__spacer"></span>
           <span class="stf-count" id="stfCountBonos"></span>
         </div>
@@ -174,7 +121,7 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20260831-staffing" defer></script>
-  <script src="./assets/js/staffing.js?v=11" defer></script>
+  <script src="./assets/js/staffing.js?v=14" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

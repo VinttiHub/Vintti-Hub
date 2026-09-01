@@ -174,6 +174,7 @@ datalist { display: none; }
   align-items: flex-end;
 }
 .stf-filter { display: inline-flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.stf-filter--wide { min-width: 280px; flex: 1 1 280px; max-width: 420px; }
 .stf-filter__label {
   font-size: 10px;
   font-weight: 700;
@@ -253,7 +254,162 @@ datalist { display: none; }
   top: 0;
   z-index: 2;
   box-shadow: inset 0 -1px 0 var(--stf-rule);
+  /* el padding lo pone el botón, que ocupa toda la celda */
+  padding: 0;
 }
+
+/* ---------- Encabezado filtrable (estilo Excel) ---------- */
+.stf-th__btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 8px;
+  transition: background .12s ease, color .12s ease;
+}
+.stf-table th.stf-th-name .stf-th__btn,
+.stf-table th.stf-th--left .stf-th__btn { justify-content: flex-start; }
+.stf-th__btn:hover { background: rgba(108, 56, 255, .06); color: var(--stf-ink); }
+.stf-th__icon { font-size: 9px; opacity: 0; transition: opacity .12s ease; }
+.stf-th__btn:hover .stf-th__icon { opacity: .45; }
+.stf-th__btn.is-active { color: var(--stf-violet); }
+.stf-th__btn.is-active .stf-th__icon { opacity: 1; }
+
+.stf-table th.stf-th--left,
+.stf-table td.stf-td--left { text-align: left; }
+
+/* ---------- Popover de filtro ---------- */
+.stf-pop {
+  position: absolute;
+  z-index: 8000;
+  width: 252px;
+  background: var(--stf-card);
+  border: 1px solid var(--stf-rule);
+  border-radius: 12px;
+  box-shadow: 0 14px 36px rgba(13, 18, 30, .18);
+  padding: 10px;
+  font-size: 13px;
+  color: var(--stf-ink);
+}
+.stf-pop__sort { display: flex; gap: 6px; margin-bottom: 8px; }
+.stf-pop__sort button {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--stf-rule);
+  background: var(--stf-card-soft);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--stf-ink-2);
+  cursor: pointer;
+}
+.stf-pop__sort button:hover { border-color: rgba(108, 56, 255, .35); color: var(--stf-ink); }
+.stf-pop__sort button.is-active {
+  background: rgba(108, 56, 255, .10);
+  border-color: rgba(108, 56, 255, .35);
+  color: var(--stf-violet);
+}
+.stf-pop__search {
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  border: 1px solid var(--stf-rule);
+  background: var(--stf-card-soft);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.stf-pop__search:focus {
+  outline: none;
+  border-color: rgba(108, 56, 255, .55);
+  box-shadow: 0 0 0 3px rgba(108, 56, 255, .12);
+}
+.stf-pop__list { max-height: 216px; overflow-y: auto; overscroll-behavior: contain; }
+.stf-pop__opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.stf-pop__opt:hover { background: rgba(108, 56, 255, .06); }
+.stf-pop__opt span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-pop__opt input { accent-color: var(--stf-violet); flex: 0 0 auto; margin: 0; }
+.stf-pop__opt--all {
+  font-weight: 600;
+  border-bottom: 1px solid var(--stf-rule);
+  border-radius: 0;
+  margin-bottom: 4px;
+  padding-bottom: 7px;
+}
+.stf-pop__range { display: flex; flex-direction: column; gap: 8px; }
+.stf-pop__range label { display: flex; flex-direction: column; gap: 3px; }
+.stf-pop__range span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+}
+.stf-pop__range input {
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  border: 1px solid var(--stf-rule);
+  background: var(--stf-card-soft);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12.5px;
+}
+.stf-pop__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--stf-rule);
+}
+.stf-pop__foot button {
+  appearance: none;
+  border: 1px solid var(--stf-rule);
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--stf-ink-2);
+  cursor: pointer;
+}
+.stf-pop__foot button:hover { color: var(--stf-ink); border-color: rgba(108, 56, 255, .35); }
+.stf-pop__apply {
+  background: var(--stf-violet) !important;
+  border-color: var(--stf-violet) !important;
+  color: #fff !important;
+}
+.stf-pop__apply:hover { background: #5b2ce6 !important; }
 .stf-table thead .stf-th-name { z-index: 4; }
 .stf-table th.stf-th-name,
 .stf-table td.stf-td-name { text-align: left; }
