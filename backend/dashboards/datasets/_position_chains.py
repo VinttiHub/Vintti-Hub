@@ -170,6 +170,34 @@ WINDOW_FILTER = """
             AND (p.pos_end IS NULL OR p.pos_end >= %(win_ini)s::date)
 """
 
+# Scope de la sección Position Lifetime: todas / sólo activas / sólo cerradas.
+# "Activa" incluye "En reemplazo" (la silla sigue siendo nuestra); "cerrada" incluye
+# Buyout (el asiento terminó igual, aunque no sea churn real).
+# OJO con las activas: su reloj sigue corriendo, así que su vida es un PISO, no el
+# total final — por eso el promedio de activas y el de cerradas no son comparables.
+_SCOPE_SQL = {
+    "all": "",
+    "active": "          WHERE estado IN ('Activa', 'En reemplazo')\n",
+    "closed": "          WHERE estado NOT IN ('Activa', 'En reemplazo')\n",
+}
+
+_SCOPE_ALIASES = {
+    "active": "active", "activa": "active", "activas": "active", "abiertas": "active",
+    "closed": "closed", "cerrada": "closed", "cerradas": "closed",
+}
+
+
+def scope_filter(filters: dict | None) -> tuple[str, str]:
+    """WHERE por estado para la CTE ya filtrada por ventana.
+
+    Devuelve (sql, scope). Summary y detail DEBEN usar el mismo: si divergen, la
+    card y la tabla dejan de reconciliar (mismo criterio que `lifetime_window`).
+    """
+    filters = filters or {}
+    raw = str(filters.get("pos_scope") or filters.get("scope") or "all").strip().lower()
+    scope = _SCOPE_ALIASES.get(raw, "all")
+    return _SCOPE_SQL[scope], scope
+
 
 def lifetime_window(filters: dict | None, corte: date) -> tuple[date, date]:
     """Ventana de la métrica: ALL-TIME por defecto, acotada si el usuario filtra.

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=119">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=121">
 </head>
 <body>
 
@@ -1085,64 +1085,58 @@
 
     <div class="grid skpi-grid" data-subtab="staffing">
 
-      <!-- Vida promedio -->
+      <!-- Vida promedio · SÓLO ACTIVAS (el reloj sigue corriendo: es un piso, no la vida final) -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
-          <span class="skpi-tile__title">Vida promedio de la posición</span>
+          <span class="skpi-tile__title">Vida promedio · Activas</span>
           <span class="skpi-tile__tag">All-time</span>
         </div>
         <div class="skpi-tile__value"
-             data-chart="gr_kpi_position_lifetime" data-bind="text"
+             data-chart="gr_kpi_position_lifetime" data-override-pos-scope="active" data-bind="text"
              data-field="avg_months" data-reduce="first" data-fmt="months">—</div>
-        <div class="skpi-tile__sub">
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+        <div class="skpi-tile__sub"><span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="active" data-bind="text"
                 data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
-          posiciones ·
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                data-field="positions_active" data-reduce="first" data-fmt="int">—</span>
-          activas
-        </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="position-lifetime" data-drawer-hero="avg" aria-label="Ver detalle Position Lifetime">Ver detalle</button>
+          posiciones vivas · reloj corriendo</div>
+        <button type="button" class="skpi-tile__detail-btn"
+                data-category-detail-open="position-lifetime" data-category-key="pos-scope" data-category-value="active"
+                aria-label="Ver detalle posiciones activas">Ver detalle</button>
       </div>
 
-      <!-- Mediana -->
+      <!-- Vida promedio · SÓLO CERRADAS (vida definitiva: Cerrada + Buyout) -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
-          <span class="skpi-tile__title">Mediana</span>
+          <span class="skpi-tile__title">Vida promedio · Cerradas</span>
           <span class="skpi-tile__tag">All-time</span>
         </div>
         <div class="skpi-tile__value"
-             data-chart="gr_kpi_position_lifetime" data-bind="text"
-             data-field="median_months" data-reduce="first" data-fmt="months">—</div>
-        <div class="skpi-tile__sub">
-          Sólo cerradas:
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                data-field="avg_months_closed" data-reduce="first" data-fmt="months">—</span>
-          · máx
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                data-field="max_months" data-reduce="first" data-fmt="months">—</span>
-        </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="position-lifetime" data-drawer-hero="median" aria-label="Ver detalle mediana Position Lifetime">Ver detalle</button>
+             data-chart="gr_kpi_position_lifetime" data-override-pos-scope="closed" data-bind="text"
+             data-field="avg_months" data-reduce="first" data-fmt="months">—</div>
+        <div class="skpi-tile__sub"><span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="closed" data-bind="text"
+                data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
+          posiciones cerradas · máx <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="closed" data-bind="text"
+                data-field="max_months" data-reduce="first" data-fmt="months">—</span></div>
+        <button type="button" class="skpi-tile__detail-btn"
+                data-category-detail-open="position-lifetime" data-category-key="pos-scope" data-category-value="closed"
+                aria-label="Ver detalle posiciones cerradas">Ver detalle</button>
       </div>
 
-      <!-- % con reemplazo -->
+      <!-- Vida promedio · TOTAL (activas + cerradas) -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
-          <span class="skpi-tile__title">% posiciones con reemplazo</span>
+          <span class="skpi-tile__title">Vida promedio · Total</span>
           <span class="skpi-tile__tag">All-time</span>
         </div>
         <div class="skpi-tile__value"
-             data-chart="gr_kpi_position_lifetime" data-bind="text"
-             data-field="pct_with_replacement" data-reduce="first" data-fmt="percent">—</div>
-        <div class="skpi-tile__sub">
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                data-field="positions_with_replacement" data-reduce="first" data-fmt="int">—</span>
-          posiciones ·
-          <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                data-field="replacements_total" data-reduce="first" data-fmt="int">—</span>
-          reemplazos en total
-        </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="position-lifetime" data-drawer-hero="repl" aria-label="Ver detalle reemplazos Position Lifetime">Ver detalle</button>
+             data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+             data-field="avg_months" data-reduce="first" data-fmt="months">—</div>
+        <div class="skpi-tile__sub"><span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
+          posiciones · <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                data-field="positions_active" data-reduce="first" data-fmt="int">—</span> activas + <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                data-field="positions_closed" data-reduce="first" data-fmt="int">—</span> cerradas</div>
+        <button type="button" class="skpi-tile__detail-btn"
+                data-category-detail-open="position-lifetime" data-category-key="pos-scope" data-category-value="all"
+                aria-label="Ver detalle todas las posiciones">Ver detalle</button>
       </div>
 
       <!-- Tabla · una fila por posición -->
@@ -1154,7 +1148,7 @@
           </div>
         </div>
         <div class="scroll-x"
-             data-chart="gr_table_position_lifetime_detail" data-bind="dtable" data-sortable data-scroll
+             data-chart="gr_table_position_lifetime_detail" data-override-pos-scope="all" data-bind="dtable" data-sortable data-scroll
              data-multi-filter="client_name|Cliente,estado|Estado"
              data-cols="client_name|Cliente|raw,position_name|Posición|raw,estado|Estado|posst,start_date|Inicio|raw,end_date|Fin|raw,months|Vida|months,n_contractors|Contractors|int,n_replacements|Reemplazos|int,contractors|Ocupantes|raw,close_date|Close date|raw"
              data-empty-text="Sin posiciones en el período."></div>
@@ -7408,95 +7402,31 @@
             <div>
               <p class="kpi-drawer__eyebrow">Management · Staffing</p>
               <h3 class="kpi-drawer__title">Position Lifetime</h3>
-              <p class="kpi-drawer__sub">Cuánto vive una posición, más allá de quién la ocupe</p>
+              <p class="kpi-drawer__sub">Cuánto vive una posición, más allá de quién la ocupe · <strong
+                 data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                 data-field="scope_label" data-reduce="first">—</strong></p>
             </div>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
 
-            <!-- Un hero por tile. El botón que abre el drawer elige cuál con
-                 data-drawer-hero; sin eso queda el primero (avg). -->
-            <div class="kpi-drawer__hero kpi-drawer__hero--lime" data-drawer-hero-variant="avg">
+            <!-- Un solo hero: vida promedio del scope que abrió el drawer
+                 (Activas / Cerradas / Total), con su % de reemplazo al lado. -->
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
               <span class="kpi-drawer__hero__label">Vida promedio de la posición</span>
               <span class="kpi-drawer__hero__value"
-                    data-chart="gr_kpi_position_lifetime" data-bind="text"
+                    data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                     data-field="avg_months" data-reduce="first" data-fmt="months">—</span>
               <span class="kpi-drawer__hero__delta">
-                mediana
-                <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                      data-field="median_months" data-reduce="first" data-fmt="months">—</span>
-              </span>
-            </div>
-
-            <div class="kpi-drawer__hero kpi-drawer__hero--cool" data-drawer-hero-variant="median" style="display:none">
-              <span class="kpi-drawer__hero__label">Mediana de vida de la posición</span>
-              <span class="kpi-drawer__hero__value"
-                    data-chart="gr_kpi_position_lifetime" data-bind="text"
-                    data-field="median_months" data-reduce="first" data-fmt="months">—</span>
-              <span class="kpi-drawer__hero__delta">
-                promedio
-                <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                      data-field="avg_months" data-reduce="first" data-fmt="months">—</span>
-                · la mediana aguanta mejor los outliers
-              </span>
-            </div>
-
-            <div class="kpi-drawer__hero kpi-drawer__hero--mag" data-drawer-hero-variant="repl" style="display:none">
-              <span class="kpi-drawer__hero__label">% posiciones con reemplazo</span>
-              <span class="kpi-drawer__hero__value"
-                    data-chart="gr_kpi_position_lifetime" data-bind="text"
-                    data-field="pct_with_replacement" data-reduce="first" data-fmt="percent">—</span>
-              <span class="kpi-drawer__hero__delta">
-                <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                      data-field="positions_with_replacement" data-reduce="first" data-fmt="int">—</span>
-                de
-                <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                sobre
+                <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                       data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
                 posiciones ·
-                <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                      data-field="replacements_total" data-reduce="first" data-fmt="int">—</span>
-                reemplazos en total
+                <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                      data-field="pct_with_replacement" data-reduce="first" data-fmt="percent">—</span>
+                con reemplazo
               </span>
             </div>
-
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Panorama</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--four">
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Posiciones</span>
-                  <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
-                        data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">la más vieja lleva
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                          data-field="max_months" data-reduce="first" data-fmt="months">—</span>
-                  </span>
-                </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Activas</span>
-                  <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
-                        data-field="positions_active" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">incluye "en reemplazo"</span>
-                </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Cerradas</span>
-                  <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
-                        data-field="positions_closed" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Vida prom. cerradas</span>
-                  <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
-                        data-field="avg_months_closed" data-reduce="first" data-fmt="months">—</span>
-                  <span class="kpi-drawer__stat__sub">la más larga que cerró:
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                          data-field="max_months_closed" data-reduce="first" data-fmt="months">—</span>
-                  </span>
-                </div>
-              </div>
-            </section>
 
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Distribución de vidas</h4>
@@ -7504,57 +7434,57 @@
                 <div class="bars__row">
                   <span class="bars__name">0-3 meses
                     <span class="bars__name-sub">
-                      <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                      <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                             data-field="bucket_0_3" data-reduce="first" data-fmt="int">—</span> posiciones
                     </span>
                   </span>
                   <span class="bars__val"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="bucket_0_3_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="bars__bar mag"><span
-                        data-chart="gr_kpi_position_lifetime" data-bind="progress-fill"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="progress-fill"
                         data-field="bucket_0_3_pct" data-reduce="first"></span></span>
                 </div>
                 <div class="bars__row">
                   <span class="bars__name">3-6 meses
                     <span class="bars__name-sub">
-                      <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                      <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                             data-field="bucket_3_6" data-reduce="first" data-fmt="int">—</span> posiciones
                     </span>
                   </span>
                   <span class="bars__val"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="bucket_3_6_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="bars__bar violet"><span
-                        data-chart="gr_kpi_position_lifetime" data-bind="progress-fill"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="progress-fill"
                         data-field="bucket_3_6_pct" data-reduce="first"></span></span>
                 </div>
                 <div class="bars__row">
                   <span class="bars__name">6-12 meses
                     <span class="bars__name-sub">
-                      <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                      <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                             data-field="bucket_6_12" data-reduce="first" data-fmt="int">—</span> posiciones
                     </span>
                   </span>
                   <span class="bars__val"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="bucket_6_12_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="bars__bar cyan"><span
-                        data-chart="gr_kpi_position_lifetime" data-bind="progress-fill"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="progress-fill"
                         data-field="bucket_6_12_pct" data-reduce="first"></span></span>
                 </div>
                 <div class="bars__row">
                   <span class="bars__name">12+ meses
                     <span class="bars__name-sub">
-                      <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                      <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                             data-field="bucket_12_plus" data-reduce="first" data-fmt="int">—</span> posiciones
                     </span>
                   </span>
                   <span class="bars__val"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="bucket_12_plus_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="bars__bar lime"><span
-                        data-chart="gr_kpi_position_lifetime" data-bind="progress-fill"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="progress-fill"
                         data-field="bucket_12_plus_pct" data-reduce="first"></span></span>
                 </div>
               </div>
@@ -7562,51 +7492,47 @@
 
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Reemplazos</h4>
-              <p class="kpi-drawer__note" style="margin:0 0 12px">
-                Cuántas posiciones cambiaron de persona alguna vez, y cuántas veces pasó en total.
-                Los dos números no coinciden porque una misma posición puede reemplazarse más de una vez.
-              </p>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Posiciones que cambiaron de persona</span>
+                  <span class="kpi-drawer__stat__label">Posiciones con reemplazo</span>
                   <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="positions_with_replacement" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub">de
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                    <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                           data-field="positions_total" data-reduce="first" data-fmt="int">—</span>
                     posiciones en total</span>
                 </div>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Eso es</span>
                   <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                         data-field="pct_with_replacement" data-reduce="first" data-fmt="percent">—</span>
                   <span class="kpi-drawer__stat__sub">las otras
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                    <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                           data-field="positions_without_replacement" data-reduce="first" data-fmt="int">—</span>
                     nunca cambiaron de persona</span>
                 </div>
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Veces que hubo que reemplazar</span>
+                  <span class="kpi-drawer__stat__label">Posiciones con más de 1 reemplazo</span>
                   <span class="kpi-drawer__stat__value"
-                        data-chart="gr_kpi_position_lifetime" data-bind="text"
-                        data-field="replacements_total" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
+                        data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                        data-field="positions_repl_2plus" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">las otras
+                    <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
                           data-field="positions_repl_1" data-reduce="first" data-fmt="int">—</span>
-                    posiciones se reemplazaron 1 vez ·
-                    <span data-chart="gr_kpi_position_lifetime" data-bind="text"
-                          data-field="positions_repl_2plus" data-reduce="first" data-fmt="int">—</span>
-                    se reemplazaron 2 veces</span>
+                    cambiaron de persona una sola vez · en total fueron
+                    <span data-chart="gr_kpi_position_lifetime" data-override-pos-scope="all" data-bind="text"
+                          data-field="replacements_total" data-reduce="first" data-fmt="int">—</span>
+                    reemplazos</span>
                 </div>
               </div>
             </section>
 
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle por posición <span class="count" data-chart="gr_table_position_lifetime_detail" data-bind="text" data-field="client_name" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Detalle por posición <span class="count" data-chart="gr_table_position_lifetime_detail" data-override-pos-scope="all" data-bind="text" data-field="client_name" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dtable-wrap"
-                   data-chart="gr_table_position_lifetime_detail" data-bind="dtable" data-sortable data-scroll
+                   data-chart="gr_table_position_lifetime_detail" data-override-pos-scope="all" data-bind="dtable" data-sortable data-scroll
                    data-multi-filter="client_name|Cliente,estado|Estado"
                    data-cols="client_name|Cliente|raw,position_name|Posición|raw,estado|Estado|posst,start_date|Inicio|raw,end_date|Fin|raw,months|Vida|months,n_contractors|Contractors|int,n_replacements|Reemplazos|int,contractors|Ocupantes|raw"
                    data-empty-text="Sin posiciones en el período."></div>
@@ -7619,6 +7545,9 @@
               arma con <code>opp_type = 'Replacement'</code> + <code>replacement_of</code>.
               Sólo Staffing, sin cuentas internas. Por defecto es <strong>all-time</strong>;
               se acota si cargás Desde/Hasta o Mes en la barra de filtros.
+              <br>Las <strong>activas</strong> tienen el reloj corriendo: su vida promedio es un
+              piso, no el total final. Las <strong>cerradas</strong> (incluye Buyout) ya tienen su
+              vida definitiva — por eso dan más bajo, no porque duren menos.
             </p>
 
           </div>
@@ -9688,7 +9617,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=149" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=151" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

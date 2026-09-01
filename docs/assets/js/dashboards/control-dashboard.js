@@ -3950,9 +3950,12 @@
       });
     };
     // Botón "Ver detalle (todas)" de una dona categórica → abre SIN filtro (limpia).
+    // data-category-value: abre el panel FIJADO a ese valor (ej. las tiles de
+    // Position Lifetime, una por scope). Sin el atributo, sigue abriendo sin filtro.
     document.querySelectorAll('[data-category-detail-open]').forEach(btn => {
       btn.addEventListener('click', () => {
-        openCategoryDrawer(btn.dataset.categoryDetailOpen, btn.dataset.categoryKey || 'reason', '');
+        openCategoryDrawer(btn.dataset.categoryDetailOpen, btn.dataset.categoryKey || 'reason',
+                           btn.dataset.categoryValue || '');
       });
     });
 

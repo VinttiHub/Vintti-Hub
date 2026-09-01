@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date
 
 from ._now import today_ar
-from ._position_chains import CHAIN_CTES, WINDOW_FILTER, lifetime_window
+from ._position_chains import CHAIN_CTES, WINDOW_FILTER, lifetime_window, scope_filter
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -40,14 +40,29 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or today_ar()
     )
     win_ini, win_fin = lifetime_window(filters, corte)
+    scope_sql, scope = scope_filter(filters)
+    # El drawer muestra qué recorte está mirando; que salga del dataset evita que la
+    # etiqueta y los números se desincronicen.
+    scope_label = {
+        "all": "Activas + cerradas",
+        "active": "Sólo activas",
+        "closed": "Sólo cerradas",
+    }[scope]
 
     sql = "WITH RECURSIVE " + CHAIN_CTES + """,
         en_ventana AS (
           SELECT p.*
           FROM posiciones p
 """ + WINDOW_FILTER + """
+        ),
+        -- Scope del toggle de la sección (todas / activas / cerradas). Vacío = todas.
+        en_scope AS (
+          SELECT * FROM en_ventana
+""" + scope_sql + """
         )
         SELECT
+          %(scope)s::text                                                 AS scope,
+          %(scope_label)s::text                                           AS scope_label,
           COUNT(*)::int                                                   AS positions_total,
           COUNT(*) FILTER (WHERE estado IN ('Activa', 'En reemplazo'))::int AS positions_active,
           COUNT(*) FILTER (WHERE estado NOT IN ('Activa', 'En reemplazo'))::int AS positions_closed,
@@ -90,16 +105,20 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 / NULLIF(COUNT(*), 0), 1)::float                          AS bucket_6_12_pct,
           ROUND(100.0 * COUNT(*) FILTER (WHERE months >= 12)::numeric
                 / NULLIF(COUNT(*), 0), 1)::float                          AS bucket_12_plus_pct
-        FROM en_ventana;
+        FROM en_scope;
     """
 
-    return sql, {"corte": corte, "win_ini": win_ini, "win_fin": win_fin}
+    return sql, {"corte": corte, "win_ini": win_ini, "win_fin": win_fin,
+                 "scope": scope, "scope_label": scope_label}
 
 
 DATASET = {
     "key": "position_lifetime_summary",
     "label": "Position Lifetime — Vida promedio de la posición (Staffing)",
-    "dimensions": [],
+    "dimensions": [
+        {"key": "scope", "label": "Scope (all / active / closed)", "type": "string"},
+        {"key": "scope_label", "label": "Scope (etiqueta)", "type": "string"},
+    ],
     "measures": [
         {"key": "avg_months", "label": "Vida promedio (meses)", "type": "number"},
         {"key": "median_months", "label": "Mediana (meses)", "type": "number"},

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 
 from ._now import today_ar
-from ._position_chains import CHAIN_CTES, WINDOW_FILTER, lifetime_window
+from ._position_chains import CHAIN_CTES, WINDOW_FILTER, lifetime_window, scope_filter
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -37,12 +37,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or today_ar()
     )
     win_ini, win_fin = lifetime_window(filters, corte)
+    scope_sql, _scope = scope_filter(filters)
 
     sql = "WITH RECURSIVE " + CHAIN_CTES + """,
-        en_ventana AS (
+        en_ventana_full AS (
           SELECT p.*
           FROM posiciones p
 """ + WINDOW_FILTER + """
+        ),
+        -- Mismo scope que el summary (toggle Todas / Activas / Cerradas).
+        en_ventana AS (
+          SELECT * FROM en_ventana_full
+""" + scope_sql + """
         ),
         -- Quiénes ocuparon el asiento, en orden de entrada.
         ocupantes AS (
