@@ -63,6 +63,7 @@ def execute(run_id=None, trigger_source="cli", send_email=True, persist=True) ->
                     waived_count += 1
             meta["waived_count"] = waived_count
             store.finish_run(conn, run_id, status="ok", findings_total=len(findings),
+                             html_source=topo.source,
                              **{k: meta[k] for k in
                                 ("nodes_seen", "datasets_run", "datasets_failed", "elapsed_ms")})
 

@@ -32,16 +32,24 @@ def start_run(conn, trigger_source="cli", html_source=None) -> int:
 
 def finish_run(conn, run_id, *, status, nodes_seen=None, datasets_run=None,
                datasets_failed=None, elapsed_ms=None, findings_total=None,
-               error_text=None) -> None:
+               error_text=None, html_source=None) -> None:
+    """Cierra la corrida.
+
+    html_source se escribe aca y no al abrirla: el endpoint crea la fila antes
+    de saber de donde salio el HTML. Es el campo que delata si la auditoria
+    corrio contra el dashboard de produccion o contra una copia vieja del
+    contenedor, asi que no puede quedar nulo.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """UPDATE dashboard_audit_runs
                   SET finished_at = NOW(), status = %s, nodes_seen = %s,
                       datasets_run = %s, datasets_failed = %s, elapsed_ms = %s,
-                      findings_total = %s, error_text = %s
+                      findings_total = %s, error_text = %s,
+                      html_source = COALESCE(%s, html_source)
                 WHERE run_id = %s""",
             (status, nodes_seen, datasets_run, datasets_failed, elapsed_ms,
-             findings_total, error_text, run_id),
+             findings_total, error_text, html_source, run_id),
         )
 
 

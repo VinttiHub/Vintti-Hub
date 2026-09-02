@@ -187,16 +187,21 @@ def _rows_hash(rows) -> str:
 
 
 def _variants(base, node) -> dict:
-    """Contrastes de ventana, usando las perillas que la propia card declara.
+    """Contrastes de ventana, usando SOLO perillas que el dashboard manda de verdad.
 
-    Hay cuatro mecanismos de periodo conviviendo en el repo (`dias` del
-    window_bounds compartido, `window` de los _window_bounds locales, `periodo`
-    en Marketing y `meses` en las cohortes). Contrastar solo uno marcaria como
-    rotas a todas las cards que usan otro.
+    Nada de inventar parametros: `dias` lo entiende window_bounds() pero la UI
+    nunca lo envia (no esta en FILTER_KEYS de control-dashboard.js), asi que
+    contrastar con el marcaba como rotos a detalles que en pantalla cuadran
+    perfecto. Un hallazgo que el usuario no puede reproducir es ruido.
+
+    Se contrastan los cuatro mecanismos reales de periodo que conviven en el
+    repo: `mes`, `desde/hasta`, `window` y, donde aplican, `periodo` y `meses`.
     """
     out = {
-        "dias_7": {**base, "dias": "7"},
-        "dias_400": {**base, "dias": "400"},
+        "mes_a": {**base, "mes": "2026-07"},
+        "mes_b": {**base, "mes": "2026-08"},
+        "rango_a": {**base, "desde": "2026-01-01", "hasta": "2026-03-31"},
+        "rango_b": {**base, "desde": "2026-01-01", "hasta": "2026-12-31"},
         "win_week": {**base, "window": "week"},
         "win_30d": {**base, "window": "30d"},
     }
@@ -209,7 +214,7 @@ def _variants(base, node) -> dict:
     return out
 
 
-_PAIRS = (("dias_7", "dias_400"), ("win_week", "win_30d"),
+_PAIRS = (("mes_a", "mes_b"), ("rango_a", "rango_b"), ("win_week", "win_30d"),
           ("per_semana", "per_anio"), ("meses_1", "meses_12"))
 
 
