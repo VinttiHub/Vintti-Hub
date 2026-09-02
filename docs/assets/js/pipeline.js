@@ -855,7 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("🔹 opportunityId:", opportunityId)
             console.log("🔹 newStage:", mappedStage)
 
-            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
+            fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json'
@@ -934,7 +934,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
 
   try {
     console.log("Payload:", payload);
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1296,7 +1296,7 @@ function loadPipelineCandidates() {
   }
 
   // Hacer fetch al backend
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+  fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`)
     .then(response => response.json())
     .then(candidates => {
       console.log('🔵 Candidates:', candidates);
@@ -1317,6 +1317,11 @@ candidates.forEach(candidate => {
   card.className = 'candidate-card pipeline-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
   const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
+  // Mail de sign off ya enviado en esta vacante (el backend no lo vuelve a mandar).
+  const signoffSentAt = candidate.signoff_email_sent_at;
+  const signoffSentBadge = signoffSentAt
+    ? `<span class="signoff-sent-badge" title="Sign off enviado el ${new Date(signoffSentAt).toLocaleDateString()}">\u2709\u2713</span>`
+    : '';
   const isStarred = candidate.star === 'yes';
   const starClass = isStarred ? 'starred' : '';
   const rawBlacklist = candidate.is_blacklisted ?? candidate.blacklist;
@@ -1338,6 +1343,7 @@ card.innerHTML = `
       <div class="card-header-actions">
         <i class="fas fa-star star-icon ${starClass}" title="Star"></i>
         <div class="signoff-toggle">
+          ${signoffSentBadge}
           <label class="switch">
             <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
             <span class="slider round"></span>
@@ -1419,7 +1425,7 @@ decorateCandidateAssociations(card, candidate);
       const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
 
       if (confirm("Are you sure you want to remove this candidate from this pipeline?")) {
-        const deleteRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}`, {
+        const deleteRes = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}`, {
           method: 'DELETE'
         });
         if (deleteRes.ok) {
@@ -1437,7 +1443,7 @@ card.querySelector(".star-icon").addEventListener("click", async (e) => {
   const newStarValue = starIcon.classList.contains('starred') ? 'no' : 'yes';
 
   try {
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/star`, {
+    await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/star`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ star: newStarValue })
@@ -1456,7 +1462,7 @@ card.querySelector(".star-icon").addEventListener("click", async (e) => {
   const signOffValue = checkbox.checked ? "yes" : "no";
 
   try {
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/signoff`, {
+    await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/signoff`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sign_off: signOffValue }),

@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260827-cvbrand" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260902-signoff" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -793,26 +793,24 @@
 
       <label>To</label>
       <select id="signoff-to" multiple></select>
+      <p id="signoff-hint" class="signoff-note">Se preseleccionan los candidatos con el toggle de sign off activado. Se envía un mail individual a cada uno y <strong>XXX</strong> se reemplaza por su nombre.</p>
+      <p id="signoff-already-sent" class="signoff-note signoff-note--sent" hidden></p>
 
       <label>Subject</label>
       <input type="text" id="signoff-subject" value="Update on your application" />
 
       <label>Message</label>
-      <textarea id="signoff-message" style="height: 200px;">Dear applicant,
+      <textarea id="signoff-message" style="height: 200px;">Hii XXX! 🌟 I hope you're doing well.
 
-Thank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.
+I want to let you know that this time we've decided to move forward with another candidate for our search. But we'd love for you to continue participating in our processes, so I'm leaving you the link to our Career Site where you'll receive all our new job proposals 💪🏻:
 
-We truly appreciate your time and interest!
-If you'd like to share your experience with the selection process, here’s a short anonymous survey (under 3 minutes):
-🔗 https://tally.so/r/w7K859
+https://careers.vintti.com/
 
-Wishing you all the best in your journey! ✨
-Warmly,
-the Vintti team</textarea>
+Thank you very much for your time and we keep in touch for future positions 🫶🏻
 
-      <div style="margin-top: 10px;">
-        <button id="toggleLangBtn">Change Language</button>
-      </div>
+Additionally, here's a 100% anonymous survey for you to share your experience with the selection process at Vintti. It won't take more than 3 minutes, and it helps us immensely to make the candidate experience even better.
+
+https://tally.so/r/3lQE5o</textarea>
 
       <button id="sendSignOffBtn">Send</button>
     </div>
@@ -1099,8 +1097,8 @@ the Vintti team</textarea>
   <!-- Your app bundles -->
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
-  <script src="./assets/js/pipeline.js?v=20260723a-alex" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260827-cvbrand" defer></script>
+  <script src="./assets/js/pipeline.js?v=20260902-signoff3" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260902-signoff3" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->

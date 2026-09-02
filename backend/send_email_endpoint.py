@@ -5,7 +5,7 @@ import traceback
 import logging
 from flask import request, jsonify, make_response
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email
+from sendgrid.helpers.mail import Mail, Email, Cc
 import requests
 import logging
 import re
@@ -35,6 +35,39 @@ def _html_to_plain(html: str) -> str:
     s = re.sub(r'[ \t]+\n', '\n', s)
     s = re.sub(r'\n{3,}', '\n\n', s)
     return s.strip()
+
+def send_email_message(to_emails, subject, body, cc_emails=None):
+    """Envia un mail por SendGrid y devuelve el status code.
+
+    Extraido de /send_email para poder reusarlo desde otras rutas (p. ej. el
+    envio individual de sign-off). Levanta excepcion si falla.
+    """
+    if not to_emails or not subject or not body:
+        raise ValueError("Missing required fields (to/subject/body)")
+
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    if not api_key:
+        raise RuntimeError("SendGrid API Key not configured")
+
+    # Asegura HTML aunque venga texto plano (e.g., desde un <textarea>)
+    html_body = body if _looks_like_html(body) else _text_to_html(body)
+    plain_body = _html_to_plain(html_body)
+
+    message = Mail(
+        from_email=Email('hub@vintti-hub.com', name='Vintti HUB'),
+        to_emails=to_emails,
+        subject=subject,
+        plain_text_content=plain_body,
+        html_content=html_body,
+    )
+
+    for email in (cc_emails or []):
+        # Cc(), no Email(): sendgrid>=6 rechaza un Email genérico en add_cc.
+        message.add_cc(Cc(email))
+
+    response = SendGridAPIClient(api_key).send(message)
+    return response.status_code
+
 
 def register_send_email_route(app):
     @app.route("/send_email", methods=["POST", "OPTIONS"])
@@ -107,33 +140,12 @@ def register_send_email_route(app):
         try:
             logging.info("✉️ Construyendo mensaje...")
 
-            # Asegura HTML aunque te envíen texto plano (e.g., desde <textarea>)
-            if _looks_like_html(body):
-                html_body = body
-            else:
-                html_body = _text_to_html(body)
-
-            plain_body = _html_to_plain(html_body)
-
-            message = Mail(
-                from_email=Email('hub@vintti-hub.com', name='Vintti HUB'),
-                to_emails=to_emails,
-                subject=subject,
-                plain_text_content=plain_body,  # 👈 versión texto (mejora entregabilidad y preview)
-                html_content=html_body          # 👈 versión HTML con saltos y formato
-            )
-
-            for email in cc_emails:
-                message.add_cc(Email(email))  
-
             api_key = os.environ.get('SENDGRID_API_KEY')
             if not api_key:
                 logging.error("🛑 No se encontró SENDGRID_API_KEY en las variables de entorno")
                 return jsonify({"error": "SendGrid API Key not configured"}), 500
             logging.info(f"🔐 API Key detectada (comienza con {api_key[:5]}...)")
 
-            # ENVÍO REAL (descomenta esta línea para pruebas reales)
-            sg = SendGridAPIClient(api_key)
             logging.info("🚀 Enviando correo con SendGrid...")
             try:
                 logging.info("🌐 Probing SendGrid API connectivity...")
@@ -143,11 +155,10 @@ def register_send_email_route(app):
                 logging.error("❌ Fallo al conectar a SendGrid directamente")
                 logging.exception(e)
 
-            response = sg.send(message)
-            logging.info("✅ Envío exitoso. Status: %s", response.status_code)
-            logging.info("📨 Headers de SendGrid: %s", dict(response.headers))
+            status_code = send_email_message(to_emails, subject, body, cc_emails)
+            logging.info("✅ Envío exitoso. Status: %s", status_code)
 
-            resp = jsonify({"status": "Email sent", "code": response.status_code})
+            resp = jsonify({"status": "Email sent", "code": status_code})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             return resp

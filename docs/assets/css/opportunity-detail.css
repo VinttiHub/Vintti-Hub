@@ -5328,6 +5328,29 @@ input:checked + .slider::before {
 #pipeline .pipeline-card .signoff-toggle {
   position: static;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Badge de "sign off ya enviado" al lado del toggle de la tarjeta. */
+#pipeline .pipeline-card .signoff-sent-badge {
+  font-size: 11px;
+  line-height: 1;
+  color: #6d4aff;
+  cursor: default;
+}
+
+/* Notas del modal Send Rejection Email. */
+#signOffPopup .signoff-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+#signOffPopup .signoff-note--sent {
+  color: #6d4aff;
 }
 
 #pipeline .pipeline-card .switch {

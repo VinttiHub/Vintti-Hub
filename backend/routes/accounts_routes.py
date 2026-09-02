@@ -28,6 +28,12 @@ from utils.credit_loop import (
     update_credit_status,
 )
 from utils.hire_state import clear_stale_hire_for_opportunity
+from utils.transactional_email import post_transactional_email
+from utils.signoff_email import (
+    ensure_signoff_sent_column,
+    personalize_signoff_body,
+    signoff_sent_column_exists,
+)
 from utils.hr_lead_todo import create_assignment_todo, create_replacement_todo, create_stage_todos
 from utils.storage_utils import (
     get_account_pdf_keys,
@@ -1285,8 +1291,17 @@ def get_candidates_by_opportunity(opportunity_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        # La columna la crea la migración 20260902 (o el propio endpoint de
+        # envío). Acá sólo se lee, así que se consulta el catálogo en vez de
+        # hacer un ADD COLUMN en el path de lectura.
+        signoff_sent_col = (
+            "oc.signoff_email_sent_at"
+            if signoff_sent_column_exists(cursor)
+            else "NULL::timestamptz AS signoff_email_sent_at"
+        )
+
+        cursor.execute(f"""
             SELECT 
                 c.candidate_id,
                 c.name,
@@ -1308,6 +1323,7 @@ def get_candidates_by_opportunity(opportunity_id):
                     'Contactado'
                 ) AS stage,
                 oc.sign_off,
+                {signoff_sent_col},
                 oc.star
             FROM candidates c
             INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
@@ -1765,6 +1781,115 @@ def update_signoff_status(opportunity_id, candidate_id):
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/opportunities/<int:opportunity_id>/signoff-emails', methods=['POST'])
+def send_signoff_emails(opportunity_id):
+    """Manda el mail de sign off, uno por candidato, y deja registro.
+
+    Un mail por destinatario (no un solo mail con todos en el `to`, que haria
+    que cada candidato rechazado vea las direcciones de los demas) y con el
+    placeholder XXX del template reemplazado por su nombre.
+
+    Se saltea a quien ya recibio el sign off EN ESTA vacante
+    (`opportunity_candidates.signoff_email_sent_at`).
+    """
+    data = request.get_json(silent=True) or {}
+    raw_ids = data.get('candidate_ids') or []
+    subject = (data.get('subject') or '').strip()
+    body = data.get('body') or ''
+
+    candidate_ids = []
+    for cid in raw_ids:
+        try:
+            candidate_ids.append(int(cid))
+        except (TypeError, ValueError):
+            continue
+
+    if not candidate_ids:
+        return jsonify({'error': 'candidate_ids is required'}), 400
+    if not subject or not body.strip():
+        return jsonify({'error': 'subject and body are required'}), 400
+
+    result = {'sent': [], 'skipped': [], 'no_email': [], 'failed': []}
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            ensure_signoff_sent_column(cur)
+            conn.commit()
+
+            cur.execute("""
+                SELECT c.candidate_id,
+                       c.name,
+                       c.email,
+                       oc.signoff_email_sent_at
+                  FROM candidates c
+                  INNER JOIN opportunity_candidates oc
+                          ON oc.candidate_id = c.candidate_id
+                 WHERE oc.opportunity_id = %s
+                   AND c.candidate_id = ANY(%s)
+            """, (opportunity_id, candidate_ids))
+            rows = cur.fetchall()
+
+        for row in rows:
+            cid = row['candidate_id']
+            name = row['name'] or ''
+            email = (row['email'] or '').strip()
+            entry = {'candidate_id': cid, 'name': name, 'email': email}
+
+            if row['signoff_email_sent_at']:
+                result['skipped'].append(entry)
+                continue
+            if '@' not in email:
+                result['no_email'].append(entry)
+                continue
+
+            try:
+                # Va por el /send_email FIJO de produccion (post_transactional_email),
+                # no por SendGrid directo: el backend corriendo local no llega a
+                # SendGrid (CERTIFICATE_VERIFY_FAILED del interceptor TLS de la
+                # maquina). Mismo patron que reminders / reference feedback.
+                sent = post_transactional_email(
+                    [email],
+                    subject,
+                    personalize_signoff_body(body, name),
+                    f'signoff opp {opportunity_id} cand {cid}',
+                )
+                if not sent.get('sent'):
+                    raise RuntimeError(f"/send_email respondio {sent.get('status_code')}")
+            except Exception as e:
+                logging.exception("🧨 Fallo el sign off de %s (%s)", cid, email)
+                result['failed'].append(dict(entry, error=str(e)))
+                continue
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE opportunity_candidates
+                       SET signoff_email_sent_at = NOW(),
+                           sign_off = 'yes'
+                     WHERE opportunity_id = %s AND candidate_id = %s
+                """, (opportunity_id, cid))
+            conn.commit()
+            result['sent'].append(entry)
+
+        found = {r['candidate_id'] for r in rows}
+        for cid in candidate_ids:
+            if cid not in found:
+                result['failed'].append({
+                    'candidate_id': cid,
+                    'error': 'candidate not in this opportunity',
+                })
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print("❌ ERROR EN POST /opportunities/<id>/signoff-emails")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @bp.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/star', methods=['PATCH'])
 def update_candidate_star(opportunity_id, candidate_id):
