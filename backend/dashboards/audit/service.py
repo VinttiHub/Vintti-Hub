@@ -6,7 +6,6 @@ base ni mail) mientras se calibran las reglas, que es como conviene iterar.
 from __future__ import annotations
 
 import logging
-import os
 import time
 
 from . import report, store
@@ -14,11 +13,10 @@ from .runner import run as run_audit
 
 log = logging.getLogger(__name__)
 
-RECIPIENTS = [
-    e.strip() for e in
-    os.environ.get("DASHBOARD_AUDIT_RECIPIENTS", "pgonzales@vintti.com").split(",")
-    if e.strip()
-]
+# Decision de la owner: el reporte va SIEMPRE y SOLO a pgonzales. Sin env var
+# de por medio, para que una variable mal seteada no lo mande a otro lado ni
+# sume destinatarios de mas.
+RECIPIENTS = ["pgonzales@vintti.com"]
 
 
 def execute(run_id=None, trigger_source="cli", send_email=True, persist=True) -> dict:
