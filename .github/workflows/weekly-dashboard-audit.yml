@@ -1,0 +1,20 @@
+name: Weekly dashboard audit
+
+# Audita todas las metricas del dashboard y manda por mail las inconsistencias.
+# Solo dispara: la corrida tarda varios minutos y el backend responde 202,
+# asi que este job falla unicamente si el auditor no pudo ARRANCAR.
+on:
+  schedule:
+    - cron: "0 11 * * 1"      # lunes 11:00 UTC = 08:00 Argentina / 05:00 Guatemala
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar la auditoria
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/dashboards/audit/run?trigger=cron"

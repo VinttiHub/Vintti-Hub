@@ -71,6 +71,36 @@ Third-party clients and helpers are grouped under `backend/utils/` and `backend/
 
 - Don´t work on the frontend file, everything that is related to React, Do not touch the files
 
+## Dashboard metrics audit
+
+`backend/dashboards/audit/` recalcula cada número que muestra `docs/dashboard.html` y
+verifica invariantes que antes sólo se detectaban a ojo. Corre los lunes vía
+`.github/workflows/weekly-dashboard-audit.yml` → `POST /dashboards/audit/run` (202 +
+hilo; la corrida tarda ~6 min y gunicorn corta a los 300s) → mail con los hallazgos.
+
+```bash
+cd backend
+python -m dashboards.audit                      # en seco: no escribe ni manda mail
+python -m dashboards.audit --tab sales          # una pestaña
+python -m dashboards.audit --local-html         # usar docs/ del repo en vez de prod
+```
+
+Cómo funciona: `topology.py` parsea el HTML (los 1219 nodos `data-chart` declaran
+chart, columna, `data-reduce` y overrides), `reduce.py` es un **port 1:1** de
+`reduce()` de `control-dashboard.js:873` — si tocás uno, tocá el otro o el auditor
+valida contra una semántica que ya no existe. `runner.py` deduplica a ~316 queries y
+las corre **secuencialmente sobre una conexión** (RDS tiene `max_connections=81` y
+prod ya usa ~60 en pico).
+
+Para el triage: `GET /dashboards/audit/last` devuelve cada hallazgo con
+`source_file` (el módulo del dataset) y `html_line`, así se va directo al archivo.
+Un hallazgo aceptado se silencia con `POST /dashboards/audit/waivers`; se sigue
+guardando, sólo no aparece en el mail.
+
+Requiere la migración `backend/sql/20260902_dashboard_audit.sql` corrida a mano y las
+env `DASHBOARD_AUDIT_TOKEN` (App Runner + secret de GitHub) y opcional
+`DASHBOARD_AUDIT_RECIPIENTS`.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):
