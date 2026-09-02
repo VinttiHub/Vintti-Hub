@@ -173,8 +173,8 @@ def _row_limit_findings(ctx, execs) -> list:
         seen.add(ex.comp_key)
         out.append(R.Finding(
             rule="row_limit_hit", severity=R.CRITICAL,
-            message=f"El dataset devolvio {ROW_LIMIT} filas: el executor lo trunco, "
-                    "asi que los conteos y sumas de esta card estan por debajo del real",
+            message=f"La lista se corto en {ROW_LIMIT} filas, asi que el numero que "
+                    "muestra esta card es menor al real",
             observed=f"{ROW_LIMIT} filas (techo)", expected=f"< {ROW_LIMIT} filas",
             **ctx._base(node, ex),
         ))

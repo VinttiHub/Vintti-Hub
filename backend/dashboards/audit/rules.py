@@ -112,8 +112,9 @@ def r01_dataset_error(ctx) -> list:
         missing = ex.dataset_key is None
         out.append(Finding(
             rule="dataset_error", severity=CRITICAL,
-            message=("El chart no existe en dashboard_charts (la card queda vacia)"
-                     if missing else f"El dataset falla al ejecutarse: {ex.error}"),
+            message=("Esta card no esta conectada a ningun dato: se ve vacia siempre"
+                     if missing else "Esta card no carga: la consulta que la alimenta "
+                                     "esta fallando"),
             observed=ex.error, expected="ejecuta sin error",
             **ctx._base(node, ex),
         ))
@@ -141,7 +142,8 @@ def r02_field_missing(ctx) -> list:
             seen.add(key)
             out.append(Finding(
                 rule="field_missing", severity=CRITICAL,
-                message=f"La card lee '{fld}' pero el dataset no devuelve esa columna",
+                message=(f"La card busca un dato que ya no existe con ese nombre "
+                     f"('{fld}'), asi que queda en blanco"),
                 observed=f"columnas: {', '.join(sorted(ex.columns))[:200]}",
                 expected=f"'{fld}' presente",
                 **{**ctx._base(node, ex), "field": fld},
@@ -171,14 +173,17 @@ def r03_empty_rows(ctx) -> list:
         kpis = [n for n in nodes if n.bind == "text" and n.reduce not in ("count", "count-distinct")]
         declares_empty = any(n.empty_text for n in nodes)
         if kpis and not declares_empty:
-            sev, why = HIGH, "un KPI queda en blanco"
+            sev = HIGH
+            msg = "No hay ningun dato en este periodo, asi que el numero queda en blanco"
         elif declares_empty:
-            sev, why = LOW, "la lista declara data-empty-text, puede estar vacia por diseno"
+            sev = LOW
+            msg = ("La lista esta vacia en este periodo. Puede ser normal: la pantalla "
+                   "ya contempla que no haya movimiento")
         else:
-            sev, why = MEDIUM, "la lista queda vacia"
+            sev = MEDIUM
+            msg = "La lista no tiene nada para mostrar en este periodo"
         out.append(Finding(
-            rule="empty_rows", severity=sev,
-            message=f"El dataset no devuelve filas: {why}",
+            rule="empty_rows", severity=sev, message=msg,
             observed="0 filas", expected="al menos 1 fila",
             **ctx._base(nodes[0], ex),
         ))
@@ -211,9 +216,9 @@ def r04_blank_value(ctx) -> list:
             # Es un bug del HTML, no de la metrica, y tiene arreglo directo.
             out.append(Finding(
                 rule="blank_value", severity=HIGH,
-                message=(f"La card muestra '—' pero el dato existe: '{node.field}' es "
-                         f"texto y el nodo usa data-fmt=\"{node.fmt}\". "
-                         'Falta data-fmt="raw".'),
+                message=(f"Muestra un guion donde deberia decir \u00ab{val}\u00bb. "
+                         f"El dato existe, pero la pantalla lo esta tratando como si "
+                         f"fuera un numero y no un texto"),
                 observed=repr(val), expected="el texto renderizado",
                 **ctx._base(node, ex),
             ))
@@ -226,11 +231,19 @@ def r04_blank_value(ctx) -> list:
         )
         if zero_denom:
             sev = LOW
-            msg = (f"La card muestra '—' porque no hay datos en la ventana "
-                   f"('{zero_denom}' = 0)")
+            msg = ("Muestra un guion porque no hubo movimiento en este periodo. "
+                   "No es un error")
+        elif node.fmt in _PERCENT_FMTS:
+            # Un porcentaje nulo es, casi siempre, la guarda NULLIF(den, 0) que
+            # usa todo el repo: no hubo base para calcularlo en el periodo.
+            # Sigue valiendo la pena verlo (puede ser que la base este mal
+            # armada), pero no es lo mismo que una metrica rota.
+            sev = MEDIUM
+            msg = ("No se puede calcular este porcentaje: no hubo casos en el "
+                   "periodo sobre los cuales sacarlo")
         else:
             sev = HIGH
-            msg = f"La card muestra '—': '{node.field}' vino nulo"
+            msg = "Este numero llega vacio cuando deberia traer un valor"
         out.append(Finding(
             rule="blank_value", severity=sev, message=msg,
             observed=repr(val), expected="un valor numerico",
@@ -253,14 +266,17 @@ def r05_pct_out_of_range(ctx) -> list:
         if val > 100 and elastic and val <= 1000:
             continue
         if val > 1000:
-            sev, why = CRITICAL, "casi siempre es una fraccion tratada como porcentaje"
+            sev = CRITICAL
+            msg = (f"Este porcentaje da {val:.0f}%. Parece que se esta mostrando una "
+                   f"fraccion como si fuera un porcentaje")
         elif val < 0:
-            sev, why = HIGH, "un porcentaje no puede ser negativo"
+            sev = HIGH
+            msg = f"Este porcentaje da negativo ({val:.2f}%), y eso no puede ser"
         else:
-            sev, why = HIGH, "deberia estar entre 0% y 100%"
+            sev = HIGH
+            msg = f"Este porcentaje da {val:.2f}%, o sea mas de 100%. No tiene sentido"
         out.append(Finding(
-            rule="pct_out_of_range", severity=sev,
-            message=f"Porcentaje fuera de rango: {val:.2f}% ({why})",
+            rule="pct_out_of_range", severity=sev, message=msg,
             observed=f"{val:.2f}%", expected="entre 0% y 100%",
             **ctx._base(node),
         ))
@@ -281,7 +297,8 @@ def r07_negative_count(ctx) -> list:
             continue
         out.append(Finding(
             rule="negative_count", severity=HIGH,
-            message=f"Conteo negativo: {val:g}",
+            message=(f"Esta contando en negativo ({val:g}). Un conteo no puede dar "
+                     f"menos de cero"),
             observed=f"{val:g}", expected=">= 0",
             **ctx._base(node),
         ))
@@ -323,8 +340,10 @@ def r08_hero_vs_detail(ctx) -> list:
         out.append(Finding(
             rule="hero_vs_detail", severity=CRITICAL if strong else LOW,
             message=(
-                f"El drawer muestra {hero_val:g} pero su detalle da {det_val:g}"
-                + ("" if strong else " (par inferido: verificar que sean la misma metrica)")
+                f"El numero grande dice {hero_val:g}, pero al abrir el detalle da "
+                f"{det_val:g}. No coinciden"
+                + ("" if strong else ". Puede que no sean exactamente la misma metrica, "
+                   "conviene confirmarlo")
             ),
             observed=f"hero {hero_val:g} vs detalle {det_val:g}",
             expected="mismo valor",
@@ -437,8 +456,8 @@ def r06_ratio_inverted(ctx) -> list:
                     continue
                 out.append(Finding(
                     rule="ratio_inverted", severity=HIGH,
-                    message=(f"El numerador supera al denominador: "
-                             f"{num_col}={a:g} > {den_col}={b:g}"),
+                    message=(f"La parte es mas grande que el total: {a:g} de {b:g}. "
+                             f"No tiene sentido"),
                     observed=f"{a:g} / {b:g}", expected=f"{num_col} <= {den_col}",
                     **{**ctx._base(node, ex), "field": num_col},
                 ))
@@ -470,7 +489,8 @@ def r11_mix_not_100(ctx) -> list:
                 continue
             out.append(Finding(
                 rule="mix_not_100", severity=HIGH,
-                message=f"{a_col} + {b_col} = {total:.2f}%, deberia dar 100%",
+                message=(f"Estos dos porcentajes tendrian que sumar 100% entre los dos "
+                         f"y suman {total:.2f}%"),
                 observed=f"{a:.2f}% + {b:.2f}% = {total:.2f}%", expected="100%",
                 **{**ctx._base(node, ex), "field": f"{a_col}+{b_col}"},
             ))
@@ -482,11 +502,14 @@ _ID_COL = re.compile(r"_id$|^id$")
 
 
 def r14_duplicate_rows(ctx) -> list:
-    """Filas repetidas en un detalle: inflan el contador del drawer.
+    """Filas indistinguibles en un detalle del drawer.
 
     Solo se mira la fila COMPLETA duplicada. Repetir una entidad es legitimo
-    (un candidato con dos colocaciones); repetir la fila entera casi siempre es
-    un JOIN mal cardinalizado.
+    (un candidato con dos colocaciones), pero dos filas identicas caracter por
+    caracter tienen dos causas posibles y hay que abrir el caso para saber cual:
+    un JOIN mal cardinalizado que infla el conteo, o dos entidades reales
+    distintas que el detalle no muestra con suficiente columna como para
+    distinguirlas. Por eso no se afirma que el numero este mal.
     """
     out, seen = [], set()
     for node in ctx.topo.nodes:
@@ -501,10 +524,13 @@ def r14_duplicate_rows(ctx) -> list:
         if not dupes:
             continue
         out.append(Finding(
-            rule="duplicate_detail_rows", severity=HIGH,
-            message=(f"El detalle trae {dupes} fila(s) duplicada(s) de "
-                     f"{len(ex.rows)}: el contador del drawer queda inflado"),
-            observed=f"{dupes} duplicadas", expected="sin duplicados",
+            rule="duplicate_detail_rows", severity=MEDIUM,
+            message=(f"En el detalle hay {dupes} "
+                     + ("fila repetida" if dupes == 1 else "filas repetidas")
+                     + f" de {len(ex.rows)}. O esta contando de mas, o son cosas "
+                     "distintas que en pantalla no se pueden diferenciar"),
+            observed=f"{dupes} fila(s) identica(s)",
+            expected="cada fila distinguible de las demas",
             **ctx._base(node, ex),
         ))
     return out
@@ -547,7 +573,8 @@ def r13_stale_data(ctx, max_days=60) -> list:
             continue
         out.append(Finding(
             rule="stale_data", severity=MEDIUM,
-            message=f"El dato mas nuevo es de hace {age} dias ({col} = {newest})",
+            message=(f"El dato mas nuevo es del {newest}, hace {age} dias. Puede que "
+                     f"haya dejado de actualizarse"),
             observed=f"{newest} ({age}d)", expected=f"< {max_days} dias",
             **{**ctx._base(node, ex), "field": col},
         ))
@@ -566,7 +593,7 @@ def r16_slow_query(ctx, threshold_ms=10000) -> list:
             continue
         out.append(Finding(
             rule="slow_query", severity=LOW,
-            message=f"El dataset tarda {ex.elapsed_ms / 1000:.1f}s en responder",
+            message=f"Esta card tarda {ex.elapsed_ms / 1000:.1f} segundos en cargar",
             observed=f"{ex.elapsed_ms}ms", expected=f"< {threshold_ms}ms",
             **ctx._base(node, ex),
         ))
@@ -592,9 +619,9 @@ def r09_detail_ignores_window(ctx) -> list:
         node = info["node"]
         out.append(Finding(
             rule="detail_ignores_window", severity=CRITICAL,
-            message=(f"El KPI de la card cambia al mover la ventana pero su detalle "
-                     f"devuelve siempre las mismas {info['rows']} filas: el drawer no "
-                     f"esta filtrando por periodo y no cuadra con la card"),
+            message=(f"Al cambiar el filtro de fechas el numero de la card cambia, "
+                     f"pero el detalle sigue mostrando siempre las mismas "
+                     f"{info['rows']} filas. El detalle no esta respetando el filtro"),
             observed=f"KPI ({info['kpi']}) se mueve, detalle no",
             expected="distinta cantidad de filas segun la ventana",
             **{**ctx._base(node), "dataset_key": dataset_key},

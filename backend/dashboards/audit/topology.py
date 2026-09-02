@@ -69,6 +69,11 @@ CONTAINER_HINTS = (
 )
 
 
+_TITLE_SET = frozenset(TITLE_CLASSES)
+_LABEL_SET = frozenset(LABEL_CLASSES)
+_CONTAINER_SET = frozenset(CONTAINER_HINTS)
+
+
 @dataclass
 class Node:
     """Un elemento del HTML que pide datos y pinta un numero."""
@@ -106,9 +111,18 @@ class Node:
         return self.chart_key + "?" + "&".join(f"{k}={v}" for k, v in items)
 
     def where(self) -> str:
-        """Ubicacion legible para el reporte: pestana, card y que numero es."""
-        bits = [b for b in (self.tab, self.panel_title or self.card_title, self.label) if b]
+        """Titulo de la card y que numero de esa card es, tal como se leen en pantalla.
+
+        Sin la pestana: el reporte la muestra aparte y con el nombre real de la
+        barra de navegacion, no con el slug interno.
+        """
+        bits = [b for b in (self.panel_title or self.card_title, self.label) if b]
         return " · ".join(bits) or self.chart_key
+
+    @property
+    def in_drawer(self) -> bool:
+        """El numero vive dentro del panel de detalle, no en la card de la pestana."""
+        return self.panel is not None
 
 
 class _Frame:
@@ -158,7 +172,7 @@ class _DashboardParser(HTMLParser):
     def _title_owner(self):
         """Contenedor de card al que pertenece un titulo (saltea el wrapper __head)."""
         for f in reversed(self.stack):
-            if any(h in f.classes for h in CONTAINER_HINTS):
+            if _class_tokens(f.classes) & _CONTAINER_SET:
                 return f
         return self.stack[-1] if self.stack else None
 
@@ -207,17 +221,18 @@ class _DashboardParser(HTMLParser):
                 corte_field=a.get("data-corte-field"),
                 month_aware=a.get("data-month-aware") if "data-month-aware" in a else None,
                 empty_text=a.get("data-empty-text"),
-                is_hero="kpi-drawer__hero__value" in classes,
+                is_hero="kpi-drawer__hero__value" in _class_tokens(classes),
                 line=line,
                 _ancestors=list(self.stack) + [frame],
             ))
 
         # El texto del titulo/label se junta hasta que cierre SU tag, pero se
         # cuelga del contenedor (titulo) o del padre inmediato (label).
-        if any(c in classes for c in TITLE_CLASSES):
+        tokens = _class_tokens(classes)
+        if tokens & _TITLE_SET:
             self._flush_capture()
             self._capture = (self._title_owner(), "title", frame)
-        elif any(c in classes for c in LABEL_CLASSES):
+        elif tokens & _LABEL_SET:
             self._flush_capture()
             self._capture = (self.stack[-1] if self.stack else None, "label", frame)
 
@@ -246,6 +261,17 @@ class _DashboardParser(HTMLParser):
     def handle_data(self, data):
         if self._capture:
             self._buf.append(data)
+
+
+def _class_tokens(classes: str) -> set:
+    """Clases como tokens exactos.
+
+    Comparar por substring rompia el titulo de casi todas las cards: el hint
+    "skpi-tile" matcheaba tambien a "skpi-tile__head", asi que el titulo se
+    colgaba del wrapper del encabezado en vez de la card, y los numeros
+    hermanos nunca lo encontraban como ancestro.
+    """
+    return set(classes.split())
 
 
 def _resolve(parser: _DashboardParser) -> None:

@@ -84,12 +84,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           (SELECT ROUND(AVG(days))::int FROM base) AS promedio_dias,
           (SELECT COUNT(*)::int FROM base)         AS deal_count,
-          (SELECT dias FROM agg WHERE channel='sales')     AS sales_dias,
-          (SELECT cnt  FROM agg WHERE channel='sales')     AS sales_count,
-          (SELECT dias FROM agg WHERE channel='marketing') AS mkt_dias,
-          (SELECT cnt  FROM agg WHERE channel='marketing') AS mkt_count,
-          (SELECT dias FROM agg WHERE channel='referrals') AS ref_dias,
-          (SELECT cnt  FROM agg WHERE channel='referrals') AS ref_count,
+          -- Los `dias` son promedios: si el canal no tuvo deals en la ventana no
+          -- hay nada que promediar y el NULL (que la card pinta como '—') es la
+          -- respuesta correcta. Los `count` no: cero deals es 0, y sin el
+          -- COALESCE la subconsulta escalar sobre un `agg` sin esa fila devuelve
+          -- NULL y la card muestra '—' como si el dato no existiera.
+          (SELECT dias FROM agg WHERE channel='sales')             AS sales_dias,
+          COALESCE((SELECT cnt FROM agg WHERE channel='sales'), 0) AS sales_count,
+          (SELECT dias FROM agg WHERE channel='marketing')             AS mkt_dias,
+          COALESCE((SELECT cnt FROM agg WHERE channel='marketing'), 0) AS mkt_count,
+          (SELECT dias FROM agg WHERE channel='referrals')             AS ref_dias,
+          COALESCE((SELECT cnt FROM agg WHERE channel='referrals'), 0) AS ref_count,
           (CASE (SELECT channel FROM agg WHERE cnt > 0 ORDER BY dias ASC, cnt DESC LIMIT 1)
              WHEN 'sales' THEN 'Sales'
              WHEN 'referrals' THEN 'Referrals'

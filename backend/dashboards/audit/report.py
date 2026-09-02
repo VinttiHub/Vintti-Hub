@@ -26,10 +26,30 @@ MAX_ROWS = 60
 
 _MESES = ("ene", "feb", "mar", "abr", "may", "jun",
           "jul", "ago", "sep", "oct", "nov", "dic")
+# Nombre de cada pestana tal como se lee en la barra del dashboard. El reporte
+# nunca muestra el slug interno (growth-new, ops): quien lee el mail tiene que
+# poder ir a la pestana sin traducir nada.
 TAB_LABEL = {
     "sales": "Sales", "ops": "Operations", "am": "Account Management",
     "growth-new": "Management Dashboard", "marketing": "Marketing",
 }
+# Los paneles del drawer viven fuera de las pestanas en el HTML, asi que algunos
+# hallazgos no tienen pestana propia. El prefijo del chart_key la delata.
+PREFIX_TAB = {
+    "sa": "Sales", "ae": "Sales", "gr": "Management Dashboard",
+    "mg": "Management Dashboard", "am": "Account Management",
+    "op": "Operations", "mk": "Marketing",
+}
+
+
+def _location(f) -> str:
+    """Pestana (y si el numero esta dentro del detalle) para el subtitulo."""
+    tab = TAB_LABEL.get(f.tab or "")
+    if not tab:
+        tab = PREFIX_TAB.get((f.chart_key or "").split("_")[0], "")
+    if f.panel:
+        return f"{tab} · dentro del detalle" if tab else "Dentro del detalle"
+    return tab
 
 
 def _esc(v) -> str:
@@ -72,12 +92,11 @@ def _findings_table(findings, status) -> str:
             fp_state = status.get(getattr(f, "_fp", ""), "")
             badge = ('<span style="color:#ff1fdb;font-weight:700;">NUEVO</span> '
                      if fp_state == "new" else "")
-            tab = TAB_LABEL.get(f.tab or "", f.tab or "")
             rows.append(f"""
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;vertical-align:top;width:34%;">
             <div style="font-weight:600;color:#111927;">{badge}{_esc(f.where or f.chart_key)}</div>
-            <div style="font-size:12px;color:#8a94a6;margin-top:2px;">{_esc(tab)}</div>
+            <div style="font-size:12px;color:#8a94a6;margin-top:2px;">{_esc(_location(f))}</div>
           </td>
           <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;vertical-align:top;color:#243B53;">
             <div>{_esc(f.message)}</div>
