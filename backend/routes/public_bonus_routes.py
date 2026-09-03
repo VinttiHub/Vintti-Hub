@@ -12,8 +12,8 @@ from sendgrid.helpers.mail import Mail, Email
 
 bp = Blueprint("public_bonus", __name__, url_prefix="/public/bonus_request")
 
-BONUS_EMAIL_FALLBACK_RECIPIENTS = ["agustin@vintti.com", "lara@vintti.com", "pgonzales@vintti.com"]
-BONUS_EMAIL_RECIPIENT_USER_IDS = [1, 2, 12]
+BONUS_EMAIL_FALLBACK_RECIPIENTS = ["agustin@vintti.com", "lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com"]
+BONUS_EMAIL_RECIPIENT_USER_IDS = [1, 2, 6, 12]
 
 def _safe_date(s):
     if not s: return None
@@ -271,7 +271,7 @@ def submit_bonus_request():
         bonus_email_recipients = _resolve_bonus_email_recipients(cur)
 
 
-        TODO_OWNER_USER_IDS = [1, 2]
+        TODO_OWNER_USER_IDS = [1, 2, 6]
 
         if payout_date:
             auto_marker = f"[AUTO:bonus_request:{bonus_request_id}]"
