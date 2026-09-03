@@ -767,7 +767,7 @@
       '<div class="stf-section-label">Filled in by hand</div>' +
       selectField("Platform", "platform", ["", "Deel", "Ontop", "Bank Account"], row.platform) +
       selectField("Performance", "performance",
-        ["", "Performing", "Under review", "Onboarding", "Salary review", "Computer repair"], row.performance) +
+        ["", "Performing", "Feedback", "Under review", "Onboarding", "Salary review", "Computer repair"], row.performance) +
       selectField("Provider", "provider", ["", "Quipteams", "Onbordea"], row.provider) +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
       '<div class="stf-section-label">From the Hub</div>' +
