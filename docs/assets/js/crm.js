@@ -1186,10 +1186,32 @@ function initHubSpotSyncButton() {
       }
 
       const created = Number(payload.created || 0);
-      const linked = Number(payload.linked || payload.updated || 0);
-      const errors = Array.isArray(payload.errors) ? payload.errors.length : 0;
-      alert(`HubSpot sync complete. Created: ${created}. Linked existing: ${linked}. Errors: ${errors}.`);
-      window.location.reload();
+      const linked = Number(payload.linked || 0) + Number(payload.updated || 0);
+      // El backend siempre mando los mensajes completos en payload.errors; antes se
+      // mostraba solo el numero y el reload de abajo borraba la consola, asi que para
+      // saber que habia fallado habia que ir a CloudWatch.
+      const errorList = Array.isArray(payload.errors) ? payload.errors : [];
+
+      const head = `HubSpot sync complete. Created: ${created}. Linked existing: ${linked}. Errors: ${errorList.length}.`;
+      if (!errorList.length) {
+        alert(head);
+        window.location.reload();
+        return;
+      }
+
+      console.group(`HubSpot sync: ${errorList.length} errors`);
+      console.table(errorList);
+      console.groupEnd();
+
+      const detail = errorList.slice(0, 3)
+        .map(e => `• ${e.client_name || e.contact_id || e.deal_id || '?'}: ${e.error}`)
+        .join('\n');
+      const more = errorList.length > 3
+        ? `\n(+${errorList.length - 3} more — see the browser console)`
+        : '';
+      // A proposito NO se recarga cuando hubo errores: el reload borraria la tabla
+      // de la consola, que es justamente donde esta el detalle.
+      alert(`${head}\n\nFirst errors:\n${detail}${more}\n\nThe page was NOT reloaded so the console keeps the full list. Refresh manually when you are done.`);
     } catch (err) {
       console.error('HubSpot sync failed:', err);
       alert(`HubSpot sync failed: ${err.message || err}`);

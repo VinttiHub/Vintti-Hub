@@ -1,6 +1,7 @@
 import os
 import time
 from datetime import datetime, timezone
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 
@@ -253,9 +254,52 @@ def employee_size_bucket(value):
     return "+500"
 
 
+# Prefijos de parametros de tracking (Google Ads, UTM, Facebook, Bing, HubSpot).
+TRACKING_QUERY_PREFIXES = (
+    "gad_", "gclid", "gbraid", "wbraid", "utm_", "fbclid", "msclkid", "hsa_", "_hs",
+)
+
+
+def strip_tracking_params(url):
+    """Saca la cola de tracking de una URL y deja la direccion util.
+
+    HubSpot guarda el website tal como lo tipeo el lead, y a veces eso es la URL de
+    una campana: 213 caracteres de ?gad_source=...&gclid=... . `account.website` es
+    varchar(128), asi que ese valor hace fallar el INSERT/UPDATE. Recortar a lo bruto
+    dejaria un gclid cortado al medio (una URL que no abre); lo que sirve es sacar los
+    parametros de tracking.
+    """
+    raw = str(url or "").strip()
+    if not raw or "?" not in raw:
+        return raw
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return raw
+    kept = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not key.lower().startswith(TRACKING_QUERY_PREFIXES)
+    ]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
+
+
+def clip(value, limit):
+    """Recorta `value` a `limit` caracteres.
+
+    Varias columnas de `account` son varchar angostos (website=128, client_name=50...).
+    Un valor mas largo tira StringDataRightTruncation y aborta la transaccion. Ver
+    ACCOUNT_COLUMN_LIMITS en routes/hubspot_routes.py.
+    """
+    if value is None or limit is None:
+        return value
+    text = str(value)
+    return text[:limit] if len(text) > limit else value
+
+
 def normalize_website(company_props):
     website = (company_props.get("website") or company_props.get("domain") or "").strip()
-    return website
+    return strip_tracking_params(website)
 
 
 def normalize_account_name_from_deal(value):

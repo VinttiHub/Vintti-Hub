@@ -13,12 +13,31 @@ from utils.hubspot import (
     HubSpotError,
     association_ids,
     build_account_payload,
+    clip,
     comma_env,
     hubspot_datetime_to_ms,
+    strip_tracking_params,
 )
 
 
 bp = Blueprint("hubspot", __name__)
+
+# Anchos REALES de las columnas angostas de `account` (information_schema, 2026-09-03).
+# HubSpot no valida largos: un website de 213 caracteres (una URL de campana con
+# gclid) contra website varchar(128) tira StringDataRightTruncation, y eso ABORTA la
+# transaccion de Postgres. Las columnas que no estan aca son varchar sin limite.
+ACCOUNT_COLUMN_LIMITS = {
+    "client_name": 50,
+    "account_manager": 50,
+    "contract": 50,
+    "mail": 50,
+    "size": 50,
+    "state": 50,
+    "timezone": 50,
+    "website": 128,
+    "linkedin": 256,
+}
+
 
 HUBSPOT_NDA_SENT_DATE_PROPERTY = "hs_v2_date_entered_1226596718"
 HUBSPOT_DEEP_DIVE_DATE_PROPERTY = "hs_v2_date_entered_1226596717"
@@ -103,6 +122,37 @@ OUTSOURCE_NORMALIZATION = {
 }
 
 
+def _clip_account_values(values):
+    """Recorta cada valor al ancho de su columna. Las claves son nombres de columna."""
+    return {
+        key: clip(value, ACCOUNT_COLUMN_LIMITS.get(key))
+        for key, value in values.items()
+    }
+
+
+def _rollback_quietly(conn, label):
+    """Deja la conexion usable para el siguiente registro del loop."""
+    try:
+        conn.rollback()
+    except Exception:
+        logging.exception("HubSpot sync: rollback fallido despues de %s", label)
+
+
+def _error_record(exc, **fields):
+    """Error con el diagnostico de psycopg2 (pgcode / columna / constraint).
+
+    Sin esto el front solo mostraba "Errors: N" y habia que ir a CloudWatch para
+    enterarse de que columna rebotaba.
+    """
+    diag = getattr(exc, "diag", None)
+    record = dict(fields)
+    record["error"] = str(exc)
+    record["pgcode"] = getattr(exc, "pgcode", None)
+    record["column"] = getattr(diag, "column_name", None)
+    record["constraint"] = getattr(diag, "constraint_name", None)
+    return record
+
+
 def _require_sync_secret():
     expected = os.environ.get("HUBSPOT_SYNC_SECRET")
     if not expected:
@@ -113,7 +163,65 @@ def _require_sync_secret():
     return None
 
 
+# Se cachea por proceso: en regimen el schema ya esta aplicado y no hace falta ni
+# consultar el catalogo de nuevo.
+_HUBSPOT_ACCOUNT_COLUMNS = (
+    "hubspot_deal_id",
+    "hubspot_company_id",
+    "hubspot_contact_id",
+    "hubspot_synced_at",
+    "vintti_ai",
+    "lead_source_detail",
+    "conversion_channel",
+    "credit_loop",
+    "sql_meeting_date",
+)
+_HUBSPOT_ACCOUNT_SCHEMA_READY = None
+
+
+def _hubspot_account_schema_is_ready(cursor):
+    """True si ya estan todas las columnas y el indice. Solo lee el catalogo."""
+    cursor.execute(
+        """
+        SELECT column_name
+          FROM information_schema.columns
+         WHERE table_name = 'account' AND column_name = ANY(%s)
+        """,
+        (list(_HUBSPOT_ACCOUNT_COLUMNS),),
+    )
+    present = {
+        (row["column_name"] if isinstance(row, dict) else row[0])
+        for row in cursor.fetchall()
+    }
+    if len(present) < len(_HUBSPOT_ACCOUNT_COLUMNS):
+        return False
+    cursor.execute(
+        """
+        SELECT 1
+          FROM pg_indexes
+         WHERE tablename = 'account' AND indexname = 'idx_account_hubspot_deal_id'
+         LIMIT 1
+        """
+    )
+    return cursor.fetchone() is not None
+
+
 def _ensure_hubspot_account_columns(cursor):
+    """Idempotente y BARATO en regimen.
+
+    Antes corria 9 ALTER TABLE + 1 CREATE INDEX en CADA request de 8 endpoints. Un
+    ALTER TABLE toma ACCESS EXCLUSIVE sobre `account` aunque el IF NOT EXISTS no haga
+    nada, y aca corre justo antes de un loop que tarda minutos: la tabla quedaba
+    trabada todo ese rato para cualquier otra request. Ver el comentario de
+    backend/db.py:32 y el patron de users_has_color().
+    """
+    global _HUBSPOT_ACCOUNT_SCHEMA_READY
+    if _HUBSPOT_ACCOUNT_SCHEMA_READY:
+        return
+    if _hubspot_account_schema_is_ready(cursor):
+        _HUBSPOT_ACCOUNT_SCHEMA_READY = True
+        return
+
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_deal_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_contact_id TEXT")
@@ -134,6 +242,7 @@ def _ensure_hubspot_account_columns(cursor):
         WHERE hubspot_deal_id IS NOT NULL AND hubspot_deal_id <> ''
         """
     )
+    _HUBSPOT_ACCOUNT_SCHEMA_READY = True
 
 
 def _ensure_opportunity_stage_date_columns(cursor):
@@ -507,6 +616,10 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
     payload["where_come_from"] = _normalize_lead_source(payload.get("where_come_from"))
     payload["credit_loop"] = _normalize_credit_loop_value(payload.get("credit_loop"))
     payload["vintti_ai"] = _normalize_boolean_value(payload.get("vintti_ai"))
+    # El website mapeado desde HubSpot puede venir como URL de campana (?gclid=...) y
+    # pasarse de los 128 chars de la columna. Se limpia ACA y no solo en el INSERT para
+    # que el preview muestre exactamente lo que se va a guardar.
+    payload["website"] = strip_tracking_params(payload.get("website"))
 
     return payload
 
@@ -779,6 +892,36 @@ def _preview_existing_account(cursor, payload):
 
 def _link_existing_account_to_hubspot(cursor, account_id, payload):
     now = datetime.now(timezone.utc)
+    # Los ids se guardan .strip()eados porque _find_existing_account los BUSCA
+    # .strip()eados: escribir el valor crudo hace que la proxima corrida busque en una
+    # fila y escriba en otra.
+    values = _clip_account_values({
+        "size": payload.get("size"),
+        "timezone": payload.get("timezone"),
+        "state": payload.get("state"),
+        "website": payload.get("website"),
+        "linkedin": payload.get("linkedin"),
+        "comments": payload.get("about"),
+        "mail": payload.get("mail"),
+        "where_come_from": _normalize_lead_source(payload.get("where_come_from")),
+        "lead_source_detail": payload.get("lead_source_detail"),
+        "conversion_channel": payload.get("conversion_channel"),
+        "referal_source": payload.get("referal_source"),
+        "industry": payload.get("industry"),
+        "outsource": _normalize_outsource_value(payload.get("outsource")),
+        "pain_points": payload.get("pain_points"),
+        "contract": payload.get("contract"),
+        "position": payload.get("position"),
+        "type": payload.get("type"),
+        "name": payload.get("contact_name"),
+        "surname": payload.get("contact_surname"),
+        "account_manager": payload.get("account_manager"),
+        "credit_loop": _normalize_credit_loop_value(payload.get("credit_loop")),
+        "vintti_ai": _normalize_boolean_value(payload.get("vintti_ai")),
+        "hubspot_deal_id": (payload.get("hubspot_deal_id") or "").strip(),
+        "hubspot_company_id": (payload.get("hubspot_company_id") or "").strip(),
+        "hubspot_contact_id": (payload.get("hubspot_contact_id") or "").strip(),
+    })
     cursor.execute(
         """
         UPDATE account
@@ -811,31 +954,31 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
         WHERE account_id = %s
         """,
         (
-            payload.get("size"),
-            payload.get("timezone"),
-            payload.get("state"),
-            payload.get("website"),
-            payload.get("linkedin"),
-            payload.get("about"),
-            payload.get("mail"),
-            _normalize_lead_source(payload.get("where_come_from")),
-            payload.get("lead_source_detail"),
-            payload.get("conversion_channel"),
-            payload.get("referal_source"),
-            payload.get("industry"),
-            _normalize_outsource_value(payload.get("outsource")),
-            payload.get("pain_points"),
-            payload.get("contract"),
-            payload.get("position"),
-            payload.get("type"),
-            payload.get("contact_name"),
-            payload.get("contact_surname"),
-            payload.get("account_manager"),
-            _normalize_credit_loop_value(payload.get("credit_loop")),
-            _normalize_boolean_value(payload.get("vintti_ai")),
-            payload.get("hubspot_deal_id"),
-            payload.get("hubspot_company_id"),
-            payload.get("hubspot_contact_id"),
+            values["size"],
+            values["timezone"],
+            values["state"],
+            values["website"],
+            values["linkedin"],
+            values["comments"],
+            values["mail"],
+            values["where_come_from"],
+            values["lead_source_detail"],
+            values["conversion_channel"],
+            values["referal_source"],
+            values["industry"],
+            values["outsource"],
+            values["pain_points"],
+            values["contract"],
+            values["position"],
+            values["type"],
+            values["name"],
+            values["surname"],
+            values["account_manager"],
+            values["credit_loop"],
+            values["vintti_ai"],
+            values["hubspot_deal_id"],
+            values["hubspot_company_id"],
+            values["hubspot_contact_id"],
             now,
             account_id,
         ),
@@ -1207,69 +1350,90 @@ def sync_mariano_sql_contacts():
         errors = []
         conn = get_connection()
         try:
-            with conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    _ensure_hubspot_account_columns(cursor)
-                    for contact_summary in contacts:
-                        contact_id = str(contact_summary.get("id") or "")
-                        try:
-                            contact = client.get_contact(
-                                contact_id,
-                                extra_properties=contact_extra_properties,
-                                associations=["companies", "deals"],
-                            )
-                            company_ids = association_ids(contact, "companies")
-                            deal_ids = association_ids(contact, "deals")
-                            company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
-                            deal = client.get_deal_with_associations(deal_ids[0], extra_properties=deal_extra_properties) if deal_ids else {}
-                            payload = build_account_payload(
-                                deal,
-                                company=company,
-                                contact=contact,
-                                owner_email=owner_email,
-                            )
-                            payload = _apply_account_field_overrides(
-                                payload,
-                                contact=contact,
-                                company=company,
-                                deal=deal,
-                                property_maps=property_maps,
-                            )
-                            existing = _preview_existing_account(cursor, payload)
-                            if existing:
-                                account_id = existing["account_id"]
-                                _link_existing_account_to_hubspot(cursor, account_id, payload)
-                                action = "linked"
-                            else:
-                                result = _insert_or_update_account(cursor, payload)
-                                account_id = result["account_id"]
-                                action = "created"
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                _ensure_hubspot_account_columns(cursor)
+                # Commitear el DDL YA. Si queda abierto dentro de la transaccion del
+                # loop, el ACCESS EXCLUSIVE sobre `account` se retiene los minutos que
+                # dura el sync y traba cualquier otra request que toque la tabla.
+                conn.commit()
 
-                            contact_props = contact.get("properties") or {}
-                            # R1: anclar el SQL por la fecha REAL del meeting (igual que
-                            # Marketing). Guardamos meeting_date___time en account.sql_meeting_date
-                            # para AMBAS ramas (creado y linkeado), porque el path "linked" no
-                            # pasa por _insert_or_update_account.
-                            sql_meeting_d = _parse_hubspot_date(contact_props.get(meeting_datetime_property))
-                            if sql_meeting_d is not None:
-                                cursor.execute(
-                                    "UPDATE account SET sql_meeting_date = %s WHERE account_id = %s",
-                                    (sql_meeting_d, account_id),
-                                )
-                            synced.append({
-                                "contact_id": contact_id,
-                                "deal_id": payload.get("hubspot_deal_id"),
-                                "account_id": account_id,
-                                "action": action,
-                                "client_name": payload.get("name"),
-                                "contact_email": contact_props.get("email"),
-                                "meeting_datetime": contact_props.get(meeting_datetime_property),
-                                "sql_meeting_date": sql_meeting_d.isoformat() if sql_meeting_d else None,
-                                "lead_life": contact_props.get(lead_life_property),
-                            })
-                        except Exception as exc:
-                            logging.exception("HubSpot contact sync failed for contact %s", contact_id)
-                            errors.append({"contact_id": contact_id, "error": str(exc)})
+                for contact_summary in contacts:
+                    contact_id = str(contact_summary.get("id") or "")
+                    # Sin este reset, si falla antes de armarse, el except leeria el
+                    # payload del contacto ANTERIOR (o tiraria NameError en la 1ra vuelta).
+                    payload = None
+                    try:
+                        contact = client.get_contact(
+                            contact_id,
+                            extra_properties=contact_extra_properties,
+                            associations=["companies", "deals"],
+                        )
+                        company_ids = association_ids(contact, "companies")
+                        deal_ids = association_ids(contact, "deals")
+                        company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                        deal = client.get_deal_with_associations(deal_ids[0], extra_properties=deal_extra_properties) if deal_ids else {}
+                        payload = build_account_payload(
+                            deal,
+                            company=company,
+                            contact=contact,
+                            owner_email=owner_email,
+                        )
+                        payload = _apply_account_field_overrides(
+                            payload,
+                            contact=contact,
+                            company=company,
+                            deal=deal,
+                            property_maps=property_maps,
+                        )
+                        existing = _preview_existing_account(cursor, payload)
+                        if existing:
+                            account_id = existing["account_id"]
+                            _link_existing_account_to_hubspot(cursor, account_id, payload)
+                            action = "linked"
+                        else:
+                            result = _insert_or_update_account(cursor, payload)
+                            account_id = result["account_id"]
+                            # _insert_or_update_account rehace la busqueda por su cuenta
+                            # y puede devolver "updated"; hardcodear "created" inflaba el
+                            # numero que ve la owner en el alert.
+                            action = result["action"]
+
+                        contact_props = contact.get("properties") or {}
+                        # R1: anclar el SQL por la fecha REAL del meeting (igual que
+                        # Marketing). Guardamos meeting_date___time en account.sql_meeting_date
+                        # para AMBAS ramas (creado y linkeado), porque el path "linked" no
+                        # pasa por _insert_or_update_account.
+                        sql_meeting_d = _parse_hubspot_date(contact_props.get(meeting_datetime_property))
+                        if sql_meeting_d is not None:
+                            cursor.execute(
+                                "UPDATE account SET sql_meeting_date = %s WHERE account_id = %s",
+                                (sql_meeting_d, account_id),
+                            )
+                        # UNA TRANSACCION POR CONTACTO. Antes todo el loop compartia una
+                        # sola: el primer error de Postgres abortaba la transaccion, los
+                        # contactos siguientes morian con InFailedSqlTransaction, y el
+                        # COMMIT final sobre una transaccion abortada equivale a ROLLBACK,
+                        # asi que hasta los que habian funcionado se perdian en silencio.
+                        conn.commit()
+                        synced.append({
+                            "contact_id": contact_id,
+                            "deal_id": payload.get("hubspot_deal_id"),
+                            "account_id": account_id,
+                            "action": action,
+                            "client_name": payload.get("name"),
+                            "contact_email": contact_props.get("email"),
+                            "meeting_datetime": contact_props.get(meeting_datetime_property),
+                            "sql_meeting_date": sql_meeting_d.isoformat() if sql_meeting_d else None,
+                            "lead_life": contact_props.get(lead_life_property),
+                        })
+                    except Exception as exc:
+                        _rollback_quietly(conn, "contact %s" % contact_id)
+                        logging.exception("HubSpot contact sync failed for contact %s", contact_id)
+                        errors.append(_error_record(
+                            exc,
+                            contact_id=contact_id,
+                            client_name=(payload or {}).get("name"),
+                        ))
         finally:
             conn.close()
 
@@ -1284,6 +1448,7 @@ def sync_mariano_sql_contacts():
             "contacts_found": len(contacts),
             "created": sum(1 for item in synced if item["action"] == "created"),
             "linked": sum(1 for item in synced if item["action"] == "linked"),
+            "updated": sum(1 for item in synced if item["action"] == "updated"),
             "errors": errors,
             "synced": synced,
         })
@@ -1510,13 +1675,15 @@ def _insert_or_update_account(cursor, payload):
         "name": payload.get("contact_name"),
         "surname": payload.get("contact_surname"),
         "account_manager": payload.get("account_manager"),
-        "hubspot_deal_id": payload.get("hubspot_deal_id"),
-        "hubspot_company_id": payload.get("hubspot_company_id"),
-        "hubspot_contact_id": payload.get("hubspot_contact_id"),
+        # .strip() para que coincida con como los BUSCA _find_existing_account.
+        "hubspot_deal_id": (payload.get("hubspot_deal_id") or "").strip(),
+        "hubspot_company_id": (payload.get("hubspot_company_id") or "").strip(),
+        "hubspot_contact_id": (payload.get("hubspot_contact_id") or "").strip(),
         "credit_loop": _normalize_credit_loop_value(payload.get("credit_loop")),
         "vintti_ai": _normalize_boolean_value(payload.get("vintti_ai")),
         "hubspot_synced_at": now,
     }
+    values = _clip_account_values(values)
 
     if existing:
         account_id = existing["account_id"] if isinstance(existing, dict) else existing[0]
@@ -1624,40 +1791,50 @@ def sync_mariano_closed_leads():
         errors = []
         conn = get_connection()
         try:
-            with conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    _ensure_hubspot_account_columns(cursor)
-                    for deal_summary in deals:
-                        deal_id = str(deal_summary.get("id") or "")
-                        try:
-                            deal = client.get_deal_with_associations(deal_id, extra_properties=deal_extra_properties)
-                            company_ids = association_ids(deal, "companies")
-                            contact_ids = association_ids(deal, "contacts")
-                            company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
-                            contact = client.get_contact(contact_ids[0], extra_properties=contact_extra_properties) if contact_ids else None
-                            payload = build_account_payload(
-                                deal,
-                                company=company,
-                                contact=contact,
-                                owner_email=owner_email,
-                            )
-                            payload = _apply_account_field_overrides(
-                                payload,
-                                contact=contact,
-                                company=company,
-                                deal=deal,
-                                property_maps=property_maps,
-                            )
-                            result = _insert_or_update_account(cursor, payload)
-                            synced.append({
-                                "deal_id": deal_id,
-                                "account_id": result["account_id"],
-                                "action": result["action"],
-                                "client_name": payload.get("name"),
-                            })
-                        except Exception as exc:
-                            logging.exception("HubSpot deal sync failed for deal %s", deal_id)
-                            errors.append({"deal_id": deal_id, "error": str(exc)})
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                _ensure_hubspot_account_columns(cursor)
+                conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
+
+                for deal_summary in deals:
+                    deal_id = str(deal_summary.get("id") or "")
+                    payload = None
+                    try:
+                        deal = client.get_deal_with_associations(deal_id, extra_properties=deal_extra_properties)
+                        company_ids = association_ids(deal, "companies")
+                        contact_ids = association_ids(deal, "contacts")
+                        company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                        contact = client.get_contact(contact_ids[0], extra_properties=contact_extra_properties) if contact_ids else None
+                        payload = build_account_payload(
+                            deal,
+                            company=company,
+                            contact=contact,
+                            owner_email=owner_email,
+                        )
+                        payload = _apply_account_field_overrides(
+                            payload,
+                            contact=contact,
+                            company=company,
+                            deal=deal,
+                            property_maps=property_maps,
+                        )
+                        result = _insert_or_update_account(cursor, payload)
+                        # Una transaccion por deal: un error no puede abortar el resto
+                        # del lote ni descartar lo ya hecho. Ver sync_mariano_sql_contacts.
+                        conn.commit()
+                        synced.append({
+                            "deal_id": deal_id,
+                            "account_id": result["account_id"],
+                            "action": result["action"],
+                            "client_name": payload.get("name"),
+                        })
+                    except Exception as exc:
+                        _rollback_quietly(conn, "deal %s" % deal_id)
+                        logging.exception("HubSpot deal sync failed for deal %s", deal_id)
+                        errors.append(_error_record(
+                            exc,
+                            deal_id=deal_id,
+                            client_name=(payload or {}).get("name"),
+                        ))
         finally:
             conn.close()
 
@@ -1710,97 +1887,101 @@ def backfill_opportunity_nda_sent_dates():
         errors = []
 
         try:
-            with conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    _ensure_opportunity_stage_date_columns(cursor)
-                    _ensure_hubspot_account_columns(cursor)
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                _ensure_opportunity_stage_date_columns(cursor)
+                _ensure_hubspot_account_columns(cursor)
+                conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
 
-                    query = """
-                        WITH candidates AS (
-                            SELECT
-                                o.opportunity_id,
-                                o.opp_stage,
-                                a.account_id,
-                                a.client_name,
-                                a.hubspot_deal_id,
-                                COUNT(*) OVER (PARTITION BY a.hubspot_deal_id) AS deal_candidate_count
-                            FROM opportunity o
-                            JOIN account a ON a.account_id = o.account_id
-                            WHERE o.nda_sent_date IS NULL
-                              AND NULLIF(a.hubspot_deal_id, '') IS NOT NULL
-                              AND TRIM(COALESCE(o.opp_stage, '')) = ANY(%s)
-                        )
-                        SELECT *
-                        FROM candidates
-                        ORDER BY hubspot_deal_id, opportunity_id
-                    """
-                    params = [list(NDA_SENT_OR_LATER_STAGES)]
-                    if limit:
-                        query += " LIMIT %s"
-                        params.append(limit)
+                query = """
+                    WITH candidates AS (
+                        SELECT
+                            o.opportunity_id,
+                            o.opp_stage,
+                            a.account_id,
+                            a.client_name,
+                            a.hubspot_deal_id,
+                            COUNT(*) OVER (PARTITION BY a.hubspot_deal_id) AS deal_candidate_count
+                        FROM opportunity o
+                        JOIN account a ON a.account_id = o.account_id
+                        WHERE o.nda_sent_date IS NULL
+                          AND NULLIF(a.hubspot_deal_id, '') IS NOT NULL
+                          AND TRIM(COALESCE(o.opp_stage, '')) = ANY(%s)
+                    )
+                    SELECT *
+                    FROM candidates
+                    ORDER BY hubspot_deal_id, opportunity_id
+                """
+                params = [list(NDA_SENT_OR_LATER_STAGES)]
+                if limit:
+                    query += " LIMIT %s"
+                    params.append(limit)
 
-                    cursor.execute(query, params)
-                    rows = cursor.fetchall()
-                    date_by_deal = {}
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                date_by_deal = {}
 
-                    for row in rows:
-                        deal_id = str(row.get("hubspot_deal_id") or "").strip()
-                        if not deal_id:
-                            continue
-                        if not allow_ambiguous and int(row.get("deal_candidate_count") or 0) > 1:
+                for row in rows:
+                    deal_id = str(row.get("hubspot_deal_id") or "").strip()
+                    if not deal_id:
+                        continue
+                    if not allow_ambiguous and int(row.get("deal_candidate_count") or 0) > 1:
+                        skipped.append({
+                            "opportunity_id": row.get("opportunity_id"),
+                            "account_id": row.get("account_id"),
+                            "client_name": row.get("client_name"),
+                            "deal_id": deal_id,
+                            "reason": "ambiguous_hubspot_deal_maps_to_multiple_opportunities",
+                            "deal_candidate_count": row.get("deal_candidate_count"),
+                        })
+                        continue
+                    try:
+                        if deal_id not in date_by_deal:
+                            deal = client.get_deal_with_associations(
+                                deal_id,
+                                extra_properties=[property_name],
+                            )
+                            props = deal.get("properties") or {}
+                            date_by_deal[deal_id] = _parse_hubspot_date(props.get(property_name))
+
+                        nda_sent_date = date_by_deal[deal_id]
+                        if not nda_sent_date:
                             skipped.append({
                                 "opportunity_id": row.get("opportunity_id"),
-                                "account_id": row.get("account_id"),
-                                "client_name": row.get("client_name"),
                                 "deal_id": deal_id,
-                                "reason": "ambiguous_hubspot_deal_maps_to_multiple_opportunities",
-                                "deal_candidate_count": row.get("deal_candidate_count"),
+                                "reason": "missing_hubspot_date",
                             })
                             continue
-                        try:
-                            if deal_id not in date_by_deal:
-                                deal = client.get_deal_with_associations(
-                                    deal_id,
-                                    extra_properties=[property_name],
-                                )
-                                props = deal.get("properties") or {}
-                                date_by_deal[deal_id] = _parse_hubspot_date(props.get(property_name))
 
-                            nda_sent_date = date_by_deal[deal_id]
-                            if not nda_sent_date:
-                                skipped.append({
-                                    "opportunity_id": row.get("opportunity_id"),
-                                    "deal_id": deal_id,
-                                    "reason": "missing_hubspot_date",
-                                })
-                                continue
-
-                            if not dry_run:
-                                cursor.execute(
-                                    """
-                                    UPDATE opportunity
-                                    SET nda_sent_date = %s
-                                    WHERE opportunity_id = %s
-                                      AND nda_sent_date IS NULL
-                                    """,
-                                    (nda_sent_date, row.get("opportunity_id")),
-                                )
-
-                            updated.append({
-                                "opportunity_id": row.get("opportunity_id"),
-                                "deal_id": deal_id,
-                                "nda_sent_date": nda_sent_date.isoformat(),
-                            })
-                        except Exception as exc:  # noqa: BLE001
-                            logging.exception(
-                                "HubSpot NDA sent date backfill failed for deal %s",
-                                deal_id,
+                        if not dry_run:
+                            cursor.execute(
+                                """
+                                UPDATE opportunity
+                                SET nda_sent_date = %s
+                                WHERE opportunity_id = %s
+                                  AND nda_sent_date IS NULL
+                                """,
+                                (nda_sent_date, row.get("opportunity_id")),
                             )
-                            errors.append({
-                                "opportunity_id": row.get("opportunity_id"),
-                                "deal_id": deal_id,
-                                "error": str(exc),
-                            })
+
+                        # Una transaccion por fila: un error no aborta el resto del
+                        # backfill ni descarta lo ya escrito.
+                        conn.commit()
+                        updated.append({
+                            "opportunity_id": row.get("opportunity_id"),
+                            "deal_id": deal_id,
+                            "nda_sent_date": nda_sent_date.isoformat(),
+                        })
+                    except Exception as exc:  # noqa: BLE001
+                        _rollback_quietly(conn, "deal %s" % deal_id)
+                        logging.exception(
+                            "HubSpot NDA sent date backfill failed for deal %s",
+                            deal_id,
+                        )
+                        errors.append(_error_record(
+                            exc,
+                            opportunity_id=row.get("opportunity_id"),
+                            deal_id=deal_id,
+                        ))
         finally:
             conn.close()
 
@@ -1854,97 +2035,101 @@ def backfill_opportunity_deep_dive_dates():
         errors = []
 
         try:
-            with conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    _ensure_opportunity_stage_date_columns(cursor)
-                    _ensure_hubspot_account_columns(cursor)
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                _ensure_opportunity_stage_date_columns(cursor)
+                _ensure_hubspot_account_columns(cursor)
+                conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
 
-                    query = """
-                        WITH candidates AS (
-                            SELECT
-                                o.opportunity_id,
-                                o.opp_stage,
-                                a.account_id,
-                                a.client_name,
-                                a.hubspot_deal_id,
-                                COUNT(*) OVER (PARTITION BY a.hubspot_deal_id) AS deal_candidate_count
-                            FROM opportunity o
-                            JOIN account a ON a.account_id = o.account_id
-                            WHERE o.deep_dive_date IS NULL
-                              AND NULLIF(a.hubspot_deal_id, '') IS NOT NULL
-                              AND TRIM(COALESCE(o.opp_stage, '')) = ANY(%s)
-                        )
-                        SELECT *
-                        FROM candidates
-                        ORDER BY hubspot_deal_id, opportunity_id
-                    """
-                    params = [list(DEEP_DIVE_OR_LATER_STAGES)]
-                    if limit:
-                        query += " LIMIT %s"
-                        params.append(limit)
+                query = """
+                    WITH candidates AS (
+                        SELECT
+                            o.opportunity_id,
+                            o.opp_stage,
+                            a.account_id,
+                            a.client_name,
+                            a.hubspot_deal_id,
+                            COUNT(*) OVER (PARTITION BY a.hubspot_deal_id) AS deal_candidate_count
+                        FROM opportunity o
+                        JOIN account a ON a.account_id = o.account_id
+                        WHERE o.deep_dive_date IS NULL
+                          AND NULLIF(a.hubspot_deal_id, '') IS NOT NULL
+                          AND TRIM(COALESCE(o.opp_stage, '')) = ANY(%s)
+                    )
+                    SELECT *
+                    FROM candidates
+                    ORDER BY hubspot_deal_id, opportunity_id
+                """
+                params = [list(DEEP_DIVE_OR_LATER_STAGES)]
+                if limit:
+                    query += " LIMIT %s"
+                    params.append(limit)
 
-                    cursor.execute(query, params)
-                    rows = cursor.fetchall()
-                    date_by_deal = {}
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                date_by_deal = {}
 
-                    for row in rows:
-                        deal_id = str(row.get("hubspot_deal_id") or "").strip()
-                        if not deal_id:
-                            continue
-                        if not allow_ambiguous and int(row.get("deal_candidate_count") or 0) > 1:
+                for row in rows:
+                    deal_id = str(row.get("hubspot_deal_id") or "").strip()
+                    if not deal_id:
+                        continue
+                    if not allow_ambiguous and int(row.get("deal_candidate_count") or 0) > 1:
+                        skipped.append({
+                            "opportunity_id": row.get("opportunity_id"),
+                            "account_id": row.get("account_id"),
+                            "client_name": row.get("client_name"),
+                            "deal_id": deal_id,
+                            "reason": "ambiguous_hubspot_deal_maps_to_multiple_opportunities",
+                            "deal_candidate_count": row.get("deal_candidate_count"),
+                        })
+                        continue
+                    try:
+                        if deal_id not in date_by_deal:
+                            deal = client.get_deal_with_associations(
+                                deal_id,
+                                extra_properties=[property_name],
+                            )
+                            props = deal.get("properties") or {}
+                            date_by_deal[deal_id] = _parse_hubspot_date(props.get(property_name))
+
+                        deep_dive_date = date_by_deal[deal_id]
+                        if not deep_dive_date:
                             skipped.append({
                                 "opportunity_id": row.get("opportunity_id"),
-                                "account_id": row.get("account_id"),
-                                "client_name": row.get("client_name"),
                                 "deal_id": deal_id,
-                                "reason": "ambiguous_hubspot_deal_maps_to_multiple_opportunities",
-                                "deal_candidate_count": row.get("deal_candidate_count"),
+                                "reason": "missing_hubspot_date",
                             })
                             continue
-                        try:
-                            if deal_id not in date_by_deal:
-                                deal = client.get_deal_with_associations(
-                                    deal_id,
-                                    extra_properties=[property_name],
-                                )
-                                props = deal.get("properties") or {}
-                                date_by_deal[deal_id] = _parse_hubspot_date(props.get(property_name))
 
-                            deep_dive_date = date_by_deal[deal_id]
-                            if not deep_dive_date:
-                                skipped.append({
-                                    "opportunity_id": row.get("opportunity_id"),
-                                    "deal_id": deal_id,
-                                    "reason": "missing_hubspot_date",
-                                })
-                                continue
-
-                            if not dry_run:
-                                cursor.execute(
-                                    """
-                                    UPDATE opportunity
-                                    SET deep_dive_date = %s
-                                    WHERE opportunity_id = %s
-                                      AND deep_dive_date IS NULL
-                                    """,
-                                    (deep_dive_date, row.get("opportunity_id")),
-                                )
-
-                            updated.append({
-                                "opportunity_id": row.get("opportunity_id"),
-                                "deal_id": deal_id,
-                                "deep_dive_date": deep_dive_date.isoformat(),
-                            })
-                        except Exception as exc:  # noqa: BLE001
-                            logging.exception(
-                                "HubSpot Deep Dive date backfill failed for deal %s",
-                                deal_id,
+                        if not dry_run:
+                            cursor.execute(
+                                """
+                                UPDATE opportunity
+                                SET deep_dive_date = %s
+                                WHERE opportunity_id = %s
+                                  AND deep_dive_date IS NULL
+                                """,
+                                (deep_dive_date, row.get("opportunity_id")),
                             )
-                            errors.append({
-                                "opportunity_id": row.get("opportunity_id"),
-                                "deal_id": deal_id,
-                                "error": str(exc),
-                            })
+
+                        # Una transaccion por fila: un error no aborta el resto del
+                        # backfill ni descarta lo ya escrito.
+                        conn.commit()
+                        updated.append({
+                            "opportunity_id": row.get("opportunity_id"),
+                            "deal_id": deal_id,
+                            "deep_dive_date": deep_dive_date.isoformat(),
+                        })
+                    except Exception as exc:  # noqa: BLE001
+                        _rollback_quietly(conn, "deal %s" % deal_id)
+                        logging.exception(
+                            "HubSpot Deep Dive date backfill failed for deal %s",
+                            deal_id,
+                        )
+                        errors.append(_error_record(
+                            exc,
+                            opportunity_id=row.get("opportunity_id"),
+                            deal_id=deal_id,
+                        ))
         finally:
             conn.close()
 
