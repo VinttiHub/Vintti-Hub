@@ -5341,18 +5341,6 @@ input:checked + .slider::before {
   cursor: default;
 }
 
-/* Notas del modal Send Rejection Email. */
-#signOffPopup .signoff-note {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #6b7280;
-}
-
-#signOffPopup .signoff-note--sent {
-  color: #6d4aff;
-}
-
 #pipeline .pipeline-card .switch {
   width: 24px;
   height: 16px;
@@ -5586,7 +5574,7 @@ input:checked + .slider::before {
 /* =====================================================================
    "Send Candidates for Approval" — layout compacto
    Todo scopeado a #approvalEmailPopup para no tocar los otros popups que comparten
-   .email-popup-content (signOffPopup, emailPopup).
+   .email-popup-content (emailPopup).
 
    El original acumulaba ~60px de aire por campo: gap:1rem del flex de .popup-content, más
    margin-top:10px del label, más margin-top:6px y margin-bottom:12px del input. Con eso el

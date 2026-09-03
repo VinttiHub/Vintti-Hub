@@ -1703,9 +1703,6 @@ function openApplicantLinkPopup() {
 document.addEventListener('DOMContentLoaded', setupDeleteOpportunityControls);
 document.addEventListener('DOMContentLoaded', setupApplicantLinkButton);
 
-document.getElementById('closeSignOffPopup')?.addEventListener('click', () => {
-  document.getElementById('signOffPopup')?.classList.add('hidden');
-});
 function getOpportunityIdStrict(){
   // tu helper ya hace esto, pero dejo versión corta que se apoya en el mismo <span>
   return (document.getElementById('opportunity-id-text')?.getAttribute('data-id') || '').trim();
@@ -2343,140 +2340,9 @@ aiGo.addEventListener('click', async () => {
       }
     }
 
-    function getSignoffPositionName() {
-  return (
-    document.getElementById('details-opportunity-name')?.value ||
-    window.currentOpportunityData?.opp_position_name ||
-    ''
-  ).trim();
-}
-
-function buildSignoffSubject() {
-  const baseSubject = 'Update on your application';
-  const positionName = getSignoffPositionName();
-  return positionName ? `${baseSubject} - ${positionName}` : baseSubject;
-}
-
-// El "XXX" del saludo lo reemplaza el backend por el nombre de cada candidato,
-// porque se manda un mail individual por persona.
-function buildSignoffMessage() {
-  return `Hii XXX! \u{1F31F} I hope you're doing well.
-
-I want to let you know that this time we've decided to move forward with another candidate for our search. But we'd love for you to continue participating in our processes, so I'm leaving you the link to our Career Site where you'll receive all our new job proposals \u{1F4AA}\u{1F3FB}:
-
-https://careers.vintti.com/
-
-Thank you very much for your time and we keep in touch for future positions \u{1FAF6}\u{1F3FB}
-
-Additionally, here's a 100% anonymous survey for you to share your experience with the selection process at Vintti. It won't take more than 3 minutes, and it helps us immensely to make the candidate experience even better.
-
-https://tally.so/r/3lQE5o`;
-}
-
-document.getElementById('signOffBtn').addEventListener('click', async () => {
-  const opportunityId = getOpportunityId();
-  if (!opportunityId) return;
-
-  document.getElementById('signOffPopup').classList.remove('hidden');
-  document.getElementById('signoff-subject').value = buildSignoffSubject();
-  document.getElementById('signoff-message').value = buildSignoffMessage();
-
-  const select = document.getElementById('signoff-to');
-  const alreadySentEl = document.getElementById('signoff-already-sent');
-  // Destruir la instancia previa ANTES de tocar el <select>: si no, Choices
-  // sigue dueño del elemento y la preselección se pierde al reinicializar.
-  if (window.signoffChoices) {
-    window.signoffChoices.destroy();
-    window.signoffChoices = null;
-  }
-  select.innerHTML = '';
-  alreadySentEl.hidden = true;
-  alreadySentEl.textContent = '';
-
-  let candidates = [];
-  try {
-    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`);
-    candidates = await res.json();
-  } catch (err) {
-    console.error('❌ No se pudieron cargar los candidatos del sign off:', err);
-    alert('❌ No se pudieron cargar los candidatos');
-    return;
-  }
-
-  // Los que ya recibieron el sign off en ESTA vacante no vuelven a ser opción.
-  const alreadySent = candidates.filter(c => c.signoff_email_sent_at);
-  if (alreadySent.length) {
-    alreadySentEl.textContent =
-      `Ya recibieron el sign off en esta vacante: ${alreadySent.map(c => c.name || `#${c.candidate_id}`).join(', ')}.`;
-    alreadySentEl.hidden = false;
-  }
-
-  const selectable = candidates.filter(c => !c.signoff_email_sent_at);
-  selectable.forEach(c => {
-    const hasEmail = !!(c.email || '').trim();
-    const label = c.name || `#${c.candidate_id}`;
-    const opt = document.createElement('option');
-    opt.value = String(c.candidate_id);          // el backend resuelve el email
-    opt.textContent = hasEmail ? label : `${label} (sin email)`;
-    opt.disabled = !hasEmail;
-    // Preselección: los que tienen el toggle de sign off prendido.
-    opt.selected = hasEmail && c.sign_off === 'yes';
-    select.appendChild(opt);
-  });
-
-  window.signoffChoices = new Choices(select, { removeItemButton: true });
-
-  const preselected = selectable.filter(c => (c.email || '').trim() && c.sign_off === 'yes');
-  if (!preselected.length) {
-    alert('⚠️ No hay candidatos con el toggle de sign off activado. Podés elegirlos a mano en el campo "To".');
-  }
-});
-
-document.getElementById('sendSignOffBtn').addEventListener('click', async () => {
-  const opportunityId = getOpportunityId();
-  const btn = document.getElementById('sendSignOffBtn');
-  const candidateIds = (window.signoffChoices?.getValue() || []).map(o => Number(o.value));
-  const subject = document.getElementById('signoff-subject').value;
-  const body = document.getElementById('signoff-message').value;
-
-  if (!candidateIds.length || !subject || !body) {
-    alert("❌ Fill in all fields");
-    return;
-  }
-
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Sending…';
-
-  try {
-    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/signoff-emails`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate_ids: candidateIds, subject, body })
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      alert("❌ Error: " + (data.detail || data.error || res.status));
-      return;
-    }
-
-    const parts = [`✅ ${data.sent.length} enviado(s)`];
-    if (data.skipped.length) parts.push(`${data.skipped.length} omitido(s) (ya lo recibieron)`);
-    if (data.no_email.length) parts.push(`${data.no_email.length} sin email: ${data.no_email.map(c => c.name).join(', ')}`);
-    if (data.failed.length) parts.push(`${data.failed.length} fallido(s): ${data.failed.map(c => c.name || c.candidate_id).join(', ')}`);
-    alert(parts.join('\n'));
-
-    document.getElementById('signOffPopup').classList.add('hidden');
-    if (typeof window.loadPipelineCandidates === 'function') window.loadPipelineCandidates();
-  } catch (err) {
-    console.error(err);
-    alert("❌ Failed to send email");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-  }
-});
+    // El sign off ya no se manda desde acá. El botón "Sign off" y su popup se
+    // eliminaron: ahora lo dispara el toggle de cada card, en pipeline.js
+    // (helpers buildSignoffSubject / buildSignoffMessage incluidos).
 document.getElementById('closeApprovalEmailPopup').addEventListener('click', () => {
   document.getElementById('approvalEmailPopup').classList.add('hidden');
 });

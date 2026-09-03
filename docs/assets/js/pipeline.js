@@ -1285,6 +1285,71 @@ function openAprioraCreateModal({ oppId, title, button, statusEl, markCreated })
   });
 }
 
+// Guarda el estado del toggle sin mandar mail. Si el PATCH falla, el switch
+// vuelve a donde estaba: antes se quedaba prendido con la base sin cambiar.
+async function persistSignOff(checkbox, opportunityId, candidateId, signOffValue) {
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/signoff`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sign_off: signOffValue }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    console.log(`\u{1F4DD} Sign off status updated for candidate ${candidateId}`);
+    checkbox.checked = signOffValue === 'yes';
+  } catch (err) {
+    console.error("❌ Error updating sign_off:", err);
+    checkbox.checked = signOffValue !== 'yes';
+    alert("❌ No se pudo guardar el toggle de sign off.");
+  }
+}
+
+// Pinta el badge ✉✓ en la card recién enviada, en vez de recargar el board
+// entero (loadPipelineCandidates) y perder scroll y posiciones.
+function markSignoffSent(card, sentAt) {
+  const wrapper = card.querySelector('.signoff-toggle');
+  if (!wrapper || wrapper.querySelector('.signoff-sent-badge')) return;
+  const badge = document.createElement('span');
+  badge.className = 'signoff-sent-badge';
+  badge.title = `Sign off enviado el ${new Date(sentAt).toLocaleDateString()}`;
+  badge.textContent = '\u2709\u2713';
+  wrapper.prepend(badge);
+}
+
+// ─── Template del mail de sign off ────────────────────────────────────────────
+// Vivían en opportunity-detail.js, atados al popup que abría el botón "Sign off".
+// Ese botón ya no existe: el mail lo dispara el toggle de la card, así que el
+// template se mudó acá, que es donde está el único que lo usa.
+function getSignoffPositionName() {
+  return (
+    document.getElementById('details-opportunity-name')?.value ||
+    window.currentOpportunityData?.opp_position_name ||
+    ''
+  ).trim();
+}
+
+function buildSignoffSubject() {
+  const baseSubject = 'Update on your application';
+  const positionName = getSignoffPositionName();
+  return positionName ? `${baseSubject} - ${positionName}` : baseSubject;
+}
+
+// El "XXX" del saludo lo reemplaza el backend por el nombre de cada candidato,
+// porque se manda un mail individual por persona.
+function buildSignoffMessage() {
+  return `Hii XXX! \u{1F31F} I hope you're doing well.
+
+I want to let you know that this time we've decided to move forward with another candidate for our search. But we'd love for you to continue participating in our processes, so I'm leaving you the link to our Career Site where you'll receive all our new job proposals \u{1F4AA}\u{1F3FB}:
+
+https://careers.vintti.com/
+
+Thank you very much for your time and we keep in touch for future positions \u{1FAF6}\u{1F3FB}
+
+Additionally, here's a 100% anonymous survey for you to share your experience with the selection process at Vintti. It won't take more than 3 minutes, and it helps us immensely to make the candidate experience even better.
+
+https://tally.so/r/3lQE5o`;
+}
+
 // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
 function loadPipelineCandidates() {
   // Leer el opportunity_id que ya está en la página
@@ -1455,24 +1520,98 @@ card.querySelector(".star-icon").addEventListener("click", async (e) => {
   }
 });
 
+  // El toggle NO es sólo una marca: prenderlo MANDA el mail de sign off.
+  // Antes había que prender el toggle y después acordarse de apretar el botón
+  // "Sign off" de la barra del pipeline; ese segundo paso se olvidaba y el
+  // candidato quedaba marcado sin recibir nada. Ahora el toggle pregunta y manda.
   card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
-  e.stopPropagation();
-  const checkbox = e.target;
-  const candidateId = checkbox.getAttribute("data-candidate-id");
-  const signOffValue = checkbox.checked ? "yes" : "no";
+    e.stopPropagation();
+    const checkbox = e.target;
+    const candidateId = checkbox.getAttribute("data-candidate-id");
+    const candidateName = candidate.name || `#${candidateId}`;
+    const candidateEmail = (candidate.email || '').trim();
+    // Ojo: `candidate.signoff_email_sent_at` es del render. Lo pisamos a mano
+    // cuando el envío sale bien, para que apagar y volver a prender en la misma
+    // sesión no vuelva a preguntar.
+    const alreadySent = !!candidate.signoff_email_sent_at;
 
-  try {
-    await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/signoff`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sign_off: signOffValue }),
-    });
-    console.log(`📝 Sign off status updated for candidate ${candidateId}`);
-    checkbox.checked = signOffValue === 'yes';
-  } catch (err) {
-    console.error("❌ Error updating sign_off:", err);
-  }
-});
+    // Apagar: sólo persiste, nunca manda mail ni pregunta.
+    if (!checkbox.checked) {
+      await persistSignOff(checkbox, opportunityId, candidateId, 'no');
+      return;
+    }
+
+    // Ya lo recibió en esta vacante: el backend igual lo saltearía.
+    if (alreadySent) {
+      await persistSignOff(checkbox, opportunityId, candidateId, 'yes');
+      return;
+    }
+
+    if (!candidateEmail) {
+      alert(`⚠️ ${candidateName} no tiene email cargado, no se le puede mandar el sign off.`);
+      checkbox.checked = false;
+      return;
+    }
+
+    const confirmed = confirm(
+      `¿Enviar el mail de sign off a ${candidateName}?\n` +
+      `Se le manda a ${candidateEmail} el template estándar de rechazo.`
+    );
+    if (!confirmed) {
+      checkbox.checked = false;
+      return;
+    }
+
+    checkbox.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/signoff-emails`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate_ids: [Number(candidateId)],
+          subject: buildSignoffSubject(),
+          body: buildSignoffMessage(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`❌ Error: ${data.detail || data.error || res.status}`);
+        checkbox.checked = false;
+        return;
+      }
+
+      // El endpoint es multi-candidato: acá mandamos uno solo, así que basta con
+      // ver en qué balde cayó.
+      if (data.sent?.length) {
+        candidate.signoff_email_sent_at = new Date().toISOString();
+        markSignoffSent(card, candidate.signoff_email_sent_at);
+        alert(`✅ Sign off enviado a ${candidateName}.`);
+        return;
+      }
+
+      const failure = data.failed?.[0];
+      if (data.skipped?.length) {
+        // Raro: el toggle decía que no, la base dice que sí. Dejarlo prendido.
+        candidate.signoff_email_sent_at = new Date().toISOString();
+        markSignoffSent(card, candidate.signoff_email_sent_at);
+        alert(`ℹ️ ${candidateName} ya había recibido el sign off en esta vacante.`);
+        return;
+      }
+      if (data.no_email?.length) {
+        alert(`⚠️ ${candidateName} no tiene email cargado, no se mandó nada.`);
+      } else {
+        alert(`❌ No se pudo mandar el sign off a ${candidateName}: ${failure?.error || 'error desconocido'}`);
+      }
+      checkbox.checked = false;
+    } catch (err) {
+      console.error("❌ Error enviando el sign off:", err);
+      alert("❌ Failed to send email");
+      checkbox.checked = false;
+    } finally {
+      checkbox.disabled = false;
+    }
+  });
 
   enableDrag(card);
   card.addEventListener('click', (e) => {
