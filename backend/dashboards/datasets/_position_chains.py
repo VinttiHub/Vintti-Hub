@@ -184,7 +184,15 @@ _ACTIVE_MIN_MONTHS = 3
 # OJO con las activas: su reloj sigue corriendo, así que su vida es un PISO, no el
 # total final — por eso el promedio de activas y el de cerradas no son comparables.
 _SCOPE_SQL = {
-    "all": "",
+    # 'all' aplica el MISMO piso de madurez que 'active': si no, el total cuenta
+    # activas de 1 mes que la card de Activas deja afuera, y los tres numeros
+    # dejan de cerrar entre si (activas 77 + cerradas 115 != total 210). El piso
+    # NO se aplica a las cerradas: una posicion que duro un mes y termino tiene
+    # una vida real de un mes, y sacarla falsearia el promedio hacia arriba.
+    "all": (
+        "          WHERE estado NOT IN ('Activa', 'En reemplazo')\n"
+        f"             OR months >= {_ACTIVE_MIN_MONTHS}\n"
+    ),
     "active": (
         "          WHERE estado IN ('Activa', 'En reemplazo')\n"
         f"            AND months >= {_ACTIVE_MIN_MONTHS}\n"
