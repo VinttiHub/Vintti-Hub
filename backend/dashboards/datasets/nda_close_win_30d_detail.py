@@ -72,6 +72,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             o.opportunity_id,
             a.client_name,
+            o.opp_position_name,
             o.opp_model,
             NULLIF(o.opp_close_date::text,'')::date AS close_d,
             TRIM(o.opp_stage) AS opp_stage
@@ -89,7 +90,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT * FROM base WHERE opp_stage IN ('Close Win','Closed Lost')
         )
         SELECT
+          cu.opportunity_id,
           cu.client_name,
+          cu.opp_position_name,
           cu.opp_model,
           TO_CHAR(cu.close_d, 'YYYY-MM-DD') AS close_d,
           cu.opp_stage,
@@ -117,7 +120,12 @@ DATASET = {
     "key": "nda_close_win_30d_detail",
     "label": "Conversión global NDA → cliente — Detalle ventana 30 días",
     "dimensions": [
+        # opportunity_id + posicion: sin ellos dos opps distintas del mismo cliente
+        # cerradas el mismo dia salen como filas identicas y no hay forma de saber,
+        # mirando la pantalla, si el conteo esta inflado o son dos deals reales.
+        {"key": "opportunity_id", "label": "Opp", "type": "number"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
+        {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "opp_model", "label": "Modelo", "type": "string"},
         {"key": "close_d", "label": "Fecha cierre", "type": "date"},
         {"key": "opp_stage", "label": "Stage", "type": "string"},

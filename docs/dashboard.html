@@ -3562,16 +3562,20 @@
         </div>
       </div>
 
-      <!-- Lead source x Close Win/Lost (current month) bar list -->
+      <!-- Lead source x Close Win/Lost · sigue la ventana global (antes: mes actual).
+           El título ya decía "30d" (data-window-label) pero el dataset estaba anclado
+           al mes en curso: los primeros días de cada mes la card salía vacía aunque
+           hubiera cierres en los últimos 30 días. sa_bar_lead_source_30d usa
+           window_bounds y devuelve exactamente los mismos campos. -->
       <div class="card s-12">
         <div class="card__head">
           <div>
             <h3 class="card__title">Lead source · Close Win vs Closed Lost <span data-window-label>30d</span></h3>
-            <p class="card__sub">Mes actual · cuántas oportunidades cerraron por fuente</p>
+            <p class="card__sub">Ventana seleccionada · cuántas oportunidades cerraron por fuente</p>
           </div>
           <span class="card__menu">⋯</span>
         </div>
-        <div class="bars" data-chart="sa_bar_lead_source_month" data-bind="bar-list"
+        <div class="bars" data-chart="sa_bar_lead_source_30d" data-bind="bar-list"
              data-bar-name="lead_source" data-bar-value="total_closed_opps"
              data-bar-win-value="close_win" data-bar-lost-value="closed_lost"
              data-bar-limit="20"></div>
@@ -7043,7 +7047,7 @@
                 <div class="dtable-wrap"
                      data-chart="am_table_lara_winrate_30d_detail" data-bind="dtable"
                      data-override-opp_stage="Total"
-                     data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,nda_d|NDA|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                     data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,nda_d|NDA|raw,close_d|Cierre|raw,opp_stage|Stage|raw,opportunity_id|Opp|raw"
                      data-empty-text="Sin opps cerradas por AM en los últimos 30d."></div>
               </div>
             </section>
@@ -7067,7 +7071,7 @@
                 <div class="dtable-wrap"
                      data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
                      data-override-resultado="Total"
-                     data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                     data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,close_d|Cierre|raw,opp_stage|Stage|raw,opportunity_id|Opp|raw"
                      data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
@@ -8294,7 +8298,7 @@
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Deals cerrados (<span data-window-label>30d</span>)</h4>
               <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
-                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
+                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw,opportunity_id|Opp|raw"
                    data-empty-text="Sin deals cerrados (AM+AE) en los últimos 30 días."></div>
             </section>
           </div>
@@ -8315,7 +8319,7 @@
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Deals cerrados Outbound (<span data-window-label>30d</span>)</h4>
               <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-override-channel="outbound" data-bind="dtable"
-                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
+                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw,opportunity_id|Opp|raw"
                    data-empty-text="Sin deals cerrados Outbound (AM+AE) en los últimos 30 días."></div>
             </section>
           </div>
@@ -8337,7 +8341,7 @@
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle por deal</h4>
               <div class="dtable-wrap" data-chart="sa_table_kr_time_to_closewin_detail" data-bind="dtable"
-                   data-cols="days|Días|int,client_name|Cliente|raw,opp_position_name|Posición|raw,nda_date|NDA firmado|raw,close_date|Close date|raw"
+                   data-cols="days|Días|int,client_name|Cliente|raw,opp_position_name|Posición|raw,nda_date|NDA firmado|raw,close_date|Close date|raw,opportunity_id|Opp|raw"
                    data-empty-text="Sin close wins (AM+AE) con NDA en los últimos 30 días."></div>
             </section>
           </div>

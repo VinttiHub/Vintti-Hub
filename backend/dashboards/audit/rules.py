@@ -539,7 +539,11 @@ def r14_duplicate_rows(ctx) -> list:
 # --- R13 ---------------------------------------------------------------------
 _DATE_COL = re.compile(r"date|fecha|_d$|_at$|mes|month")
 # Datasets que miran cohortes cerradas o historia: estar "viejos" es correcto.
-_STALE_EXEMPT = re.compile(r"lifetime|cohort|history|ytd|all_time|churn_window")
+# `revenue_outbound_*`: son acumulados del año (YTD) aunque la key no diga "ytd";
+# que el close win más nuevo sea de hace meses es el dato, no un pipeline caído.
+_STALE_EXEMPT = re.compile(
+    r"lifetime|cohort|history|ytd|all_time|churn_window|revenue_outbound"
+)
 
 
 def r13_stale_data(ctx, max_days=60) -> list:

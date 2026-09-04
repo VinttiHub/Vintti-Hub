@@ -77,6 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date <= %(hasta)s::date)
         )
         SELECT
+          opportunity_id,
           client_name,
           opp_position_name,
           opp_model,
@@ -111,6 +112,10 @@ DATASET = {
     "key": "lara_winrate_30d_detail",
     "label": "Win Rate Re contrataciones (Lara) — Detalle ventana 30 días",
     "dimensions": [
+        # Sin opportunity_id, dos opps reales del mismo cliente para la misma
+        # posicion y con las mismas fechas (pasa: varios asientos del mismo rol)
+        # salen como filas identicas y no se distinguen en pantalla.
+        {"key": "opportunity_id", "label": "Opp", "type": "number"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "opp_model", "label": "Modelo", "type": "string"},

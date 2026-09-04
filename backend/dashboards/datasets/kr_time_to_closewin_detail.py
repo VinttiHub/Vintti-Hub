@@ -28,6 +28,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
     sql = """
         SELECT
+          o.opportunity_id,
           a.client_name,
           o.opp_position_name,
           TO_CHAR(NULLIF(o.nda_signature_or_start_date::text,'')::date, 'YYYY-MM-DD') AS nda_date,
@@ -54,6 +55,9 @@ DATASET = {
     "key": "kr_time_to_closewin_detail",
     "label": "Obj3 KR3 detalle · días NDA→cierre (AM+AE, 30d)",
     "dimensions": [
+        # Idem lara_winrate_30d_detail: dos opps del mismo rol/cliente cerradas el
+        # mismo dia serian filas identicas sin este id.
+        {"key": "opportunity_id", "label": "Opp", "type": "number"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "nda_date", "label": "NDA firmado", "type": "date"},

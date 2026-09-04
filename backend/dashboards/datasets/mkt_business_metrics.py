@@ -157,7 +157,12 @@ _PG_SQL = """
         ROUND(COUNT(*) FILTER (WHERE won_cur)::numeric * 100.0
               / NULLIF(COUNT(*) FILTER (WHERE dec_cur), 0), 1)::float AS cur,
         ROUND(COUNT(*) FILTER (WHERE won_prev)::numeric * 100.0
-              / NULLIF(COUNT(*) FILTER (WHERE dec_prev), 0), 1)::float AS prev
+              / NULLIF(COUNT(*) FILTER (WHERE dec_prev), 0), 1)::float AS prev,
+        -- Denominador expuesto a proposito: cuando close_rate viene NULL hay que
+        -- poder decir si es "no cerro nada en el periodo" (den = 0, normal los
+        -- primeros dias del mes) o una metrica rota. Sin esta columna el guion de
+        -- la card es indistinguible de un bug.
+        COUNT(*) FILTER (WHERE dec_cur)::int AS den_cur
       FROM dec
     ),
     -- LTV (avg meses activos por cliente de Staffing) — mismo bloque canonico que
@@ -231,6 +236,7 @@ _PG_SQL = """
     SELECT
       newc.cur                                     AS new_clients,
       cr.cur                                       AS close_rate,
+      cr.den_cur                                   AS close_rate_denom,
       nr.cur                                       AS net_rev,
       CASE WHEN newc.prev > 0 THEN ROUND((newc.cur - newc.prev)::numeric * 100.0 / newc.prev)::float END        AS new_clients_delta,
       CASE WHEN cr.prev IS NOT NULL AND cr.cur IS NOT NULL THEN ROUND((cr.cur - cr.prev)::numeric)::float END    AS close_rate_delta,
@@ -267,6 +273,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         "sqls": sqls_cur,
         "new_clients": rec.get("new_clients"),
         "close_rate": rec.get("close_rate"),
+        "close_rate_denom": rec.get("close_rate_denom"),
         "net_rev": rec.get("net_rev"),
         "sqls_delta": float(sqls_delta) if sqls_delta is not None else None,
         "new_clients_delta": rec.get("new_clients_delta"),
@@ -286,6 +293,7 @@ DATASET = {
         {"key": "sqls", "label": "SQLs totales", "type": "number"},
         {"key": "new_clients", "label": "New active clients", "type": "number"},
         {"key": "close_rate", "label": "Tasa de cierre", "type": "percent"},
+        {"key": "close_rate_denom", "label": "Cuentas decididas (denom.)", "type": "number"},
         {"key": "net_rev", "label": "Net revenue", "type": "currency"},
         {"key": "sqls_delta", "label": "Δ SQLs", "type": "number"},
         {"key": "new_clients_delta", "label": "Δ Clients", "type": "number"},
