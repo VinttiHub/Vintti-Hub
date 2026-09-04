@@ -958,35 +958,19 @@
         </div>
         <div class="bars" style="margin-top:14px">
           <div class="bars__row">
-            <span class="bars__name">SQL → NDA signed
+            <span class="bars__name" title="Mismo dato que la card azul 'SQL → Close Win' de la pestaña Sales: PER CLIENT, cohorte = clientes que cerraron en la ventana (no exige haber pasado por NDA), M+B por opp_sales_lead.">SQL → Close Win
               <span class="bars__name-sub">
-                <span data-chart="gr_kpi_sql_to_nda_30d" data-bind="text"
-                      data-field="nda_count" data-reduce="first" data-fmt="int">—</span> NDAs ·
-                <span data-chart="gr_kpi_sql_to_nda_30d" data-bind="text"
-                      data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL
-              </span>
-            </span>
-            <span class="bars__val"
-                  data-chart="gr_kpi_sql_to_nda_30d"
-                  data-bind="text" data-field="sql_to_nda_pct" data-reduce="first" data-fmt="percent">—</span>
-            <span class="bars__bar violet"><span
-                  data-chart="gr_kpi_sql_to_nda_30d"
-                  data-bind="progress-fill" data-field="sql_to_nda_pct" data-reduce="first"></span></span>
-          </div>
-          <div class="bars__row">
-            <span class="bars__name" title="Mismo dato que la card rosada 'NDA → Close Win' de la pestaña Sales: PER CLIENT, cohorte = clientes con NDA firmado que cerraron en la ventana, M+B por opp_sales_lead. Antes usaba sa_kpi_nda_30d (per opportunity) y por eso no coincidía con Sales.">NDA signed → CW
-              <span class="bars__name-sub">
-                <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
                       data-field="total_win" data-reduce="first" data-fmt="int">—</span> CW ·
-                <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                      data-field="total_nda" data-reduce="first" data-fmt="int">—</span> closed
+                <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="total_sql" data-reduce="first" data-fmt="int">—</span> closed
               </span>
             </span>
             <span class="bars__val"
-                  data-chart="sa_kpi_nda_to_clientwin_30d"
+                  data-chart="sa_kpi_sql_to_clientwin_30d"
                   data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
             <span class="bars__bar violet"><span
-                  data-chart="sa_kpi_nda_to_clientwin_30d"
+                  data-chart="sa_kpi_sql_to_clientwin_30d"
                   data-bind="progress-fill" data-field="total_pct" data-reduce="first"></span></span>
           </div>
           <div class="bars__row">
@@ -7011,58 +6995,35 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations excellence · Funnel</span>
             <h3 class="kpi-drawer__title">Conversion rates · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Las 4 conversiones del funnel comercial completo, todas en el período (<span data-window-label>30d</span>).</p>
+            <p class="kpi-drawer__sub">Las 3 conversiones del funnel comercial, todas en el período (<span data-window-label>30d</span>).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body" data-funnel-detail-root="conversion-rates">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">1 · SQL → NDA signed</h4>
+              <h4 class="kpi-drawer__section-title">1 · SQL → Close Win <span class="card__title-qual">(per client · = card azul de Sales)</span></h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1">
                   <span class="kpi-drawer__stat__label">Conversion</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_to_nda_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
                 </button>
-                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1" data-detail-filter-field="has_nda" data-detail-filter-value="Sí">
-                  <span class="kpi-drawer__stat__label">NDAs</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="nda_count" data-reduce="first" data-fmt="int">—</span>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1" data-detail-filter-field="estado" data-detail-filter-value="Close Win">
+                  <span class="kpi-drawer__stat__label">CW</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span>
                 </button>
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1">
-                  <span class="kpi-drawer__stat__label">SQL</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__label">Closed</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span>
                 </button>
               </div>
               <div class="funnel-detail" data-funnel-detail-panel="conv-block-1" hidden>
                 <div class="dtable-wrap"
-                     data-chart="gr_table_sql_to_nda_30d_detail" data-bind="dtable"
-                     data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_nda|Con NDA|raw,nda_d|Fecha NDA|raw"
-                     data-empty-text="Sin accounts creadas en los últimos 30d."></div>
-              </div>
-            </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">2 · NDA signed → CW <span class="card__title-qual">(per client · = card rosada de Sales)</span></h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2">
-                  <span class="kpi-drawer__stat__label">Conversion</span>
-                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
-                </button>
-                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2" data-detail-filter-field="estado" data-detail-filter-value="Close Win">
-                  <span class="kpi-drawer__stat__label">CW</span>
-                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span>
-                </button>
-                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2">
-                  <span class="kpi-drawer__stat__label">Closed</span>
-                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_nda" data-reduce="first" data-fmt="int">—</span>
-                </button>
-              </div>
-              <div class="funnel-detail" data-funnel-detail-panel="conv-block-2" hidden>
-                <div class="dtable-wrap"
-                     data-chart="sa_table_nda_to_clientwin_30d_detail" data-bind="dtable"
+                     data-chart="sa_table_sql_to_clientwin_30d_detail" data-bind="dtable"
                      data-cols="close_date|Última close|raw,nda_date|NDA firmado|raw,channel|Canal|raw,client_name|Cliente|raw,opps|Opps|int,estado|Estado|raw"
                      data-empty-text="Sin clientes cerrados (M+B) en la ventana."></div>
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">3 · Account Management Conversion Rate</h4>
+              <h4 class="kpi-drawer__section-title">2 · Account Management Conversion Rate</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-3">
                   <span class="kpi-drawer__stat__label">Conversion</span>
@@ -7086,7 +7047,7 @@
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">4 · NDA → Client (operations view)</h4>
+              <h4 class="kpi-drawer__section-title">3 · NDA → Client (operations view)</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4">
                   <span class="kpi-drawer__stat__label">Conversion</span>
@@ -7109,7 +7070,7 @@
                      data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
-            <p class="kpi-drawer__note">El funnel se lee de arriba a abajo. Cada barra usa el dataset de su pestaña fuente — "NDA signed → CW" es exactamente la card rosada "NDA → Close Win" de Sales (per client, AE's M+B), y la versión "NDA → Client (ops)" abre el filtro a más AE's, por eso da distinto.</p>
+            <p class="kpi-drawer__note">Cada barra usa el dataset de su pestaña fuente — "SQL → Close Win" es exactamente la card azul de Sales (per client, cohorte = clientes cerrados en la ventana, AE's M+B), y la versión "NDA → Client (ops)" abre el filtro a más AE's, por eso da distinto.</p>
           </div>
         </div>
 
