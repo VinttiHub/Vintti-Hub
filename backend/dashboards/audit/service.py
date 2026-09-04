@@ -13,10 +13,12 @@ from .runner import run as run_audit
 
 log = logging.getLogger(__name__)
 
-# Decision de la owner: el reporte va SIEMPRE y SOLO a pgonzales. Sin env var
-# de por medio, para que una variable mal seteada no lo mande a otro lado ni
-# sume destinatarios de mas.
-RECIPIENTS = ["pgonzales@vintti.com"]
+# Lista fija y explicita, sin env var de por medio: asi una variable mal seteada no
+# puede redirigir el reporte ni sumar destinatarios de mas. Para agregar o sacar a
+# alguien hay que editar esta linea, con nombre y apellido, y que lo pida la owner.
+#   - pgonzales@vintti.com  Priscila Gonzales (owner)
+#   - lara@vintti.com       Lara Reinhardt (Account Manager) - agregada 2026-09-04
+RECIPIENTS = ["pgonzales@vintti.com", "lara@vintti.com"]
 
 
 def execute(run_id=None, trigger_source="cli", send_email=True, persist=True) -> dict:

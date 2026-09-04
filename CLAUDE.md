@@ -97,9 +97,11 @@ Para el triage: `GET /dashboards/audit/last` devuelve cada hallazgo con
 Un hallazgo aceptado se silencia con `POST /dashboards/audit/waivers`; se sigue
 guardando, sólo no aparece en el mail.
 
-El mail va **siempre y sólo a `pgonzales@vintti.com`**, hardcodeado en `service.py`
-por decisión de la owner: sin env var de por medio para que nadie lo redirija ni sume
-destinatarios por error.
+Los destinatarios están **hardcodeados** en `RECIPIENTS`, en `service.py`: hoy
+`pgonzales@vintti.com` (owner) y `lara@vintti.com` (AM, agregada 2026-09-04). Sin env
+var de por medio, para que una variable mal seteada no pueda redirigir el reporte ni
+sumar destinatarios por error. Para tocar la lista hay que editar esa línea, y sólo a
+pedido de la owner.
 
 Requiere la migración `backend/sql/20260902_dashboard_audit.sql` corrida a mano y la env
 `DASHBOARD_AUDIT_TOKEN` (ya seteada en App Runner y como secret del repo).
