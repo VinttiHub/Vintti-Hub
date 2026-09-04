@@ -144,7 +144,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
             FROM salary_updates s
             WHERE s.candidate_id = om.candidate_id
               AND s.date IS NOT NULL
-            ORDER BY s.date::date ASC, s.update_id ASC
+            -- Desempate por update_id DESC: candidate-details.js crea DOS salary_updates
+            -- con la MISMA fecha al editar el Hire (blur de Salary con el Fee vacio
+            -- graba fee 0, y despues el blur de Fee graba el valor real). Con ASC este
+            -- fallback tomaba la fila de fee 0 y subvaluaba el MRR Fee en silencio.
+            ORDER BY s.date::date ASC, s.update_id DESC
             LIMIT 1
           ) su_earliest ON TRUE
         ),
@@ -221,7 +225,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
           LEFT JOIN LATERAL (
             SELECT s.salary, s.fee FROM salary_updates s
             WHERE s.candidate_id = am.candidate_id AND s.date IS NOT NULL
-            ORDER BY s.date::date ASC, s.update_id ASC LIMIT 1
+            -- Desempate por update_id DESC: candidate-details.js crea DOS salary_updates
+            -- con la MISMA fecha al editar el Hire (blur de Salary con el Fee vacio
+            -- graba fee 0, y despues el blur de Fee graba el valor real). Con ASC este
+            -- fallback tomaba la fila de fee 0 y subvaluaba el MRR Fee en silencio.
+            ORDER BY s.date::date ASC, s.update_id DESC LIMIT 1
           ) su_earliest ON TRUE
         ),
         a_eff AS (

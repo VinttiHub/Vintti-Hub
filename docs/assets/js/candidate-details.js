@@ -224,7 +224,31 @@ function coerceNum(x){
 
 function isValidNum(n){ return typeof n === 'number' && Number.isFinite(n); }
 
+// La API devuelve `date` en formato RFC ("Thu, 17 Sep 2026 00:00:00 GMT"), no
+// "YYYY-MM-DD". Se normaliza en UTC porque la fecha viene a medianoche UTC y con
+// getters locales un huso al oeste la corre un día para atrás.
+function ymdOf(v){
+  if (v == null) return '';
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+  const dd = String(d.getUTCDate()).padStart(2,'0');
+  return `${d.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+// Los blur de Salary y Fee pueden dispararse casi juntos (tabulando rápido). Sin
+// serializar, los dos leerían la lista ANTES de que el otro postee y ninguno
+// borraría la fila del otro: volvían los duplicados que esto viene a evitar.
+let _salaryUpdateChain = Promise.resolve();
 async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  const run = _salaryUpdateChain.then(() => _createSalaryUpdateFromInputs(source, candidateId, apiBase));
+  _salaryUpdateChain = run.catch(() => {});   // un fallo no puede cortar la cadena
+  return run;
+}
+
+async function _createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
   // Modelo confiable (API/caché), NO del pill crudo
   const modelLower = await ensureOppModelLower(candidateId, apiBase);
   const isRecruiting = (modelLower === 'recruiting');
@@ -262,13 +286,27 @@ if (isStaffing){
     if (isValidNum(uiSalary)) body.salary = uiSalary;
     if (isValidNum(uiFee))    body.fee    = uiFee;
   }
-} else {
-  // Recruiting
+} else if (isRecruiting){
+  // Recruiting: no hay fee mensual, el 0 acá es el valor real.
   if (isValidNum(uiSalary)) body.salary = uiSalary;
 
   // 🔒 Anti-400: algunos backends esperan ver al menos UNO; manda fee=0 explícito
   if (!isValidNum(body.fee)) body.fee = 0;
+} else {
+  // Modelo desconocido: ensureOppModelLower() devuelve '' si falla el fetch del
+  // hire_opportunity Y el pill no arranca con la palabra. Antes caía en la rama
+  // Recruiting y grababa fee 0 — o sea, a un hire de Staffing le escribía una fila
+  // basura. Sin saber el modelo no se graba nada.
+  console.warn('salary_update omitido: no se pudo resolver el opp_model del candidato', candidateId);
+  return;
 }
+
+// ⛔️ En Staffing el fee es parte del registro: mientras el campo esté VACÍO no hay
+//    update real que guardar. Antes se grababa fee 0 igual, así que cargar un hire
+//    nuevo dejaba DOS filas con la misma fecha (el blur de Salary con fee 0, y el de
+//    Fee con el valor bueno). Un 0 tipeado a mano sí se guarda: acá sólo se corta el
+//    campo vacío. Ver backend/sql/20260904_dedupe_salary_updates.sql.
+if (isStaffing && (!isValidNum(body.salary) || !isValidNum(body.fee))) return;
 
 // ⛔️ Si NO hay nada real que guardar (salary ni fee numéricos), no postees
 if (!isValidNum(body.salary) && !isValidNum(body.fee)) return;
@@ -285,7 +323,17 @@ if (/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
   body.date = todayYmd();
 }
 
-console.debug('POST /salary_updates payload →', body);
+// Filas que YA existen para esta misma fecha: se reemplazan, no se apilan. Editar
+// Salary y después Fee es UN update, no dos. Se listan ANTES de postear y se borran
+// DESPUÉS, para no quedar nunca sin ninguna fila si el POST falla.
+let sameDay = [];
+try {
+  const prev = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`)
+    .then(r => r.ok ? r.json() : []);
+  sameDay = (prev || []).filter(u => ymdOf(u.date) === body.date);
+} catch { sameDay = []; }
+
+console.debug('POST /salary_updates payload →', body, '| reemplaza:', sameDay.map(u => u.update_id));
 
 const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, {
   method:'POST',
@@ -295,6 +343,16 @@ const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, 
 if (!resp.ok){
   const t = await resp.text().catch(()=> '');
   throw new Error(`POST salary_update failed ${resp.status}: ${t}`);
+}
+
+for (const u of sameDay){
+  try {
+    await fetch(`${apiBase}/salary_updates/${u.update_id}`, { method:'DELETE' });
+  } catch (e) {
+    // Si el borrado falla queda una fila de más, pero los datasets ya desempatan
+    // por update_id DESC y se quedan con la nueva: el número no se rompe.
+    console.warn('no se pudo borrar el salary_update viejo', u.update_id, e);
+  }
 }
 
 
