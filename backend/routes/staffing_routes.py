@@ -234,6 +234,9 @@ HIRES_CTE = """
           CASE WHEN CAST(ho.end_date AS TEXT) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                THEN LEFT(TRIM(CAST(ho.end_date AS TEXT)), 10)::date END
         ) AS end_dash,
+        -- churn_d: el día en que se marcó la baja en la base (`carga_inactive`),
+        -- no el último día trabajado (ése es end_d).
+        ho.carga_inactive::date AS churn_d,
         LOWER(TRIM(COALESCE(CAST(ho.status AS TEXT), ''))) AS hire_status,
         CASE
           WHEN NULLIF(TRIM(ho.buyout_daterange), '') IS NOT NULL
@@ -269,6 +272,9 @@ HIRES_CTE = """
         h.account_id,
         MIN(h.start_d) AS start_d,
         CASE WHEN BOOL_OR(h.end_d IS NULL) THEN NULL ELSE MAX(h.end_d) END AS end_d,
+        -- Misma puerta que end_d: si al par le queda un hire abierto no hay baja
+        -- que mostrar, aunque una fila vieja tenga carga_inactive de un paso anterior.
+        CASE WHEN BOOL_OR(h.end_d IS NULL) THEN NULL ELSE MAX(h.churn_d) END AS churn_d,
         MAX(h.buyout_d) AS buyout_d,
         -- Vigencia = la misma regla que el GMRR del dashboard
         -- (gmrr_contractors_detail / staffing_window_summary) y que
@@ -358,6 +364,7 @@ HIRES_CTE = """
         cu.account_id,
         cu.start_d,
         cu.end_d,
+        cu.churn_d,
         cu.buyout_d,
         cu.vigente,
         MAX(e.hire_opp_id)    FILTER (WHERE e.rn_primary = 1) AS hire_opp_id,
@@ -370,7 +377,8 @@ HIRES_CTE = """
         MAX(e.inactive_vinttierror)     FILTER (WHERE e.rn_primary = 1) AS inactive_vinttierror
       FROM cut cu
       LEFT JOIN eff e ON e.candidate_id = cu.candidate_id AND e.account_id = cu.account_id
-      GROUP BY cu.candidate_id, cu.account_id, cu.start_d, cu.end_d, cu.buyout_d, cu.vigente
+      GROUP BY cu.candidate_id, cu.account_id, cu.start_d, cu.end_d, cu.churn_d,
+               cu.buyout_d, cu.vigente
     )
 """
 
@@ -391,6 +399,7 @@ PAIRS_SELECT = """
       LOWER(NULLIF(TRIM(COALESCE(o.opp_hr_lead, '')), ''))    AS hr_lead_email,
       p.start_d::text                                        AS start_date,
       p.end_d::text                                          AS end_date,
+      p.churn_d::text                                        AS churn_date,
       p.buyout_d::text                                       AS buyout_month,
       COALESCE(p.salary, 0)::bigint                          AS salary,
       COALESCE(p.fee, 0)::bigint                             AS fee,
@@ -446,6 +455,7 @@ ORPHANS_SQL = """
       NULL::text            AS hr_lead_email,
       NULL::text            AS start_date,
       NULL::text            AS end_date,
+      NULL::text            AS churn_date,
       NULL::text            AS buyout_month,
       0::bigint             AS salary,
       0::bigint             AS fee,
@@ -549,7 +559,8 @@ def staffing_database_csv():
     cols = [
         ("candidate_name", "Candidate"), ("status", "Status"), ("mail", "Mail"),
         ("performance", "Performance"), ("client_name", "Client"), ("country", "Country"),
-        ("start_date", "Starting Date"), ("end_date", "End date"), ("platform", "Platform"),
+        ("start_date", "Starting Date"), ("end_date", "End date"), ("churn_date", "Churn date"),
+        ("platform", "Platform"),
         ("salary", "Salary"), ("equipment", "Equipment"), ("provider", "Provider"),
         ("recruiter", "Recruiter"), ("notes", "Comments"),
     ]
