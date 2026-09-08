@@ -1,0 +1,33 @@
+name: Monthly AE commissions
+
+# Levanta la data del mes vencido para liquidar comisiones de Account Executives
+# y la manda por mail. Corre el dia 1 porque eso es lo que pide la spec: el 1 de
+# septiembre se levantan todos los cierres de agosto.
+#
+# La corrida es sincronica (tres queries), asi que este job SI falla si el
+# reporte no se pudo generar. Es a proposito: un mes sin data es un mes sin
+# liquidacion, y tiene que verse en rojo.
+on:
+  schedule:
+    - cron: "0 11 1 * *"      # dia 1, 11:00 UTC = 08:00 Argentina / 05:00 Guatemala
+    # NO bajar esta hora por debajo de las 03:00 UTC. Sin `period`, el backend
+    # reporta el mes vencido respecto de HOY en hora Argentina (UTC-3): a las
+    # 02:00 UTC del 1-oct en Argentina todavia es 30-sep, y el reporte saldria
+    # con agosto en vez de septiembre.
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Mes a reportar (YYYY-MM). Vacio = mes vencido."
+        required: false
+        default: ""
+
+jobs:
+  ae-commissions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generar y enviar el reporte
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/ae-commissions/run?trigger=cron&period=${{ github.event.inputs.period }}"

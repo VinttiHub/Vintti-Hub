@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comisiones AE · Vintti Hub</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
+  <link rel="stylesheet" href="./assets/css/ae-commissions.css?v=6" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content page aec-page">
+
+    <!-- Sin permiso: se muestra el candado en vez de redirigir, igual que CV Review. -->
+    <section class="aec-denied" id="aecDenied" hidden>
+      <i class="fa-solid fa-lock"></i>
+      <h2>Sin acceso</h2>
+      <p>Esta sección está limitada al equipo que liquida las comisiones de Account Executives.</p>
+      <a class="aec-btn" href="opportunities.html">Volver a Opportunities</a>
+    </section>
+
+    <div id="aecApp" hidden>
+      <header class="aec-head">
+        <div>
+          <h1 class="aec-head__title">Comisiones AE</h1>
+          <p class="aec-head__sub" id="aecSub">Data mensual para el cálculo de comisiones de Account Executives.</p>
+        </div>
+        <div class="aec-head__actions">
+          <label class="aec-field">
+            <span class="aec-field__label">Mes</span>
+            <!-- select y no <input type="month">: Safari no lo soporta y lo degrada
+                 a un campo de texto libre. Las opciones las llena el JS. -->
+            <select class="aec-field__input aec-field__select" id="aecMonth"></select>
+          </label>
+          <button type="button" class="aec-btn" id="aecExportCsv">
+            <i class="fa-solid fa-file-arrow-down"></i> Export CSV
+          </button>
+        </div>
+      </header>
+
+      <p class="aec-error" id="aecError" hidden></p>
+
+      <div class="aec-kpis" id="aecKpis"></div>
+
+      <div class="aec-tabs" role="tablist">
+        <button type="button" class="aec-tab is-active" data-tab="staffing" role="tab">
+          Staffing<span class="aec-tab__count" data-count="staffing">0</span>
+        </button>
+        <button type="button" class="aec-tab" data-tab="recruiting" role="tab">
+          Recruiting<span class="aec-tab__count" data-count="recruiting">0</span>
+        </button>
+        <button type="button" class="aec-tab" data-tab="m3" role="tab">
+          M3 · Replacements<span class="aec-tab__count" data-count="m3">0</span>
+        </button>
+      </div>
+
+      <section class="aec-panel is-active" data-panel="staffing">
+        <div class="aec-card"><div id="aecTableStaffing" class="aec-loading">Cargando…</div></div>
+      </section>
+
+      <section class="aec-panel" data-panel="recruiting">
+        <div class="aec-card"><div id="aecTableRecruiting" class="aec-loading">Cargando…</div></div>
+      </section>
+
+      <section class="aec-panel" data-panel="m3">
+        <div class="aec-card">
+          <div id="aecTableM3" class="aec-loading">Cargando…</div>
+          <p class="aec-foot">
+            Bajas reales (sin buyouts) ocurridas <strong>en el mes</strong> dentro de los
+            primeros 3 meses del candidato, así cada caída se reporta una sola vez.
+            No coincide con el detalle de la card de churn M3 del dashboard, y no tiene
+            por qué: esa card mide una tasa sobre los que arrancaron en los últimos 90
+            días, y además no filtra por AE.
+          </p>
+        </div>
+      </section>
+
+      <div id="aecNotice"></div>
+    </div>
+  </main>
+
+  <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260908-aec2" defer></script>
+  <script src="./assets/js/ae-commissions.js?v=7" defer></script>
+</body>
+</html>

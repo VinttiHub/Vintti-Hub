@@ -154,6 +154,13 @@
       'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
     ]).has(email));
 
+    // Comisiones AE. Cosmetico: el gate real es AE_COMMISSIONS_ALLOWED en
+    // backend/routes/ae_commissions_routes.py, y las dos listas se mantienen en
+    // sincronia a mano. Bahia se suma cuando lo pida la owner.
+    setDisplay('aeCommissionsLink', new Set([
+      'pgonzales@vintti.com','bahia@vintti.com','lara@vintti.com','agustin@vintti.com'
+    ]).has(email));
+
     // Summary link
     const summaryLink = document.getElementById('summaryLink');
     const allowedEmails = new Set([
