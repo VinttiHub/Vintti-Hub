@@ -1070,8 +1070,10 @@
     <div class="grid skpi-grid" data-subtab="staffing">
 
       <!-- Vida promedio · SÓLO ACTIVAS (el reloj sigue corriendo: es un piso, no la vida final).
-           Excluye las que arrancaron hace menos de 3 meses (_ACTIVE_MIN_MONTHS en
-           _position_chains.py): todavía no tuvieron tiempo de durar y tiraban el promedio abajo. -->
+           Excluye las que arrancaron hace menos de _ACTIVE_MIN_MONTHS meses calendario (hoy 4,
+           en _position_chains.py): todavía no tuvieron tiempo de durar y tiraban el promedio abajo.
+           OJO: los rótulos visibles siguen diciendo "3+ meses" por pedido de la dueña (2026-09-08),
+           para no cambiar cómo se viene reportando el número. El piso real es el de la constante. -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">Vida promedio · Activas</span>

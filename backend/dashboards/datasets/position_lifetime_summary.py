@@ -13,7 +13,7 @@ from datetime import date
 
 from ._now import today_ar
 from ._position_chains import (
-    ACTIVE_MIN_MONTHS,
+    ACTIVE_MIN_MONTHS_LABEL,
     ACTIVE_YOUNG_SQL,
     CHAIN_CTES,
     WINDOW_FILTER,
@@ -51,8 +51,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # El drawer muestra qué recorte está mirando; que salga del dataset evita que la
     # etiqueta y los números se desincronicen.
     scope_label = {
+        # Los rótulos usan ACTIVE_MIN_MONTHS_LABEL, no el piso real: la dueña pidió
+        # dejar el texto como venía. Ver _position_chains.py.
         "all": "Activas + cerradas",
-        "active": f"Sólo activas · {ACTIVE_MIN_MONTHS}+ meses",
+        "active": f"Sólo activas · {ACTIVE_MIN_MONTHS_LABEL}+ meses",
         "closed": "Sólo cerradas",
     }[scope]
 
@@ -140,7 +142,7 @@ DATASET = {
         {"key": "positions_total", "label": "Posiciones", "type": "number"},
         {"key": "positions_active", "label": "Posiciones activas", "type": "number"},
         {"key": "positions_closed", "label": "Posiciones cerradas", "type": "number"},
-        {"key": "positions_active_young", "label": f"Activas con menos de {ACTIVE_MIN_MONTHS} meses (excluidas)", "type": "number"},
+        {"key": "positions_active_young", "label": f"Activas con menos de {ACTIVE_MIN_MONTHS_LABEL} meses (excluidas)", "type": "number"},
         {"key": "positions_with_replacement", "label": "Posiciones con reemplazo", "type": "number"},
         {"key": "positions_repl_1", "label": "Posiciones reemplazadas 1 vez", "type": "number"},
         {"key": "positions_repl_2plus", "label": "Posiciones reemplazadas 2+ veces", "type": "number"},

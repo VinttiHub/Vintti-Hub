@@ -44,6 +44,22 @@ _MAX_DEPTH = 12
 # Stages que NO cuentan como "reemplazo abierto" (ya se decidieron o se abandonó).
 _CLOSED_STAGES = "('Close Win', 'Closed Lost', 'Stop', '')"
 
+# Piso de madurez para el scope "activas" (decisión de la dueña: 3 meses el
+# 2026-09-01, extendido a "all" el 2026-09-04, subido a 4 el 2026-09-08).
+# Una posición que arrancó hace 3 semanas entra al promedio con 0,7 meses y lo tira
+# abajo, pero no dice NADA sobre cuánto va a durar: todavía no tuvo tiempo de durar.
+# Vive ACÁ ARRIBA porque se inyecta dentro de CHAIN_CTES (columna `madura`): el
+# umbral se toca en este único lugar.
+# NUNCA aplica a "cerradas": un asiento de 1 mes que terminó duró un mes de verdad,
+# y sacarlo inflaría el promedio.
+_ACTIVE_MIN_MONTHS = 4
+
+# Meses que dicen los ROTULOS de las cards y del drawer. La dueña pidió (2026-09-08)
+# dejar el texto como venía ("3+ meses") aunque el piso real haya subido a 4, para no
+# cambiar cómo se viene reportando el número. Está separado a propósito: si algún día
+# el rótulo tiene que acompañar al piso, se iguala a _ACTIVE_MIN_MONTHS y listo.
+_ACTIVE_MIN_MONTHS_LABEL = 3
+
 # Bloque WITH RECURSIVE compartido. El dataset que lo use arranca con
 # `WITH RECURSIVE ` + CHAIN_CTES + su propio SELECT (o CTEs extra encadenadas).
 # Params requeridos: %(corte)s. El filtro de ventana lo aplica cada dataset sobre
@@ -153,13 +169,21 @@ CHAIN_CTES = """
             ROUND(
               ((COALESCE(g.pos_end, %(corte)s::date) - g.pos_start)::numeric / 30.44),
               1
-            ) AS months
+            ) AS months,
+            -- Piso de madurez, en meses CALENDARIO. NO se compara contra `months`:
+            -- ese valor está redondeado a un decimal, así que una posición de 90 días
+            -- daba 2,96 -> 3,0 y pasaba un umbral de 3 sin haber cumplido 3 meses.
+            -- Acá se compara la fecha de verdad, que además respeta los meses de
+            -- distinto largo. Sólo lo usan los scopes con activas; en cerradas la vida
+            -- ya es definitiva y no se recorta nada.
+            (COALESCE(g.pos_end, %(corte)s::date) >= g.pos_start + INTERVAL '__MIN_MONTHS__ months')
+                                                                          AS madura
           FROM agg g
           JOIN hires r ON r.opportunity_id = g.root_opp
           LEFT JOIN open_repl orp ON orp.root_opp = g.root_opp
           WHERE g.pos_start IS NOT NULL
         )
-""".replace("__MAX_DEPTH__", str(_MAX_DEPTH)).replace("__CLOSED_STAGES__", _CLOSED_STAGES)
+""".replace("__MAX_DEPTH__", str(_MAX_DEPTH)).replace("__CLOSED_STAGES__", _CLOSED_STAGES).replace("__MIN_MONTHS__", str(_ACTIVE_MIN_MONTHS))
 
 
 # Filtro de ventana compartido. Una posición entra si estuvo VIVA en algún momento
@@ -170,42 +194,35 @@ WINDOW_FILTER = """
             AND (p.pos_end IS NULL OR p.pos_end >= %(win_ini)s::date)
 """
 
-# Piso de madurez para el scope "activas" (decisión de la dueña, 2026-09-01).
-# Una posición que arrancó hace 3 semanas entra al promedio con 0,7 meses y lo tira
-# abajo, pero no dice NADA sobre cuánto va a durar: todavía no tuvo tiempo de durar.
-# Con el corte en 3 meses el promedio de activas mide posiciones ya asentadas.
-# Sólo aplica a "activas": en cerradas un asiento de 1 mes SÍ es información real
-# (duró un mes de verdad), y el total queda como el universo completo sin recortes.
-_ACTIVE_MIN_MONTHS = 3
-
 # Scope de la sección Position Lifetime: todas / sólo activas / sólo cerradas.
 # "Activa" incluye "En reemplazo" (la silla sigue siendo nuestra); "cerrada" incluye
 # Buyout (el asiento terminó igual, aunque no sea churn real).
 # OJO con las activas: su reloj sigue corriendo, así que su vida es un PISO, no el
 # total final — por eso el promedio de activas y el de cerradas no son comparables.
+# El piso de madurez entra por la columna `madura` (ver CHAIN_CTES): el umbral vive
+# en _ACTIVE_MIN_MONTHS y la comparación es por fecha calendario, no por `months`.
 _SCOPE_SQL = {
     # 'all' aplica el MISMO piso de madurez que 'active': si no, el total cuenta
     # activas de 1 mes que la card de Activas deja afuera, y los tres numeros
-    # dejan de cerrar entre si (activas 77 + cerradas 115 != total 210). El piso
-    # NO se aplica a las cerradas: una posicion que duro un mes y termino tiene
-    # una vida real de un mes, y sacarla falsearia el promedio hacia arriba.
+    # dejan de cerrar entre si (activas + cerradas != total). El piso NO se aplica
+    # a las cerradas: una posicion que duro un mes y termino tiene una vida real de
+    # un mes, y sacarla falsearia el promedio hacia arriba.
     "all": (
         "          WHERE estado NOT IN ('Activa', 'En reemplazo')\n"
-        f"             OR months >= {_ACTIVE_MIN_MONTHS}\n"
+        "             OR madura\n"
     ),
     "active": (
         "          WHERE estado IN ('Activa', 'En reemplazo')\n"
-        f"            AND months >= {_ACTIVE_MIN_MONTHS}\n"
+        "            AND madura\n"
     ),
     "closed": "          WHERE estado NOT IN ('Activa', 'En reemplazo')\n",
 }
 
 # SQL del recorte de madurez, para que el summary pueda contar cuántas activas quedan
-# afuera. Vive acá para que el umbral se toque en UN solo lugar.
-ACTIVE_YOUNG_SQL = (
-    f"estado IN ('Activa', 'En reemplazo') AND months < {_ACTIVE_MIN_MONTHS}"
-)
+# afuera. Vive acá para que el criterio se toque en UN solo lugar.
+ACTIVE_YOUNG_SQL = "estado IN ('Activa', 'En reemplazo') AND NOT madura"
 ACTIVE_MIN_MONTHS = _ACTIVE_MIN_MONTHS
+ACTIVE_MIN_MONTHS_LABEL = _ACTIVE_MIN_MONTHS_LABEL
 
 _SCOPE_ALIASES = {
     "active": "active", "activa": "active", "activas": "active", "abiertas": "active",
