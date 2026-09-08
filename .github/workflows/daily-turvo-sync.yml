@@ -1,0 +1,49 @@
+name: Daily turbo sync
+
+# Trae del Google Calendar de cada recruiter las reuniones "turbo" y las persiste en la
+# tabla `turvo`, que alimenta las 4 KPIs de turbo de la pestana Ops del dashboard.
+#
+# Existe porque el unico disparador era abrir una oportunidad en la UI: entre el
+# 2026-08-06 y el 2026-09-08 nadie abrio ninguna con turbos, la tabla quedo congelada y
+# las cards mostraron "—" durante un mes sin que nada avisara. La auditoria semanal lo
+# reporto recien como 10 hallazgos `low` indistinguibles de "no hubo movimiento".
+#
+# Corre todos los dias, y los lunes ANTES que weekly-dashboard-audit (11:00 UTC) para
+# que la auditoria mire datos frescos.
+on:
+  schedule:
+    - cron: "0 10 * * *"      # 10:00 UTC = 07:00 Argentina / 04:00 Guatemala
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sincronizar turbos
+        run: |
+          set -euo pipefail
+          # A diferencia de la auditoria, este endpoint responde sincronico: si el sync
+          # no arranca (backend caido, token mal), --fail-with-body voltea el job.
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Turvo-Token: ${{ secrets.TURVO_SYNC_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/turvo/sync" | tee sync.json
+
+      - name: Fallar si algun calendario no se pudo leer
+        run: |
+          # El endpoint devuelve 200 aunque un recruiter tenga el token revocado: sin
+          # este chequeo volveriamos al fallo silencioso que el sync existe para evitar.
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open("sync.json"))
+          fallaron = d.get("recruiters_failed") or []
+          sin_token = d.get("recruiters_without_tokens") or []
+          s = d.get("stats", {})
+          print(f"insertados={s.get('inserted')} duplicados={s.get('duplicates')} "
+                f"sin vacante en el titulo={s.get('skipped_no_opportunity')}")
+          if sin_token:
+              print(f"::warning::sin Google Calendar conectado: {', '.join(sin_token)}")
+          if fallaron:
+              print(f"::error::calendarios que fallaron: {', '.join(fallaron)}")
+              sys.exit(1)
+          PY

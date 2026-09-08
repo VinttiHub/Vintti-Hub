@@ -16,6 +16,7 @@ es exactamente el momento en que la gente lo mira.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 import time
@@ -34,6 +35,8 @@ WINDOW_EXEMPT = re.compile(
 
 # Igual que dashboards/executor.py: si un dataset devuelve exactamente esto,
 # la lista vino truncada y cualquier suma o conteo sobre ella miente.
+log = logging.getLogger(__name__)
+
 ROW_LIMIT = 5000
 STATEMENT_TIMEOUT = os.environ.get("DASHBOARD_AUDIT_STMT_TIMEOUT", "25s")
 
@@ -147,14 +150,46 @@ def run(topo=None, tab=None, progress=None) -> tuple:
             execs[comp_key] = _execute(conn, comp_key, node.chart_key, dataset_key, filters)
             if progress:
                 progress(i, len(wanted), execs[comp_key])
+
+        # Se mide con la conexion todavia abierta: pregunta por la TABLA, no por los
+        # datasets, que es la unica forma de ver una ingesta muerta (ver R26).
+        ingest_probe = ingest_freshness(conn)
     finally:
         conn.close()
 
     ctx = R.Context(topo=topo, execs=execs, charts=charts)
     ctx.window_probe = window_contrast(execs, topo, charts, progress=progress)
+    ctx.ingest_probe = ingest_probe
     findings = R.run_all(ctx)
     findings.extend(_row_limit_findings(ctx, execs))
     return findings, execs, topo
+
+
+def ingest_freshness(conn) -> dict:
+    """MAX(fecha) de cada tabla alimentada por una integracion externa (R26).
+
+    Consulta la tabla y no el dataset a proposito: cuando la ingesta muere, la ventana
+    del dashboard viene vacia y no queda ninguna fila cuya fecha mirar. Los nombres de
+    tabla y columna salen del registro fijo `R.INGEST_SOURCES`, nunca de un filtro, asi
+    que interpolarlos en el SQL es seguro.
+    """
+    from datetime import date
+
+    out = {}
+    today = date.today()
+    for src in R.INGEST_SOURCES:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'SELECT MAX({src["column"]})::date FROM {src["table"]}')
+                newest = cur.fetchone()[0]
+        except Exception as exc:  # noqa: BLE001 - una sonda rota no puede voltear la corrida
+            log.warning("ingest_freshness fallo para %s: %s", src["table"], exc)
+            continue
+        out[src["table"]] = {
+            "newest": newest.isoformat() if newest else None,
+            "age_days": (today - newest).days if newest else None,
+        }
+    return out
 
 
 def _row_limit_findings(ctx, execs) -> list:

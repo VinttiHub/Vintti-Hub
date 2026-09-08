@@ -151,8 +151,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # matching acpa_history.
     window_raw = str(filters.get("event_window") or "").strip().lower()
     event_mode = bool(window_raw)
-    # Narrow event-mode results to accounts whose FIRST-EVER Recruiting close
-    # falls in the window. Matches "new clients · Recruiting" card semantics.
+    # Narrow results to accounts whose FIRST-EVER Recruiting close falls in the window.
+    # Matches "new clients · Recruiting" card semantics.
+    #
+    # Se evalúa ANTES que event_mode a propósito. Antes sólo aplicaba junto con
+    # `event_window`, así que al abrir el drawer sin tocar ningún botón de ventana el
+    # filtro se caía y la lista mostraba TODOS los clientes Recruiting activos: el hero
+    # decía 0 y el detalle 27 (hallazgo hero_vs_detail de la auditoría del 2026-09-07).
     first_close_only = str(filters.get("first_close_only") or "").strip().lower() in ("1", "true", "yes")
     if event_mode:
         win_ini, win_fin = _window_bounds(window_raw, corte)
@@ -163,9 +168,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
     modelo_lc = modelo.lower()  # 'staffing' | 'recruiting' | 'total'
 
-    if event_mode and first_close_only:
+    if first_close_only:
         # New-client semantics: restrict to accounts whose FIRST Recruiting
         # close_d falls in the window (the same set the recruiting card counts).
+        # La ventana ya quedó resuelta arriba: con `event_window` la fija
+        # `_window_bounds`, sin él `window_bounds(filters)` — el mismo helper que usa
+        # la card, así que detalle y número grande miran siempre el mismo rango.
         sql += """,
         first_recruiting_close AS (
           SELECT account_id, MIN(close_d) AS first_close_d

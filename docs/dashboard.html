@@ -7324,7 +7324,7 @@
               </div>
             </section>
             <section class="kpi-drawer__section" data-drawer-detail-section="new-clients-recruiting">
-              <h4 class="kpi-drawer__section-title">Detalle · clientes Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-override-first-close-only="true" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware data-drawer-window-target="new-clients-recruiting">—</span>
+              <h4 class="kpi-drawer__section-title">Detalle · clientes nuevos de Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-override-first-close-only="true" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware="on-demand" data-drawer-window-target="new-clients-recruiting">—</span>
                 <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="new-clients-recruiting" aria-label="Volver a vista por mes">—</button>
                 <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-clients-recruiting" hidden></span>
               </h4>
@@ -7332,10 +7332,11 @@
                    data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-override-first-close-only="true" data-bind="rollup-list"
                    data-group-by="client_name" data-sub-template="{n} candidatos"
                    data-list-date="start_date" data-limit="80"
-                   data-month-aware
+                   data-month-aware="on-demand"
+                   data-empty-text="Sin clientes nuevos de Recruiting en la ventana."
                    data-drawer-window-target="new-clients-recruiting"></div>
             </section>
-            <p class="kpi-drawer__note">Es "nuevo cliente" en Recruiting si no había tenido ningún Recruiting close win antes. La lista de abajo muestra todos los clientes Recruiting activos en la ventana (no solo "nuevos") — si querés clientes nuevos estrictos (Staffing+Recruiting), abrí el drawer de New clients en Sales.</p>
+            <p class="kpi-drawer__note">Es "nuevo cliente" en Recruiting si no había tenido ningún Recruiting close win antes. La lista de abajo muestra esos mismos clientes, así que su cuenta coincide con el número grande — si querés clientes nuevos estrictos (Staffing+Recruiting), abrí el drawer de New clients en Sales; si buscás todos los Recruiting activos (no sólo los nuevos), está el drawer de Active clients · Recruiting.</p>
           </div>
         </div>
 

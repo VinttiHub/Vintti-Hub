@@ -402,13 +402,6 @@ def r12_cross_tab_divergence(ctx) -> list:
     return out
 
 
-ALL_RULES = [
-    r01_dataset_error, r02_field_missing, r03_empty_rows, r04_blank_value,
-    r05_pct_out_of_range, r07_negative_count, r08_hero_vs_detail,
-    r12_cross_tab_divergence,
-]
-
-
 def run_all(ctx, only=None) -> list:
     rules = [r for r in ALL_RULES if not only or r.__name__.split("_")[0] in only]
     out = []
@@ -633,9 +626,71 @@ def r09_detail_ignores_window(ctx) -> list:
     return out
 
 
+# --- R26 ---------------------------------------------------------------------
+# Tablas que se llenan desde una integracion externa y no desde la operacion diaria en
+# la app. Cuando una de estas deja de recibir filas no hay ningun sintoma visible: las
+# cards que dependen de ella se vacian y se leen como "no hubo movimiento".
+#
+# R13 no puede detectarlo. R13 mira la fecha mas nueva DENTRO del dataset, y un dataset
+# sin filas esta exento; justamente lo que produce una ingesta muerta es una ventana
+# vacia. Por eso `turvo` estuvo un mes sin sincronizar (2026-08-06 -> 2026-09-08) con
+# las 4 KPIs de turbo en "—", y la auditoria del 2026-09-07 lo reporto como 10
+# hallazgos `low` indistinguibles del ruido semanal.
+#
+# El registro se mantiene corto a proposito: una entrada por integracion real, con un
+# umbral pensado para su cadencia. No es una regla generica sobre 1212 nodos.
+INGEST_SOURCES = (
+    {
+        "table": "turvo",
+        "column": "meeting_date",
+        "max_days": 21,
+        "label": "turbos del Google Calendar",
+        "datasets": re.compile(r"^turbo_"),
+        "fix": "el sync diario (.github/workflows/daily-turvo-sync.yml -> POST /turvo/sync)",
+    },
+)
+
+
+def r26_ingest_stale(ctx) -> list:
+    """Una tabla alimentada por una integracion externa dejo de recibir filas."""
+    probe = getattr(ctx, "ingest_probe", None) or {}
+    out = []
+    for src in INGEST_SOURCES:
+        info = probe.get(src["table"])
+        if not info or info.get("age_days") is None:
+            continue
+        age = info["age_days"]
+        if age <= src["max_days"]:
+            continue
+        # Se cuelga de una card que dependa de esa tabla, para que el triage caiga en
+        # la pantalla afectada y no en un hallazgo sin ubicacion.
+        node = next(
+            (n for n in ctx.topo.nodes
+             if ctx.ex(n) is not None
+             and src["datasets"].search(ctx.ex(n).dataset_key or "")),
+            None,
+        )
+        # Con --tab acotado puede no haber ninguna card de esa tabla en la corrida;
+        # el hallazgo sigue siendo valido, solo que sin donde apuntar.
+        base = ctx._base(node) if node is not None else {
+            "where": f"Ingesta externa · tabla {src['table']}"
+        }
+        out.append(Finding(
+            rule="ingest_stale", severity=HIGH,
+            message=(f"No entran {src['label']} desde hace {age} dias (el mas nuevo es "
+                     f"del {info['newest']}). Las cards que dependen de esto muestran "
+                     f"'—' como si no hubiera habido movimiento. Revisar {src['fix']}"),
+            observed=f"{info['newest']} ({age}d)",
+            expected=f"< {src['max_days']} dias",
+            **{**base, "field": f"{src['table']}.{src['column']}"},
+        ))
+    return out
+
+
 ALL_RULES = [
     r01_dataset_error, r02_field_missing, r03_empty_rows, r04_blank_value,
     r05_pct_out_of_range, r06_ratio_inverted, r07_negative_count,
     r08_hero_vs_detail, r09_detail_ignores_window, r11_mix_not_100,
     r12_cross_tab_divergence, r13_stale_data, r14_duplicate_rows, r16_slow_query,
+    r26_ingest_stale,
 ]
