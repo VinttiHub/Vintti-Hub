@@ -967,8 +967,15 @@ def leader_update_timeoff(req_id: int):
             html_content=html
         )
         if new_status == "approved":
+            # OJO: SendGrid rechaza el mensaje ENTERO (400 "Each email address in the
+            # personalization block should be unique between to, cc, and bcc") si una
+            # direccion esta a la vez en `to` y en `cc`. Cuando quien pedia las vacaciones
+            # era una de estas tres, el mail de aprobacion no le llegaba a NADIE: ni a
+            # ella ni a las otras dos. Por eso el destinatario se saca del CC.
+            recipient = str(rec.get("user_email") or "").strip().lower()
             for cc_email in ("lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com"):
-                msg.add_cc(Cc(cc_email))
+                if cc_email != recipient:
+                    msg.add_cc(Cc(cc_email))
         sg = SendGridAPIClient(api_key)
         sg.send(msg)
     except Exception as e:

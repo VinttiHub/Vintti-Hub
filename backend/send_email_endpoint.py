@@ -61,8 +61,17 @@ def send_email_message(to_emails, subject, body, cc_emails=None):
         html_content=html_body,
     )
 
+    # SendGrid rechaza el mensaje ENTERO (400) si una direccion aparece a la vez en
+    # `to` y en `cc`, asi que no le llega a nadie. Se saca del CC lo que ya este en el
+    # TO (y los CC repetidos), comparando en minusculas.
+    _to = to_emails if isinstance(to_emails, (list, tuple, set)) else [to_emails]
+    _already = {str(e).strip().lower() for e in _to if e}
     for email in (cc_emails or []):
-        # Cc(), no Email(): sendgrid>=6 rechaza un Email genérico en add_cc.
+        addr = str(email).strip().lower()
+        if not addr or addr in _already:
+            continue
+        _already.add(addr)
+        # Cc(), no Email(): sendgrid>=6 rechaza un Email generico en add_cc.
         message.add_cc(Cc(email))
 
     response = SendGridAPIClient(api_key).send(message)
