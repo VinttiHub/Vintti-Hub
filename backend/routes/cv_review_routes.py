@@ -401,11 +401,29 @@ SKIP_REASONS = {
         "Already in 3+ client processes — Agostina has to clear this one first"),
     "client_process_blocked": (
         "Blocked by Agostina — already in 3+ client processes"),
+    # Reenvío de un batch donde sólo cambió un CV. Ver _resend_guard.
+    "already_approved": "Already approved — this CV has not changed since",
+    "unchanged": "This CV has not changed since the sales lead asked for corrections",
+    # Estos dos los devuelven _prepare_review y _insert_review desde siempre, pero no
+    # estaban acá: el fallback SKIP_REASONS.get(err, err) le mostraba a la recruiter el
+    # código crudo ("opp_not_found") en la lista de la pantalla.
+    "opp_not_found": "Opportunity not found",
+    "rejected": "Rejected by sales for this vacancy — reopen it to send a new round",
 }
 
 # Los códigos del gate, para que quien llame sepa que tiene que mirar `gate` en vez de
 # tratarlo como un skip cualquiera.
 CLEARANCE_CODES = ("client_process_pending", "client_process_blocked")
+
+# Quedaron afuera del envío, pero SÍ van a llegar al cliente: son parte del proceso, no un
+# problema. Dos consecuencias, y las dos importan:
+#   1. siguen en el borrador al cliente (regla de la owner: las correcciones NO quitan a
+#      nadie del mail — un batch de 3 se manda al cliente con los 3);
+#   2. si TODOS los skips de un envío son de estos, no hay nada roto y el endpoint devuelve
+#      200, no el 422 de "ninguno se pudo mandar".
+# Lo que NO está acá se saca del borrador porque nunca va a llegar al cliente: bloqueado o
+# esperando el OK de client process, sin CV generado, o rechazado por sales.
+BENIGN_SKIP_CODES = ("already_pending", "already_approved", "unchanged")
 
 
 def _client_process_count(cur, candidate_id):
@@ -580,12 +598,61 @@ def _prepare_review(conn, cur, candidate_id, opportunity_id, actor):
     }, None, gate
 
 
+def _resend_guard(cur, ctx):
+    """¿Este reenvío tiene algo nuevo que mandar? Devuelve un código de skip, o None.
+
+    El problema que resuelve: reenviar un batch recorría TODOS sus candidatos sin mirar cómo
+    quedó la ronda anterior. Los ya aprobados generaban una ronda N+1, se re-scoreaban con
+    OpenAI y volvían a la cola del sales lead, que tenía que aprobar de nuevo lo mismo. En un
+    caso real de 3 candidatos donde se corrigió UNO, se pagaron 3 scoreos para obtener 1, y
+    quedó registrado que la sales lead aprobó a dos de ellos en dos rondas distintas.
+
+    El corte es el CV, no el estado: `resume_hash` ya se guarda por ronda, así que "aprobado
+    y el documento no cambió" es exactamente lo que no hay que volver a mandar. Si la
+    recruiter SÍ le tocó algo a un CV aprobado, entra como ronda nueva — el sales lead aprobó
+    otro documento y tiene que ver éste.
+
+    Mira sólo la ÚLTIMA ronda: las viejas ya se decidieron sobre otros documentos.
+
+    Por qué un SELECT y no extender el HAVING de abajo: el HAVING es atómico y así tiene que
+    seguir para 'rejected', donde una carrera dejaría pasar un perfil cerrado. Acá el peor
+    caso de una carrera es una ronda de más — que es lo que pasa hoy SIEMPRE — y a cambio se
+    puede devolver el motivo exacto, cosa que el HAVING no permite: devuelve 0 filas y no hay
+    forma de distinguirlo de un rechazo.
+    """
+    cur.execute(
+        """
+        SELECT status, resume_hash
+        FROM cv_reviews
+        WHERE candidate_id = %s AND opportunity_id = %s
+        ORDER BY round DESC
+        LIMIT 1
+        """,
+        (ctx["candidate_id"], ctx["opportunity_id"]),
+    )
+    last = cur.fetchone()
+    if not last:
+        return None  # primer envío de este perfil
+    # Un hash vacío de un lado u otro no puede leerse como "iguales": ante la duda, se manda.
+    if not last["resume_hash"] or last["resume_hash"] != ctx["resume_hash"]:
+        return None  # el CV cambió (o no se puede saber): va como ronda nueva
+    if last["status"] == "approved":
+        return "already_approved"
+    if last["status"] == "changes_requested":
+        return "unchanged"
+    return None
+
+
 def _insert_review(conn, cur, ctx, actor, note):
     """Inserta la ronda N+1. Devuelve (row, error_code).
 
     La fila va ANTES del score a propósito: si scoreáramos primero, el usuario miraría un
     spinner de 20-60s y un doble click crearía dos rondas.
     """
+    stale = _resend_guard(cur, ctx)
+    if stale:
+        return None, stale
+
     cid, oid = ctx["candidate_id"], ctx["opportunity_id"]
     for attempt in (1, 2):  # el índice parcial puede rechazar una carrera; un retry
         try:
@@ -700,6 +767,19 @@ def submit_cv_review(candidate_id):
                          "round to send. If that was a mistake, ask the sales lead to "
                          "reopen the rejection.",
                 "code": "rejected"}), 409
+        # El botón de candidate-details ofrece "Send again · round N+1" sobre un perfil ya
+        # aprobado. Sin esta rama, la guarda de reenvío caía en el `if not inserted` de más
+        # abajo y devolvía un 500 genérico en vez de decir qué pasa.
+        if ins_err == "already_approved":
+            return jsonify({
+                "error": "The sales lead already approved this CV and it has not changed "
+                         "since. Edit the CV and it will go out as a new round.",
+                "code": "already_approved"}), 409
+        if ins_err == "unchanged":
+            return jsonify({
+                "error": "This CV has not changed since the sales lead asked for "
+                         "corrections, so there is nothing new to review.",
+                "code": "unchanged"}), 409
     except Exception:
         # Exception y no psycopg2.Error: este bloque también arma el snapshot e importa
         # ai_routes, así que un fallo no-SQL acá tiene que devolver un error limpio en vez
@@ -856,6 +936,19 @@ def submit_batch_cv_reviews(batch_id):
         _spawn_clearance_notice(pending_clearances)
 
     if not created:
+        # Si NADA se creó pero todo lo que quedó afuera es benigno (ya aprobado, ya en
+        # revisión, sin cambios que mandar), no hay ningún error: es el caso normal de
+        # reenviar un batch que ya está con sales. Un 422 acá le decía a la recruiter que
+        # algo falló cuando en realidad estaba todo bien.
+        if skipped and all(s_["code"] in BENIGN_SKIP_CODES for s_ in skipped):
+            return jsonify({
+                "batch_number": batch_number,
+                "created": [], "skipped": skipped,
+                "code": "nothing_new",
+                "message": "Everything in this batch is already with sales — "
+                           "there is nothing new to send.",
+                "ai_pending": False, "email_queued": False,
+            }), 200
         return jsonify({
             "error": "None of the candidates in this batch could be sent to review.",
             "code": "none_eligible",
@@ -868,20 +961,23 @@ def submit_batch_cv_reviews(batch_id):
     # sacar los que no van — si no, el sales lead reenvía al cliente el CV de alguien que
     # nunca se mandó a review.
     #
-    # "Quedó afuera de ESTE envío" no es lo mismo que "no va al cliente". Un candidato con
-    # already_pending YA está en revisión, de un envío anterior: el cliente lo va a ver, así
-    # que tiene que seguir en el borrador. Sacarlo mutilaba el mail — quedaba un solo
-    # candidato de un batch de dos. Los que sí se sacan son los que NO van a llegar al
-    # cliente: bloqueados, esperando el OK, sin CV, o ya rechazados para esta vacante.
-    still_pending = [s_ for s_ in skipped if s_["code"] == "already_pending"]
+    # "Quedó afuera de ESTE envío" NO es lo mismo que "no va al cliente", y la diferencia es
+    # una regla de negocio, no una tecnicidad (owner, 2026-09-09): las correcciones no quitan
+    # a nadie del mail. Un batch de 3 donde uno se mandó a corregir se le manda al cliente
+    # con los 3 — el borrador lo copia el sales lead DESPUÉS de aprobar todo, así que el que
+    # se está corrigiendo igual va a terminar llegando.
+    # Por eso se conservan los BENIGN_SKIP_CODES (ya en revisión, ya aprobado, en corrección)
+    # y sólo se saca a quien NUNCA va a llegar: bloqueado o esperando el OK de client
+    # process, sin CV generado, o rechazado por sales.
+    still_in = [s_ for s_ in skipped if s_["code"] in BENIGN_SKIP_CODES]
     keep_ids = [c["candidate_id"] for c in created] + \
-               [s_["candidate_id"] for s_ in still_pending]
+               [s_["candidate_id"] for s_ in still_in]
     client_body, dropped_ids = _prune_client_draft(client_body, keep_ids)
     by_id = {s_["candidate_id"]: s_["name"] for s_ in skipped}
     client_dropped = [by_id.get(cid) or f"Candidate {cid}" for cid in dropped_ids]
     # Sin esto, el sales lead lee "1 CV to review" arriba y un borrador con dos nombres
     # abajo, y no tiene forma de saber por qué.
-    client_pending = [s_["name"] for s_ in still_pending]
+    client_pending = [s_["name"] for s_ in still_in]
 
     # UN hilo para todo el batch: scorea los N y después manda UN mail con los N scores.
     _spawn_batch_scoring(

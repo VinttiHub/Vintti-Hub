@@ -2416,11 +2416,26 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
         } else {
           const n = (out.created || []).length;
           const skipped = out.skipped || [];
-          outcome = `✅ ${n} CV${n === 1 ? '' : 's'} sent for review.\n`
-                  + `The AI is scoring them now; the email lands in a minute or two.`;
-          if (skipped.length) {
-            outcome += `\n\n⚠️ ${skipped.length} left out:\n`
-                     + skipped.map(s => `• ${s.name}: ${s.reason}`).join('\n');
+          // "Quedó afuera" no siempre es un problema. Al reenviar un batch donde sólo se
+          // corrigió un CV, los ya aprobados se saltean a propósito — y avisarlo con ⚠️
+          // hacía parecer que algo falló justo cuando todo salió bien. Los benignos van
+          // como nota informativa; el ⚠️ queda para lo que sí hay que ir a resolver.
+          const BENIGN = ['already_approved', 'already_pending', 'unchanged'];
+          const fine = skipped.filter(s => BENIGN.includes(s.code));
+          const problems = skipped.filter(s => !BENIGN.includes(s.code));
+
+          outcome = out.code === 'nothing_new'
+            ? `✅ ${out.message || 'Nothing new to send — this batch is already with sales.'}`
+            : `✅ ${n} CV${n === 1 ? '' : 's'} sent for review.\n`
+              + `The AI is scoring ${n === 1 ? 'it' : 'them'} now; the email lands in a minute or two.`;
+
+          if (fine.length) {
+            outcome += `\n\nℹ️ ${fine.length} not re-sent (already with sales):\n`
+                     + fine.map(s => `• ${s.name}: ${s.reason}`).join('\n');
+          }
+          if (problems.length) {
+            outcome += `\n\n⚠️ ${problems.length} left out:\n`
+                     + problems.map(s => `• ${s.name}: ${s.reason}`).join('\n');
           }
           document.getElementById('approvalEmailPopup').classList.add('hidden');
         }
