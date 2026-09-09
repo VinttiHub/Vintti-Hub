@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from ._periods import window_bounds
+from ._clearances import CLIENT_PROCESS_BLOCKED_FLAG
 
 
 def _parse_date(value) -> date | None:
@@ -85,7 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # (NULL = 'x' da NULL, y COALESCE(NULL, FALSE) = FALSE).
     # Las keys de las measures NO cambian, para no romper los data-field del HTML ni
     # obligar a re-seed (mismo criterio que R5 con upsells_lara).
-    sql = """
+    sql = f"""
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
@@ -96,7 +97,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opportunity_id,
             NULLIF(o.cantidad_entrevistados, 0)::numeric AS entrevistados,
             cb.candidate_id,
-            (LOWER(TRIM(cb.status)) = 'rejected by sales') AS rechazado_por_sales
+            (LOWER(TRIM(cb.status)) = 'rejected by sales') AS rechazado_por_sales,
+            -- Bloqueado (o esperando el OK) por el gate de client process: tampoco
+            -- llegó al cliente. Ver _clearances.py. Va en el numerador y no en el
+            -- WHERE por el mismo motivo que el de arriba.
+            {CLIENT_PROCESS_BLOCKED_FLAG} AS bloqueado_client_process
           FROM candidates_batches cb
           JOIN batch b ON b.batch_id = cb.batch_id
           JOIN opportunity o ON o.opportunity_id = b.opportunity_id
@@ -117,7 +122,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             opportunity_id,
             entrevistados,
             COUNT(DISTINCT candidate_id)
-              FILTER (WHERE NOT COALESCE(rechazado_por_sales, FALSE)) AS enviados
+              FILTER (WHERE NOT COALESCE(rechazado_por_sales, FALSE)
+                        AND NOT COALESCE(bloqueado_client_process, FALSE)) AS enviados
           FROM base
           GROUP BY 1, 2
         ),

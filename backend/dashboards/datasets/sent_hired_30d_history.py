@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._clearances import CLIENT_PROCESS_NOT_BLOCKED
 
 
 def _parse_date(value) -> date | None:
@@ -50,7 +51,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
 
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    sql = f"""
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
@@ -88,6 +89,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             -- 'Client Rejected CV'), así que se compara en LOWER(TRIM(...)); el
             -- COALESCE deja pasar los status NULL, que son un envío sin decisión.
             AND COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
+            -- Bloqueado (o esperando el OK) por el gate de client process: nunca llegó
+            -- al cliente, así que tampoco es un enviado. Ver _clearances.py.
+            AND {CLIENT_PROCESS_NOT_BLOCKED}
           GROUP BY 1
         ),
         hired AS (

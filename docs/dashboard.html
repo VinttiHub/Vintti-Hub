@@ -9533,6 +9533,15 @@
               <div class="dlist" data-chart="op_table_sent_hired_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="contratado" data-limit="120"></div>
             </section>
+            <!-- Mismo bloque que en Interviewed → Sent: los que el gate dejó afuera no
+                 entran al denominador de esta card, así que se listan aparte para que se
+                 vea POR QUÉ falta gente, sin romper la paridad card↔detalle. -->
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">⛔ No enviados · client process <span class="count" data-chart="op_table_client_process_blocked_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="op_table_client_process_blocked_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="motivo" data-limit="120"
+                   data-empty-text="Nadie quedó afuera por client process en este período."></div>
+            </section>
           </div>
         </div>
 
@@ -9553,6 +9562,17 @@
               <h4 class="kpi-drawer__section-title">Candidatos enviados al cliente <span class="count" data-chart="op_table_interviewed_sent_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <div class="dlist" data-chart="op_table_interviewed_sent_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="status_final" data-limit="120"></div>
+            </section>
+            <!-- Los que el gate de client process dejó afuera. Bloque APARTE y no filas
+                 de la lista de arriba: ese título cuenta sus propias filas
+                 (data-reduce="count"), así que meter acá gente que la card NO cuenta haría
+                 que el drawer diga un número y la card otro. Vacío no molesta: sin
+                 bloqueados el contador queda en 0 y la lista sale sin filas. -->
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">⛔ No enviados · client process <span class="count" data-chart="op_table_client_process_blocked_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="op_table_client_process_blocked_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="motivo" data-limit="120"
+                   data-empty-text="Nadie quedó afuera por client process en este período."></div>
             </section>
           </div>
         </div>
@@ -9616,7 +9636,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=151" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=152" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._clearances import CLIENT_PROCESS_NOT_BLOCKED
 
 
 def _parse_date(value) -> date | None:
@@ -69,7 +70,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
 
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    sql = f"""
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
@@ -117,6 +118,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           -- 2026-08-31 (owner): los rechazados por sales no cuentan como enviados en la
           -- card, así que tampoco se listan acá. Ver sent_hired_30d_summary.
           WHERE COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
+            -- Bloqueado (o esperando el OK) por el gate de client process: nunca llegó
+            -- al cliente, así que tampoco es un enviado. Ver _clearances.py.
+            AND {CLIENT_PROCESS_NOT_BLOCKED}
         ),
         hired_any AS (
           -- R17: dos arreglos. (1) excluir hires fantasma (filas del formulario público

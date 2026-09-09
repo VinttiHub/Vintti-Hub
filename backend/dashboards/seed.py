@@ -220,6 +220,7 @@ RESET_CHART_KEYS = {
         "op_line_sent_hired_30d",
         "op_table_sent_hired_30d_detail",
         "op_kpi_sent_hired_30d",
+        "op_table_client_process_blocked_detail",
         "op_kpi_turbo_closewin_30d",
         "op_line_turbo_closewin",
         "op_table_turbo_closewin_30d_detail",
@@ -3133,6 +3134,31 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 70, "w": 6, "h": 5},
         "sort_order": 330,
+    },
+    {
+        # Los que el gate de client process dejó afuera. Va como chart APARTE y no como
+        # filas del detalle de enviados: ese detalle se cuenta con data-reduce="count" en
+        # el drawer, así que sumarle gente que la card no cuenta rompería la paridad
+        # card↔detalle (y el auditor lo levanta como hero_vs_detail).
+        "chart_key": "op_table_client_process_blocked_detail",
+        "tab_key": "operations",
+        "title": "Client process — Candidatos NO enviados (bloqueados o esperando el OK)",
+        "type": "table",
+        "dataset_key": "op_client_process_blocked_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "opportunity_id",
+                    "client_name",
+                    "opp_position_name",
+                    "candidate_name",
+                    "estado",
+                    "motivo",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 75, "w": 6, "h": 5},
+        "sort_order": 335,
     },
     {
         "chart_key": "op_kpi_interviewed_sent_30d",

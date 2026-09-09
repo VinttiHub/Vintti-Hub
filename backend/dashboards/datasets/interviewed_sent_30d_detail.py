@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from ._now import today_ar
 from ._periods import window_bounds
+from ._clearances import CLIENT_PROCESS_NOT_BLOCKED
 
 
 def _parse_date(value) -> date | None:
@@ -72,7 +73,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # total_enviados de la card, que capa al 100 por opp y sólo suma opps con dato.
     desde, hasta = window_bounds(filters)
 
-    sql = """
+    sql = f"""
         WITH base AS (
           SELECT
             b.opportunity_id,
@@ -98,6 +99,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             -- 2026-08-31 (owner): los rechazados por sales no se cuentan como enviados,
             -- así que tampoco se listan acá. Casing inconsistente en la columna → LOWER().
             AND COALESCE(LOWER(TRIM(cb.status)), '') <> 'rejected by sales'
+            -- Bloqueado (o esperando el OK) por el gate de client process: nunca llegó
+            -- al cliente, así que tampoco es un enviado. Ver _clearances.py.
+            AND {CLIENT_PROCESS_NOT_BLOCKED}
             AND (%(opportunity_id)s::int IS NULL OR b.opportunity_id = %(opportunity_id)s)
         )
         SELECT
