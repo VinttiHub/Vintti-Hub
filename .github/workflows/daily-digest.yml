@@ -1,0 +1,35 @@
+name: Daily data-entry digest
+
+# Postea a Slack los pendientes de carga: pricing de hires, job descriptions y
+# datos base de las opps, mencionando a cada duenio.
+#
+# Corre SINCRONICO y devuelve el resumen, asi que este job falla si el digest no
+# pudo calcularse O si Slack rechazo el mensaje.
+on:
+  schedule:
+    # Lun a Vie 12:00 UTC = 09:00 Argentina.
+    # Argentina es UTC-3 FIJO (sin DST desde 2009, ver dashboards/datasets/_now.py):
+    # este horario NO se corre en octubre ni en marzo. No "arreglarlo" por estacion.
+    # El scheduler de GitHub es best-effort: suele disparar 5-15 min tarde.
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = calcula y devuelve el preview, NO postea a Slack"
+        required: false
+        default: ""
+      rule:
+        description: "correr una sola regla: pricing | jd | base"
+        required: false
+        default: ""
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Postear el digest
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/daily-digest/run?trigger=cron&dry=${{ github.event.inputs.dry }}&rule=${{ github.event.inputs.rule }}"
