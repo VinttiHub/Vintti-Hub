@@ -1110,6 +1110,38 @@ def list_client_process_clearances():
         conn.close()
 
 
+@bp.route("/opportunities/<int:opportunity_id>/client_process_clearances", methods=["GET"])
+def list_opportunity_clearances(opportunity_id):
+    """Las habilitaciones de UNA vacante, para pintarlas en la pestaña Candidates.
+
+    Cualquier usuario activo, no sólo la supervisión: el punto es justamente que la
+    recruiter (y quien mire la vacante) vea POR QUÉ ese candidato no se envió, en vez de
+    que el perfil desaparezca del batch sin explicación. Es de lectura y acotado a una
+    vacante; decidir sigue siendo sólo de OVERSIGHT_EMAILS.
+    """
+    denied = _require_actor()
+    if denied:
+        return denied
+
+    ensure_cv_review_tables()
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(_CLEARANCE_SELECT + " WHERE cl.opportunity_id = %s",
+                    (CLIENT_PROCESS_STAGE, opportunity_id))
+        # Indexado por candidate_id, que es como lo va a buscar la tarjeta del candidato.
+        return jsonify({"candidates": {str(r["candidate_id"]): _serialize_clearance(r)
+                                       for r in cur.fetchall()}})
+    except Exception:
+        # Un fallo acá NO puede tumbar la pestaña: los batches se ven igual sin los chips.
+        logging.exception("cv_review: no se pudieron leer las habilitaciones de la opp %s",
+                          opportunity_id)
+        return jsonify({"candidates": {}})
+    finally:
+        cur.close()
+        conn.close()
+
+
 @bp.route("/cv_client_process_clearances/pending_count", methods=["GET"])
 def client_process_clearance_pending_count():
     denied = _require_oversight()

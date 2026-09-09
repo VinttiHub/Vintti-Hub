@@ -3991,6 +3991,7 @@ async function loadBatchesForOpportunity(opportunityId) {
   const requestId = ++batchDetailRequestId;
   container.innerHTML = '';
   window.__clientViewsMap = {};
+  window.__clearanceMap = {};
 
   try {
     const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
@@ -4021,6 +4022,17 @@ async function loadBatchesForOpportunity(opportunityId) {
       } catch (err) {
         console.warn('⚠️ Could not load client CV views', err);
       }
+    }
+
+    // Habilitaciones de client process: por qué un candidato del batch no se envió a review.
+    // Sin esto el perfil simplemente no aparecía en la cola de sales y nadie sabía por qué.
+    try {
+      const clRes = await fetch(
+        `${API_BASE}/opportunities/${opportunityId}/client_process_clearances`,
+        { headers: { 'X-User-Email': currentUserEmail() } });
+      if (clRes.ok) window.__clearanceMap = (await clRes.json()).candidates || {};
+    } catch (err) {
+      console.warn('⚠️ Could not load client process clearances', err);
     }
     if (requestId !== batchDetailRequestId) return;
 
@@ -4165,6 +4177,38 @@ function createCandidateCard(c, batchId) {
       badge.textContent = '👁️ Not opened yet';
     }
     primaryCell.appendChild(badge);
+
+    // Chip de client process. Va en la tarjeta y no sólo en el mail para que quede
+    // REGISTRO: cualquiera que abra el batch entiende por qué falta ese perfil en sales,
+    // sin tener que preguntar ni buscar el mail.
+    const cl = (window.__clearanceMap || {})[String(c.candidate_id)];
+    if (cl) {
+      const CHIP = {
+        rejected: ['⛔ Blocked — client process', '#ffe0e6', '#a30f31'],
+        pending:  ['⏳ Waiting on approval — client process', '#ffe9b8', '#8a5a00'],
+        approved: ['✅ Cleared — client process', '#e6f7ed', '#1a7a44'],
+      };
+      const [label, bg, fg] = CHIP[cl.status] || [];
+      if (label) {
+        const chip = document.createElement('span');
+        chip.className = 'client-process-badge';
+        chip.style.cssText = badge.style.cssText;
+        chip.style.background = bg;
+        chip.style.color = fg;
+        chip.textContent = label;
+        const n = cl.client_process_count ?? cl.opps_at_request;
+        // El title lleva el porqué completo: en la tarjeta no entra y truncarlo sería
+        // dejar el chip sin la única parte accionable.
+        chip.title = [
+          `In ${n} client process${n === 1 ? '' : 'es'} (limit ${cl.limit || 3}).`,
+          cl.status === 'rejected' ? `Blocked by ${cl.decided_by || '—'}.` : '',
+          cl.status === 'approved' ? `Cleared by ${cl.decided_by || '—'}.` : '',
+          cl.status === 'pending' ? 'Waiting for Agostina to approve or block.' : '',
+          cl.decision_note ? `Reason: ${cl.decision_note}` : '',
+        ].filter(Boolean).join(' ');
+        primaryCell.appendChild(chip);
+      }
+    }
   }
 
   if (isBlacklisted) {
