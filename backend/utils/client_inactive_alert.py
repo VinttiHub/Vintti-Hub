@@ -28,11 +28,14 @@ from utils.transactional_email import (
     post_transactional_email,
 )
 
+# Lista distinta (y a propósito) de CHURN_EMAIL_RECIPIENTS (routes/candidates_routes.py):
+# perder al cliente entero se escala más arriba que perder un contractor.
 CLIENT_INACTIVE_EMAIL_RECIPIENTS = [
     'mia@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'jazmin@vintti.com',
+    'manuela@vintti.com',
 ]
 
 # Texto del disparador, para que el mail diga por qué se cayó la cuenta.

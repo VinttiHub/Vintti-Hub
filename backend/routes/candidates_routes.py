@@ -53,15 +53,6 @@ CHURN_EMAIL_RECIPIENTS = [
     'lara@vintti.com',
     'agostina@vintti.com',
 ]
-# Se dispara cuando la baja de un contractor deja a la cuenta SIN ningún activo.
-# Lista distinta (y a propósito) de CHURN_EMAIL_RECIPIENTS: perder al cliente
-# entero se escala más arriba que perder un contractor.
-CLIENT_INACTIVE_EMAIL_RECIPIENTS = [
-    'mia@vintti.com',
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'jazmin@vintti.com',
-]
 _REFERENCE_CANDIDATE_FIELDS = [
     'references_notes',
     'reference_1_name',
