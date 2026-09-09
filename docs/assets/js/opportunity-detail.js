@@ -2232,6 +2232,22 @@ if (tabName === 'Candidates') {
   });
 });
 
+// Deep-link de pestaña: ?tab=candidates abre esa solapa en vez de Overview. Lo usa el mail
+// del client process check para dejar a la recruiter parada donde están sus batches, en vez
+// de hacerla entrar por Overview y buscar la pestaña.
+//
+// Va con .click() y NO llamando a activateTab(): cada pestaña tiene efectos de carga
+// colgados del listener (batches, pipeline, turbos) y hay DOS listeners distintos sobre los
+// mismos .nav-item. Reimplementar eso acá los duplicaría y se desincronizaría al primer
+// cambio. Además tiene que correr después de que los dos listeners estén registrados y
+// después del activateTab(0) de arriba, que si no lo pisa.
+(function openTabFromQuery() {
+  const wanted = (new URLSearchParams(location.search).get('tab') || '').trim().toLowerCase();
+  if (!wanted) return;
+  const tab = Array.from(tabs).find(t => t.textContent.trim().toLowerCase() === wanted);
+  if (tab) tab.click();
+})();
+
 // Botón abre popup
 aiBtn.addEventListener('click', () => {
   aiPopup.classList.remove('hidden');

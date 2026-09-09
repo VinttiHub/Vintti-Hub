@@ -144,6 +144,48 @@ CREATE TABLE IF NOT EXISTS cv_review_requirement_kind (
 )
 """
 
+# Habilitacion de Agostina para un candidato que ya esta en 3+ procesos con cliente.
+# UNA fila por (candidato, vacante) y el status evoluciona: "revertir un rechazo" es un
+# UPDATE y no hay que decidir cual de N filas manda. El precio es que solo queda la ULTIMA
+# decision (decided_by / decided_at / decision_note); se acepto a cambio de no sumar una
+# segunda tabla de eventos.
+#
+# El alcance es el PAR, no el candidato: mandarlo a otra vacante es meterlo en un proceso
+# de cliente mas, que es justo el riesgo que este gate controla, asi que vuelve a preguntar.
+#
+# opps_at_request congela en cuantos procesos estaba cuando se pidio: el conteo de hoy puede
+# ser otro, y sin este numero no se puede leer contra que se decidio.
+_CLEARANCES_DDL = """
+CREATE TABLE IF NOT EXISTS cv_client_process_clearances (
+    clearance_id    BIGSERIAL   PRIMARY KEY,
+    candidate_id    INTEGER     NOT NULL,
+    opportunity_id  INTEGER     NOT NULL,
+    status          TEXT        NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending','approved','rejected')),
+    opps_at_request SMALLINT    NOT NULL,
+    requested_by    TEXT        NOT NULL,
+    requested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_by      TEXT,
+    decided_at      TIMESTAMPTZ,
+    decision_note   TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT cv_cpc_decided_has_decider CHECK (
+        status = 'pending' OR (decided_at IS NOT NULL AND decided_by IS NOT NULL)
+    )
+)
+"""
+
+_CLEARANCES_INDEX_DDL = (
+    # El indice que hace imposible la fila duplicada, y ademas el que usa el ON CONFLICT
+    # del gate para no pedirle dos veces lo mismo a Agostina.
+    """CREATE UNIQUE INDEX IF NOT EXISTS cv_cpc_pair_uq
+         ON cv_client_process_clearances (candidate_id, opportunity_id)""",
+    """CREATE INDEX IF NOT EXISTS cv_cpc_pending_idx
+         ON cv_client_process_clearances (requested_at DESC) WHERE status = 'pending'""",
+)
+
+
 # --- migraciones sobre una tabla que YA existe -------------------------------------------
 # El camino rápido de _ensure_locked() no corre DDL cuando las tablas están, que es el caso
 # de producción. Así que un valor nuevo de `status` no entra por el CREATE TABLE: hay que
@@ -313,6 +355,33 @@ def _migrate_status_check(conn) -> None:
                  ", ".join(_STATUS_VALUES))
 
 
+def _clearances_is_current(cur) -> bool:
+    """Esta la tabla de habilitaciones? Catalogo puro, sin locks.
+
+    Mismo requisito que las otras tres: corre en CADA arranque, asi que no puede tomar un
+    solo lock o volvemos al problema que documenta _tables_exist().
+    """
+    cur.execute("SELECT to_regclass('public.cv_client_process_clearances') IS NOT NULL")
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def _migrate_clearances(conn) -> None:
+    """Crea cv_client_process_clearances. Mismos timeouts que el resto del DDL.
+
+    Tabla nueva: el CREATE no toca cv_reviews y no compite por su ACCESS EXCLUSIVE. Si aun
+    asi no consigue el lock en _LOCK_TIMEOUT se rinde y lo reintenta el proximo arranque.
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SET LOCAL lock_timeout = '{_LOCK_TIMEOUT}'")
+        cur.execute(f"SET LOCAL statement_timeout = '{_STATEMENT_TIMEOUT}'")
+        cur.execute(_CLEARANCES_DDL)
+        for stmt in _CLEARANCES_INDEX_DDL:
+            cur.execute(stmt)
+    conn.commit()
+    logging.info("cv_reviews: clearances migrada (cv_client_process_clearances)")
+
+
 def _ensure_locked() -> bool:
     global _TABLE_READY, _LAST_FAILURE_TS
     conn = None
@@ -330,6 +399,7 @@ def _ensure_locked() -> bool:
                 status_ok = _status_check_is_current(cur)
                 checklist_ok = _checklist_is_current(cur)
                 kind_cache_ok = _kind_cache_is_current(cur)
+                clearances_ok = _clearances_is_current(cur)
                 conn.commit()
                 if not status_ok:
                     _migrate_status_check(conn)
@@ -337,6 +407,8 @@ def _ensure_locked() -> bool:
                     _migrate_checklist(conn)
                 if not kind_cache_ok:
                     _migrate_kind_cache(conn)
+                if not clearances_ok:
+                    _migrate_clearances(conn)
                 _TABLE_READY = True
                 _LAST_FAILURE_TS = 0.0
                 return True
@@ -356,6 +428,9 @@ def _ensure_locked() -> bool:
             cur.execute(_CHECKLIST_DDL)
             cur.execute(_CHECKLIST_INDEX_DDL)
             cur.execute(_KIND_CACHE_DDL)
+            cur.execute(_CLEARANCES_DDL)
+            for stmt in _CLEARANCES_INDEX_DDL:
+                cur.execute(stmt)
         conn.commit()
         _TABLE_READY = True
         _LAST_FAILURE_TS = 0.0

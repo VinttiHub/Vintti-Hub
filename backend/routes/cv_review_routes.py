@@ -22,6 +22,7 @@ no puede depender del presupuesto de OpenAI.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
 import time
@@ -51,6 +52,38 @@ OVERSIGHT_EMAILS = ("pgonzales@vintti.com", "agostina@vintti.com")
 
 # Quien puede decidir además de los sales leads con rol. Corta a propósito.
 REVIEW_OVERRIDE_EMAILS = set(OVERSIGHT_EMAILS)
+
+# --- gate de "client process" ------------------------------------------------
+# Un candidato metido en muchos procesos con cliente a la vez es un problema de negocio, no
+# de documento: si lo toman en dos lados se cae una colocación. Antes esto era sólo la card
+# "Client process check" del drawer, que se pinta DESPUÉS de que el CV ya se mandó y no
+# frena nada. Acá sí frena: pasado el límite, el perfil no entra al batch hasta que la
+# supervisión lo habilita.
+#
+# Los dos valores espejan docs/assets/js/cv-review.js:1562-1563. Si tocás uno, tocá el otro
+# o el número del gate y el chip "N of 3 used" dejan de ser el mismo número.
+CLIENT_PROCESS_STAGE = "En proceso con Cliente"
+CLIENT_PROCESS_LIMIT = 3
+
+# A dónde apuntan los links de los mails. Misma env var y mismo default que admin_routes y
+# reset_password, para que el Hub tenga UNA sola noción de "dónde vive el front".
+# Local: FRONT_BASE_URL=http://localhost:5500 y los botones del mail vuelven a tu máquina
+# en vez de mandarte a producción, donde la habilitación de prueba no existe.
+FRONT_BASE_URL = os.environ.get("FRONT_BASE_URL", "https://vinttihub.vintti.com").rstrip("/")
+
+# --- modo prueba de los mails del gate ---------------------------------------
+# APAGADO: los mails salen a quien corresponde (el pedido a OVERSIGHT_EMAILS, la decisión a
+# la recruiter + OVERSIGHT_EMAILS).
+#
+# Prendiéndolo, TODO mail de client process va sólo a CLEARANCE_TEST_RECIPIENTS y no le
+# llega a nadie más — ni a agostina ni a la recruiter. Sirve para probar el circuito
+# completo sin escribirle a gente que todavía no sabe que esto existe.
+#
+# Esto NO es una lista de permisos: quién puede decidir sigue siendo OVERSIGHT_EMAILS.
+# Es a quién se le ESCRIBE, y está separado a propósito para que prender o apagar el modo
+# prueba no toque los permisos ni al revés.
+CLEARANCE_EMAIL_TEST_MODE = False
+CLEARANCE_TEST_RECIPIENTS = ("pgonzales@vintti.com",)
 
 _SALES_LEADS: set[str] = set()
 _SALES_LEADS_TS: float = 0.0
@@ -183,6 +216,24 @@ def _require_reviewer():
     if email in REVIEW_OVERRIDE_EMAILS or email in _sales_lead_emails():
         return None
     return jsonify({"error": "forbidden", "code": "not_a_reviewer"}), 403
+
+
+def _require_oversight():
+    """Decidir una habilitación de client process: sólo el par de supervisión.
+
+    A diferencia de _require_reviewer(), acá NO entran los sales leads con rol: el gate
+    existe para que un candidato no se reparta entre varias vacantes, y quien lo pide es
+    justamente el lado que quiere mandarlo. Si el sales lead de la vacante pudiera
+    autohabilitarse, el control no controlaría nada.
+
+    Falla CERRADO, igual que _require_reviewer.
+    """
+    denied = _require_active_user()
+    if denied:
+        return denied
+    if _user_email() in REVIEW_OVERRIDE_EMAILS:
+        return None
+    return jsonify({"error": "forbidden", "code": "not_oversight"}), 403
 
 
 def _require_actor():
@@ -344,11 +395,115 @@ SKIP_REASONS = {
     "no_jd": "The opportunity has no job description",
     "already_pending": "Already waiting for a sales review",
     "failed": "Could not be prepared",
+    # Los dos del gate de client process. El texto nombra a quién hay que ir a buscar: un
+    # "blocked" a secas deja a la recruiter sin saber qué hacer después.
+    "client_process_pending": (
+        "Already in 3+ client processes — Agostina has to clear this one first"),
+    "client_process_blocked": (
+        "Blocked by Agostina — already in 3+ client processes"),
 }
 
+# Los códigos del gate, para que quien llame sepa que tiene que mirar `gate` en vez de
+# tratarlo como un skip cualquiera.
+CLEARANCE_CODES = ("client_process_pending", "client_process_blocked")
 
-def _prepare_review(cur, candidate_id, opportunity_id):
-    """Valida y arma todo lo que necesita un review. Devuelve (ctx, error_code)."""
+
+def _client_process_count(cur, candidate_id):
+    """En cuántas oportunidades está HOY este candidato en proceso con cliente.
+
+    Cuenta sobre opportunity_candidates, que tiene una fila por par — acá NO hace falta el
+    dedupe por opportunity_id que sí necesita el frontend, donde los duplicados los mete el
+    LEFT JOIN con batches (ver el comentario de renderOpps en cv-review.js).
+
+    Incluye la vacante que se está mandando, igual que la card del drawer, para que el
+    número del gate y el del chip "N of 3 used" sean el mismo número.
+
+    stage_pipeline es el estado ACTUAL, no un historial: no hay tabla de historia de
+    stages, así que esto es "está hoy en N procesos", no "estuvo alguna vez".
+    """
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM opportunity_candidates
+        WHERE candidate_id = %s
+          AND TRIM(COALESCE(stage_pipeline, '')) = %s
+        """,
+        (candidate_id, CLIENT_PROCESS_STAGE),
+    )
+    row = cur.fetchone()
+    return int((row or {}).get("n") or 0)
+
+
+def _client_process_gate(conn, cur, candidate_id, opportunity_id, actor):
+    """¿Se puede mandar este perfil, o hace falta el OK de la supervisión?
+
+    Devuelve (error_code | None, info | None). `info` trae el conteo y, cuando la
+    habilitación se acaba de crear, `is_new=True` para que quien llama mande UN mail.
+
+    La habilitación es por PAR (candidato, vacante): mandarlo a otra vacante es meterlo en
+    un proceso de cliente más, que es justo el riesgo que esto controla, así que vuelve a
+    preguntar. Un OK global convertiría el gate en un trámite de una sola vez.
+    """
+    n = _client_process_count(cur, candidate_id)
+    if n < CLIENT_PROCESS_LIMIT:
+        return None, None
+
+    cur.execute(
+        """
+        SELECT clearance_id, status, opps_at_request, decided_by, decision_note
+        FROM cv_client_process_clearances
+        WHERE candidate_id = %s AND opportunity_id = %s
+        LIMIT 1
+        """,
+        (candidate_id, opportunity_id),
+    )
+    row = cur.fetchone()
+
+    if row:
+        info = {"clearance_id": row["clearance_id"], "status": row["status"],
+                "count": n, "is_new": False,
+                "decided_by": row.get("decided_by"),
+                "decision_note": row.get("decision_note")}
+        if row["status"] == "approved":
+            return None, info
+        if row["status"] == "rejected":
+            return "client_process_blocked", info
+        # pending: NO se re-inserta ni se re-mailea. Sin esto, una recruiter que re-manda el
+        # batch cinco veces le manda cinco mails iguales a la supervisión y el aviso deja de
+        # leerse.
+        return "client_process_pending", info
+
+    # ON CONFLICT DO NOTHING contra cv_cpc_pair_uq: dos envíos simultáneos del mismo batch
+    # no pueden crear dos pedidos. El que pierde la carrera vuelve a leer la fila del otro y
+    # no manda un segundo mail.
+    cur.execute(
+        """
+        INSERT INTO cv_client_process_clearances
+            (candidate_id, opportunity_id, opps_at_request, requested_by)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
+        RETURNING clearance_id, status
+        """,
+        (candidate_id, opportunity_id, n, actor),
+    )
+    created = cur.fetchone()
+    conn.commit()
+
+    if created:
+        return "client_process_pending", {"clearance_id": created["clearance_id"],
+                                          "status": "pending", "count": n, "is_new": True}
+
+    # Perdimos la carrera: hay fila, la relee el próximo intento. No mandamos mail.
+    return "client_process_pending", {"clearance_id": None, "status": "pending",
+                                      "count": n, "is_new": False}
+
+
+def _prepare_review(conn, cur, candidate_id, opportunity_id, actor):
+    """Valida y arma todo lo que necesita un review. Devuelve (ctx, error_code, gate).
+
+    `gate` sólo viene lleno cuando el candidato pasó por el gate de client process, y es lo
+    que quien llama necesita para saber si tiene que mandar el mail a la supervisión.
+    """
     cur.execute(
         """
         SELECT c.name AS candidate_name,
@@ -360,7 +515,7 @@ def _prepare_review(cur, candidate_id, opportunity_id):
     )
     candidate = cur.fetchone()
     if not candidate:
-        return None, "not_found"
+        return None, "not_found", None
 
     cur.execute(
         """
@@ -377,14 +532,23 @@ def _prepare_review(cur, candidate_id, opportunity_id):
     )
     opp = cur.fetchone()
     if not opp:
-        return None, "opp_not_found"
+        return None, "opp_not_found", None
     if not opp["linked"]:
-        return None, "not_linked"
+        return None, "not_linked", None
 
     cur.execute("SELECT * FROM resume WHERE candidate_id = %s LIMIT 1", (candidate_id,))
     snapshot = cv_review_ai.resume_snapshot(cur.fetchone() or {})
     if cv_review_ai.snapshot_is_empty(snapshot):
-        return None, "empty_resume"
+        return None, "empty_resume", None
+
+    # El gate va DESPUÉS de empty_resume y ANTES de armar la JD. Lo primero porque si el
+    # perfil no tiene CV generado gana "empty_resume": no se puede mandar igual y no tiene
+    # sentido molestar a la supervisión por algo que la recruiter todavía no terminó. Lo
+    # segundo porque armar la JD son varias lecturas que no sirven para nada si el perfil
+    # no va a salir.
+    gate_err, gate = _client_process_gate(conn, cur, candidate_id, opportunity_id, actor)
+    if gate_err:
+        return None, gate_err, gate
 
     # La JD la trae el mismo helper que usa el generador, así el juez ve exactamente la JD
     # que vio el generador (misma precedencia hr_jd → career_desc → career_reqs y el mismo
@@ -413,7 +577,7 @@ def _prepare_review(cur, candidate_id, opportunity_id):
         "has_jd": bool((jd_plain or "").strip()),
         "sales_lead": (opp["opp_sales_lead"] or "").strip().lower() or None,
         "hr_lead": (opp["opp_hr_lead"] or "").strip().lower() or None,
-    }, None
+    }, None, gate
 
 
 def _insert_review(conn, cur, ctx, actor, note):
@@ -497,8 +661,21 @@ def submit_cv_review(candidate_id):
 
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
+    # Se junta acá y se manda DESPUÉS de cerrar la conexión: _send_email hace un POST con
+    # timeout=30 y no puede correr con una conexión de RDS tomada.
+    pending_clearances = []
     try:
-        ctx, err = _prepare_review(cur, candidate_id, opportunity_id)
+        ctx, err, gate = _prepare_review(conn, cur, candidate_id, opportunity_id, actor)
+        if err in CLEARANCE_CODES:
+            # 409 y no 422: no es que falte un dato, es que falta una decisión de otra
+            # persona. La UI muestra el motivo y la recruiter re-manda cuando la tiene.
+            if gate and gate.get("is_new"):
+                pending_clearances.append(gate["clearance_id"])
+            return jsonify({
+                "error": SKIP_REASONS[err],
+                "code": err,
+                "client_process_count": (gate or {}).get("count"),
+            }), 409
         if err == "not_found":
             return jsonify({"error": "candidate not found"}), 404
         if err == "opp_not_found":
@@ -533,6 +710,7 @@ def submit_cv_review(candidate_id):
     finally:
         cur.close()
         conn.close()
+        _spawn_clearance_notice(pending_clearances)
 
     if not inserted:  # defensivo: no debería pasar, pero mejor 500 que AttributeError
         return jsonify({"error": "Could not create the review."}), 500
@@ -609,6 +787,10 @@ def submit_batch_cv_reviews(batch_id):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     created, skipped = [], []
+    # Los pedidos de habilitación que ESTE envío creó. Se manda UN mail con todos al final,
+    # y después de cerrar la conexión: N mails por un batch de N sería ruido, y _send_email
+    # hace un POST con timeout=30 que no puede correr con una conexión de RDS tomada.
+    pending_clearances = []
     batch_number = None
     try:
         cur.execute(
@@ -641,8 +823,10 @@ def submit_batch_cv_reviews(batch_id):
         for m in members:
             cid, name = m["candidate_id"], m["name"]
             try:
-                ctx, err = _prepare_review(cur, cid, opportunity_id)
+                ctx, err, gate = _prepare_review(conn, cur, cid, opportunity_id, actor)
                 if err:
+                    if gate and gate.get("is_new"):
+                        pending_clearances.append(gate["clearance_id"])
                     skipped.append({"candidate_id": cid, "name": name, "code": err,
                                     "reason": SKIP_REASONS.get(err, err)})
                     continue
@@ -669,6 +853,7 @@ def submit_batch_cv_reviews(batch_id):
     finally:
         cur.close()
         conn.close()
+        _spawn_clearance_notice(pending_clearances)
 
     if not created:
         return jsonify({
@@ -677,6 +862,26 @@ def submit_batch_cv_reviews(batch_id):
             "batch_number": batch_number,
             "created": [], "skipped": skipped,
         }), 422
+
+    # El borrador al cliente lo armó el frontend al abrir el popup, con TODOS los del batch.
+    # Acá recién se sabe quiénes entraron, así que es el único lugar donde se le pueden
+    # sacar los que no van — si no, el sales lead reenvía al cliente el CV de alguien que
+    # nunca se mandó a review.
+    #
+    # "Quedó afuera de ESTE envío" no es lo mismo que "no va al cliente". Un candidato con
+    # already_pending YA está en revisión, de un envío anterior: el cliente lo va a ver, así
+    # que tiene que seguir en el borrador. Sacarlo mutilaba el mail — quedaba un solo
+    # candidato de un batch de dos. Los que sí se sacan son los que NO van a llegar al
+    # cliente: bloqueados, esperando el OK, sin CV, o ya rechazados para esta vacante.
+    still_pending = [s_ for s_ in skipped if s_["code"] == "already_pending"]
+    keep_ids = [c["candidate_id"] for c in created] + \
+               [s_["candidate_id"] for s_ in still_pending]
+    client_body, dropped_ids = _prune_client_draft(client_body, keep_ids)
+    by_id = {s_["candidate_id"]: s_["name"] for s_ in skipped}
+    client_dropped = [by_id.get(cid) or f"Candidate {cid}" for cid in dropped_ids]
+    # Sin esto, el sales lead lee "1 CV to review" arriba y un borrador con dos nombres
+    # abajo, y no tiene forma de saber por qué.
+    client_pending = [s_["name"] for s_ in still_pending]
 
     # UN hilo para todo el batch: scorea los N y después manda UN mail con los N scores.
     _spawn_batch_scoring(
@@ -688,6 +893,8 @@ def submit_batch_cv_reviews(batch_id):
         extra_cc=extra_cc,
         client_subject=client_subject,
         client_body=client_body,
+        client_dropped=client_dropped,
+        client_pending=client_pending,
     )
 
     return jsonify({
@@ -700,7 +907,8 @@ def submit_batch_cv_reviews(batch_id):
 
 
 def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, extra_cc,
-                            client_subject=None, client_body=None):
+                            client_subject=None, client_body=None, client_dropped=None,
+                            client_pending=None):
     """Scorea los N CVs del batch y después manda UN solo mail. Fuera del request."""
     for it in items:
         ctx = it.get("_ctx") or {}
@@ -726,6 +934,8 @@ def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, ex
             extra_cc=extra_cc,
             client_subject=client_subject,
             client_body=client_body,
+            client_dropped=client_dropped,
+            client_pending=client_pending,
         )
     except Exception:
         logging.exception("cv_review batch: notification failed")
@@ -813,6 +1023,218 @@ def _store_analysis(review_id, score, analysis, ai_error):
     finally:
         cur.close()
         conn.close()
+
+
+# --- habilitaciones de client process ---------------------------------------
+
+_CLEARANCE_COLS = """
+    cl.clearance_id, cl.candidate_id, cl.opportunity_id, cl.status,
+    cl.opps_at_request, cl.requested_by, cl.requested_at,
+    cl.decided_by, cl.decided_at, cl.decision_note
+"""
+
+# El JOIN va SIEMPRE con el conteo actual al lado del congelado: entre que se pidió y que se
+# mira, el candidato pudo entrar o salir de otros procesos, y decidir contra un número viejo
+# es justo lo que este gate quiere evitar.
+_CLEARANCE_SELECT = """
+    SELECT """ + _CLEARANCE_COLS + """,
+           COALESCE(c.name, '') AS candidate_name,
+           COALESCE(o.opp_position_name, '') AS "position",
+           COALESCE(a.client_name, '') AS client_name,
+           (SELECT COUNT(*) FROM opportunity_candidates oc
+             WHERE oc.candidate_id = cl.candidate_id
+               AND TRIM(COALESCE(oc.stage_pipeline, '')) = %s) AS client_process_count
+    FROM cv_client_process_clearances cl
+    LEFT JOIN candidates  c ON c.candidate_id   = cl.candidate_id
+    LEFT JOIN opportunity o ON o.opportunity_id = cl.opportunity_id
+    LEFT JOIN account     a ON a.account_id     = o.account_id
+"""
+
+
+def _serialize_clearance(row):
+    return {
+        "clearance_id": row["clearance_id"],
+        "candidate_id": row["candidate_id"],
+        "opportunity_id": row["opportunity_id"],
+        "candidate_name": row.get("candidate_name") or "",
+        "position": row.get("position") or "",
+        "client_name": row.get("client_name") or "",
+        "status": row["status"],
+        # `opps_at_request` es contra qué se decidió; `client_process_count` es hoy.
+        "opps_at_request": row["opps_at_request"],
+        "client_process_count": row.get("client_process_count"),
+        "limit": CLIENT_PROCESS_LIMIT,
+        "requested_by": row.get("requested_by"),
+        "requested_at": _iso(row.get("requested_at")),
+        "decided_by": row.get("decided_by"),
+        "decided_at": _iso(row.get("decided_at")),
+        "decision_note": row.get("decision_note"),
+    }
+
+
+@bp.route("/cv_client_process_clearances", methods=["GET"])
+def list_client_process_clearances():
+    """La cola de la supervisión. `status` vacío o "all" trae el historial completo."""
+    denied = _require_oversight()
+    if denied:
+        return denied
+
+    status = (request.args.get("status") or "pending").strip().lower()
+    ensure_cv_review_tables()
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        params = [CLIENT_PROCESS_STAGE]
+        where = ""
+        if status and status != "all":
+            where = " WHERE cl.status = %s"
+            params.append(status)
+        # Los pendientes primero y los más viejos arriba: la cola se lee de arriba hacia
+        # abajo y lo que está esperando hace más tiempo es lo que más frena a alguien.
+        cur.execute(
+            _CLEARANCE_SELECT + where + """
+            ORDER BY (cl.status = 'pending') DESC,
+                     CASE WHEN cl.status = 'pending' THEN cl.requested_at END ASC,
+                     cl.decided_at DESC NULLS LAST
+            LIMIT 300
+            """,
+            tuple(params),
+        )
+        return jsonify([_serialize_clearance(r) for r in cur.fetchall()])
+    except Exception:
+        logging.exception("cv_review: no se pudo listar las habilitaciones")
+        return jsonify({"error": "Could not load the clearances."}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@bp.route("/cv_client_process_clearances/pending_count", methods=["GET"])
+def client_process_clearance_pending_count():
+    denied = _require_oversight()
+    if denied:
+        return denied
+    ensure_cv_review_tables()
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) AS n FROM cv_client_process_clearances "
+                    "WHERE status = 'pending'")
+        return jsonify({"pending": int((cur.fetchone() or {}).get("n") or 0)})
+    except Exception:
+        logging.exception("cv_review: no se pudo contar las habilitaciones pendientes")
+        return jsonify({"pending": 0})
+    finally:
+        cur.close()
+        conn.close()
+
+
+@bp.route("/cv_client_process_clearances/<int:clearance_id>/decision",
+          methods=["POST", "OPTIONS"])
+def decide_client_process_clearance(clearance_id):
+    """Aprobar o rechazar (o revertir) una habilitación.
+
+    A propósito SIN `WHERE status = 'pending'`: revertir un rechazo es un requisito, no un
+    accidente. Lo que sí se pide es que la decisión cambie algo — repetir la misma decisión
+    devuelve 409 en vez de pisar decided_at y perder cuándo se decidió de verdad.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    denied = _require_oversight()
+    if denied:
+        return denied
+    actor = _user_email()
+
+    data = request.get_json(silent=True) or {}
+    decision = (data.get("decision") or "").strip().lower()
+    note = (data.get("note") or "").strip() or None
+
+    if decision not in ("approved", "rejected"):
+        return jsonify({"error": "decision must be approved or rejected",
+                        "code": "bad_decision"}), 400
+    # Mismo criterio que el reject de un CV: un bloqueo sin motivo es imposible de discutir
+    # y la recruiter no sabe qué corregir.
+    if decision == "rejected" and not note:
+        return jsonify({"error": "Say why you are blocking this candidate.",
+                        "code": "note_required"}), 422
+
+    ensure_cv_review_tables()
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            """
+            UPDATE cv_client_process_clearances
+               SET status = %s, decided_by = %s, decided_at = NOW(),
+                   decision_note = %s, updated_at = NOW()
+             WHERE clearance_id = %s AND status IS DISTINCT FROM %s
+            RETURNING clearance_id, candidate_id, opportunity_id
+            """,
+            (decision, actor, note, clearance_id, decision),
+        )
+        fresh_ids = cur.fetchone()
+        if fresh_ids is None:
+            conn.rollback()
+            cur.execute("SELECT status FROM cv_client_process_clearances "
+                        "WHERE clearance_id = %s", (clearance_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "clearance not found"}), 404
+            return jsonify({"error": f"This one is already {row['status']}.",
+                            "code": "already_decided", "status": row["status"]}), 409
+        conn.commit()
+
+        # Bloquear tiene que SACARLO de la cola, no sólo impedir el próximo envío. Si el
+        # candidato ya tenía una ronda pendiente de antes (se mandó antes de que existiera
+        # el gate, o antes de que se pasara del límite), sin esto seguía apareciéndole al
+        # sales lead con el CV abrible — bloqueado en un lado y en revisión en el otro.
+        #
+        # Sólo las 'pending': una ya decidida es historia y no se pisa. 'cancelled' y no
+        # 'rejected' a propósito — no es un rechazo de sales, y un rejected cerraría el
+        # perfil para siempre (el HAVING de _insert_review), así que desbloquearlo después
+        # no serviría de nada. Cancelada, al desbloquear entra una ronda nueva.
+        cancelled = []
+        if decision == "rejected":
+            cur.execute(
+                """
+                UPDATE cv_reviews SET status = 'cancelled', updated_at = NOW()
+                 WHERE candidate_id = %s AND opportunity_id = %s AND status = 'pending'
+                RETURNING review_id
+                """,
+                (fresh_ids["candidate_id"], fresh_ids["opportunity_id"]),
+            )
+            cancelled = [r["review_id"] for r in cur.fetchall()]
+            conn.commit()
+            if cancelled:
+                logging.info("cv_review: habilitación %s bloqueada, se cancelaron %s",
+                             clearance_id, cancelled)
+
+        cur.execute(_CLEARANCE_SELECT + " WHERE cl.clearance_id = %s",
+                    (CLIENT_PROCESS_STAGE, clearance_id))
+        fresh = cur.fetchone()
+    except Exception:
+        conn.rollback()
+        logging.exception("cv_review: no se pudo decidir la habilitación %s", clearance_id)
+        return jsonify({"error": "Could not record the decision."}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    # El mail a la recruiter cierra el loop: sin esto se queda esperando sin saber que ya
+    # puede re-mandar el batch (o que no lo va a poder mandar nunca).
+    _spawn_clearance_decided(clearance_id)
+
+    if not fresh:  # defensivo: acabamos de escribirla, pero mejor 200 vacío que un 500
+        return jsonify({"clearance_id": clearance_id, "status": decision,
+                        "cancelled_reviews": cancelled}), 200
+    out = _serialize_clearance(fresh)
+    # Para que la pantalla pueda decir "y además lo saqué de la cola", en vez de dejar a
+    # quien decide adivinando si el review viejo sigue vivo.
+    out["cancelled_reviews"] = cancelled
+    return jsonify(out), 200
 
 
 # --- historial de un candidato ---------------------------------------------
@@ -1902,7 +2324,7 @@ def _candidate_profile_block(candidate_id, title, body, anchor="",
 def _review_cta_block(review_id, title, body):
     """profile_cta_block apunta al perfil del candidato; el reviewer necesita la cola."""
     from routes.public_reference_feedback_routes import _escape_html
-    url = f"https://vinttihub.vintti.com/cv-review.html?review_id={review_id}"
+    url = f"{FRONT_BASE_URL}/cv-review.html?review_id={review_id}"
     return f"""
     <div style="margin:0 0 20px;padding:18px 20px;border-radius:16px;
                 background:#eef2ff;border:1px solid #c7d2fe;">
@@ -2090,11 +2512,292 @@ def _notify_submitted(review_id):
     return _send_email(subject, html, recipients)
 
 
+def _clearance_cta_block(clearance_id):
+    """UN botón, y neutro: lleva a la pantalla donde se decide de verdad.
+
+    Antes eran dos, "Approve" y "Block", y ninguno de los dos decidía nada: los dos abrían
+    la misma pantalla. Un botón que promete una acción y sólo navega miente, y encima
+    invita a creer que ya está resuelto. Decidir en el GET tampoco es opción — lo dispara
+    solo el escáner de links de Outlook/Gmail y una aprobación falsa anula justo el control
+    que este gate construye. Así que el mail avisa y linkea; la decisión se toma en el Hub.
+
+    Mismo azul y misma forma que el CTA de CV Review (_review_cta_block): es la misma
+    pantalla, no puede verse como otra cosa.
+    """
+    url = f"{FRONT_BASE_URL}/cv-review.html?clearance={clearance_id}"
+    return (f'<a href="{url}" style="display:inline-block;padding:11px 20px;'
+            f'border-radius:12px;background:#4f46e5;color:#ffffff;text-decoration:none;'
+            f'font-weight:700;font-size:14px;">Review this candidate &rarr;</a>')
+
+
+def _clearance_batch_cta(opportunity_id, label):
+    """Botón del mail de decisión: deja a la recruiter parada en sus batches.
+
+    `?tab=candidates` lo lee opportunity-detail.js y abre esa solapa en vez de Overview —
+    sin eso el botón la dejaba en la pantalla de la vacante y todavía tenía que buscar la
+    pestaña. No apunta a UN batch porque la habilitación es por (candidato, vacante) y no
+    guarda de qué batch salió; la pestaña los muestra todos, que para el caso alcanza.
+    """
+    url = f"{FRONT_BASE_URL}/opportunity-detail.html?id={opportunity_id}&tab=candidates"
+    return (f'<a href="{url}" style="display:inline-block;margin-top:16px;padding:11px 20px;'
+            f'border-radius:12px;background:#4f46e5;color:#ffffff;text-decoration:none;'
+            f'font-weight:700;font-size:14px;">{label}</a>')
+
+
+def _clearance_rows(clearance_ids):
+    """Relee las habilitaciones por id, con nombre, vacante y conteo. [] si algo falla."""
+    ids = [int(i) for i in (clearance_ids or []) if i]
+    if not ids or not ensure_cv_review_tables():
+        return []
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                _CLEARANCE_SELECT + " WHERE cl.clearance_id = ANY(%s) ORDER BY cl.clearance_id",
+                (CLIENT_PROCESS_STAGE, ids),
+            )
+            return [_serialize_clearance(r) for r in cur.fetchall()]
+    except Exception:
+        logging.exception("cv_review: no se pudieron leer las habilitaciones %s", ids)
+        return []
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _clearance_other_opps(candidate_ids):
+    """{candidate_id: [otras vacantes en proceso con cliente]} para varios candidatos.
+
+    Es el dato que hace decidible el pedido: "está en 4 procesos" no dice nada sin saber en
+    cuáles. En bulk y no de a uno porque esto corre por batch: con RDS en max_connections=81
+    (ver backend/gunicorn.conf.py) abrir una conexión por candidato es exactamente el patrón
+    que ahoga la base. Un fallo acá no puede tumbar el mail — se manda igual, con menos
+    contexto.
+    """
+    ids = [int(i) for i in (candidate_ids or []) if i]
+    if not ids:
+        return {}
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT oc.candidate_id,
+                       o.opportunity_id,
+                       COALESCE(o.opp_position_name, '') AS "position",
+                       COALESCE(a.client_name, '')       AS client_name
+                FROM opportunity_candidates oc
+                JOIN opportunity o ON o.opportunity_id = oc.opportunity_id
+                LEFT JOIN account a ON a.account_id = o.account_id
+                WHERE oc.candidate_id = ANY(%s)
+                  AND TRIM(COALESCE(oc.stage_pipeline, '')) = %s
+                ORDER BY o.opportunity_id DESC
+                """,
+                (ids, CLIENT_PROCESS_STAGE),
+            )
+            out = {}
+            for r in cur.fetchall():
+                out.setdefault(r["candidate_id"], []).append(r)
+            return out
+    except Exception:
+        logging.exception("cv_review: no se pudieron leer las otras vacantes")
+        return {}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _clearance_card(row, others):
+    """Una tarjeta del mail de pedido. Se arma acá para no anidar f-strings en el cuerpo."""
+    from routes.public_reference_feedback_routes import _escape_html
+
+    # La vacante que se está pidiendo ya está en el encabezado de la tarjeta: repetirla en
+    # la lista de "dónde más" haría que el mail se contradiga con su propio conteo.
+    others = [o for o in (others or [])
+              if int(o["opportunity_id"]) != int(row["opportunity_id"])]
+    others_html = "".join(
+        "<li>{} &middot; {}</li>".format(
+            _escape_html(o["position"] or "Opportunity %s" % o["opportunity_id"]),
+            _escape_html(o["client_name"] or "—"))
+        for o in others
+    )
+    where_block = ""
+    if others_html:
+        where_block = ('<p style="margin:0 0 4px;"><b>Also in:</b></p>'
+                       '<ul style="margin:0 0 12px;">%s</ul>' % others_html)
+
+    n = row.get("client_process_count") or row["opps_at_request"]
+    plural = "es" if n != 1 else ""
+    return f"""
+      <div style="margin:0 0 18px;padding:16px 18px;border-radius:14px;
+                  background:#ffffff;border:1px solid #e4e8f0;">
+        <div style="font-size:16px;font-weight:800;margin-bottom:8px;">
+          {_escape_html(row['candidate_name'] or 'Candidate')}
+        </div>
+        <p style="margin:0 0 4px;"><b>Wants to go to:</b>
+          {_escape_html(row['position'] or '—')} &middot;
+          {_escape_html(row['client_name'] or '—')}</p>
+        <p style="margin:0 0 10px;"><b>Recruiter:</b>
+          {_escape_html(row['requested_by'] or '—')}</p>
+        <p style="margin:0 0 10px;padding:10px 14px;background:#fff4dc;
+                  border-left:5px solid #e0a300;border-radius:10px;color:#6b4700;
+                  font-weight:700;">
+          Already in {n} client process{plural} — the limit is {CLIENT_PROCESS_LIMIT}.
+        </p>
+        {where_block}
+        <div style="margin-top:12px;">
+          {_clearance_cta_block(row['clearance_id'])}
+        </div>
+      </div>"""
+
+
+def _clearance_recipients(wanted):
+    """A quién se le manda de verdad un mail del gate.
+
+    En modo prueba corta a la owner y descarta TODO lo demás — incluida la recruiter que
+    disparó el pedido. Es a propósito: si dejáramos pasar a la recruiter, probar el flujo
+    le mandaría mails a gente que todavía no sabe que esto existe.
+    """
+    if CLEARANCE_EMAIL_TEST_MODE:
+        return clean_emails(CLEARANCE_TEST_RECIPIENTS)
+    return clean_emails(wanted)
+
+
+def _notify_clearance_requested(clearance_ids):
+    """UN mail a la supervisión con todos los pedidos que abrió este envío.
+
+    Uno solo y no N: un batch de cinco candidatos pasados de límite mandaría cinco mails
+    iguales, y un aviso que llega cinco veces deja de leerse.
+    """
+    from routes.public_reference_feedback_routes import _send_email
+
+    rows = _clearance_rows(clearance_ids)
+    if not rows:
+        return False
+
+    others = _clearance_other_opps([r["candidate_id"] for r in rows])
+    cards = "".join(_clearance_card(r, others.get(r["candidate_id"])) for r in rows)
+    n_c = len(rows)
+    many = n_c != 1
+    lead = ("Before {} to sales for review, {} your OK: {} already in {} or more client "
+            "processes at once.").format(
+        "these CVs go" if many else "this CV goes",
+        "they need" if many else "it needs",
+        "each of these candidates is" if many else "this candidate is",
+        CLIENT_PROCESS_LIMIT)
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
+      <h2 style="margin:0 0 6px;">Client process check</h2>
+      <p style="margin:0 0 16px;">{lead}</p>
+      {cards}
+      <p style="margin:16px 0 0;color:#50607f;font-size:13px;">
+        Approving lets the recruiter send that CV for this vacancy. Blocking keeps it out of
+        the batch until you change your mind — only you can undo it.
+      </p>
+    </div>
+    """
+    subject = "Client process check – {} candidate{} need{} your OK".format(
+        n_c, "s" if many else "", "" if many else "s")
+    return _send_email(subject, html, _clearance_recipients(OVERSIGHT_EMAILS))
+
+
+def _notify_clearance_decided(clearance_id):
+    """Le avisa a la recruiter que ya tiene (o no) la habilitación.
+
+    Sin este mail la recruiter se queda esperando sin saber que ya puede re-mandar el batch
+    — o que no lo va a poder mandar nunca.
+    """
+    from routes.public_reference_feedback_routes import _escape_html, _send_email
+
+    rows = _clearance_rows([clearance_id])
+    if not rows:
+        return False
+    row = rows[0]
+
+    approved = row["status"] == "approved"
+    # La recruiter primero; la supervisión siempre, para que quede la copia de la decisión.
+    recipients = _clearance_recipients([row.get("requested_by")] + list(OVERSIGHT_EMAILS))
+    if not recipients:
+        return False
+
+    banner = ('<p style="padding:12px 16px;background:#eaffd4;border-left:5px solid #c1ff72;'
+              'border-radius:12px;color:#3a6b00;font-weight:700;">'
+              '&#10004; Cleared. Send the batch again and this CV will go through.</p>'
+              ) if approved else (
+              '<p style="padding:12px 16px;background:#ffeaea;border-left:5px solid #d84343;'
+              'border-radius:12px;color:#8f0f0f;font-weight:700;">'
+              '&#10007; Blocked. This CV stays out of the batch for this vacancy.</p>')
+
+    why = ""
+    if row.get("decision_note"):
+        why = '<p style="margin:12px 0 0;"><b>Why:</b> %s</p>' % _escape_html(
+            row["decision_note"])
+
+    verdict = "approved" if approved else "blocked"
+    # Aprobado, lo que sigue es re-mandar el batch, así que el botón lo dice. Bloqueado, no
+    # hay nada que re-mandar: el link sirve para ir a sacarlo de la lista.
+    cta = _clearance_batch_cta(
+        row["opportunity_id"],
+        "Open the batch &rarr;" if approved else "Open the opportunity &rarr;")
+    html = f"""
+    <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
+      <h2 style="margin:0 0 12px;">Client process check &mdash; {verdict}</h2>
+      <p style="margin:0 0 6px;"><b>Candidate:</b>
+        {_escape_html(row['candidate_name'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Position:</b> {_escape_html(row['position'] or '—')}</p>
+      <p style="margin:0 0 6px;"><b>Client:</b> {_escape_html(row['client_name'] or '—')}</p>
+      <p style="margin:0 0 16px;"><b>Decided by:</b>
+        {_escape_html(row.get('decided_by') or '—')}</p>
+      {banner}
+      {why}
+      {cta}
+    </div>
+    """
+    subject = "Client process check – {} {}".format(
+        row["candidate_name"] or "Candidate", verdict)
+    return _send_email(subject, html, recipients)
+
+
+def _spawn_clearance_notice(clearance_ids):
+    """Manda el aviso a la supervisión en background. Lista vacía = no hace nada."""
+    ids = [i for i in (clearance_ids or []) if i]
+    if not ids:
+        return
+
+    def _run():
+        try:
+            _notify_clearance_requested(ids)
+        except Exception:
+            logging.exception("cv_review: falló el aviso de habilitación")
+
+    threading.Thread(target=_run, name="cv-review-clearance-notice", daemon=True).start()
+
+
+def _spawn_clearance_decided(clearance_id):
+    def _run():
+        try:
+            _notify_clearance_decided(clearance_id)
+        except Exception:
+            logging.exception("cv_review: falló el aviso de decisión de habilitación")
+
+    threading.Thread(target=_run, name=f"cv-review-clearance-{clearance_id}",
+                     daemon=True).start()
+
+
 def _batch_cta_block(opportunity_id, title, body):
     """Como _review_cta_block pero apunta a la cola filtrada por oportunidad, porque un
     batch son N reviews y no tiene sentido abrir uno solo."""
     from routes.public_reference_feedback_routes import _escape_html
-    url = f"https://vinttihub.vintti.com/cv-review.html?opportunity_id={opportunity_id}"
+    url = f"{FRONT_BASE_URL}/cv-review.html?opportunity_id={opportunity_id}"
     return f"""
     <div style="margin:0 0 20px;padding:18px 20px;border-radius:16px;
                 background:#eef2ff;border:1px solid #c7d2fe;">
@@ -2138,16 +2841,85 @@ def _sanitize_client_draft(html):
     return clean.strip()[:_DRAFT_LIMIT]
 
 
-def _client_draft_block(subject, body):
+# Cada candidato del borrador es un <li> con el link a su CV. Ese id es el ancla: el nombre
+# lo puede editar la recruiter, el link no.
+_DRAFT_LI = re.compile(r"<li\b[^>]*>.*?</li>", re.I | re.S)
+_DRAFT_RESUME_ID = re.compile(r"resume-readonly\.html\?id=(\d+)", re.I)
+
+
+def _prune_client_draft(html, keep_ids):
+    """Saca del borrador al cliente a los que NO se enviaron a review.
+
+    El borrador lo arma el frontend al ABRIR el popup, con TODOS los del batch y ANTES de
+    que el backend decida quién queda afuera. Sin esto, el sales lead recibe un borrador que
+    nombra y linkea el CV de un candidato bloqueado, listo para copiar y mandárselo al
+    cliente — exactamente lo que este gate existe para impedir. Y no es sólo el gate: pasaba
+    igual con los que se caen por no tener CV o por estar ya en revisión.
+
+    Sólo toca los <li> que puede identificar por el link del CV. Uno sin link se deja como
+    está: puede no ser un bloque de candidato, y borrar texto que no entendemos sería peor.
+
+    Devuelve (html, [candidate_id quitados]).
+    """
+    raw = str(html or "")
+    if not raw.strip():
+        return raw, []
+    keep = {int(i) for i in keep_ids}
+    dropped = []
+
+    def _repl(match):
+        block = match.group(0)
+        found = _DRAFT_RESUME_ID.search(block)
+        if not found:
+            return block
+        cid = int(found.group(1))
+        if cid in keep:
+            return block
+        dropped.append(cid)
+        return ""
+
+    return _DRAFT_LI.sub(_repl, raw), dropped
+
+
+def _client_draft_block(subject, body, dropped_names=None, pending_names=None):
     """El mail listo para reenviar al cliente, adentro del mail de review.
 
     Va enmarcado y al final a propósito: primero se decide, después se reenvía. Y va
     entero, con los XXX incluidos, porque quien lo reenvía es quien los completa.
+
+    `dropped_names` son los candidatos que se sacaron del borrador porque no se enviaron a
+    review. Se dicen en voz alta: el borrador que ve acá NO es el que armó la recruiter, y
+    callarlo haría que el sales lead lo mande sin darse cuenta de que falta alguien.
     """
     from routes.public_reference_feedback_routes import _escape_html
     body = _sanitize_client_draft(body)
     if not body:
         return ""
+    # Los que ya estaban en revisión de antes: siguen en el borrador, pero se dicen, para
+    # que el sales lead entienda por qué la tabla de arriba tiene menos gente que la lista
+    # de abajo.
+    pending_row = ""
+    if pending_names:
+        pn = ", ".join(_escape_html(n) for n in pending_names)
+        pending_row = (
+            f'<div style="padding:10px 16px;border-bottom:1px solid #e4ebfb;font-size:12px;'
+            f'background:#eef2ff;color:#312e81;">'
+            f'<b>Already waiting for review:</b> {pn} — '
+            f'{"they were" if len(pending_names) != 1 else "this one was"} sent earlier, so '
+            f'{"they are" if len(pending_names) != 1 else "it is"} not in the table above '
+            f'but {"they stay" if len(pending_names) != 1 else "it stays"} in the draft.</div>'
+        )
+    dropped_row = ""
+    if dropped_names:
+        names = ", ".join(_escape_html(n) for n in dropped_names)
+        dropped_row = (
+            f'<div style="padding:10px 16px;border-bottom:1px solid #e4ebfb;font-size:12px;'
+            f'background:#fff4dc;color:#6b4700;">'
+            f'<b>Taken out of this draft:</b> {names} — '
+            f'{"they were" if len(dropped_names) != 1 else "this one was"} not sent for '
+            f'review, so {"they are" if len(dropped_names) != 1 else "it is"} not in the '
+            f'list below.</div>'
+        )
     subj = _escape_html(str(subject or "").strip())
     subject_row = (
         f'<div style="padding:10px 16px;border-bottom:1px solid #e4ebfb;font-size:13px;'
@@ -2163,13 +2935,16 @@ def _client_draft_block(subject, body):
           </div>
         </div>
         {subject_row}
+        {pending_row}
+        {dropped_row}
         <div style="padding:16px;background:#ffffff;">{body}</div>
       </div>
     """
 
 
 def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_cc,
-                            client_subject=None, client_body=None):
+                            client_subject=None, client_body=None, client_dropped=None,
+                            client_pending=None):
     """UN mail con los N CVs de un batch.
 
     N mails separados para un batch de cinco es exactamente lo que hace que la gente deje
@@ -2215,7 +2990,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
             echoed += 1
         # La vacante define la marca del CV (Vintti vs vintti.ai): sale de la cuenta de
         # ESTA review, no de todos los procesos del candidato.
-        url = f"https://vinttihub.vintti.com/resume-readonly.html?id={r['candidate_id']}"
+        url = f"{FRONT_BASE_URL}/resume-readonly.html?id={r['candidate_id']}"
         if r.get('opportunity_id'):
             url += f"&opportunity_id={r['opportunity_id']}"
         blocks.append(f"""
@@ -2294,7 +3069,7 @@ def _notify_batch_submitted(*, review_ids, batch_number, note, extra_to, extra_c
                         'The scores are a hint, not a verdict — read each CV, then approve it, '
                         'request changes if the document can be fixed, or reject it if the '
                         'candidate is not right for this opening.')}
-      {_client_draft_block(client_subject, client_body)}
+      {_client_draft_block(client_subject, client_body, client_dropped, client_pending)}
     </div>
     """
     subject = (f"{len(rows)} CVs to review – Batch#{batch_number} • "

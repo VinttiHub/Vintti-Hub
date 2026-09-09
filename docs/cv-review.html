@@ -23,7 +23,7 @@
   <!-- Tarjeta por recruiter, compartida con recruiter-power.html. Va ANTES de
        cv-review.css para que esa pueda pisar algo si hiciera falta. -->
   <link rel="stylesheet" href="./assets/css/cv-review-cards.css?v=20260827-shared" />
-  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260827-checklist" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260909-clearance" />
 </head>
 
 <body class="light-mode">
@@ -143,6 +143,38 @@
           <div id="cvrMetrics" class="cvr-metrics"></div>
           <div class="hx-state cvr-state-sm" id="cvrMetricsEmpty" hidden>
             <p>No profiles were sent to review in this period.</p>
+          </div>
+        </div>
+
+        <!-- ============ Habilitaciones de client process ============ -->
+        <!-- Sólo la supervisión (pgonzales + agostina). El gate real es del backend
+             (_require_oversight → 403); esto evita que un sales lead vea una sección
+             que no puede usar. Arranca ABIERTA cuando hay pendientes: es trabajo que
+             frena a una recruiter, no material de repaso como las métricas. -->
+        <div class="cvr-sec-head cvr-sec-head--toggle" id="cvrClearToggle" hidden
+             role="button" tabindex="0" aria-expanded="false" aria-controls="cvrClearPanel">
+          <i class="fa-solid fa-chevron-right cvr-chev"></i>
+          <h2>Client process check</h2>
+          <span class="cvr-sec-sum" id="cvrClearSum"></span>
+        </div>
+
+        <div id="cvrClearPanel" hidden>
+          <details class="cvr-note">
+            <summary><i class="fa-regular fa-circle-question"></i> What this is</summary>
+            <div class="cvr-note-body">
+              A candidate sitting in <b>3 or more</b> client processes at once is a risk:
+              if two clients take them, a placement falls through. When a recruiter tries to
+              send that CV for review, it is <b>held out of the batch</b> until you decide
+              here. <b>Approve</b> and the recruiter can send it for that vacancy — they have
+              to send the batch again. <b>Block</b> and it stays out; only you can undo that.
+              The decision is <b>per vacancy</b>: the same candidate on another opening comes
+              back to you.
+            </div>
+          </details>
+
+          <div id="cvrClearList" class="cvr-clear-list"></div>
+          <div class="hx-state cvr-state-sm" id="cvrClearEmpty" hidden>
+            <p>Nothing waiting. Candidates over the limit will show up here.</p>
           </div>
         </div>
 
@@ -366,6 +398,6 @@
   <script src="./assets/js/sidebar.js?v=20260908-aec2" defer></script>
   <!-- defer preserva el orden, así que CvReviewCards ya existe cuando corre cv-review.js -->
   <script src="./assets/js/cv-review-cards.js?v=20260827-shared" defer></script>
-  <script src="./assets/js/cv-review.js?v=20260901-toolcore" defer></script>
+  <script src="./assets/js/cv-review.js?v=20260909-clearance" defer></script>
 </body>
 </html>

@@ -88,6 +88,10 @@
   const DEEP = new URLSearchParams(location.search);
   const deepReviewId = Number(DEEP.get('review_id')) || null;
   const deepOppId = Number(DEEP.get('opportunity_id')) || null;
+  // El link del mail de client process. Es UNO solo y neutro: no decide nada, sólo trae a
+  // esta pantalla y resalta la fila. Decidir en el GET lo dispara solo el escáner de links
+  // de Outlook/Gmail, y una aprobación falsa anula justo el control que el gate construye.
+  const deepClearanceId = Number(DEEP.get('clearance')) || null;
 
   /* ---------------------------------------------------------------- métricas */
 
@@ -292,6 +296,216 @@
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const act = hit(e);
       if (act) { e.preventDefault(); act(); }
+    });
+  }
+
+  /* ------------------------------------------- habilitaciones de client process
+   *
+   * Un candidato que ya está en CLIENT_PROCESS_LIMIT o más procesos con cliente no entra
+   * al batch: el backend lo deja afuera y abre un pedido acá. La supervisión aprueba (la
+   * recruiter re-manda y pasa) o bloquea (queda afuera hasta que ella misma lo revierta).
+   *
+   * El límite y el stage espejan CLIENT_PROCESS_LIMIT / CLIENT_PROCESS_STAGE de
+   * backend/routes/cv_review_routes.py. Si tocás uno, tocá el otro o el número del gate y
+   * el del chip "N of 3 used" dejan de ser el mismo número.
+   */
+  let clearances = [];
+  // La fila que el link del mail pidió mirar. Se consume una sola vez: si no, cada refresh
+  // volvería a saltar a ella y no habría forma de trabajar el resto de la cola.
+  let clearHighlight = deepClearanceId || null;
+
+  const CLEAR_STATUS = {
+    pending:  ['Waiting on you', 'cvr-st-pending',  'is-warn'],
+    approved: ['Approved',       'cvr-st-approved', 'is-ok'],
+    rejected: ['Blocked',        'cvr-st-rejected', 'is-bad'],
+  };
+
+  function loadClearances() {
+    if (!OVERSIGHT.has(me)) return Promise.resolve();
+    // "all" y no "pending": la sección también es el historial, y el deep-link de un mail
+    // puede apuntar a una que ya se decidió (dos personas mirando el mismo mail).
+    return fetch(`${API}/cv_client_process_clearances?status=all`, { headers: headers() })
+      .then(res => (res.ok ? res.json() : []))
+      .then(rows => { clearances = Array.isArray(rows) ? rows : []; renderClearances(); })
+      // Un fallo acá NO puede tumbar la página: la cola de reviews se puede trabajar igual.
+      .catch(err => console.warn('Could not load the client process clearances', err));
+  }
+
+  function clearanceCard(c) {
+    const [label, badge, cls] = CLEAR_STATUS[c.status] || [c.status, '', ''];
+    const n = c.client_process_count ?? c.opps_at_request;
+    const limit = c.limit || 3;
+    const armed = clearHighlight && Number(clearHighlight) === Number(c.clearance_id);
+    const pending = c.status === 'pending';
+
+    // El conteo de hoy puede no ser el de cuando se pidió: decidir contra un número viejo
+    // es justo lo que este gate quiere evitar, así que se dicen los dos.
+    const drift = (c.opps_at_request != null && n != null && n !== c.opps_at_request)
+      ? ` <i class="cvr-clear-drift">(was ${c.opps_at_request} when asked)</i>`
+      : '';
+
+    const decided = c.status !== 'pending'
+      ? `<p class="cvr-clear-decided">${esc(label)} by <b>${esc(c.decided_by || '—')}</b>
+           on ${fmtDate(c.decided_at)}${
+             c.decision_note ? ` — ${esc(c.decision_note)}` : ''}</p>`
+      : '';
+
+    // Un bloqueo sin motivo no se puede discutir y la recruiter no sabe qué corregir, así
+    // que el backend lo exige (422 note_required) y el formulario también.
+    const form = `
+      <div class="cvr-clear-form" hidden>
+        <textarea class="cvr-clear-note" rows="2"
+                  placeholder="Why is this candidate blocked for this vacancy?"></textarea>
+        <div class="cvr-clear-form-actions">
+          <button class="hx-btn hx-btn-danger" data-clear-do="rejected">Block</button>
+          <button class="hx-btn hx-btn-ghost" data-clear-do="cancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const actions = pending
+      ? `<div class="cvr-clear-actions">
+           <button class="hx-btn hx-btn-primary" data-clear-do="approved">Approve</button>
+           <button class="hx-btn hx-btn-ghost" data-clear-do="reject-open">Block</button>
+         </div>`
+      // Revertir: es explícitamente lo que puede hacer la supervisión y nadie más.
+      : `<div class="cvr-clear-actions">
+           <button class="hx-btn hx-btn-ghost" data-clear-do="${
+             c.status === 'rejected' ? 'approved' : 'reject-open'}">${
+             c.status === 'rejected' ? 'Unblock' : 'Block instead'}</button>
+         </div>`;
+
+    return `
+      <div class="cvr-clear ${cls}${armed ? ' is-armed' : ''}"
+           data-clearance="${c.clearance_id}">
+        <div class="cvr-clear-main">
+          <div class="cvr-clear-head">
+            <b class="cvr-clear-name">${esc(c.candidate_name || 'Candidate')}</b>
+            <span class="hx-status ${badge}">${esc(label)}</span>
+          </div>
+          <p class="cvr-clear-line">
+            <a href="opportunity-detail.html?id=${encodeURIComponent(c.opportunity_id)}"
+               target="_blank" rel="noopener">${esc(c.position || 'Opportunity')}</a>
+            · ${esc(c.client_name || '—')}
+          </p>
+          <p class="cvr-clear-line cvr-clear-count">
+            In <b>${n}</b> client process${n === 1 ? '' : 'es'} — the limit is ${limit}.${drift}
+          </p>
+          <p class="cvr-clear-line cvr-clear-meta">
+            Asked by ${esc(c.requested_by || '—')} on ${fmtDate(c.requested_at)}
+          </p>
+          ${decided}
+          <p class="cvr-clear-error" hidden></p>
+          ${form}
+        </div>
+        ${actions}
+      </div>`;
+  }
+
+  function renderClearances() {
+    if (!OVERSIGHT.has(me)) return;
+    const head = $('cvrClearToggle');
+    const panel = $('cvrClearPanel');
+    const list = $('cvrClearList');
+    if (!head || !panel || !list) return;
+
+    show(head, true);
+
+    const pending = clearances.filter(c => c.status === 'pending');
+    // Las decididas se muestran sólo si hay algo que mirar: un historial largo arriba de la
+    // cola es ruido cuando no hay nada pendiente.
+    const rows = pending.length ? clearances : clearances.slice(0, 10);
+
+    $('cvrClearSum').textContent = pending.length
+      ? `${pending.length} waiting on you`
+      : 'nothing waiting';
+    head.classList.toggle('is-loud', pending.length > 0);
+
+    list.innerHTML = rows.map(clearanceCard).join('');
+    show($('cvrClearEmpty'), rows.length === 0);
+
+    // Se abre sola cuando hay algo que decidir o cuando el mail apuntó acá: es trabajo que
+    // está frenando a una recruiter, no material de repaso como las métricas.
+    if ((pending.length || clearHighlight) && panel.hidden) setClearOpen(true);
+
+    if (clearHighlight) {
+      const el = list.querySelector(`[data-clearance="${clearHighlight}"]`);
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // Consumido: el link resalta la fila UNA vez, no en cada refresh.
+      clearHighlight = null;
+    }
+  }
+
+  function setClearOpen(open) {
+    const head = $('cvrClearToggle');
+    const panel = $('cvrClearPanel');
+    if (!head || !panel) return;
+    panel.hidden = !open;
+    head.setAttribute('aria-expanded', String(open));
+    head.classList.toggle('is-open', open);
+  }
+
+  function decideClearance(box, decision, note) {
+    const id = box.dataset.clearance;
+    const errEl = box.querySelector('.cvr-clear-error');
+    const btns = box.querySelectorAll('button');
+    btns.forEach(b => { b.disabled = true; });
+    show(errEl, false);
+
+    fetch(`${API}/cv_client_process_clearances/${id}/decision`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ decision, note: note || '' }),
+    })
+      .then(async res => {
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`),
+                                         { code: out.code });
+        return out;
+      })
+      .then(() => loadClearances())
+      .catch(err => {
+        errEl.textContent = err.message;
+        show(errEl, true);
+        btns.forEach(b => { b.disabled = false; });
+        // 409 = alguien más ya la decidió (las dos personas miran el mismo mail). La
+        // pantalla quedó vieja, así que se recarga: si no, el botón sigue ofreciendo una
+        // acción que ya no existe.
+        if (err.code === 'already_decided') loadClearances();
+      });
+  }
+
+  function wireClearances() {
+    const list = $('cvrClearList');
+    const head = $('cvrClearToggle');
+    if (!list || !head) return;
+
+    const toggle = () => setClearOpen($('cvrClearPanel').hidden);
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+
+    list.addEventListener('click', e => {
+      const btn = e.target.closest('[data-clear-do]');
+      if (!btn) return;
+      const box = btn.closest('[data-clearance]');
+      if (!box) return;
+      const what = btn.dataset.clearDo;
+
+      if (what === 'reject-open') { show(box.querySelector('.cvr-clear-form'), true);
+                                    box.querySelector('.cvr-clear-note').focus(); return; }
+      if (what === 'cancel') { show(box.querySelector('.cvr-clear-form'), false); return; }
+      if (what === 'approved') { decideClearance(box, 'approved'); return; }
+      if (what === 'rejected') {
+        const note = (box.querySelector('.cvr-clear-note').value || '').trim();
+        if (!note) {
+          const errEl = box.querySelector('.cvr-clear-error');
+          errEl.textContent = 'Say why you are blocking this candidate.';
+          show(errEl, true);
+          return;
+        }
+        decideClearance(box, 'rejected', note);
+      }
     });
   }
 
@@ -1579,6 +1793,21 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     [CLIENT_PROCESS_STAGE]: 'is-client',
   };
 
+  // Desde que existe el gate, "está en 4 procesos" ya no es sólo un dato: puede haber una
+  // decisión tomada encima. Sale de la lista que ya cargó loadClearances(), así que no
+  // cuesta un request más; para quien no es supervisión la lista está vacía y no se pinta.
+  function clearanceLine(review) {
+    const c = clearances.find(x =>
+      Number(x.candidate_id) === Number(review.candidate_id) &&
+      Number(x.opportunity_id) === Number(review.opportunity_id));
+    if (!c) return '';
+    const [label] = CLEAR_STATUS[c.status] || [c.status];
+    const who = c.decided_by ? ` by ${esc(c.decided_by)}` : '';
+    const why = c.decision_note ? ` — ${esc(c.decision_note)}` : '';
+    return `<p class="cvr-clear-decided"><b>Client process check:</b> ${
+      esc(label)}${c.status === 'pending' ? '' : who}${why}</p>`;
+  }
+
   function renderOpps(rows, review) {
     // El endpoint hace LEFT JOIN con batches, así que una vacante con dos batches vuelve
     // dos veces. Se cuenta por vacante, no por fila: si no, un candidato con dos batches
@@ -1649,6 +1878,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       // había que leer el chip para entender por qué importa.
       scoreHead('fa-layer-group', 'Client process check', cls, chip)
       + `<p class="cvr-hop-lead">${lead}</p>`
+      + clearanceLine(review)
       + (rowsHtml ? `<div class="cvr-opp-list">${rowsHtml}</div>` : '');
     show($('cvrOpps'), opps.length > 0);
   }
@@ -2097,6 +2327,8 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     $('cvrSearch').addEventListener('input', renderQueue);
     wireQueue();
     wireMetricsToggle();
+    wireClearances();
+    loadClearances();
 
     $('cvrRejectToggle').addEventListener('click', () => setDecisionMode('rejected'));
     $('cvrChangesToggle').addEventListener('click', () => setDecisionMode('changes_requested'));

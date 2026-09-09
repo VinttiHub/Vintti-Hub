@@ -1642,3 +1642,113 @@ q.cvr-hl-item::before { vertical-align: 1px; }
   color: var(--hx-ink-2);
   line-height: 1.45;
 }
+
+/* ============================================================================
+   Habilitaciones de client process
+   Sección de la supervisión: los candidatos que quedaron fuera del batch por estar
+   en 3+ procesos con cliente y esperan un aprobar/bloquear.
+   Reusa los tokens de hirex.css y las clases de estado de esta página (cvr-st-*).
+   ========================================================================== */
+
+.cvr-clear-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.cvr-clear {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid var(--hx-line);
+  /* Barra de color a la izquierda, igual que los bloques del drawer (.cvr-hop): el estado
+     se lee de reojo sin tener que buscar el badge. */
+  border-left: 4px solid var(--hx-slate);
+  border-radius: 14px;
+  background: var(--hx-surface, #fff);
+}
+.cvr-clear.is-warn { border-left-color: var(--hx-amber); background: #fffdf7; }
+.cvr-clear.is-ok   { border-left-color: var(--hx-lime); }
+.cvr-clear.is-bad  { border-left-color: #d11a41; }
+
+/* La fila a la que apuntó el botón del mail. Sin esto, con la sección abierta y varias
+   pendientes, no se distingue cuál vino a decidir. */
+.cvr-clear.is-armed {
+  box-shadow: 0 0 0 2px var(--hx-accent);
+}
+
+.cvr-clear-main { flex: 1 1 320px; min-width: 0; }
+
+.cvr-clear-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.cvr-clear-name { font-size: 14.5px; color: var(--hx-ink); }
+
+.cvr-clear-line {
+  margin: 2px 0;
+  font-size: 12.5px;
+  color: var(--hx-ink-2);
+}
+.cvr-clear-line a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.cvr-clear-line a:hover { color: var(--hx-accent); }
+
+.cvr-clear-count { color: var(--hx-ink); }
+.cvr-clear-count b { color: var(--hx-amber-ink); }
+.cvr-clear-drift { color: var(--hx-faint); font-style: normal; font-size: 11.5px; }
+
+.cvr-clear-meta { color: var(--hx-faint); font-size: 11.5px; }
+
+.cvr-clear-decided {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f4f6fa;
+  font-size: 12px;
+  color: var(--hx-ink-2);
+}
+
+.cvr-clear-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hx-urgent);
+}
+
+.cvr-clear-form { margin-top: 10px; }
+.cvr-clear-note {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12.5px;
+  resize: vertical;
+}
+.cvr-clear-note:focus { outline: none; border-color: var(--hx-accent); }
+.cvr-clear-form-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+.cvr-clear-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+  align-items: flex-start;
+}
+
+/* El encabezado grita sólo cuando hay algo esperando: si grita siempre, no lo lee nadie
+   (mismo criterio que la card "Client process check" del drawer). */
+.cvr-sec-head--toggle.is-loud h2 { color: var(--hx-amber-ink); }
+.cvr-sec-head--toggle.is-loud .cvr-sec-sum {
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+}
