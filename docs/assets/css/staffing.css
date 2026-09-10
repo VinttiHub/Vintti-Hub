@@ -498,6 +498,24 @@ datalist { display: none; }
 .stf-badge--info  { background: rgba(75, 169, 255, .16); color: #12558f; }
 .stf-badge--ghost { background: transparent; color: var(--stf-ink-3); border: 1px dashed var(--stf-rule); }
 
+/* Performance: un color por opción del catálogo (staffing.js → PERFORMANCE_OPTIONS). */
+.stf-badge--perf-red     { background: rgba(239, 68, 68, .16);  color: #b3261e; }
+.stf-badge--perf-green   { background: rgba(193, 255, 114, .55); color: #3a6b00; }
+.stf-badge--perf-yellow  { background: rgba(250, 204, 21, .30);  color: #8a6600; }
+.stf-badge--perf-orange  { background: rgba(244, 140, 66, .26);  color: #a1500f; }
+.stf-badge--perf-blue    { background: rgba(75, 169, 255, .22);  color: #12558f; }
+.stf-badge--perf-purple  { background: rgba(108, 56, 255, .22); color: #4a1fb8; }
+.stf-badge--perf-magenta { background: rgba(255, 31, 219, .16); color: #a3007f; }
+.stf-badge--perf-teal    { background: rgba(45, 160, 145, .20); color: #1f6b5e; }
+
+/* Platform: un color por plataforma (staffing.js → PLATFORM_OPTIONS). */
+.stf-badge--plat-orange { background: rgba(244, 140, 66, .30); color: #a1500f; }
+.stf-badge--plat-lilac  { background: rgba(108, 56, 255, .12); color: #5b2ce6; }
+.stf-badge--plat-cyan   { background: rgba(75, 169, 255, .32); color: #0f4f88; }
+
+/* En el desplegable del filtro el valor viene como chip, no como texto pelado. */
+.stf-pop__opt .stf-badge { padding: 2px 8px; font-size: 11px; }
+
 .stf-note-dot {
   display: inline-block;
   width: 6px; height: 6px;

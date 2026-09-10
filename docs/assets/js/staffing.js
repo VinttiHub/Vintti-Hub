@@ -187,6 +187,33 @@
     return "—";
   }
 
+  // Catálogo fijo de Performance: el desplegable del filtro y el del drawer
+  // ofrecen SIEMPRE estas opciones, aunque hoy ninguna fila las use todavía.
+  // El orden es el que quiere la owner, no alfabético.
+  var PERFORMANCE_OPTIONS = [
+    { value: "Not performing",  cls: "stf-badge--perf-red" },
+    { value: "Performing",      cls: "stf-badge--perf-green" },
+    { value: "Under review",    cls: "stf-badge--perf-yellow" },
+    { value: "Feedback",        cls: "stf-badge--perf-orange" },
+    { value: "Salary review",   cls: "stf-badge--perf-blue" },
+    { value: "Computer repair", cls: "stf-badge--perf-purple" },
+    { value: "Computer pedido", cls: "stf-badge--perf-magenta" },
+    { value: "Onboarding",      cls: "stf-badge--perf-teal" }
+  ];
+  var PERFORMANCE_VALUES = PERFORMANCE_OPTIONS.map(function (o) { return o.value; });
+  var PERFORMANCE_CLASS = {};
+  PERFORMANCE_OPTIONS.forEach(function (o) { PERFORMANCE_CLASS[o.value.toLowerCase()] = o.cls; });
+
+  // Lo mismo para Platform: catálogo fijo y un color por plataforma.
+  var PLATFORM_OPTIONS = [
+    { value: "Bank Account", cls: "stf-badge--plat-orange" },
+    { value: "Deel",         cls: "stf-badge--plat-lilac" },
+    { value: "Ontop",        cls: "stf-badge--plat-cyan" }
+  ];
+  var PLATFORM_VALUES = PLATFORM_OPTIONS.map(function (o) { return o.value; });
+  var PLATFORM_CLASS = {};
+  PLATFORM_OPTIONS.forEach(function (o) { PLATFORM_CLASS[o.value.toLowerCase()] = o.cls; });
+
   var COLUMNS = {
     database: [
       { key: "candidate_name", label: "Contractor", type: "text", sticky: true,
@@ -217,11 +244,11 @@
       { key: "client_payment", label: "Client payment", type: "number", total: true,
         value: function (r) { return r.client_payment; }, cell: moneyCell("stf-money--solid") },
       { key: "platform", label: "Platform", type: "text",
+        options: PLATFORM_VALUES, badge: platformBadge,
         value: function (r) { return r.platform; },
-        cell: function (r) {
-          return r.platform ? '<span class="stf-badge stf-badge--info">' + esc(r.platform) + "</span>" : "—";
-        } },
+        cell: function (r) { return platformBadge(r.platform); } },
       { key: "performance", label: "Performance", type: "text",
+        options: PERFORMANCE_VALUES, badge: performanceBadge,
         value: function (r) { return r.performance; },
         cell: function (r) { return performanceBadge(r.performance); } },
       { key: "equipment", label: "Equipment", type: "text", muted: true,
@@ -491,14 +518,21 @@
         if (b === BLANK) return -1;
         return a.localeCompare(b, "en", { numeric: true });
       });
+      // Columnas con catálogo (Performance): primero el catálogo en su orden,
+      // después lo que haya en los datos y no esté en él, y (Blank) al final.
+      if (col.options) {
+        var extra = list.filter(function (v) { return col.options.indexOf(v) === -1 && v !== BLANK; });
+        list = col.options.concat(extra).concat(values[BLANK] ? [BLANK] : []);
+      }
       var chosen = current ? current.values : list;
       html += '<input type="text" class="stf-pop__search" placeholder="Search values…">' +
         '<label class="stf-pop__opt stf-pop__opt--all">' +
           '<input type="checkbox" data-all' + (chosen.length === list.length ? " checked" : "") + '>' +
           "<span>Select all</span></label>" +
         '<div class="stf-pop__list">' + list.map(function (v) {
+          var label = col.badge && v !== BLANK ? col.badge(v) : esc(v);
           return '<label class="stf-pop__opt"><input type="checkbox" value="' + esc(v) + '"' +
-            (chosen.indexOf(v) > -1 ? " checked" : "") + "><span>" + esc(v) + "</span></label>";
+            (chosen.indexOf(v) > -1 ? " checked" : "") + "><span>" + label + "</span></label>";
         }).join("") + "</div>";
     } else {
       var isDate = col.type === "date";
@@ -619,7 +653,13 @@
 
   function performanceBadge(value) {
     if (!value) return "—";
-    var cls = value === "Performing" ? "stf-badge--good" : "stf-badge--warn";
+    var cls = PERFORMANCE_CLASS[String(value).trim().toLowerCase()] || "";
+    return '<span class="stf-badge ' + cls + '">' + esc(value) + "</span>";
+  }
+
+  function platformBadge(value) {
+    if (!value) return "—";
+    var cls = PLATFORM_CLASS[String(value).trim().toLowerCase()] || "stf-badge--info";
     return '<span class="stf-badge ' + cls + '">' + esc(value) + "</span>";
   }
 
@@ -770,9 +810,8 @@
 
     drawer.body.innerHTML =
       '<div class="stf-section-label">Filled in by hand</div>' +
-      selectField("Platform", "platform", ["", "Deel", "Ontop", "Bank Account"], row.platform) +
-      selectField("Performance", "performance",
-        ["", "Performing", "Feedback", "Under review", "Onboarding", "Salary review", "Computer repair"], row.performance) +
+      selectField("Platform", "platform", [""].concat(PLATFORM_VALUES), row.platform) +
+      selectField("Performance", "performance", [""].concat(PERFORMANCE_VALUES), row.performance) +
       selectField("Provider", "provider", ["", "Quipteams", "Onbordea"], row.provider) +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
       '<div class="stf-section-label">From the Hub</div>' +
