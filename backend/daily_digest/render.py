@@ -118,9 +118,10 @@ def build(findings: list[dict], *, fallos: list[str] | None = None,
         if not heartbeat:
             return [], ""
         return ([{"type": "section", "text": {"type": "mrkdwn",
-                  "text": f":white_check_mark: *Todo al dia* - {fecha_larga()}. "
-                          "Ningun dato pendiente de carga."}}],
-                "Todo al dia: ningun dato pendiente")
+                  "text": (f"{people.EMOJI_TODO_AL_DIA} *Todo al dia* - "
+                           f"{fecha_larga()}\nNo hay nada pendiente de cargar. "
+                           "Bien hecho.")}}],
+                "Todo al dia: no hay nada pendiente de cargar")
 
     total = len(findings)
     blocks: list = [

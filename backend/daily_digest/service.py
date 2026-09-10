@@ -120,7 +120,7 @@ def execute(trigger_source: str = "cli", *, post: bool = True, persist: bool = T
         with conn.cursor() as cur:
             cur.execute("SET default_transaction_read_only = off")
 
-        heartbeat = hoy.weekday() == people.HEARTBEAT_WEEKDAY
+        heartbeat = people.POSTEAR_SIN_PENDIENTES
         blocks, texto = render.build(payload["findings"], fallos=payload["fallos"],
                                      heartbeat=heartbeat)
         payload["blocks"] = blocks

@@ -50,6 +50,22 @@ def _no_vacio(expr: str) -> str:
             f" AND LOWER(TRIM(COALESCE({expr}, ''))) NOT IN ({lista}))")
 
 
+# Cuentas que el digest no mira. Se interpola en las tres reglas para que no
+# puedan separarse: el dia que se agregue una exclusion, se toca UNA linea.
+#
+#   vintti_internal -> las vacantes internas de Vintti, que no son trabajo de
+#                      cliente.
+#   vintti_ai       -> el negocio de Vintti AI. Excluido a pedido de la owner
+#                      (2026-09-10). Se filtra por la MARCA DE LA CUENTA y no
+#                      por el mail de quien la lleva (hoy mia@vintti.com): asi
+#                      una opp normal de Mia le sigue llegando, y una opp de AI
+#                      que agarre otra persona sigue excluida. Un mail hardcodeado
+#                      se desincroniza el dia que alguien cambia de rol.
+_SCOPE_CUENTA = """
+        AND COALESCE(a.vintti_internal, FALSE) = FALSE
+        AND COALESCE(a.vintti_ai, FALSE) = FALSE
+"""
+
 # El duenio se resuelve contra `users` SIEMPRE por LEFT JOIN. Ver el docstring.
 _OWNER_JOIN = """
     LEFT JOIN users u
@@ -121,6 +137,9 @@ def pricing() -> tuple[str, dict]:
     Esto DIFIERE a proposito de `routes/staffing_routes.py`: alla la pregunta es
     "que numero muestro", aca es "?alguien cargo algo?". Ante la duda se
     sobre-suprime, nunca se sobre-avisa.
+
+    Solo mira hires desde `people.PRICING_DESDE`: el backlog historico quedo
+    perdonado por decision de la owner y la AM. Ver el comentario de esa constante.
     """
     sql = f"""
     WITH {_HIRES_CTE},
@@ -151,13 +170,13 @@ def pricing() -> tuple[str, dict]:
          LIMIT 1
       ) su ON TRUE
       WHERE TRIM(o.opp_stage) IN ({_stage_list(people.STAGES_CON_HIRE)})
-        AND COALESCE(a.vintti_internal, FALSE) = FALSE
+{_SCOPE_CUENTA}
         AND h.carga_inactive IS NULL
         AND (h.end_d IS NULL OR h.end_d >= CURRENT_DATE)
         AND LOWER(TRIM(COALESCE(h.status, ''))) <> 'inactive'
         AND h.start_d IS NOT NULL
         AND h.start_d <= CURRENT_DATE - %(gracia)s::int
-        AND h.start_d >= CURRENT_DATE - %(backlog)s::int
+        AND h.start_d >= %(desde)s::date
     ),
     flagged AS (
       SELECT b.*, ARRAY_REMOVE(ARRAY[
@@ -182,7 +201,7 @@ def pricing() -> tuple[str, dict]:
     ORDER BY owner.anchor_date
     """
     return sql, {"gracia": people.GRACIA_DIAS["pricing"],
-                 "backlog": people.BACKLOG_DIAS}
+                 "desde": people.PRICING_DESDE}
 
 
 # --------------------------------------------------------------------------- #
@@ -222,7 +241,7 @@ def job_description() -> tuple[str, dict]:
       FROM opportunity o
       LEFT JOIN account a ON a.account_id = o.account_id
       WHERE TRIM(o.opp_stage) IN ({_stage_list(people.STAGES_ABIERTOS)})
-        AND COALESCE(a.vintti_internal, FALSE) = FALSE
+{_SCOPE_CUENTA}
         AND {_no_vacio('o.opp_hr_lead')}
         AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) IS NULL
              OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing)
@@ -303,7 +322,7 @@ def base_data() -> tuple[str, dict]:
       FROM opportunity o
       LEFT JOIN account a ON a.account_id = o.account_id
       WHERE TRIM(o.opp_stage) IN ({_stage_list(people.STAGES_ABIERTOS)})
-        AND COALESCE(a.vintti_internal, FALSE) = FALSE
+{_SCOPE_CUENTA}
         AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) IS NULL
              OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing)
                 <= CURRENT_DATE - %(gracia)s::int)

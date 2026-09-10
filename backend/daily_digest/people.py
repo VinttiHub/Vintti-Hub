@@ -10,6 +10,8 @@ ya instalada, `GET /daily-digest/slack-users` devuelve el mapa listo para pegar.
 """
 from __future__ import annotations
 
+from datetime import date
+
 # mail Vintti -> Slack member ID (el `U...` de "View full profile / Copy member ID").
 # Cosechado del directorio del workspace el 2026-09-09 con
 # `python3 -m daily_digest --members`, no tipeado a mano: el costo de un typo aca
@@ -78,8 +80,22 @@ GRACIA_DIAS = {
     "base": 3,
 }
 
-# Backlog maximo. Mas viejo que esto ya no es "te falta cargar", es arqueologia.
-BACKLOG_DIAS = 180
+# Raya en la arena para la regla de PRICING: solo se reclaman hires que arrancaron
+# en esta fecha o despues.
+#
+# Decision de Lara (AM) y la owner, 2026-09-10, con el digest ya andando: los 11
+# hires incompletos que habia iban de 16 a 177 dias de antiguedad y varios son
+# irrecuperables. Textual: "estas q quedaron incompletas ya esta, a partir d ahora
+# no deberian quedar incompletas". Reclamarlos todos los dias no los completa, solo
+# entrena a la gente a ignorar el mensaje.
+#
+# Es una FECHA FIJA, no una ventana movil de N dias, y la diferencia importa: con
+# una ventana, un pendiente que se ignora lo suficiente se cae solo de la lista, que
+# es exactamente el incentivo que este digest tiene que evitar. Con una fecha fija,
+# lo que entra no se va hasta que alguien carga el dato.
+#
+# Mover esta fecha hacia adelante = perdonar otra tanda. Que lo pida la owner.
+PRICING_DESDE = date(2026, 9, 10)
 
 # Menos de estos caracteres de TEXTO PLANO (ya sin tags) = no hay job
 # description. No es 0 porque `<p></p>` y `<p>-</p>` limpian a 0-3 caracteres,
@@ -107,13 +123,30 @@ CAMPOS_BASE = {
     "years_experience": False,
 }
 
-# Stages con trabajo abierto. `Interviewing` es el mas poblado del pipeline (28
-# opps de 65) y es facil de olvidar al escribir una lista a mano; los datasets de
-# dashboards que si lo contemplan son la referencia (batch_delivery_time_*.py,
-# sales_funnel_*.py). `Stop` queda afuera a proposito: pausada, no atrasada.
-STAGES_ABIERTOS = ("Deep Dive", "NDA Sent", "Sourcing", "Interviewing", "Negotiating")
+# Stages del pipeline ACTIVO, para las reglas de JD y datos base.
+#
+# `Deep Dive` y `NDA Sent` estan afuera por decision de la owner (2026-09-10): en
+# esas dos la vacante todavia se esta negociando y reclamar el budget o la job
+# description es reclamar algo que legitimamente no existe. Sacarlas bajo el
+# ruido de 27 avisos a 10.
+#
+# `Interviewing` es el stage mas poblado del pipeline y es facil de olvidar al
+# escribir una lista a mano; los datasets de dashboards que si lo contemplan son
+# la referencia (batch_delivery_time_*.py, sales_funnel_*.py).
+# `Stop` queda afuera a proposito: pausada, no atrasada.
+STAGES_ABIERTOS = ("Sourcing", "Interviewing", "Negotiating")
 
 # Stages donde el hire ya existe y el pricing tiene que estar cargado.
+#
+# Incluye `Close Win` y NO sigue el filtro de STAGES_ABIERTOS, a proposito: al
+# firmar, la opp pasa a Close Win casi enseguida (en la base hay 1 sola opp en
+# `Signed` contra 353 en `Close Win`), asi que TODOS los hires con pricing sin
+# cargar viven ahi. Limitar esta regla al pipeline activo la deja en cero.
+#
+# El "activo" de esta regla pasa por otro lado y ya esta aplicado en
+# queries.pricing(): se excluyen los hires con baja cargada, con fecha de salida
+# pasada o con status inactivo. O sea, gente que hoy trabaja y no tiene el
+# numero cargado.
 STAGES_CON_HIRE = ("Signed", "Close Win")
 
 # Valores basura que el form guarda cuando nadie toca el select. El primer
@@ -125,9 +158,23 @@ PLACEHOLDERS = ("select sales lead", "select hr lead", "select", "-", "n/a")
 MAX_ITEMS_PER_PERSON = 5
 MAX_PEOPLE = 12
 
-# Lunes. El unico dia que se postea aunque no haya nada, para que "no hay
-# pendientes" no se confunda con "el cron murio".
-HEARTBEAT_WEEKDAY = 0
+# Postear tambien los dias sin pendientes, con un "todo al dia".
+#
+# Arranco al reves (silencio salvo los lunes) para no hacer ruido, pero la owner
+# lo cambio el 2026-09-10: prefiere el mensaje siempre. Tiene sentido por dos
+# motivos, y el segundo es el que importa: un dia limpio es una buena noticia que
+# vale la pena mostrar, y sobre todo el silencio es ambiguo — "no hay nada
+# pendiente" y "el cron se murio" se ven exactamente igual. Con esto, si un dia
+# no llega nada al canal, es un problema.
+POSTEAR_SIN_PENDIENTES = True
+
+# Emoji del mensaje de "todo al dia".
+#
+# Solo emoji ESTANDAR de Slack. Uno custom (un GIF subido al workspace) se
+# escribe igual, `:nombre:`, pero si alguien lo borra Slack no lo esconde: lo
+# muestra como texto literal ":nombre:" en el medio del mensaje. No vale la pena
+# esa dependencia para un adorno.
+EMOJI_TODO_AL_DIA = ":tada:"
 
 
 def slack_id(email: str) -> str | None:

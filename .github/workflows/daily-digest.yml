@@ -7,11 +7,29 @@ name: Daily data-entry digest
 # pudo calcularse O si Slack rechazo el mensaje.
 on:
   schedule:
-    # Lun a Vie 12:00 UTC = 09:00 Argentina.
-    # Argentina es UTC-3 FIJO (sin DST desde 2009, ver dashboards/datasets/_now.py):
-    # este horario NO se corre en octubre ni en marzo. No "arreglarlo" por estacion.
-    # El scheduler de GitHub es best-effort: suele disparar 5-15 min tarde.
-    - cron: "0 12 * * 1-5"
+    # Objetivo: que llegue ~09:00 Argentina. Argentina es UTC-3 FIJO (sin DST
+    # desde 2009, ver dashboards/datasets/_now.py), asi que no hay que tocar
+    # esto en octubre ni en marzo.
+    #
+    # 08:00 UTC serian las 05:00 ART, y NO es un error: el scheduler de GitHub
+    # en este repo atrasa siempre. Medido el 2026-09-10 sobre 16 corridas reales
+    # de "Daily reminders" (cron 12:00) y "Daily turbo sync" (cron 10:00):
+    #     atraso minimo   2h27      (nunca fue cero)
+    #     atraso mediano  3h58
+    #     atraso maximo   9h40      (27 y 28 de agosto)
+    # 08:00 + el atraso mediano cae 08:58 ART. El rango real va de 07:27 a
+    # 14:40 ART: el cron de GitHub tiene 7 horas de dispersion y no puede
+    # garantizar un horario. Si algun dia tiene que ser exacto, hay que mover el
+    # disparo a un EventBridge Scheduler de AWS pegandole a este mismo endpoint
+    # (preciso al minuto, pero vive fuera del repo) y sacar este bloque para no
+    # postear dos veces.
+    #
+    # El minuto queda en 0 A PROPOSITO, aunque un minuto impar reduzca la cola:
+    # las 16 mediciones son todas de jobs con minuto 0, asi que la compensacion
+    # de 4h esta calibrada contra esa poblacion. Cambiar hora y minuto a la vez
+    # invalida la calibracion: si el minuto impar funciona, el mensaje pasa a
+    # llegar 05:30 ART. Un cambio por vez, y volver a medir.
+    - cron: "0 8 * * 1-5"
   workflow_dispatch:
     inputs:
       dry:
