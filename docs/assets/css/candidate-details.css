@@ -6513,3 +6513,69 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   opacity: .5;
   pointer-events: none;
 }
+
+/* ── Sugerencia de HubSpot en la solapa Hire ─────────────────────────────────
+   Panel con lo que se cargo en el deal al pasar a Closed Win. Los montos NO se
+   escriben solos: el boton Aplicar dispara el mismo guardado que los inputs de
+   abajo (salary_updates + PATCH /hire), que es el unico camino que resuelve el
+   branch por modelo y el revenue derivado. */
+.hs-suggest {
+  grid-column: 1 / -1;
+  border: 1px solid color-mix(in srgb, #6c38ff 30%, #fff);
+  background: color-mix(in srgb, #6c38ff 6%, #fff);
+  border-radius: 14px;
+  padding: .85rem 1rem;
+  margin-bottom: .25rem;
+}
+.hs-suggest[hidden] { display: none !important; }
+
+.hs-suggest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .6rem;
+  flex-wrap: wrap;
+}
+.hs-suggest-title { font-weight: 700; font-size: .9rem; color: #4a2bb8; }
+
+.hs-suggest-apply {
+  border: 0;
+  border-radius: 999px;
+  padding: .4rem 1.1rem;
+  font-weight: 700;
+  font-size: .82rem;
+  cursor: pointer;
+  color: #3a6b00;
+  background: #c1ff72;
+}
+.hs-suggest-apply:disabled { opacity: .55; cursor: default; }
+
+.hs-suggest-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem .6rem;
+}
+.hs-suggest-item {
+  background: #fff;
+  border: 1px solid #e7e3f7;
+  border-radius: 10px;
+  padding: .35rem .6rem;
+  font-size: .82rem;
+  line-height: 1.25;
+}
+.hs-suggest-item b { display: block; font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .03em; color: #7a7a96; font-weight: 600; }
+/* El hub ya tiene otro valor para ese campo: se marca en vez de pisarlo callado. */
+.hs-suggest-item.is-diff { border-color: #ff1fdb; }
+.hs-suggest-item.is-diff small { display: block; color: #b3128f; font-size: .7rem; }
+
+.hs-suggest-note { margin: .6rem 0 0; font-size: .78rem; color: #7a7a96; }
+.hs-suggest-note[hidden] { display: none !important; }
+
+.hs-suggest-reopen { grid-column: 1 / -1; margin: 0 0 .25rem; }
+.hs-suggest-reopen[hidden] { display: none !important; }
+.hs-linklike {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: .8rem; color: #6c38ff; text-decoration: underline;
+}

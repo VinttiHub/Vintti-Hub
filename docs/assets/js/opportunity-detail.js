@@ -5,6 +5,40 @@ const OPPORTUNITY_RICH_COMMENT_HANDLES = {
   clientAbout: null,
   firstMeeting: null,
 };
+// Set Up Fee / Final Fee segun HubSpot (opportunity.hubspot_setup_fee y
+// hubspot_final_fee). Son informativos: no los lee ningun dataset del dashboard
+// ni las comisiones de AE, y por eso los inputs son readonly y no se persisten.
+function renderHubspotMirrorFees(data){
+  // 'money' se formatea como USD; 'text' va tal cual (Role Hired es texto libre y
+  // MKT Collab es un multi-select que el sync guarda normalizado como "a; b").
+  const fields = [
+    ['hubspot-setup-fee-group',    'hubspot-setup-fee-input',    data?.hubspot_setup_fee,    'money'],
+    ['hubspot-final-fee-group',    'hubspot-final-fee-input',    data?.hubspot_final_fee,    'money'],
+    ['hubspot-final-salary-group', 'hubspot-final-salary-input', data?.hubspot_final_salary, 'money'],
+    ['hubspot-role-hired-group',   'hubspot-role-hired-input',   data?.hubspot_role_hired,   'text'],
+    ['hubspot-mkt-collab-group',   'hubspot-mkt-collab-input',   data?.hubspot_mkt_collab,   'text'],
+  ];
+  for (const [groupId, inputId, raw, kind] of fields) {
+    const group = document.getElementById(groupId);
+    const input = document.getElementById(inputId);
+    if (!group || !input) continue;
+    const vacio = (raw === null || raw === undefined || String(raw).trim() === '');
+    if (vacio) {
+      input.value = '';
+      group.hidden = true;
+      continue;
+    }
+    if (kind === 'money') {
+      const value = Number(raw);
+      if (Number.isNaN(value)) { input.value = ''; group.hidden = true; continue; }
+      input.value = value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    } else {
+      input.value = String(raw).trim();
+    }
+    group.hidden = false;
+  }
+}
+
 // === MODEL helpers (normaliza, setea UI y guarda consistente) ===
 const MODEL = {
   normalize(v){
@@ -12,11 +46,16 @@ const MODEL = {
     if (!s) return '';
     if (s.startsWith('staff')) return 'staffing';
     if (s.startsWith('recr'))  return 'recruiting';
+    // Llega desde HubSpot (propiedad Model del deal). Sin esta rama normalize()
+    // devuelve '' y el change del select persiste un modelo equivocado.
+    if (s.startsWith('project')) return 'project-based';
     return '';
   },
   toTitle(norm){           // 'staffing' -> 'Staffing'
     if (!norm) return '';
-    return norm === 'staffing' ? 'Staffing' : 'Recruiting';
+    if (norm === 'staffing') return 'Staffing';
+    if (norm === 'project-based') return 'Project-Based';
+    return 'Recruiting';
   },
   setUI(raw){
     const norm  = MODEL.normalize(raw);
@@ -3589,6 +3628,9 @@ async function loadOpportunityData() {
     document.getElementById('model-select').value = data.opp_model || '';
     document.getElementById('years-experience-input').value = data.years_experience || '';
     document.getElementById('fee-input').value = data.fee || '';
+    // Espejo de solo lectura de lo que dice HubSpot al cerrar el deal. Solo se
+    // muestran si el sync trajo un valor: en una opp cargada a mano no aparecen.
+    renderHubspotMirrorFees(data);
     document.getElementById('timezone-input').value = data.account_timezone || '';
     if (OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting) {
       OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting.setHTML(data.opp_comments || '');

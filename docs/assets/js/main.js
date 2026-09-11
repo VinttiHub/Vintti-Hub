@@ -2094,6 +2094,196 @@ if (downloadCsvBtn) {
     }
   });
 }
+
+
+// El resultado se guarda antes de recargar y se pinta despues: si lo dejaramos
+// solo en la consola, el reload lo borraria — y en la practica nadie abre devtools.
+const HS_SYNC_REPORT_KEY = 'hubspotOppSyncReport';
+
+function resumenHubspotSync(payload) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const liviano = i => ({
+    deal: i.dealname || i.deal_id,
+    opp: i.opportunity_id || null,
+    posicion: i.role_to_hire || null,
+    model: i.opp_model || null,
+    stage: i.hub_stage_after || i.hub_stage_before || null,
+    motivo: i.reason || null,
+  });
+  return {
+    dry_run: !!payload.dry_run,
+    deals: Number(payload.deals_found || 0),
+    created: Number(payload.created || 0),
+    adopted: Number(payload.adopted || 0),
+    updated: Number(payload.updated || 0),
+    skipped: Number(payload.skipped || 0),
+    errores: (payload.errors || []).map(e => ({ deal: e.deal_id, error: e.error })),
+    retrocesos: (payload.retrocesos || []).map(r => ({
+      deal: r.dealname,
+      habia_llegado_a: r.hubspot_retrocedio && r.hubspot_retrocedio.habia_llegado_a,
+      ahora_en: r.hubspot_retrocedio && r.hubspot_retrocedio.ahora_en,
+    })),
+    creadas:  items.filter(i => (i.action || i.would_action) === 'created').map(liviano),
+    adoptadas: items.filter(i => (i.action || i.would_action) === 'adopted').map(liviano),
+    actualizadas: items.filter(i => (i.action || i.would_action) === 'updated').map(liviano),
+    salteadas: items.filter(i => i.action === 'skipped').map(liviano),
+  };
+}
+
+// Los `reason` del backend son identificadores, no texto para una persona.
+const HS_MOTIVOS = {
+  advanced: 'avanza de etapa',
+  nothing_to_change: 'ya estaba al día',
+  hub_ahead_or_equal: 'el hub ya está más adelante',
+  no_target_stage: 'Closed Win no mueve el stage',
+  not_yet_deep_dive: 'todavía en Intro Call',
+  unmapped_stage: 'etapa que no sincronizamos',
+  pipeline_not_tracked: 'pipeline que no sincronizamos',
+  no_role_to_hire: 'sin Role to hire cargado',
+  ambiguous_position_match: 'hay más de una opp con esa posición',
+  hub_stage_is_terminal: 'la opp está cerrada en el hub',
+  unknown_hub_stage: 'el stage del hub no se reconoce',
+  stage_changed_concurrently: 'alguien la movió al mismo tiempo',
+  adopted_concurrently: 'otra corrida la vinculó primero',
+  adopted_reload_failed: 'se vinculó pero no se pudo releer',
+  opportunity_not_resolvable: 'no se pudo resolver la opportunity',
+};
+
+function renderHubspotSyncReport(r) {
+  if (!r) return;
+  document.getElementById('hsSyncReport')?.remove();
+
+  const panel = document.createElement('section');
+  panel.id = 'hsSyncReport';
+  panel.className = 'hs-report' + (r.errores.length ? ' has-errors' : '');
+
+  const titulo = r.dry_run ? 'Simulación de sync (no se escribió nada)' : 'Sync con HubSpot';
+  const verbo = r.dry_run ? 'Se crearían' : 'Creadas';
+
+  const grupos = [
+    [verbo, r.creadas, 'ok'],
+    [r.dry_run ? 'Ya existen en el hub: se vincularían con su deal'
+               : 'Ya existían en el hub: se vincularon con su deal', r.adoptadas, 'ok'],
+    [r.dry_run ? 'Se actualizarían' : 'Actualizadas', r.actualizadas, 'ok'],
+    ['Sin cambios', r.salteadas, 'muted'],
+  ].filter(([, filas]) => filas.length);
+
+  const fila = i => `<li><b>${i.deal || '—'}</b>${i.posicion ? ` · ${i.posicion}` : ''}`
+    + `${i.model ? ` · ${i.model}` : ''}${i.stage ? ` · ${i.stage}` : ''}`
+    + `${i.opp ? ` · opp #${i.opp}` : ''}${i.motivo ? ` <span class="hs-report-why">${HS_MOTIVOS[i.motivo] || i.motivo}</span>` : ''}</li>`;
+
+  panel.innerHTML = `
+    <div class="hs-report-head">
+      <h3>${titulo}</h3>
+      <button type="button" class="hs-report-close" aria-label="Cerrar">×</button>
+    </div>
+    <p class="hs-report-counts">
+      ${r.deals} deal(s) mirados · <b>${r.created}</b> ${r.dry_run ? 'se crearían' : 'creadas'}
+      · <b>${r.adopted}</b> ${r.dry_run ? 'se vincularían' : 'vinculadas'}
+      · <b>${r.updated}</b> ${r.dry_run ? 'se actualizarían' : 'actualizadas'}
+      · ${r.skipped} sin cambios · ${r.errores.length} error(es)
+    </p>
+    ${r.adoptadas.length ? `<p class="hs-report-note">Vincular = la opportunity ya está cargada en el hub y el sync la amarra a su deal de HubSpot en vez de crear una duplicada. No le toca el stage.</p>` : ''}
+    ${r.retrocesos.length ? `<p class="hs-report-warn">${r.retrocesos.length} deal(s) retrocedieron de etapa en HubSpot; el hub quedó como estaba: ${r.retrocesos.map(x => `${x.deal} (${x.habia_llegado_a} → ${x.ahora_en})`).join(', ')}</p>` : ''}
+    ${r.errores.length ? `<ul class="hs-report-errors">${r.errores.map(e => `<li>deal ${e.deal}: ${e.error}</li>`).join('')}</ul>` : ''}
+    ${grupos.map(([t, filas, cls]) => `
+      <details class="hs-report-group ${cls}"${cls === 'ok' ? ' open' : ''}>
+        <summary>${t} (${filas.length})</summary>
+        <ul>${filas.map(fila).join('')}</ul>
+      </details>`).join('')}
+  `;
+  panel.querySelector('.hs-report-close').addEventListener('click', () => panel.remove());
+
+  const header = document.querySelector('.main-content .page-header');
+  if (header && header.parentNode) header.parentNode.insertBefore(panel, header.nextSibling);
+  else document.body.prepend(panel);
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Si la corrida anterior recargo la pagina, el reporte quedo guardado: se pinta y
+// se limpia, para que no reaparezca en la siguiente visita.
+function restoreHubspotSyncReport() {
+  try {
+    const raw = sessionStorage.getItem(HS_SYNC_REPORT_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(HS_SYNC_REPORT_KEY);
+    renderHubspotSyncReport(JSON.parse(raw));
+  } catch (e) { console.warn('No se pudo restaurar el reporte de sync', e); }
+}
+
+// Sync manual de opportunities desde HubSpot. El cron corre igual cada 30 min;
+// este boton es para no esperarlo despues de mover un deal.
+// La lista de emails es LOCAL a proposito: las `allowedEmails` de este archivo son
+// variables locales de otras funciones, no un allow-list de pagina.
+const OPP_HUBSPOT_SYNC_ALLOWED = [
+  'pgonzales@vintti.com',
+  'mariano@vintti.com',
+  'mia@vintti.com',
+  'bahia@vintti.com',
+  'agustin@vintti.com',
+];
+
+function initOpportunitiesHubSpotSyncButton() {
+  const btn = document.getElementById('oppHubSpotSyncBtn');
+  if (!btn) return;
+  // Este bloque vive dentro de la funcion que pinta la tabla, que puede correr
+  // mas de una vez: sin la marca el click dispararia N syncs en paralelo.
+  if (btn.dataset.hsWired) return;
+  btn.dataset.hsWired = '1';
+
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+  if (!OPP_HUBSPOT_SYNC_ALLOWED.includes(currentUserEmail)) {
+    btn.style.display = 'none';
+    return;
+  }
+
+  restoreHubspotSyncReport();
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    const restoreBtn = setBtnBusy(btn, 'Syncing…');
+    showOppBusy('Sincronizando con HubSpot…', 'Puede tardar hasta un minuto');
+
+    try {
+      // Body vacio = sync incremental: solo los deals modificados desde la ultima
+      // corrida. Para probar sin escribir, mandar {"dry_run": true}.
+      const response = await fetch(`${API_BASE}/hubspot/sync/opportunities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.status === 409) {
+        alert('Ya hay un sync de HubSpot corriendo. Probá de nuevo en un minuto.');
+        return;
+      }
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || `HubSpot sync failed (${response.status})`);
+      }
+
+      const resumen = resumenHubspotSync(payload);
+
+      // En una corrida real la tabla de abajo quedo vieja, asi que se recarga; el
+      // reporte sobrevive al reload via sessionStorage. En dry run no hay nada que
+      // refrescar y se pinta directo.
+      if (resumen.dry_run) {
+        renderHubspotSyncReport(resumen);
+      } else {
+        sessionStorage.setItem(HS_SYNC_REPORT_KEY, JSON.stringify(resumen));
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('HubSpot opportunity sync failed:', err);
+      alert(`HubSpot sync failed: ${err.message || err}`);
+    } finally {
+      hideOppBusy();
+      restoreBtn();
+    }
+  });
+}
+
+initOpportunitiesHubSpotSyncButton();
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
 if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
   try {

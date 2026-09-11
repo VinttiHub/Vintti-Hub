@@ -473,6 +473,176 @@ async function patchHireFromUpdate(candidateId, update, apiBase='https://7m6mw95
 
 // Trae todos los salary_updates, elige el más reciente y lo aplica al Hire
 // Trae todos los salary_updates, elige el más reciente y lo aplica al Hire
+// ── Sugerencia de HubSpot para el Hire ──────────────────────────────────────
+// El sync guarda en `opportunity` lo que se cargo en el deal al pasar a Closed Win
+// (Final Fee, Set Up Fee, Candidate's Final Salary, Role Hired, MKT Collab), pero
+// NUNCA escribe hire_opportunity: esos montos son por (candidate_id, opportunity_id)
+// y HubSpot no tiene identidad de candidato. Aca se muestran y, si alguien aprieta
+// Aplicar, se escriben en los inputs de siempre y se dispara el guardado normal.
+
+function hsNum(v){
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function hsMoney(n){
+  return n === null ? '' : n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+// Guarda lo ultimo que devolvio /hire_opportunity para que el boton no tenga que
+// volver a pedirlo.
+window.__hubspotHireSuggestion = null;
+
+function renderHubspotHireSuggestion(oppData, hireData){
+  const panel  = document.getElementById('hubspot-hire-suggestion');
+  const reopen = document.getElementById('hubspot-hire-reopen');
+  if (!panel) return;
+
+  const modelLower = String(oppData?.opp_model || '').toLowerCase();
+  const isRecruiting = modelLower === 'recruiting';
+
+  const salary   = hsNum(oppData?.hubspot_final_salary);
+  const finalFee = hsNum(oppData?.hubspot_final_fee);
+  const setupFee = hsNum(oppData?.hubspot_setup_fee);
+  const roleHired = (oppData?.hubspot_role_hired || '').trim();
+  const mktCollab = (oppData?.hubspot_mkt_collab || '').trim();
+
+  const hayAlgo = [salary, finalFee, setupFee].some(v => v !== null) || roleHired || mktCollab;
+  if (!hayAlgo){
+    panel.hidden = true;
+    if (reopen) reopen.hidden = true;
+    window.__hubspotHireSuggestion = null;
+    return;
+  }
+
+  window.__hubspotHireSuggestion = { salary, finalFee, setupFee, isRecruiting, oppData };
+
+  // En Recruiting el Final Fee es el placement fee one-shot y va a Revenue; en
+  // Staffing es el fee mensual y va a Fee. Misma propiedad, columnas distintas.
+  const filas = [
+    ['Salary', salary === null ? '' : hsMoney(salary), hsNum(hireData?.employee_salary)],
+    [isRecruiting ? 'Revenue' : 'Fee', finalFee === null ? '' : hsMoney(finalFee),
+      hsNum(isRecruiting ? hireData?.employee_revenue : hireData?.employee_fee)],
+  ];
+  if (!isRecruiting) filas.push(['Set up Fee', setupFee === null ? '' : hsMoney(setupFee), hsNum(hireData?.setup_fee)]);
+  if (roleHired) filas.push(['Role Hired', roleHired, null]);
+  if (mktCollab) filas.push(['MKT Collab', mktCollab, null]);
+
+  const nums = { 'Salary': salary, 'Fee': finalFee, 'Revenue': finalFee, 'Set up Fee': setupFee };
+  const cont = document.getElementById('hubspot-hire-values');
+  let hayDiff = false;
+  if (cont){
+    cont.innerHTML = '';
+    for (const [label, valor, enElHub] of filas){
+      if (!valor) continue;
+      const div = document.createElement('div');
+      div.className = 'hs-suggest-item';
+      const propuesto = nums[label];
+      // Se marca cuando el hub YA tiene otro numero, para que la discrepancia se
+      // vea antes de apretar nada.
+      if (enElHub !== null && enElHub !== undefined && propuesto !== null && enElHub !== propuesto){
+        div.classList.add('is-diff');
+        hayDiff = true;
+      }
+      const b = document.createElement('b'); b.textContent = label;
+      div.appendChild(b);
+      div.appendChild(document.createTextNode(valor));
+      if (div.classList.contains('is-diff')){
+        const small = document.createElement('small');
+        small.textContent = `en el hub: ${hsMoney(enElHub)}`;
+        div.appendChild(small);
+      }
+      cont.appendChild(div);
+    }
+  }
+
+  const nota = document.getElementById('hubspot-hire-note');
+  if (nota){
+    nota.hidden = !hayDiff;
+    nota.textContent = hayDiff
+      ? 'Hay campos donde el hub ya tiene otro valor. Aplicar los reemplaza.'
+      : '';
+  }
+
+  const yaAplicado = !!oppData?.hubspot_hire_applied_at;
+  panel.hidden = yaAplicado;
+  if (reopen) reopen.hidden = !yaAplicado;
+}
+
+async function applyHubspotHireSuggestion(candidateId, apiBase){
+  const sug = window.__hubspotHireSuggestion;
+  if (!sug) return;
+  const btn = document.getElementById('hubspot-hire-apply');
+  const { salary, finalFee, setupFee, isRecruiting, oppData } = sug;
+
+  const nota = document.getElementById('hubspot-hire-note');
+  if (nota && !nota.hidden){
+    if (!confirm('Algunos campos ya tienen otro valor en el hub y se van a reemplazar. ¿Seguimos?')) return;
+  }
+
+  if (btn){ btn.disabled = true; btn.textContent = 'Aplicando...'; }
+
+  const salIn = document.getElementById('hire-salary');
+  const feeIn = document.getElementById('hire-fee');
+  const revIn = document.getElementById('hire-revenue');
+  const setIn = document.getElementById('hire-setup-fee');
+
+  if (salary !== null && salIn) salIn.value = salary;
+  if (finalFee !== null){
+    if (isRecruiting){ if (revIn) revIn.value = finalFee; }
+    else { if (feeIn) feeIn.value = finalFee; }
+  }
+  if (!isRecruiting && setupFee !== null && setIn) setIn.value = setupFee;
+
+  // Cada paso va aislado. syncHireFromLatestSalaryUpdate() (que corre dentro de
+  // createSalaryUpdateFromInputs) LANZA si el PATCH /hire falla, y antes eso abortaba
+  // el resto: quedaban escrituras a medias y el sello sin poner, en silencio.
+  const fallaron = [];
+  let algoEscrito = false;
+
+  async function paso(nombre, fn){
+    try { await fn(); algoEscrito = true; }
+    catch (err){
+      console.error(`HubSpot → hire: fallo "${nombre}"`, err);
+      fallaron.push(`${nombre}: ${err.message || err}`);
+    }
+  }
+
+  // Camino de guardado de SIEMPRE: createSalaryUpdateFromInputs resuelve el modelo,
+  // deriva revenue = salary + fee en Staffing, serializa los POST y borra las filas
+  // duplicadas de la misma fecha. Duplicar esa logica aca seria pedir el bug.
+  if (salary !== null || (!isRecruiting && finalFee !== null)){
+    await paso('Salary/Fee', () => createSalaryUpdateFromInputs('salary', candidateId, apiBase));
+  }
+  // En Recruiting el revenue es manual y no lo toca syncHireFromLatestSalaryUpdate.
+  if (isRecruiting && finalFee !== null){
+    await paso('Revenue', () => window.updateHireField('employee_revenue_recruiting', finalFee, { skipReload: true }));
+  }
+  if (!isRecruiting && setupFee !== null){
+    await paso('Set up Fee', () => window.updateHireField('setup_fee', setupFee, { skipReload: true }));
+  }
+
+  // El sello va SIEMPRE que algo se haya escrito, aunque otro paso haya fallado: si
+  // no, el panel seguiria ofreciendo valores que ya estan aplicados a medias.
+  const oppId = Number(oppData?.opportunity_id) || window.__currentOppId;
+  if (oppId && algoEscrito){
+    try {
+      const r = await fetch(`${apiBase}/opportunities/${oppId}/hubspot-hire-applied`, { method: 'POST' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch (err){
+      // No rompe nada: el unico efecto es que el panel vuelve a sugerir lo mismo.
+      console.warn('No se pudo sellar hubspot_hire_applied_at', err);
+    }
+  }
+
+  if (btn){ btn.disabled = false; btn.textContent = 'Aplicar'; }
+  if (fallaron.length){
+    alert(`No se pudieron aplicar todos los valores de HubSpot:\n\n- ${fallaron.join('\n- ')}\n\nEl detalle está en la consola.`);
+  }
+  if (typeof window.loadHireData === 'function') window.loadHireData();
+}
+
 async function syncHireFromLatestSalaryUpdate(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
   if (!candidateId) return;
   try {
@@ -3736,9 +3906,13 @@ if (hireRevenue){
 
   function loadHireData() {
     const revenueInput = document.getElementById('hire-revenue');
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire_opportunity`)
+    // Se guarda para el .then de abajo: el panel de HubSpot necesita comparar lo que
+    // dice el deal contra lo que ya tiene el hire.
+    let hsOppData = null;
+    fetch(`${candidatesApiBase()}/candidates/${candidateId}/hire_opportunity`)
       .then(res => res.json())
       .then(async (oppData) => {
+        hsOppData = oppData;
         window.__currentOppId = Number(oppData?.opportunity_id) || window.__currentOppId;
         if (referenceRequestLink) {
           const refUrl = new URL('reference-request.html', window.location.href);
@@ -3763,6 +3937,8 @@ if (hireRevenue){
         if (setupEl) setupEl.value = data.setup_fee || '';
         if (salaryInput) salaryInput.value = data.employee_salary || '';
         if (feeInput)    feeInput.value    = data.employee_fee    || '';
+        try { renderHubspotHireSuggestion(hsOppData, data); }
+        catch (err) { console.warn('No se pudo pintar la sugerencia de HubSpot', err); }
         const priceType = document.getElementById('hire-price-type'); if (priceType) priceType.value = data.price_type || '';
         const comp = document.getElementById('hire-computer');      if (comp) comp.value = data.computer || '';
         const perks = document.getElementById('hire-extraperks');   if (perks) perks.innerHTML = data.extraperks || '';
@@ -3821,6 +3997,23 @@ if (hireRevenue){
       });
   }
   window.loadHireData = loadHireData;
+
+  // Botones del panel de sugerencia de HubSpot. Se cablean una sola vez; el panel
+  // se muestra u oculta desde renderHubspotHireSuggestion() en cada loadHireData().
+  const hsApplyBtn = document.getElementById('hubspot-hire-apply');
+  if (hsApplyBtn) {
+    hsApplyBtn.addEventListener('click', () =>
+      applyHubspotHireSuggestion(candidateId, candidatesApiBase()));
+  }
+  const hsReopen = document.querySelector('#hubspot-hire-reopen button');
+  if (hsReopen) {
+    hsReopen.addEventListener('click', () => {
+      const panel = document.getElementById('hubspot-hire-suggestion');
+      const wrap  = document.getElementById('hubspot-hire-reopen');
+      if (panel) panel.hidden = false;
+      if (wrap) wrap.hidden = true;
+    });
+  }
 
   const referenceRequestLink = document.getElementById('reference-request-link');
   if (referenceRequestLink) {

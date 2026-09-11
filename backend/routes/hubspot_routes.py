@@ -1,12 +1,16 @@
+import json
 import logging
 import os
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
+import psycopg2
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from db import get_connection
+from utils.credit_loop import maybe_send_credit_available_email_for_new_opportunity
+from utils.hr_lead_todo import create_stage_todos
 from utils.hubspot import (
     DEFAULT_MARIANO_EMAIL,
     HubSpotClient,
@@ -18,6 +22,8 @@ from utils.hubspot import (
     hubspot_datetime_to_ms,
     strip_tracking_params,
 )
+from utils import hubspot_opportunities as hs_opps
+from dashboards.datasets._now import today_ar
 
 
 bp = Blueprint("hubspot", __name__)
@@ -248,6 +254,163 @@ def _ensure_hubspot_account_columns(cursor):
 def _ensure_opportunity_stage_date_columns(cursor):
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+
+
+# ---------------------------------------------------------------------------
+# Sync de opportunities: esquema y marca de agua.
+# Ver backend/sql/20260910_hubspot_opportunity_sync.sql y CLAUDE.md.
+# ---------------------------------------------------------------------------
+
+HUBSPOT_OPP_SYNC_KEY = "opportunities"
+# Clave del advisory lock: el cron cada 30 min y el boton pueden solaparse, y como
+# commiteamos por deal dos corridas simultaneas podrian crear la misma opp dos veces.
+HUBSPOT_OPP_SYNC_LOCK_KEY = 761_020_910
+
+_HUBSPOT_OPPORTUNITY_COLUMNS = (
+    "hubspot_deal_id",
+    "hubspot_pipeline_id",
+    "hubspot_dealstage_id",
+    "hubspot_synced_at",
+    "hubspot_setup_fee",
+    "hubspot_final_fee",
+    "hubspot_final_salary",
+    "hubspot_role_hired",
+    "hubspot_mkt_collab",
+    "hubspot_hire_applied_at",
+    "deep_dive_date",
+    "nda_sent_date",
+)
+_HUBSPOT_OPPORTUNITY_SCHEMA_READY = None
+_HUBSPOT_SYNC_STATE_READY = None
+
+
+def _hubspot_opportunity_schema_is_ready(cursor):
+    """True si estan las columnas y el indice unico. Solo lee el catalogo."""
+    cursor.execute(
+        """
+        SELECT column_name
+          FROM information_schema.columns
+         WHERE table_name = 'opportunity' AND column_name = ANY(%s)
+        """,
+        (list(_HUBSPOT_OPPORTUNITY_COLUMNS),),
+    )
+    present = {
+        (row["column_name"] if isinstance(row, dict) else row[0])
+        for row in cursor.fetchall()
+    }
+    if len(present) < len(_HUBSPOT_OPPORTUNITY_COLUMNS):
+        return False
+    cursor.execute(
+        """
+        SELECT 1
+          FROM pg_indexes
+         WHERE tablename = 'opportunity'
+           AND indexname = 'idx_opportunity_hubspot_deal_id'
+         LIMIT 1
+        """
+    )
+    return cursor.fetchone() is not None
+
+
+def _ensure_hubspot_opportunity_columns(cursor):
+    """Idempotente y BARATO en regimen, igual que _ensure_hubspot_account_columns.
+
+    Un ALTER TABLE toma ACCESS EXCLUSIVE sobre `opportunity` aunque el IF NOT
+    EXISTS no haga nada, y aca corre justo antes de un loop que puede tardar
+    minutos: sin el chequeo previo la tabla quedaria trabada todo ese rato.
+    """
+    global _HUBSPOT_OPPORTUNITY_SCHEMA_READY
+    if _HUBSPOT_OPPORTUNITY_SCHEMA_READY:
+        return
+    if _hubspot_opportunity_schema_is_ready(cursor):
+        _HUBSPOT_OPPORTUNITY_SCHEMA_READY = True
+        return
+
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_deal_id TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_pipeline_id TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_dealstage_id TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_synced_at TIMESTAMPTZ")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_setup_fee NUMERIC(12,2)")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_final_fee NUMERIC(12,2)")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_final_salary NUMERIC(12,2)")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_role_hired TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_mkt_collab TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_hire_applied_at TIMESTAMPTZ")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_opportunity_hubspot_deal_id
+        ON opportunity (hubspot_deal_id)
+        WHERE hubspot_deal_id IS NOT NULL AND hubspot_deal_id <> ''
+        """
+    )
+    cursor.execute(
+        r"""
+        CREATE INDEX IF NOT EXISTS idx_opportunity_account_position_norm
+        ON opportunity (
+            account_id,
+            (regexp_replace(lower(btrim(coalesce(opp_position_name, ''))), '\s+', ' ', 'g'))
+        )
+        """
+    )
+    _HUBSPOT_OPPORTUNITY_SCHEMA_READY = True
+
+
+def _ensure_hubspot_sync_state_table(cursor):
+    """Marca de agua del sync incremental.
+
+    Tabla propia y NO app_cache: app_cache vence y se borra solo, y su contrato es
+    "fallar en silencio". Un watermark que se evapora hace que el sync se saltee
+    deals para siempre.
+    """
+    global _HUBSPOT_SYNC_STATE_READY
+    if _HUBSPOT_SYNC_STATE_READY:
+        return
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hubspot_sync_state (
+            sync_key     TEXT PRIMARY KEY,
+            watermark_ms BIGINT,
+            last_run_at  TIMESTAMPTZ,
+            last_status  TEXT,
+            last_report  JSONB
+        )
+        """
+    )
+    _HUBSPOT_SYNC_STATE_READY = True
+
+
+def _read_sync_watermark_ms(cursor, sync_key=HUBSPOT_OPP_SYNC_KEY):
+    cursor.execute(
+        "SELECT watermark_ms FROM hubspot_sync_state WHERE sync_key = %s",
+        (sync_key,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    value = row["watermark_ms"] if isinstance(row, dict) else row[0]
+    return int(value) if value is not None else None
+
+
+def _write_sync_state(cursor, sync_key, watermark_ms, status, report):
+    """Guarda el ultimo reporte siempre; el watermark solo si vino un valor.
+
+    COALESCE en watermark_ms para que una corrida con errores (que NO debe avanzar
+    la marca) igual deje su reporte para triage sin pisar la marca buena.
+    """
+    cursor.execute(
+        """
+        INSERT INTO hubspot_sync_state (sync_key, watermark_ms, last_run_at, last_status, last_report)
+        VALUES (%s, %s, NOW(), %s, %s::jsonb)
+        ON CONFLICT (sync_key) DO UPDATE
+           SET watermark_ms = COALESCE(EXCLUDED.watermark_ms, hubspot_sync_state.watermark_ms),
+               last_run_at  = EXCLUDED.last_run_at,
+               last_status  = EXCLUDED.last_status,
+               last_report  = EXCLUDED.last_report
+        """,
+        (sync_key, watermark_ms, status, json.dumps(report, default=str)),
+    )
 
 
 def _parse_hubspot_date(value):
@@ -2148,4 +2311,1111 @@ def backfill_opportunity_deep_dive_dates():
         return jsonify({"success": False, "error": str(exc)}), 502
     except Exception as exc:
         logging.exception("HubSpot opportunity Deep Dive date backfill failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# ===========================================================================
+# Sync HubSpot -> opportunities del hub
+#
+# Spec: doc "AUTOMATIZACIONES HUBSPOT - HUB".
+#   Intro Call -> Deep Dive  ==> crear la opportunity
+#   Deep Dive  -> NDA Sent   ==> stage 'NDA Sent'
+#   NDA Sent   -> NDA Signed ==> stage 'Sourcing'
+#   Closed Won               ==> solo Set Up Fee / Final Fee, NO mueve el stage
+#
+# La invariante que sostiene todo: una opportunity con hubspot_deal_id NULL fue
+# creada a mano desde el modal y el sync NO la toca nunca.
+# ===========================================================================
+
+
+def _opp_sync_env_flag(name, default=True):
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw not in ("0", "false", "no", "off")
+
+
+def _opp_sync_bootstrap_ms():
+    """Desde cuando mirar deals en la PRIMERA corrida (sin watermark todavia).
+
+    Default deliberadamente corto (24 h): un bootstrap ancho crearia de golpe
+    una opportunity por cada deal historico que este en Deep Dive o mas adelante.
+    Para traer historia hay que setear HUBSPOT_OPP_SYNC_BOOTSTRAP a conciencia.
+    """
+    raw = (os.environ.get("HUBSPOT_OPP_SYNC_BOOTSTRAP") or "").strip()
+    parsed = _parse_hubspot_date(raw) if raw else None
+    if parsed:
+        moment = datetime(parsed.year, parsed.month, parsed.day, tzinfo=timezone.utc)
+        return int(moment.timestamp() * 1000)
+    return int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp() * 1000)
+
+
+def _opp_sync_overlap_ms():
+    raw = (os.environ.get("HUBSPOT_OPP_SYNC_OVERLAP_MINUTES") or "").strip()
+    try:
+        minutes = int(raw) if raw else 10
+    except ValueError:
+        minutes = 10
+    return max(minutes, 0) * 60 * 1000
+
+
+def _iso_dates(mapping):
+    """Fechas -> 'YYYY-MM-DD' para que el reporte se vea igual en todos los caminos."""
+    return {
+        key: value.isoformat() if hasattr(value, "isoformat") else value
+        for key, value in mapping.items()
+        if value is not None
+    }
+
+
+def _skip(deal, reason, **extra):
+    props = (deal or {}).get("properties") or {}
+    record = {
+        "deal_id": str((deal or {}).get("id") or ""),
+        "dealname": props.get("dealname"),
+    }
+    record.update(extra)
+    # Al final: `extra` suele ser el item en construccion y puede traer un
+    # "action" de un paso anterior (p. ej. "adopted") que pisaria el skip.
+    record["action"] = "skipped"
+    record["reason"] = reason
+    return record
+
+
+def _adopt_existing_opportunity(cursor, account_id, position, allow_ambiguous, schema_ready=True):
+    """Busca una opp abierta de esa cuenta con la misma posicion, sin deal atado.
+
+    Existe porque Mariano ya venia cargando estas opps a mano: sin esto el sync
+    crearia un duplicado por cada una y ensuciaria funnel y revenue.
+    """
+    # Sin la migracion no hay hubspot_deal_id, y entonces NINGUNA opp lo tiene: el
+    # predicado sobra y hay que sacarlo para que el dry run pueda correr igual.
+    sin_deal = "AND NULLIF(hubspot_deal_id, '') IS NULL" if schema_ready else ""
+    cursor.execute(
+        r"""
+        SELECT opportunity_id, opp_stage, opp_position_name
+          FROM opportunity
+         WHERE account_id = %%s
+           %s
+           AND LOWER(BTRIM(COALESCE(opp_stage, ''))) NOT IN ('closed lost', 'stop', 'close win')
+           AND regexp_replace(LOWER(BTRIM(COALESCE(opp_position_name, ''))), '\s+', ' ', 'g') = %%s
+         ORDER BY opportunity_id DESC
+        """ % sin_deal,
+        (account_id, hs_opps.normalize_position_name(position)),
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        return None, None
+    if len(rows) > 1 and not allow_ambiguous:
+        return None, [r["opportunity_id"] for r in rows]
+    return rows[0], None
+
+
+# Sin la migracion corrida no existen hubspot_deal_id ni las dos de fees. Un dry run
+# tiene que poder correr igual: es justamente lo que se mira ANTES de migrar.
+_OPP_BASE_COLUMNS = """opportunity_id, account_id, opp_stage, opp_position_name, opp_model,
+               deep_dive_date, nda_sent_date, nda_signature_or_start_date,
+               min_budget, max_budget, min_salary, max_salary, years_experience,
+               fee, expected_fee"""
+_OPP_HUBSPOT_COLUMNS = """,
+               hubspot_setup_fee, hubspot_final_fee, hubspot_final_salary,
+               hubspot_role_hired, hubspot_mkt_collab"""
+
+
+def _opp_select_columns(schema_ready):
+    return _OPP_BASE_COLUMNS + (_OPP_HUBSPOT_COLUMNS if schema_ready else "")
+
+
+def _load_opportunity_by_deal(cursor, deal_id, schema_ready=True):
+    if not schema_ready:
+        # La columna no existe todavia, asi que ninguna opp puede estar amarrada.
+        return None
+    cursor.execute(
+        """
+        SELECT %s
+          FROM opportunity
+         WHERE NULLIF(hubspot_deal_id, '') = %%s
+         LIMIT 1
+        """ % _opp_select_columns(True),
+        (deal_id,),
+    )
+    return cursor.fetchone()
+
+
+def _load_opportunity_by_id(cursor, opportunity_id, schema_ready=True):
+    cursor.execute(
+        """
+        SELECT %s
+          FROM opportunity
+         WHERE opportunity_id = %%s
+        """ % _opp_select_columns(schema_ready),
+        (opportunity_id,),
+    )
+    return cursor.fetchone()
+
+
+def _apply_business_fields(cursor, opportunity_id, business, opp_row, dry_run):
+    """Completa budget/salario/experiencia/fees con lo que trae HubSpot.
+
+    Solo llena columnas en NULL y NUNCA pisa: esos numeros se renegocian dentro
+    del hub y el dato mas fresco suele ser el de la recruiter (decision de la
+    owner). Mismo criterio que usa el sync del CRM con las cuentas.
+
+    `fee` es la que el hub muestra como "Set Up Fee" y no la lee ningun dataset;
+    el fee del MRR sale de hire_opportunity. La unica con impacto en un card es
+    expected_fee (Active Pipeline).
+    """
+    faltantes = {
+        column: value
+        for column, value in business.items()
+        if (opp_row or {}).get(column) is None
+    }
+    if not faltantes or dry_run:
+        return faltantes
+    sets = ", ".join(f"{col} = COALESCE({col}, %s)" for col in faltantes)
+    cursor.execute(
+        f"UPDATE opportunity SET {sets}, hubspot_synced_at = NOW() "
+        f"WHERE opportunity_id = %s AND NULLIF(hubspot_deal_id, '') IS NOT NULL",
+        list(faltantes.values()) + [opportunity_id],
+    )
+    return faltantes
+
+
+def _insert_opportunity_from_deal(cursor, values):
+    """INSERT con opportunity_id = MAX+1 en UNA sentencia, con reintento.
+
+    La tabla no tiene secuencia (ver create_opportunity en accounts_routes.py:975),
+    asi que la carrera ya existe hoy; calcularlo dentro del propio INSERT deja la
+    ventana en el minimo posible y el SAVEPOINT permite reintentar sin abortar la
+    transaccion del deal.
+    """
+    for attempt in range(3):
+        cursor.execute("SAVEPOINT hs_opp_insert")
+        try:
+            cursor.execute(
+                """
+                INSERT INTO opportunity (
+                    opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead,
+                    opp_type, opp_stage, deep_dive_date, nda_sent_date, nda_signature_or_start_date,
+                    hubspot_deal_id, hubspot_pipeline_id, hubspot_dealstage_id, hubspot_synced_at
+                )
+                SELECT COALESCE(MAX(opportunity_id), 0) + 1,
+                       %(account_id)s, %(opp_model)s, %(position)s, %(sales_lead)s,
+                       'New', %(opp_stage)s,
+                       %(deep_dive_date)s, %(nda_sent_date)s, %(nda_signed_date)s,
+                       %(deal_id)s, %(pipeline_id)s, %(dealstage_id)s, NOW()
+                  FROM opportunity
+                RETURNING opportunity_id
+                """,
+                values,
+            )
+            row = cursor.fetchone()
+            cursor.execute("RELEASE SAVEPOINT hs_opp_insert")
+            return row["opportunity_id"]
+        except psycopg2.errors.UniqueViolation:
+            cursor.execute("ROLLBACK TO SAVEPOINT hs_opp_insert")
+            if attempt == 2:
+                raise
+    return None
+
+
+def _process_hubspot_deal(client, cursor, deal, ctx):
+    """Procesa UN deal. No commitea: el caller commitea por deal."""
+    pipeline_map = ctx["pipeline_map"]
+    property_maps = ctx["property_maps"]
+    opp_property_map = ctx["opp_property_map"]
+    dry_run = ctx["dry_run"]
+
+    deal_id = str(deal.get("id") or "")
+    props = deal.get("properties") or {}
+    pipeline_id = str(props.get("pipeline") or "")
+    dealstage_id = str(props.get("dealstage") or "")
+
+    entry = hs_opps.pipeline_entry(pipeline_map, pipeline_id)
+    if not entry:
+        return _skip(deal, "pipeline_not_tracked", pipeline_id=pipeline_id)
+
+    stage_key = hs_opps.deal_stage_key(pipeline_map, pipeline_id, dealstage_id)
+    if not stage_key:
+        return _skip(deal, "unmapped_stage", pipeline_key=entry["key"],
+                     dealstage_id=dealstage_id,
+                     dealstage_label=entry["stage_labels"].get(dealstage_id))
+
+    # Se detecta ANTES de los saltos tempranos: el caso mas comun de retroceso es
+    # justamente un deal que volvio a Intro Call, y ese se saltea dos lineas abajo.
+    # No se actua, solo se reporta (decision de la owner).
+    retroceso = hs_opps.detect_hubspot_regression(
+        pipeline_map, pipeline_id, props, stage_key, _parse_hubspot_date
+    )
+
+    if stage_key == "intro_call":
+        return _skip(deal, "not_yet_deep_dive", pipeline_key=entry["key"],
+                     stage_key=stage_key,
+                     **({"hubspot_retrocedio": retroceso} if retroceso else {}))
+
+    stage_dates = hs_opps.stage_dates_from_deal(
+        pipeline_map, pipeline_id, props, _parse_hubspot_date
+    )
+    # HubSpot no tiene propiedad de fecha para las dos etapas "NDA Sent": si falta
+    # la del stage donde esta el deal, se usa la fecha en que el sync lo detecta
+    # (misma semantica que el CURRENT_DATE del hub al mover el stage a mano).
+    inferida = hs_opps.fill_missing_entry_date(stage_dates, stage_key, today_ar())
+    role = str(props.get(opp_property_map.get("role_to_hire") or "") or "").strip()
+    model = _first_mapped_value(property_maps, "contract", deal=deal) or None
+    # Budget, salario, experiencia y fees esperados: HubSpot los pide al pasar a
+    # NDA Sent, y son los mismos campos que el hub muestra en Opportunity Detail.
+    business = hs_opps.business_fields_from_deal(props, opp_property_map)
+
+    item = {
+        "deal_id": deal_id,
+        "dealname": props.get("dealname"),
+        "pipeline_key": entry["key"],
+        "stage_key": stage_key,
+        "role_to_hire": role or None,
+        "opp_model": model,
+    }
+    if inferida:
+        # Se marca aparte para no hacer pasar por dato de HubSpot algo que no lo es.
+        item["fechas_inferidas"] = [inferida]
+    if retroceso:
+        item["hubspot_retrocedio"] = retroceso
+
+    schema_ready = ctx.get("schema_ready", True)
+    opp = _load_opportunity_by_deal(cursor, deal_id, schema_ready=schema_ready)
+    account_action = None
+
+    # --- la opp todavia no existe: resolver cuenta, adoptar o crear ------------
+    if not opp:
+        if not role:
+            # opp_position_name es la llave de adopcion: no se inventa.
+            return _skip(deal, "no_role_to_hire", **item)
+
+        full_deal = client.get_deal_with_associations(
+            deal_id, extra_properties=ctx["deal_extra_properties"]
+        )
+        company_ids = association_ids(full_deal, "companies")
+        contact_ids = association_ids(full_deal, "contacts")
+        company = (
+            client.get_company(company_ids[0], extra_properties=ctx["company_extra_properties"])
+            if company_ids else None
+        )
+        contact = (
+            client.get_contact(contact_ids[0], extra_properties=ctx["contact_extra_properties"])
+            if contact_ids else None
+        )
+        payload = build_account_payload(
+            full_deal, company=company, contact=contact, owner_email=entry["sales_lead"],
+        )
+        payload = _apply_account_field_overrides(
+            payload, contact=contact, company=company, deal=full_deal,
+            property_maps=property_maps,
+        )
+
+        existing_account = _preview_existing_account(cursor, payload)
+        if existing_account:
+            account_id = existing_account["account_id"]
+            account_action = "found"
+            if not dry_run:
+                _link_existing_account_to_hubspot(cursor, account_id, payload)
+                account_action = "linked"
+        elif dry_run:
+            item["account_action"] = "would_create"
+            item["would_action"] = "created"
+            item["reason"] = "advanced"
+            item["hub_stage_after"] = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
+            item["dates_written"] = _iso_dates(stage_dates)
+            return item
+        else:
+            result = _insert_or_update_account(cursor, payload)
+            account_id = result["account_id"]
+            account_action = result["action"]
+
+        item["account_id"] = account_id
+        item["account_action"] = account_action
+
+        adopted, ambiguous = _adopt_existing_opportunity(
+            cursor, account_id, role, ctx["allow_ambiguous"], schema_ready=schema_ready
+        )
+        if ambiguous:
+            return _skip(deal, "ambiguous_position_match", candidates=ambiguous, **item)
+
+        if adopted:
+            if not dry_run:
+                cursor.execute(
+                    """
+                    UPDATE opportunity
+                       SET hubspot_deal_id = %s,
+                           hubspot_pipeline_id = %s,
+                           hubspot_dealstage_id = %s,
+                           hubspot_synced_at = NOW()
+                     WHERE opportunity_id = %s
+                       AND NULLIF(hubspot_deal_id, '') IS NULL
+                    """,
+                    (deal_id, pipeline_id, dealstage_id, adopted["opportunity_id"]),
+                )
+                if cursor.rowcount == 0:
+                    # Otra corrida la agarro entre el SELECT y el UPDATE.
+                    return _skip(deal, "adopted_concurrently", **item)
+            item["would_action" if dry_run else "action"] = "adopted"
+            item["opportunity_id"] = adopted["opportunity_id"]
+            item["hub_stage_before"] = adopted["opp_stage"]
+            # Se recarga en ambos casos: el resto del flujo calcula que stage y
+            # que fechas CAMBIARIAN, y en dry run eso es justo lo que hay que ver.
+            opp = _load_opportunity_by_id(
+                cursor, adopted["opportunity_id"], schema_ready=schema_ready
+            )
+            if not opp:
+                # En una corrida real la adopcion ya quedo escrita; sin la fila no
+                # se puede seguir con stage/fechas, pero el deal quedo amarrado.
+                item["reason"] = "adopted_reload_failed"
+                return item
+        else:
+            initial_stage = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
+            if dry_run:
+                item["would_action"] = "created"
+                item["reason"] = "advanced"
+                item["hub_stage_after"] = initial_stage
+                item["dates_written"] = _iso_dates(stage_dates)
+                return item
+            new_id = _insert_opportunity_from_deal(cursor, {
+                "account_id": account_id,
+                "opp_model": model,
+                "position": role,
+                "sales_lead": entry["sales_lead"],
+                "opp_stage": initial_stage,
+                "deep_dive_date": stage_dates["deep_dive_date"],
+                "nda_sent_date": stage_dates["nda_sent_date"],
+                "nda_signed_date": stage_dates["nda_signature_or_start_date"],
+                "deal_id": deal_id,
+                "pipeline_id": pipeline_id,
+                "dealstage_id": dealstage_id,
+            })
+            item["action"] = "created"
+            item["reason"] = "advanced"
+            item["opportunity_id"] = new_id
+            item["hub_stage_after"] = initial_stage
+            item["dates_written"] = _iso_dates(stage_dates)
+            # La opp recien nacida tiene todo en NULL, asi que entra todo lo que
+            # HubSpot tenga cargado.
+            completados = _apply_business_fields(cursor, new_id, business, None, dry_run)
+            if completados:
+                item["campos_completados"] = completados
+
+            try:
+                create_stage_todos(cursor, new_id, initial_stage)
+            except Exception:  # noqa: BLE001
+                logging.exception("create_stage_todos fallo para la opp %s", new_id)
+
+            if ctx["send_emails"]:
+                try:
+                    item["credit_loop_notice"] = (
+                        maybe_send_credit_available_email_for_new_opportunity(
+                            cursor,
+                            account_id=account_id,
+                            opportunity_id=new_id,
+                            opp_model=model,
+                            opp_position_name=role,
+                            client_name=payload.get("name"),
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logging.exception("credit loop email fallo para la opp %s", new_id)
+                    item["credit_loop_notice"] = {"sent": False, "error": str(exc)}
+            else:
+                item["credit_loop_notice"] = {"sent": False, "reason": "suppressed_by_sync"}
+            return item
+
+    if not opp:
+        return _skip(deal, "opportunity_not_resolvable", **item)
+
+    # --- la opp ya existe: stage, fechas y fees -------------------------------
+    opportunity_id = opp["opportunity_id"]
+    item["opportunity_id"] = opportunity_id
+    item.setdefault("account_id", opp.get("account_id"))
+    item["hub_stage_before"] = opp.get("opp_stage")
+
+    changed = False
+    target_stage = hs_opps.STAGE_KEY_TO_HUB_STAGE.get(stage_key)
+    new_stage, reason = hs_opps.decide_stage_transition(opp.get("opp_stage"), target_stage)
+    item["reason"] = reason
+
+    if new_stage and not dry_run:
+        cursor.execute(
+            """
+            UPDATE opportunity
+               SET opp_stage = %s,
+                   hubspot_dealstage_id = %s,
+                   hubspot_pipeline_id = %s,
+                   hubspot_synced_at = NOW()
+             WHERE opportunity_id = %s
+               AND COALESCE(opp_stage, '') = %s
+            """,
+            (new_stage, dealstage_id, pipeline_id, opportunity_id, opp.get("opp_stage") or ""),
+        )
+        if cursor.rowcount == 0:
+            return _skip(deal, "stage_changed_concurrently", **item)
+        item["hub_stage_after"] = new_stage
+        changed = True
+        try:
+            create_stage_todos(cursor, opportunity_id, new_stage)
+        except Exception:  # noqa: BLE001
+            logging.exception("create_stage_todos fallo para la opp %s", opportunity_id)
+    elif new_stage:
+        item["hub_stage_after"] = new_stage
+        changed = True
+
+    # Fechas: HubSpot pisa el CURRENT_DATE que estampo el hub, pero nunca borra.
+    dates_written = {
+        column: value
+        for column, value in stage_dates.items()
+        if value is not None and opp.get(column) != value
+    }
+    if dates_written:
+        item["dates_written"] = _iso_dates(dates_written)
+        changed = True
+        if not dry_run:
+            cursor.execute(
+                """
+                UPDATE opportunity
+                   SET deep_dive_date = COALESCE(%s, deep_dive_date),
+                       nda_sent_date  = COALESCE(%s, nda_sent_date),
+                       nda_signature_or_start_date = COALESCE(%s, nda_signature_or_start_date),
+                       hubspot_synced_at = NOW()
+                 WHERE opportunity_id = %s
+                   AND NULLIF(hubspot_deal_id, '') IS NOT NULL
+                """,
+                (
+                    dates_written.get("deep_dive_date"),
+                    dates_written.get("nda_sent_date"),
+                    dates_written.get("nda_signature_or_start_date"),
+                    opportunity_id,
+                ),
+            )
+
+    completados = _apply_business_fields(cursor, opportunity_id, business, opp, dry_run)
+    if completados:
+        item["campos_completados"] = completados
+        changed = True
+
+    # Los 5 campos de Closed Win, todos a columnas ESPEJO de `opportunity`.
+    #
+    # A proposito NO se escribe hire_opportunity: esos montos viven por
+    # (candidate_id, opportunity_id) y HubSpot no tiene identidad de candidato. Ademas
+    # `revenue` es polisemica segun opp_model y se calcula en el navegador, el fee de
+    # Staffing pasa por salary_updates, el Credit Loop pisa fee/revenue, y estos numeros
+    # son el insumo del mail de comisiones. Los aplica una persona desde la solapa Hire.
+    if stage_key == "closed_won":
+        espejo = hs_opps.closed_win_fields_from_deal(props, opp_property_map)
+        nuevos = {
+            column: value
+            for column, value in espejo.items()
+            if opp.get(column) != value
+        }
+        if nuevos:
+            item["closed_win_written"] = {k: str(v) for k, v in nuevos.items()}
+            changed = True
+            if not dry_run:
+                sets = ", ".join(f"{col} = COALESCE({col}, %s)" for col in nuevos)
+                cursor.execute(
+                    f"UPDATE opportunity SET {sets}, hubspot_synced_at = NOW() "
+                    f"WHERE opportunity_id = %s AND NULLIF(hubspot_deal_id, '') IS NOT NULL",
+                    list(nuevos.values()) + [opportunity_id],
+                )
+
+    if "adopted" in (item.get("action"), item.get("would_action")):
+        return item
+    if not changed:
+        item["action"] = "skipped"
+        # El motivo por el que no se movio el stage se guarda aparte: sirve para
+        # el triage (hub_ahead_or_equal no es lo mismo que unknown_hub_stage).
+        item["stage_reason"] = item.get("reason")
+        item["reason"] = "nothing_to_change"
+        return item
+
+    item["would_action" if dry_run else "action"] = "updated"
+    return item
+
+
+@bp.route("/hubspot/debug/deal-pipelines", methods=["GET", "OPTIONS"])
+def debug_hubspot_deal_pipelines():
+    """Que stage ids resolvio el sync, y contra que labels reales de HubSpot.
+
+    Es lo primero que hay que mirar: si aca un stage sale en `unresolved`, el
+    sync lo va a ignorar en vez de adivinar.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    refresh = str(request.args.get("refresh") or "").strip().lower() in ("1", "true", "yes")
+    try:
+        client = HubSpotClient()
+        pipeline_map = hs_opps.resolve_pipeline_stage_map(client, force_refresh=refresh)
+        opp_property_map = hs_opps.resolve_opportunity_property_map(client, force_refresh=refresh)
+
+        pipelines = []
+        for entry in pipeline_map["by_pipeline_id"].values():
+            pipelines.append({
+                "key": entry["key"],
+                "id": entry["id"],
+                "label": entry["label"],
+                "sales_lead": entry["sales_lead"],
+                "stages": [
+                    {
+                        "stage_key": stage_key,
+                        "stage_id": stage_id,
+                        "label": entry["stage_labels"].get(stage_id),
+                        "date_property": entry["date_property_by_key"].get(stage_key),
+                    }
+                    for stage_key, stage_id in entry["stage_id_by_key"].items()
+                ],
+                "unresolved": entry["unresolved"],
+            })
+
+        # Las constantes viejas son de UN pipeline. Si HubSpot renumera los stages
+        # este bloque lo hace visible en vez de dejar los backfills mintiendo.
+        hiring_id = pipeline_map["pipeline_id_by_key"].get("hiring")
+        hiring = pipeline_map["by_pipeline_id"].get(hiring_id) or {}
+        hiring_stages = hiring.get("stage_id_by_key") or {}
+        constants_check = {
+            "deep_dive": {
+                "constant": HUBSPOT_DEEP_DIVE_DATE_PROPERTY,
+                "resolved": hs_opps.stage_date_property(hiring_stages["deep_dive"])
+                if hiring_stages.get("deep_dive") else None,
+            },
+            "nda_sent": {
+                "constant": HUBSPOT_NDA_SENT_DATE_PROPERTY,
+                "resolved": hs_opps.stage_date_property(hiring_stages["nda_sent"])
+                if hiring_stages.get("nda_sent") else None,
+            },
+        }
+        for check in constants_check.values():
+            check["matches"] = check["constant"] == check["resolved"]
+
+        return jsonify({
+            "success": True,
+            "pipelines": pipelines,
+            "date_properties": pipeline_map["date_properties"],
+            "deal_properties": opp_property_map,
+            "warnings": pipeline_map["warnings"],
+            "constants_check": constants_check,
+        })
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot deal pipelines debug failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@bp.route("/hubspot/sync/opportunities", methods=["POST", "OPTIONS"])
+def sync_hubspot_opportunities():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    body = request.get_json(silent=True) or {}
+    dry_run = bool(body.get("dry_run", False))
+    allow_ambiguous = bool(body.get("allow_ambiguous", False))
+    refresh = bool(body.get("refresh", False))
+    deal_ids = [str(d).strip() for d in (body.get("deal_ids") or []) if str(d).strip()]
+    send_emails = bool(body.get("send_emails", _opp_sync_env_flag("HUBSPOT_OPP_SYNC_SEND_EMAILS")))
+    if dry_run:
+        send_emails = False
+
+    limit = body.get("limit")
+    try:
+        limit = int(limit) if limit not in (None, "") else None
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "limit must be an integer"}), 400
+
+    conn = None
+    locked = False
+    try:
+        client = HubSpotClient()
+        pipeline_map = hs_opps.resolve_pipeline_stage_map(client, force_refresh=refresh)
+        if not pipeline_map["pipeline_id_by_key"]:
+            return jsonify({
+                "success": False,
+                "error": "no se pudo resolver ningun pipeline de HubSpot",
+                "warnings": pipeline_map["warnings"],
+            }), 502
+
+        property_maps = _resolve_account_property_maps(client)
+        opp_property_map = hs_opps.resolve_opportunity_property_map(client, force_refresh=refresh)
+
+        deal_extra_properties = list(pipeline_map["date_properties"])
+        for field, prop in opp_property_map.items():
+            if field == "_unresolved" or not prop:
+                continue
+            if prop not in deal_extra_properties:
+                deal_extra_properties.append(prop)
+        for prop in _mapped_property_names(property_maps, "deals"):
+            if prop not in deal_extra_properties:
+                deal_extra_properties.append(prop)
+        company_extra_properties = _mapped_property_names(property_maps, "companies")
+        contact_extra_properties = _mapped_property_names(property_maps, "contacts")
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # El cron cada 30 min y el boton pueden solaparse; como commiteamos por
+        # deal, dos corridas a la vez podrian crear la misma opportunity dos veces.
+        cursor.execute("SELECT pg_try_advisory_lock(%s) AS got", (HUBSPOT_OPP_SYNC_LOCK_KEY,))
+        if not cursor.fetchone()["got"]:
+            return jsonify({"success": False, "error": "sync_already_running"}), 409
+        locked = True
+
+        if dry_run:
+            # Un dry run tiene que ser 100% de solo lectura: sin ALTER TABLE, sin
+            # CREATE TABLE y sin la fila del reporte. Es lo que se corre ANTES de
+            # decidir aplicar la migracion, y db.py apunta a la RDS de produccion
+            # aunque el backend corra local.
+            schema_ready = _hubspot_opportunity_schema_is_ready(cursor)
+        else:
+            _ensure_hubspot_opportunity_columns(cursor)
+            _ensure_hubspot_account_columns(cursor)
+            _ensure_hubspot_sync_state_table(cursor)
+            schema_ready = True
+        conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
+
+        run_started_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+        if deal_ids:
+            since_ms = None
+            deals = [
+                client.get_deal_with_associations(deal_id, extra_properties=deal_extra_properties)
+                for deal_id in deal_ids
+            ]
+        else:
+            requested_after = body.get("modified_after")
+            since_ms = (
+                hubspot_datetime_to_ms(requested_after)
+                if requested_after not in (None, "") else None
+            )
+            if requested_after not in (None, "") and since_ms is None:
+                return jsonify({
+                    "success": False,
+                    "error": "modified_after no se pudo interpretar como fecha",
+                }), 400
+            if since_ms is None:
+                # En dry run no se lee la marca: la tabla puede no existir todavia.
+                watermark = _read_sync_watermark_ms(cursor) if not dry_run else None
+                since_ms = (
+                    max(watermark - _opp_sync_overlap_ms(), 0)
+                    if watermark else _opp_sync_bootstrap_ms()
+                )
+            deals = []
+            # search_deals acepta UN filterGroup (= AND), asi que va una llamada
+            # por pipeline. Sin filtro de dealstage a proposito: queremos ver
+            # tambien los deals que saltearon etapas.
+            for pipeline_key, pipeline_id in pipeline_map["pipeline_id_by_key"].items():
+                deals.extend(client.search_deals(
+                    [
+                        {"propertyName": "pipeline", "operator": "EQ", "value": pipeline_id},
+                        {"propertyName": "hs_lastmodifieddate", "operator": "GTE", "value": str(since_ms)},
+                    ],
+                    extra_properties=deal_extra_properties,
+                ))
+
+        ctx = {
+            "pipeline_map": pipeline_map,
+            "property_maps": property_maps,
+            "opp_property_map": opp_property_map,
+            "dry_run": dry_run,
+            "schema_ready": schema_ready,
+            "allow_ambiguous": allow_ambiguous,
+            "send_emails": send_emails,
+            "deal_extra_properties": deal_extra_properties,
+            "company_extra_properties": company_extra_properties,
+            "contact_extra_properties": contact_extra_properties,
+        }
+
+        items = []
+        errors = []
+        limit_truncated = False
+        processed = 0
+
+        for deal in deals:
+            if limit and processed >= limit:
+                limit_truncated = True
+                break
+            processed += 1
+            deal_id = str(deal.get("id") or "")
+            try:
+                items.append(_process_hubspot_deal(client, cursor, deal, ctx))
+                # Una transaccion por deal: un error no aborta el resto ni
+                # descarta lo ya escrito. En dry run se descarta a proposito, para
+                # que ni un write accidental pueda quedar.
+                conn.rollback() if dry_run else conn.commit()
+            except Exception as exc:  # noqa: BLE001
+                _rollback_quietly(conn, "deal %s" % deal_id)
+                logging.exception("HubSpot opportunity sync fallo en el deal %s", deal_id)
+                errors.append(_error_record(exc, deal_id=deal_id))
+
+        counts = {"created": 0, "adopted": 0, "updated": 0, "skipped": 0}
+        for item in items:
+            action = item.get("action") or item.get("would_action") or "skipped"
+            if action in counts:
+                counts[action] += 1
+        retrocesos = [i for i in items if i.get("hubspot_retrocedio")]
+
+        # La marca solo avanza si la corrida vio TODO lo que pidio y no fallo nada:
+        # si no, la proxima reprocesa (todo es idempotente).
+        can_advance = (
+            not dry_run and not errors and not limit_truncated
+            and not deal_ids and body.get("modified_after") in (None, "")
+        )
+        watermark_advanced_to = run_started_ms if can_advance else None
+
+        report = {
+            "success": True,
+            "dry_run": dry_run,
+            "since_ms": since_ms,
+            "since": datetime.fromtimestamp(since_ms / 1000, tz=timezone.utc).isoformat()
+            if since_ms else None,
+            "pipelines": [
+                {"key": e["key"], "id": e["id"], "label": e["label"], "unresolved": e["unresolved"]}
+                for e in pipeline_map["by_pipeline_id"].values()
+            ],
+            "warnings": pipeline_map["warnings"],
+            "migracion_aplicada": schema_ready,
+            "retrocesos": retrocesos,
+            "deals_found": len(deals),
+            "limit_truncated": limit_truncated,
+            "send_emails": send_emails,
+            "watermark_advanced_to": watermark_advanced_to,
+            "errors": errors,
+            "items": items,
+        }
+        report.update(counts)
+
+        if not dry_run:
+            try:
+                _write_sync_state(
+                    cursor,
+                    HUBSPOT_OPP_SYNC_KEY,
+                    watermark_advanced_to,
+                    "error" if errors else "ok",
+                    report,
+                )
+                conn.commit()
+            except Exception:  # noqa: BLE001
+                _rollback_quietly(conn, "sync state")
+                logging.exception("No se pudo guardar hubspot_sync_state")
+
+        return jsonify(report)
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot opportunity sync failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            if locked:
+                try:
+                    with conn.cursor() as unlock_cursor:
+                        unlock_cursor.execute(
+                            "SELECT pg_advisory_unlock(%s)", (HUBSPOT_OPP_SYNC_LOCK_KEY,)
+                        )
+                    conn.commit()
+                except Exception:  # noqa: BLE001
+                    logging.exception("No se pudo soltar el advisory lock del sync")
+            conn.close()
+
+
+@bp.route("/hubspot/sync/opportunities/last", methods=["GET", "OPTIONS"])
+def last_hubspot_opportunity_sync():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            _ensure_hubspot_sync_state_table(cursor)
+            conn.commit()
+            cursor.execute(
+                """
+                SELECT sync_key, watermark_ms, last_run_at, last_status, last_report
+                  FROM hubspot_sync_state
+                 WHERE sync_key = %s
+                """,
+                (HUBSPOT_OPP_SYNC_KEY,),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": True, "last_run_at": None, "report": None})
+        return jsonify({
+            "success": True,
+            "watermark_ms": row["watermark_ms"],
+            "last_run_at": row["last_run_at"],
+            "last_status": row["last_status"],
+            "report": row["last_report"],
+        })
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("No se pudo leer hubspot_sync_state")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/preview/opportunities", methods=["GET", "OPTIONS"])
+def preview_hubspot_opportunities():
+    """Que campo de HubSpot se lee para cada columna del hub, con valores reales.
+
+    Es la respuesta a "como se que estamos leyendo bien los campos": el dry run
+    dice QUE va a pasar, esto dice DE DONDE sale cada dato. No escribe nada y no
+    depende de que la migracion este corrida.
+
+    GET /hubspot/preview/opportunities?limit=10&days=90[&deal_id=123][&pipeline=hiring]
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    try:
+        limit = int(request.args.get("limit") or 10)
+    except ValueError:
+        return jsonify({"success": False, "error": "limit must be an integer"}), 400
+    try:
+        days = int(request.args.get("days") or 90)
+    except ValueError:
+        return jsonify({"success": False, "error": "days must be an integer"}), 400
+
+    only_deal_id = (request.args.get("deal_id") or "").strip()
+    only_pipeline = (request.args.get("pipeline") or "").strip()
+
+    try:
+        client = HubSpotClient()
+        pipeline_map = hs_opps.resolve_pipeline_stage_map(client)
+        property_maps = _resolve_account_property_maps(client)
+        opp_property_map = hs_opps.resolve_opportunity_property_map(client)
+        labels_by_name = {
+            (prop.get("name") or ""): (prop.get("label") or "")
+            for prop in client.get_properties("deals")
+        }
+
+        model_property = property_maps.get("deals", {}).get("contract")
+        role_property = opp_property_map.get("role_to_hire")
+        setup_property = opp_property_map.get("setup_fee")
+        final_property = opp_property_map.get("final_fee")
+
+        # 1) De donde sale cada columna del hub. Si algo dice resolved=false, ese
+        #    campo va a entrar vacio y hay que mirar el nombre en HubSpot.
+        resolution = {
+            "opp_position_name": {
+                "hubspot_property": role_property,
+                "hubspot_label": labels_by_name.get(role_property or ""),
+                "resolved": bool(role_property),
+            },
+            "opp_model": {
+                "hubspot_property": model_property,
+                "hubspot_label": labels_by_name.get(model_property or ""),
+                "resolved": bool(model_property),
+            },
+            "hubspot_setup_fee": {
+                "hubspot_property": setup_property,
+                "hubspot_label": labels_by_name.get(setup_property or ""),
+                "resolved": bool(setup_property),
+            },
+            "hubspot_final_fee": {
+                "hubspot_property": final_property,
+                "hubspot_label": labels_by_name.get(final_property or ""),
+                "resolved": bool(final_property),
+            },
+            "opp_sales_lead": {
+                "hubspot_property": "(el pipeline del deal)",
+                "hubspot_label": None,
+                "resolved": True,
+            },
+            "opp_type": {
+                "hubspot_property": "(fijo)",
+                "hubspot_label": None,
+                "resolved": True,
+            },
+        }
+        stages_resolution = {}
+        for entry in pipeline_map["by_pipeline_id"].values():
+            stages_resolution[entry["key"]] = {
+                "pipeline_label": entry["label"],
+                "sales_lead": entry["sales_lead"],
+                "stages": {
+                    stage_key: {
+                        "id": stage_id,
+                        "label": entry["stage_labels"].get(stage_id),
+                        "date_property": entry["date_property_by_key"].get(stage_key),
+                    }
+                    for stage_key, stage_id in entry["stage_id_by_key"].items()
+                },
+                "unresolved": entry["unresolved"],
+            }
+
+        # 2) Traer deals reales.
+        extra = [p for p in (role_property, model_property, setup_property, final_property) if p]
+        extra.extend(pipeline_map["date_properties"])
+        if only_deal_id:
+            deals = [client.get_deal_with_associations(only_deal_id, extra_properties=extra)]
+        else:
+            since_ms = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000)
+            deals = []
+            for pipeline_key, pipeline_id in pipeline_map["pipeline_id_by_key"].items():
+                if only_pipeline and pipeline_key != only_pipeline:
+                    continue
+                deals.extend(client.search_deals(
+                    [
+                        {"propertyName": "pipeline", "operator": "EQ", "value": pipeline_id},
+                        {"propertyName": "hs_lastmodifieddate", "operator": "GTE", "value": str(since_ms)},
+                    ],
+                    extra_properties=extra,
+                ))
+
+        rows = []
+        health = {}
+
+        def _track(field, value):
+            bucket = health.setdefault(field, {"con_valor": 0, "vacio": 0})
+            bucket["con_valor" if value not in (None, "") else "vacio"] += 1
+
+        for deal in deals:
+            props = deal.get("properties") or {}
+            pipeline_id = str(props.get("pipeline") or "")
+            dealstage_id = str(props.get("dealstage") or "")
+            entry = hs_opps.pipeline_entry(pipeline_map, pipeline_id)
+            stage_key = hs_opps.deal_stage_key(pipeline_map, pipeline_id, dealstage_id)
+
+            if entry is None:
+                rows.append({
+                    "deal_id": str(deal.get("id") or ""),
+                    "dealname": props.get("dealname"),
+                    "aviso": "pipeline fuera de los dos que sincronizamos; el sync lo ignora",
+                })
+                continue
+
+            stage_dates = hs_opps.stage_dates_from_deal(
+                pipeline_map, pipeline_id, props, _parse_hubspot_date
+            )
+            role = str(props.get(role_property or "") or "").strip()
+            model = _first_mapped_value(property_maps, "contract", deal=deal) or None
+            setup_fee = hs_opps.parse_money(props.get(setup_property or ""))
+            final_fee = hs_opps.parse_money(props.get(final_property or ""))
+            target_stage = (
+                hs_opps.STAGE_KEY_TO_HUB_STAGE.get(stage_key)
+                or hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
+            ) if stage_key else None
+
+            fields = [
+                {
+                    "hub_column": "opp_position_name",
+                    "hubspot_property": role_property,
+                    "valor_en_hubspot": props.get(role_property or ""),
+                    "entraria_como": role or None,
+                },
+                {
+                    "hub_column": "opp_model",
+                    "hubspot_property": model_property,
+                    "valor_en_hubspot": props.get(model_property or ""),
+                    "entraria_como": model,
+                },
+                {
+                    "hub_column": "opp_sales_lead",
+                    "hubspot_property": "(pipeline)",
+                    "valor_en_hubspot": entry["label"],
+                    "entraria_como": entry["sales_lead"],
+                },
+                {
+                    "hub_column": "opp_type",
+                    "hubspot_property": "(fijo)",
+                    "valor_en_hubspot": None,
+                    "entraria_como": "New",
+                },
+                {
+                    "hub_column": "opp_stage",
+                    "hubspot_property": "dealstage",
+                    "valor_en_hubspot": entry["stage_labels"].get(dealstage_id),
+                    "entraria_como": target_stage,
+                    "nota": (
+                        "Closed Won NO mueve el stage de una opp que ya existe (en el hub "
+                        "'Close Win' significa que hubo contratacion). Este es el stage con "
+                        "el que se crearia si todavia no existe."
+                        if stage_key == "closed_won"
+                        else "solo si el hub no esta ya mas adelante"
+                    ),
+                },
+            ]
+            for stage_key_date, column in (
+                ("deep_dive", "deep_dive_date"),
+                ("nda_sent", "nda_sent_date"),
+                ("nda_signed", "nda_signature_or_start_date"),
+            ):
+                prop = entry["date_property_by_key"].get(stage_key_date)
+                value = stage_dates.get(column)
+                fields.append({
+                    "hub_column": column,
+                    "hubspot_property": prop,
+                    "valor_en_hubspot": props.get(prop or ""),
+                    "entraria_como": value.isoformat() if value else None,
+                })
+            fields.append({
+                "hub_column": "hubspot_setup_fee",
+                "hubspot_property": setup_property,
+                "valor_en_hubspot": props.get(setup_property or ""),
+                "entraria_como": str(setup_fee) if setup_fee is not None else None,
+                "nota": "solo se escribe en Closed Won",
+            })
+            fields.append({
+                "hub_column": "hubspot_final_fee",
+                "hubspot_property": final_property,
+                "valor_en_hubspot": props.get(final_property or ""),
+                "entraria_como": str(final_fee) if final_fee is not None else None,
+                "nota": "solo se escribe en Closed Won",
+            })
+
+            for field in fields:
+                _track(field["hub_column"], field["entraria_como"])
+
+            avisos = []
+            if not stage_key:
+                avisos.append(
+                    "el stage '%s' no matchea ninguno de los que seguimos: el sync lo ignora"
+                    % (entry["stage_labels"].get(dealstage_id) or dealstage_id)
+                )
+            elif stage_key == "intro_call":
+                avisos.append("todavia en Intro Call: la opp se crea recien en Deep Dive")
+            elif not role:
+                avisos.append(
+                    "sin Role to hire: si la opp todavia no existe en el hub, el sync NO la "
+                    "crea (ese campo es opp_position_name y la llave para adoptar la manual)"
+                )
+            if stage_key and stage_key != "intro_call" and not model:
+                avisos.append("sin Model: la opp se crearia con opp_model vacio")
+
+            rows.append({
+                "deal_id": str(deal.get("id") or ""),
+                "dealname": props.get("dealname"),
+                "pipeline": entry["label"],
+                "pipeline_key": entry["key"],
+                "stage_en_hubspot": entry["stage_labels"].get(dealstage_id),
+                "stage_key": stage_key,
+                "fields": fields,
+                "avisos": avisos,
+            })
+
+            if len(rows) >= limit:
+                break
+
+        return jsonify({
+            "success": True,
+            "de_donde_sale_cada_campo": resolution,
+            "stages": stages_resolution,
+            "warnings": pipeline_map["warnings"],
+            "deals_mirados": len(rows),
+            "resumen_por_campo": health,
+            "deals": rows,
+        })
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot opportunity preview failed")
         return jsonify({"success": False, "error": str(exc)}), 500

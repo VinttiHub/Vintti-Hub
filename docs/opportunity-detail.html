@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260903-signoff-toggle" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260911-hs-closedwin" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -175,6 +175,7 @@
               <select id="details-model">
                 <option value="staffing">Staffing</option>
                 <option value="recruiting">Recruiting</option>
+                <option value="project-based">Project-Based</option>
               </select>
             </div>
           </div>
@@ -211,12 +212,40 @@
             <select id="model-select">
               <option value="Staffing">Staffing</option>
               <option value="Recruiting">Recruiting</option>
+              <!-- Llega desde HubSpot (propiedad Model del deal). Sin esta opcion el
+                   select queda en value='' y el primer change guarda un modelo equivocado. -->
+              <option value="Project-Based">Project-Based</option>
             </select>
           </div>
 
           <!-- Other info -->
           <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
           <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
+
+          <!-- Espejo de solo lectura de lo que dice HubSpot en Closed Won. NO alimenta
+               ningun dashboard ni las comisiones de AE: el fee real sigue siendo
+               opportunity.fee (el campo de arriba) y hire_opportunity.setup_fee.
+               Ojo: estos ids NO van en la lista de __fee_setVisible. -->
+          <div class="input-group" id="hubspot-setup-fee-group" hidden>
+            <label>Set Up Fee <span class="hs-badge">HubSpot</span></label>
+            <input id="hubspot-setup-fee-input" readonly />
+          </div>
+          <div class="input-group" id="hubspot-final-fee-group" hidden>
+            <label>Final Fee <span class="hs-badge">HubSpot</span></label>
+            <input id="hubspot-final-fee-input" readonly />
+          </div>
+          <div class="input-group" id="hubspot-final-salary-group" hidden>
+            <label>Candidate's Final Salary <span class="hs-badge">HubSpot</span></label>
+            <input id="hubspot-final-salary-input" readonly />
+          </div>
+          <div class="input-group" id="hubspot-role-hired-group" hidden>
+            <label>Role Hired <span class="hs-badge">HubSpot</span></label>
+            <input id="hubspot-role-hired-input" readonly />
+          </div>
+          <div class="input-group" id="hubspot-mkt-collab-group" hidden>
+            <label>MKT Collab <span class="hs-badge">HubSpot</span></label>
+            <input id="hubspot-mkt-collab-input" readonly />
+          </div>
 
           <!-- Expecteds (toggled by model) -->
           <div class="input-group">
@@ -1066,7 +1095,7 @@
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
   <script src="./assets/js/pipeline.js?v=20260903-signoff-toggle" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260909-resend-guard" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260911-hs-closedwin" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->

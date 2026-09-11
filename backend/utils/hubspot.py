@@ -66,6 +66,16 @@ class HubSpotClient:
         payload = self._request("GET", f"/crm/v3/properties/{object_type}")
         return payload.get("results", [])
 
+    def get_deal_pipelines(self):
+        """Catalogo de pipelines de deals con sus stages (id + label + displayOrder).
+
+        Es lo que permite dejar de hardcodear stage ids opacos como
+        hs_v2_date_entered_1226596717: los dos pipelines de Vintti tienen ids
+        DISTINTOS para el mismo label, asi que hay que resolverlos por pipeline.
+        """
+        payload = self._request("GET", "/crm/v3/pipelines/deals")
+        return payload.get("results", [])
+
     def search_closed_deals(self, owner_id, stage_ids=None, pipeline_id=None, modified_after_ms=None, extra_properties=None):
         filters = [
             {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)},

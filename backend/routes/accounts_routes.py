@@ -1154,6 +1154,43 @@ def accounts():
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
 
+@bp.route('/opportunities/<int:opportunity_id>/hubspot-hire-applied', methods=['POST'])
+def mark_hubspot_hire_applied(opportunity_id):
+    """Sella que alguien ya aplico al hire los valores que trajo HubSpot.
+
+    Lo llama el boton "Aplicar" del panel de la solapa Hire (candidate-details.js)
+    para que el panel deje de sugerir los mismos numeros en cada visita. No toca
+    ningun monto: los escribe el camino normal de la solapa Hire.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE opportunity
+                       SET hubspot_hire_applied_at = NOW()
+                     WHERE opportunity_id = %s
+                    RETURNING hubspot_hire_applied_at
+                    """,
+                    (opportunity_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify({"error": "Opportunity not found"}), 404
+        return jsonify({
+            "success": True,
+            "hubspot_hire_applied_at": row["hubspot_hire_applied_at"],
+        }), 200
+    except Exception as e:
+        logging.exception("mark_hubspot_hire_applied failed")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @bp.route('/opportunities/<int:opportunity_id>', methods=['PATCH'])
 def update_opportunity_stage(opportunity_id):
     data = request.get_json()

@@ -5762,3 +5762,29 @@ input:checked + .slider::before {
   line-height: 1.4;
   color: #8a94a6;
 }
+
+/* Campos espejo de HubSpot (Set Up Fee / Final Fee al cerrar el deal).
+   `.input-group` es display:flex, asi que el atributo `hidden` por si solo no
+   alcanza: sin esta regla los campos aparecerian vacios en toda opp sin datos. */
+.input-group[hidden] { display: none !important; }
+
+.hs-badge {
+  display: inline-block;
+  margin-left: .4rem;
+  padding: .1rem .45rem;
+  border-radius: 999px;
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: #6c38ff;
+  background: color-mix(in srgb, #6c38ff 12%, #fff);
+  vertical-align: middle;
+}
+
+#hubspot-setup-fee-input[readonly],
+#hubspot-final-fee-input[readonly] {
+  background: #f6f7fb;
+  color: #4a4a63;
+  cursor: default;
+}

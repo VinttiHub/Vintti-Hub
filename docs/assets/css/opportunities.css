@@ -2945,3 +2945,48 @@ button.is-busy::after {
   .opp-busy-spinner,
   button.is-busy::after { animation-duration: 2s; }
 }
+
+/* ── Reporte del Sync con HubSpot ────────────────────────────────────────────
+   Va en la pagina y no en la consola: el reload posterior borraba el console.table
+   y, en la practica, nadie tiene devtools abierto cuando aprieta el boton. */
+.hs-report {
+  margin: 0 0 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, #6c38ff 28%, #fff);
+  background: color-mix(in srgb, #6c38ff 5%, #fff);
+  border-radius: 16px;
+  font-size: .86rem;
+}
+.hs-report.has-errors { border-color: color-mix(in srgb, #ff1fdb 45%, #fff); }
+
+.hs-report-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.hs-report-head h3 { margin: 0; font-size: .95rem; color: #4a2bb8; }
+.hs-report-close {
+  background: none; border: 0; font-size: 1.4rem; line-height: 1;
+  cursor: pointer; color: #7a7a96; padding: 0 .2rem;
+}
+
+.hs-report-counts { margin: .5rem 0 .2rem; color: #4a4a63; }
+.hs-report-warn {
+  margin: .4rem 0; padding: .45rem .7rem; border-radius: 10px;
+  background: color-mix(in srgb, #ff1fdb 10%, #fff); color: #8d1073;
+}
+.hs-report-errors { margin: .4rem 0; padding-left: 1.1rem; color: #b3128f; }
+
+.hs-report-group { margin-top: .5rem; }
+.hs-report-group > summary {
+  cursor: pointer; font-weight: 600; color: #4a4a63; padding: .2rem 0;
+}
+.hs-report-group.muted > summary { color: #8a8aa3; font-weight: 500; }
+.hs-report-group ul { margin: .3rem 0 .2rem; padding-left: 1.1rem; }
+.hs-report-group li { margin: .12rem 0; color: #4a4a63; }
+.hs-report-why {
+  color: #8a8aa3; font-size: .78rem; font-style: italic; margin-left: .3rem;
+}
+/* Chrome 131+ anima ::details-content; sin esto el detalle "salta" al abrirse. */
+.hs-report-group::details-content { transition: none; }
+.hs-report-note {
+  margin: .35rem 0 .1rem; font-size: .78rem; color: #7a7a96; font-style: italic;
+}

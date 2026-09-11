@@ -1366,6 +1366,30 @@ def get_hire_opportunity(candidate_id):
         colnames = [desc[0] for desc in cur.description]
         out = dict(zip(colnames, row))
 
+        # Espejo de lo que HubSpot cargo al cerrar el deal en Closed Win. La solapa
+        # Hire lo muestra como sugerencia con un boton "Aplicar"; el sync NUNCA los
+        # escribe en hire_opportunity por su cuenta. Ver CLAUDE.md.
+        #
+        # En su propio try: si la migracion 20260911 todavia no corrio, la solapa Hire
+        # (que es una pantalla core) tiene que seguir funcionando igual.
+        try:
+            cur.execute("""
+                SELECT hubspot_setup_fee, hubspot_final_fee, hubspot_final_salary,
+                       hubspot_role_hired, hubspot_mkt_collab, hubspot_hire_applied_at
+                FROM opportunity
+                WHERE opportunity_id = %s
+            """, (out.get("opportunity_id"),))
+            hs_row = cur.fetchone()
+            if hs_row:
+                hs_cols = [desc[0] for desc in cur.description]
+                out.update(dict(zip(hs_cols, hs_row)))
+        except Exception:
+            conn.rollback()
+            logging.warning(
+                "hire_opportunity: no se pudieron leer las columnas espejo de HubSpot "
+                "(falta la migracion 20260911?)", exc_info=True
+            )
+
         cur.close()
         conn.close()
         return jsonify(out)

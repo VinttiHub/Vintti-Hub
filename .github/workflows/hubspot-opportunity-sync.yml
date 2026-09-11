@@ -1,0 +1,77 @@
+name: HubSpot opportunity sync
+
+# Refleja en el hub el movimiento de los deals de HubSpot:
+#   Intro Call -> Deep Dive  ==> crea la opportunity (Role to hire, Model, type New,
+#                                sales lead segun el pipeline)
+#   Deep Dive  -> NDA Sent   ==> stage 'NDA Sent'
+#   NDA Sent   -> NDA Signed ==> stage 'Sourcing'
+#   Closed Won               ==> solo Set Up Fee / Final Fee (NO mueve el stage)
+#
+# El endpoint es incremental (marca de agua en hubspot_sync_state), idempotente y toma
+# un advisory lock, asi que el atraso tipico de los runners de GitHub o un solapamiento
+# con el boton "Sync HubSpot" de Opportunities no rompen nada: a lo sumo una corrida
+# devuelve 409 y la siguiente levanta lo pendiente.
+#
+# Ver CLAUDE.md y backend/sql/20260910_hubspot_opportunity_sync.sql.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: hubspot-opportunity-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sincronizar opportunities
+        run: |
+          set -euo pipefail
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "Content-Type: application/json" \
+            -H "X-HubSpot-Sync-Secret: ${{ secrets.HUBSPOT_SYNC_SECRET }}" \
+            -d '{}' \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/hubspot/sync/opportunities" \
+            | tee sync.json
+
+      - name: Fallar si algun deal no se pudo procesar
+        run: |
+          # El endpoint devuelve 200 aunque un deal falle (commitea por deal para que
+          # un error no se lleve el resto). Sin este chequeo el fallo seria silencioso.
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open("sync.json"))
+          if d.get("error") == "sync_already_running":
+              print("::notice::otra corrida en curso, se salteo")
+              sys.exit(0)
+          print(" ".join(
+              f"{k}={d.get(k, 0)}"
+              for k in ("deals_found", "created", "adopted", "updated", "skipped")
+          ))
+          # Un stage sin resolver no es un error: el sync lo IGNORA en vez de adivinar,
+          # asi que hay que enterarse igual (alguien renombro una etapa en HubSpot).
+          unresolved = [
+              f"{p.get('key')}:{s}"
+              for p in d.get("pipelines", [])
+              for s in (p.get("unresolved") or [])
+          ]
+          if unresolved:
+              print(f"::warning::stages sin resolver en HubSpot: {', '.join(unresolved)}")
+          for w in d.get("warnings") or []:
+              print(f"::warning::{w}")
+          # Un deal que volvio atras en HubSpot: el sync NO toca el hub (no puede
+          # distinguir un error de carga de un retroceso real), asi que hay que verlo.
+          for r in d.get("retrocesos") or []:
+              hs = r.get("hubspot_retrocedio") or {}
+              print(f"::warning::{r.get('dealname')} retrocedio en HubSpot: "
+                    f"habia llegado a {hs.get('habia_llegado_a')} y ahora esta en "
+                    f"{hs.get('ahora_en')}; el hub quedo como estaba")
+          errs = d.get("errors") or []
+          if errs:
+              for e in errs[:10]:
+                  print(f"::error::deal {e.get('deal_id')}: {e.get('error')}")
+              sys.exit(1)
+          PY

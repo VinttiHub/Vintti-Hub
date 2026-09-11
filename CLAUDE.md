@@ -106,6 +106,149 @@ pedido de la owner.
 Requiere la migración `backend/sql/20260902_dashboard_audit.sql` corrida a mano y la env
 `DASHBOARD_AUDIT_TOKEN` (ya seteada en App Runner y como secret del repo).
 
+## Sync HubSpot → Opportunities
+
+`POST /hubspot/sync/opportunities` (en `backend/routes/hubspot_routes.py`) refleja en el hub
+el movimiento de los deals de los dos pipelines de HubSpot. Lo dispara
+`.github/workflows/hubspot-opportunity-sync.yml` cada 30 min y el botón **Sync HubSpot**
+de `docs/opportunities.html`.
+
+| HubSpot | Hub |
+|---|---|
+| Intro Call → **Deep Dive** | crea la opportunity (`Role to hire` → `opp_position_name`, `Model` → `opp_model`, `opp_type='New'`) |
+| Deep Dive → **NDA Sent** | `opp_stage = 'NDA Sent'` + los 7 campos de negocio (abajo) |
+| NDA Sent → **NDA Signed** | `opp_stage = 'Sourcing'` |
+| **Closed Win** | sólo las 5 columnas espejo (abajo). **No mueve el stage** |
+
+El sales lead lo decide el pipeline, no el owner del deal: *Proceso de contratación* →
+`mariano@vintti.com`, *Vintti AI Pipeline* → `mia@vintti.com` (`PIPELINE_SALES_LEAD` en
+`backend/utils/hubspot_opportunities.py`).
+
+**La invariante que sostiene todo**: una opportunity con `hubspot_deal_id` NULL fue creada a
+mano desde el modal y el sync **no la toca nunca**. Todos los UPDATE llevan
+`AND NULLIF(hubspot_deal_id,'') IS NOT NULL`.
+
+Tres cosas que no son obvias:
+
+- **No retrocede.** `decide_stage_transition()` compara `HUB_STAGE_RANK`: si el hub ya está en
+  Interviewing y HubSpot todavía en NDA Signed, no toca el stage (pero sí las fechas).
+  `Closed Lost` y `Stop` están blindados aparte — reabrirlos revertiría
+  `stage_before_closed_lost` y sacaría la cuenta de "Inactive Client".
+- **No hardcodea stage ids.** `resolve_pipeline_stage_map()` los resuelve por label contra
+  `GET /crm/v3/pipelines/deals` (los dos pipelines tienen ids DISTINTOS para el mismo label).
+  Si un label no matchea, el stage entra en `unresolved` y **se ignora**: nunca adivina.
+  Mirar `GET /hubspot/debug/deal-pipelines` antes de correr nada.
+- **Adopta en vez de duplicar.** Si ya hay una opp abierta de esa cuenta con el mismo
+  `opp_position_name` normalizado y sin deal atado, le pega el `hubspot_deal_id`.
+
+Campos que HubSpot pide al pasar a NDA Sent, todos **sólo si la columna del hub está
+en NULL** — nunca pisan lo que cargó la recruiter, porque budget y salario se
+renegocian dentro del hub:
+
+| HubSpot | Hub | Datasets afectados |
+|---|---|---|
+| Min/Max Client Budget | `min_budget` / `max_budget` | ninguno |
+| Min/Max Candidate Salary | `min_salary` / `max_salary` | ninguno |
+| Candidate's Years of Experience | `years_experience` | ninguno |
+| Expected Fee | `expected_fee` | Active Pipeline / Pipeline Outbound AE |
+| **Expected Set Up Fee** | `fee` (el "Set Up Fee" de Opportunity Detail) | ninguno |
+
+`opportunity.fee` NO es el fee del MRR: ese sale de `hire_opportunity.fee`, y ningún
+dataset lee `o.fee` (cuidado al grepear: `o\.fee` también matchea `ho.fee`).
+Ojo que `expected_set_up_fee` y `set_up_fee` son propiedades DISTINTAS de HubSpot
+(esperada en NDA Sent vs final en Closed Win) y van a columnas distintas.
+
+### Retrocesos en HubSpot: se detectan, no se actúan
+
+`hs_v2_date_entered_<stage>` guarda la **última** entrada a esa etapa y **no se borra al
+salir** (verificado 2026-09-11). Si hay fecha de entrada a una etapa posterior a donde
+está parado el deal, es que retrocedió: eso lo detecta
+`detect_hubspot_regression()` y sale en el reporte como `hubspot_retrocedio`, en el array
+`retrocesos`, en el alert del botón y como `::warning::` del cron.
+
+**El sync no toca ni el stage ni las fechas.** HubSpot no distingue un error de carga
+(movieron el deal de más y lo vuelven atrás) de un retroceso real (la reunión se hizo y el
+cliente se enfrió): en el primer caso querrías borrar la fecha, en el segundo borrarla
+perdería un evento que sí ocurrió y sacaría la opp de las cards del funnel de ese mes.
+Decide una persona. Y retroceder el stage por SQL saltearía
+`_unmark_signed_hire_active`, dejando una opp atrasada con el hire todavía activo.
+
+Como HubSpot actualiza `entered` en cada re-entrada y el UPDATE del sync deja ganar al
+valor de HubSpot, si el deal vuelve a avanzar la fecha nueva pisa sola a la vieja.
+
+### Closed Win: los montos van al hire, y los aplica una persona
+
+HubSpot pide 5 campos al cerrar el deal. Los cinco van a **columnas espejo** de
+`opportunity` (`hubspot_setup_fee`, `hubspot_final_fee`, `hubspot_final_salary`,
+`hubspot_role_hired`, `hubspot_mkt_collab`) y **ninguna las lee un dataset**.
+
+El sync **no escribe `hire_opportunity` ni `salary_updates`**, aunque ahí es donde viven
+esos montos de verdad. Siete razones, todas verificadas:
+
+1. `revenue` es polisémica: Staffing = `salary + fee`, Recruiting = fee one-shot. Y se
+   calcula **sólo en el navegador** (`candidate-details.js:441`).
+2. Por eso Final Fee va a `fee` si es Staffing y a `revenue` si es Recruiting.
+3. Editar Salary/Fee nunca escribe el hire directo: pasa por `salary_updates`, que el MRR
+   prefiere sobre `ho.*` (`_mrr_staffing.py:79-95`). Escribir sólo `ho.fee` deja dos
+   números distintos para el mismo hire según la card.
+4. El Credit Loop pisa `fee`/`revenue` (`utils/credit_loop.py:880-902`).
+5. Esos montos liquidan el mail mensual de comisiones AE.
+6. `hire_opportunity` tiene filas fantasma del formulario público de referencias.
+7. Una opp tiene N hires y los datasets hacen `SUM(ho.fee)`.
+
+Y sobre todo: **HubSpot no tiene identidad de candidato** — `role_hired_deal` es texto
+libre. La asociación persona↔plata sólo existe en `opportunity.candidato_contratado`, que
+escribe la recruiter al pasar a Signed.
+
+Por eso el flujo es **sugerencia + un click**: `GET /candidates/<id>/hire_opportunity`
+(que ya resuelve la opp por `candidato_contratado`) devuelve las columnas espejo, la
+solapa Hire las muestra en un panel, y **Aplicar** escribe los valores en los inputs de
+siempre y dispara `createSalaryUpdateFromInputs()` / `updateHireField()` — el único camino
+que resuelve el branch por modelo, el revenue derivado y el dedupe de `salary_updates`.
+`POST /opportunities/<id>/hubspot-hire-applied` sella que ya se aplicó.
+
+Fechas: `hs_v2_date_entered_<stage>` → `deep_dive_date` / `nda_sent_date` /
+`nda_signature_or_start_date`. HubSpot **pisa** el `CURRENT_DATE` que estampó el hub, pero nunca
+borra (`COALESCE`). Ojo que `nda_signature_or_start_date` es ancla de ~10 datasets.
+
+**HubSpot no tiene propiedad de fecha para las dos etapas "NDA Sent"** (ids
+`1429477933` y `1429487919`, agregadas después que el resto): no existe el
+`hs_v2_date_entered_*` correspondiente. Para esas, el sync estampa la fecha en que
+detecta el cambio — misma semántica que el `CURRENT_DATE` del hub al mover el stage a
+mano — y lo marca como `fechas_inferidas` en el reporte para no hacerlo pasar por dato
+de HubSpot. Sólo aplica a la etapa donde el deal está parado: si saltó de Deep Dive a
+NDA Signed no se inventa un `nda_sent_date`.
+
+Efectos que el sync SÍ dispara: `create_stage_todos` y, sólo al crear, el mail interno de
+Credit Loop (`HUBSPOT_OPP_SYNC_SEND_EMAILS=false` lo apaga). Los que **nunca** dispara:
+`_mark_signed_hire_active`/`_unmark_signed_hire_active` (el `elif` de `update_opportunity_stage`
+borra `hire_opportunity.carga_active`), `create_credit_for_close_win` y el mail de cliente
+inactivo.
+
+Marca de agua incremental en la tabla `hubspot_sync_state` (no en `app_cache`, que vence y se
+borra solo). Sólo avanza si la corrida no tuvo errores ni se cortó por `limit`.
+`GET /hubspot/sync/opportunities/last` devuelve el último reporte.
+
+Para verificar ANTES de sincronizar, dos GET que se abren en el navegador y no escriben nada:
+`GET /hubspot/debug/deal-pipelines` (qué stage ids resolvió) y
+`GET /hubspot/preview/opportunities?limit=10` (de qué propiedad de HubSpot sale cada columna del
+hub, con valores reales, más un `resumen_por_campo` que dice cuántos deals tienen cada campo
+vacío). El `dry_run` dice *qué va a pasar*; el preview dice *de dónde sale cada dato*.
+
+```bash
+curl -X POST .../hubspot/sync/opportunities -d '{"dry_run": true, "limit": 20}'
+curl -X POST .../hubspot/sync/opportunities -d '{"deal_ids": ["123"]}'
+```
+
+El esquema (columnas `hubspot_*` en `opportunity`, los 2 índices y la tabla
+`hubspot_sync_state`) ya está aplicado en RDS — se corrió a mano el 2026-09-11 y no hay
+archivo de migración versionado. En un entorno nuevo lo crea igual
+`_ensure_hubspot_opportunity_columns()` en la primera corrida del sync.
+Env opcionales: `HUBSPOT_OPP_PIPELINE_IDS`, `HUBSPOT_OPP_STAGE_IDS`, `HUBSPOT_OPP_ROLE_PROPERTY`,
+`HUBSPOT_OPP_SETUP_FEE_PROPERTY`, `HUBSPOT_OPP_FINAL_FEE_PROPERTY`,
+`HUBSPOT_OPP_SYNC_BOOTSTRAP` (default: 24 h atrás — un bootstrap ancho crearía una opp por cada
+deal histórico), `HUBSPOT_OPP_SYNC_OVERLAP_MINUTES` (10), `HUBSPOT_OPP_SYNC_SEND_EMAILS` (true).
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):
