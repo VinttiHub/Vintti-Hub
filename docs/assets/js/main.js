@@ -2338,14 +2338,20 @@ function restoreHubspotSyncReport() {
 
 // Sync manual de opportunities desde HubSpot. El cron corre igual cada 30 min;
 // este boton es para no esperarlo despues de mover un deal.
-// La lista de emails es LOCAL a proposito: las `allowedEmails` de este archivo son
-// variables locales de otras funciones, no un allow-list de pagina.
-const OPP_HUBSPOT_SYNC_ALLOWED = [
+// Los dos botones los ve CUALQUIER usuario (decision de la owner, 2026-09-11).
+// Ya no es riesgoso: desde que el sync frena los deals con candidata, correrlo de
+// mas no puede crear duplicadas — a lo sumo adelanta lo que el cron iba a hacer
+// en los proximos 30 min. Lo que sigue acotado es quien DECIDE sobre los frenados.
+//
+// Quien VE el aviso de deals frenados. Es el UNICO allow-list que queda en este
+// flujo: decidir si un deal es una busqueda nueva o la que ya estaba cargada lo
+// pueden hacer solo estas dos. Tiene que quedar igual a RECIPIENTS de
+// backend/utils/hubspot_waiting_alert.py: ver el aviso y recibir el mail son la
+// misma decision, y si se separan alguien recibe un mail de algo que no puede
+// resolver desde la pagina.
+const OPP_HUBSPOT_WAITING_ALLOWED = [
   'pgonzales@vintti.com',
   'mariano@vintti.com',
-  'mia@vintti.com',
-  'bahia@vintti.com',
-  'agustin@vintti.com',
 ];
 
 // dryRun=true simula y no escribe nada: es el paso previo obligado, porque ahi
@@ -2402,12 +2408,6 @@ function initOpportunitiesHubSpotSyncButton(botonId = 'oppHubSpotSyncBtn', dryRu
   if (btn.dataset.hsWired) return;
   btn.dataset.hsWired = '1';
 
-  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  if (!OPP_HUBSPOT_SYNC_ALLOWED.includes(currentUserEmail)) {
-    btn.style.display = 'none';
-    return;
-  }
-
   restoreHubspotSyncReport();
 
   btn.addEventListener('click', async () => {
@@ -2461,7 +2461,7 @@ function initOpportunitiesHubSpotSyncButton(botonId = 'oppHubSpotSyncBtn', dryRu
 
 initOpportunitiesHubSpotSyncButton('oppHubSpotDryRunBtn', true);
 initOpportunitiesHubSpotSyncButton();
-if (OPP_HUBSPOT_SYNC_ALLOWED.includes((localStorage.getItem('user_email') || '').toLowerCase().trim())) {
+if (OPP_HUBSPOT_WAITING_ALLOWED.includes((localStorage.getItem('user_email') || '').toLowerCase().trim())) {
   mostrarDealsFrenados();
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)

@@ -19,6 +19,9 @@ from utils.transactional_email import email_detail_table, email_shell, post_tran
 # pgonzales = owner; mariano = el que carga las opps a mano y por lo tanto el
 # unico que sabe si el deal es una busqueda nueva o la que ya tenia cargada.
 # Agregado 2026-09-11 a pedido de la owner.
+# Tiene que quedar igual a OPP_HUBSPOT_WAITING_ALLOWED de docs/assets/js/main.js,
+# que decide quien VE el aviso en la pagina: recibir el mail sin poder resolverlo
+# desde Opportunities (o al reves) no le sirve a nadie.
 RECIPIENTS = ["pgonzales@vintti.com", "mariano@vintti.com"]
 
 HUB_URL = "https://vinttihub.vintti.com/opportunities.html"
