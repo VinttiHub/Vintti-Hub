@@ -23,6 +23,7 @@ from utils.hubspot import (
     strip_tracking_params,
 )
 from utils import hubspot_opportunities as hs_opps
+from utils.hubspot_waiting_alert import send_waiting_deals_alert
 from dashboards.datasets._now import today_ar
 
 
@@ -355,6 +356,130 @@ def _ensure_hubspot_opportunity_columns(cursor):
         """
     )
     _HUBSPOT_OPPORTUNITY_SCHEMA_READY = True
+
+
+_HUBSPOT_DEALS_WAITING_READY = False
+
+
+def _ensure_hubspot_deals_waiting_table(cursor):
+    """Cola durable de los deals que el sync freno esperando una decision.
+
+    Tiene que ser una tabla y no el reporte de la ultima corrida: el sync es
+    incremental, asi que un deal frenado hoy se cae de la ventana en cuanto pasan
+    24h sin que lo toquen en HubSpot, y desapareceria de todos los reportes
+    siguientes — frenado y olvidado para siempre, que es justo lo que le paso a
+    Nsync. Aca se acumula hasta que alguien decide.
+    """
+    global _HUBSPOT_DEALS_WAITING_READY
+    if _HUBSPOT_DEALS_WAITING_READY:
+        return
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hubspot_deals_waiting (
+            deal_id       TEXT PRIMARY KEY,
+            dealname      TEXT,
+            role_to_hire  TEXT,
+            account_id    INTEGER,
+            account_name  TEXT,
+            opp_model     TEXT,
+            candidates    JSONB,
+            first_seen_at TIMESTAMPTZ DEFAULT NOW(),
+            last_seen_at  TIMESTAMPTZ DEFAULT NOW(),
+            notified_at   TIMESTAMPTZ
+        )
+        """
+    )
+    _HUBSPOT_DEALS_WAITING_READY = True
+
+
+def _remember_waiting_deal(cursor, item, candidatas):
+    """Guarda/refresca el deal frenado. Nunca pisa first_seen_at ni notified_at."""
+    cursor.execute(
+        """
+        INSERT INTO hubspot_deals_waiting
+               (deal_id, dealname, role_to_hire, account_id, account_name,
+                opp_model, candidates, first_seen_at, last_seen_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, NOW(), NOW())
+        ON CONFLICT (deal_id) DO UPDATE
+           SET dealname = EXCLUDED.dealname,
+               role_to_hire = EXCLUDED.role_to_hire,
+               account_id = EXCLUDED.account_id,
+               account_name = EXCLUDED.account_name,
+               opp_model = EXCLUDED.opp_model,
+               candidates = EXCLUDED.candidates,
+               last_seen_at = NOW()
+        """,
+        (str(item.get("deal_id")), item.get("dealname"), item.get("role_to_hire"),
+         item.get("account_id"), item.get("account_name"), item.get("opp_model"),
+         json.dumps(candidatas, default=str)),
+    )
+
+
+def _claim_unnotified_waiting_deals(cursor):
+    """Marca como avisados y devuelve los que faltaban avisar, en un solo UPDATE.
+
+    El UPDATE ... RETURNING evita la carrera del cron consigo mismo: dos corridas
+    solapadas no pueden reclamar la misma fila, asi que el mail no se duplica.
+    """
+    cursor.execute("SELECT to_regclass('public.hubspot_deals_waiting') AS t")
+    if not (cursor.fetchone() or {}).get("t"):
+        return []
+    cursor.execute(
+        """
+        UPDATE hubspot_deals_waiting
+           SET notified_at = NOW()
+         WHERE notified_at IS NULL
+        RETURNING deal_id, dealname, role_to_hire, account_name, candidates
+        """
+    )
+    return [dict(r) for r in cursor.fetchall()]
+
+
+def _forget_waiting_deal(cursor, deal_id):
+    """Sale de la cola: ya se decidio (vinculada, marcada nueva, o resuelta sola)."""
+    cursor.execute("SELECT to_regclass('public.hubspot_deals_waiting') AS t")
+    if not (cursor.fetchone() or {}).get("t"):
+        return
+    cursor.execute("DELETE FROM hubspot_deals_waiting WHERE deal_id = %s", (str(deal_id),))
+
+
+_HUBSPOT_DEAL_DECISIONS_READY = False
+
+
+def _ensure_hubspot_deal_decisions_table(cursor):
+    """Deals que una persona ya marco como "es nueva, creala".
+
+    Es lo unico que hace falta guardar: la decision contraria ("es la #628") ya
+    queda registrada sola en opportunity.hubspot_deal_id.
+    """
+    global _HUBSPOT_DEAL_DECISIONS_READY
+    if _HUBSPOT_DEAL_DECISIONS_READY:
+        return
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hubspot_deal_decisions (
+            deal_id    TEXT PRIMARY KEY,
+            decision   TEXT NOT NULL,
+            decided_by TEXT,
+            decided_at TIMESTAMPTZ DEFAULT NOW()
+        )
+        """
+    )
+    _HUBSPOT_DEAL_DECISIONS_READY = True
+
+
+def _deal_marked_as_new(cursor, deal_id):
+    """True si alguien ya dijo "es nueva". Tolera que la tabla no exista todavia:
+    un dry run corre antes de cualquier CREATE TABLE y no puede reventar por eso.
+    """
+    cursor.execute("SELECT to_regclass('public.hubspot_deal_decisions') AS t")
+    if not (cursor.fetchone() or {}).get("t"):
+        return False
+    cursor.execute(
+        "SELECT 1 FROM hubspot_deal_decisions WHERE deal_id = %s AND decision = 'new'",
+        (str(deal_id),),
+    )
+    return cursor.fetchone() is not None
 
 
 def _ensure_hubspot_sync_state_table(cursor):
@@ -2411,6 +2536,57 @@ def _adopt_existing_opportunity(cursor, account_id, position, allow_ambiguous, s
     return rows[0], None
 
 
+def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
+    """Opps de esa cuenta que una persona podria querer atar a este deal.
+
+    Es la query de adopcion SIN el predicado de nombre y CON 'close win' adentro.
+    Existe porque el nombre del puesto casi nunca coincide entre los dos sistemas
+    ('Tutor' vs 'Computer Science Teacher') y ademas la mitad de las opps que ya
+    estaban cargadas a mano estan cerradas: la adopcion automatica no las puede
+    ver, y sin esta lista el sync crearia una duplicada por cada una.
+
+    NO adopta: solo sugiere. Quien vincula es una persona, via /link-deal.
+
+    Closed Lost y Stop quedan afuera igual que en la adopcion: atarle un deal a
+    una opp muerta es casi siempre un error de carga, y el sync despues no la
+    puede mover porque son stages blindados.
+    """
+    if not account_id:
+        return []
+    sin_deal = "AND NULLIF(hubspot_deal_id, '') IS NULL" if schema_ready else ""
+    cursor.execute(
+        """
+        SELECT opportunity_id, opp_position_name, opp_stage, opp_model,
+               opp_type, opp_sales_lead, deep_dive_date, nda_signature_or_start_date
+          FROM opportunity
+         WHERE account_id = %%s
+           %s
+           AND LOWER(BTRIM(COALESCE(opp_stage, ''))) NOT IN ('closed lost', 'stop')
+         ORDER BY opportunity_id DESC
+        """ % sin_deal,
+        (account_id,),
+    )
+    filas = []
+    for row in cursor.fetchall():
+        filas.append({
+            "opportunity_id": row["opportunity_id"],
+            "opp_position_name": row["opp_position_name"],
+            "opp_stage": row["opp_stage"],
+            "opp_model": row["opp_model"],
+            # New / Replacement: es lo unico que separa dos opps del mismo puesto
+            # en la misma cuenta (Criterium-Dudka tiene dos "Admin Assistant").
+            "opp_type": row["opp_type"],
+            "opp_sales_lead": row["opp_sales_lead"],
+            "parecido": round(
+                hs_opps.position_similarity(position, row["opp_position_name"]), 3
+            ),
+        })
+    # El parecido solo ORDENA. A igual parecido gana la mas nueva, que es el mismo
+    # criterio de desempate que usa la adopcion (ORDER BY opportunity_id DESC).
+    filas.sort(key=lambda f: (-f["parecido"], -f["opportunity_id"]))
+    return filas[:limit]
+
+
 # Sin la migracion corrida no existen hubspot_deal_id ni las dos de fees. Un dry run
 # tiene que poder correr igual: es justamente lo que se mira ANTES de migrar.
 _OPP_BASE_COLUMNS = """opportunity_id, account_id, opp_stage, opp_position_name, opp_model,
@@ -2611,6 +2787,8 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             property_maps=property_maps,
         )
 
+        item["account_name"] = payload.get("name") or None
+
         existing_account = _preview_existing_account(cursor, payload)
         if existing_account:
             account_id = existing_account["account_id"]
@@ -2619,7 +2797,10 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                 _link_existing_account_to_hubspot(cursor, account_id, payload)
                 account_action = "linked"
         elif dry_run:
+            # Sin cuenta no hay candidatas posibles: se corta antes de la adopcion.
+            # El panel lo explica aparte, si no parece que no se busco ninguna.
             item["account_action"] = "would_create"
+            item["link_candidates"] = []
             item["would_action"] = "created"
             item["reason"] = "advanced"
             item["hub_stage_after"] = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
@@ -2637,6 +2818,11 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             cursor, account_id, role, ctx["allow_ambiguous"], schema_ready=schema_ready
         )
         if ambiguous:
+            # `candidates` son ids pelados; las link_candidates traen puesto y stage,
+            # que es lo que hace falta para elegir cual de las dos es.
+            item["link_candidates"] = _link_candidates(
+                cursor, account_id, role, schema_ready=schema_ready
+            )
             return _skip(deal, "ambiguous_position_match", candidates=ambiguous, **item)
 
         if adopted:
@@ -2656,6 +2842,8 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                 if cursor.rowcount == 0:
                     # Otra corrida la agarro entre el SELECT y el UPDATE.
                     return _skip(deal, "adopted_concurrently", **item)
+            if not dry_run:
+                _forget_waiting_deal(cursor, deal_id)
             item["would_action" if dry_run else "action"] = "adopted"
             item["opportunity_id"] = adopted["opportunity_id"]
             item["hub_stage_before"] = adopted["opp_stage"]
@@ -2670,8 +2858,25 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                 item["reason"] = "adopted_reload_failed"
                 return item
         else:
+            # EL FRENO. Si esa cuenta tiene alguna opp sin deal atado, el deal
+            # puede ser la misma busqueda escrita distinto ("Tutor" vs "Computer
+            # Science Teacher"): crear a ciegas deja una duplicada que ensucia
+            # funnel y revenue. Se frena y lo decide una persona desde el panel:
+            # o la ata a una existente, o la marca "es nueva" y el sync la crea.
+            # Vale en dry run igual que en la corrida real: el reporte tiene que
+            # decir lo que va a pasar de verdad.
+            candidatas = _link_candidates(
+                cursor, account_id, role, schema_ready=schema_ready
+            )
+            if candidatas and not _deal_marked_as_new(cursor, deal_id):
+                item["link_candidates"] = candidatas
+                if not dry_run:
+                    _remember_waiting_deal(cursor, dict(item, deal_id=deal_id), candidatas)
+                return _skip(deal, "waiting_for_decision", **item)
+
             initial_stage = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
             if dry_run:
+                item["link_candidates"] = candidatas
                 item["would_action"] = "created"
                 item["reason"] = "advanced"
                 item["hub_stage_after"] = initial_stage
@@ -2690,6 +2895,7 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                 "pipeline_id": pipeline_id,
                 "dealstage_id": dealstage_id,
             })
+            _forget_waiting_deal(cursor, deal_id)
             item["action"] = "created"
             item["reason"] = "advanced"
             item["opportunity_id"] = new_id
@@ -2977,6 +3183,8 @@ def sync_hubspot_opportunities():
             _ensure_hubspot_opportunity_columns(cursor)
             _ensure_hubspot_account_columns(cursor)
             _ensure_hubspot_sync_state_table(cursor)
+            _ensure_hubspot_deal_decisions_table(cursor)
+            _ensure_hubspot_deals_waiting_table(cursor)
             schema_ready = True
         conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
 
@@ -3091,6 +3299,18 @@ def sync_hubspot_opportunities():
         }
         report.update(counts)
 
+        # Un mail por deal frenado, una sola vez. Sin frenos nuevos no sale nada:
+        # avisar por los que siguen esperando serian 48 mails por dia iguales.
+        if not dry_run and send_emails:
+            try:
+                nuevos = _claim_unnotified_waiting_deals(cursor)
+                conn.commit()
+                if nuevos:
+                    report["waiting_alert"] = send_waiting_deals_alert(nuevos)
+            except Exception:  # noqa: BLE001
+                _rollback_quietly(conn, "aviso de deals frenados")
+                logging.exception("No se pudo avisar de los deals frenados")
+
         if not dry_run:
             try:
                 _write_sync_state(
@@ -3156,6 +3376,319 @@ def last_hubspot_opportunity_sync():
         })
     except Exception as exc:  # noqa: BLE001
         logging.exception("No se pudo leer hubspot_sync_state")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/opportunities/<int:opportunity_id>/link-deal", methods=["POST", "OPTIONS"])
+def link_opportunity_to_hubspot_deal(opportunity_id):
+    """Ata a mano una opp que ya existia en el hub con su deal de HubSpot.
+
+    La adopcion automatica solo empareja si `Role to hire` y `opp_position_name`
+    son identicos, y en la practica casi nunca lo son ('Tutor' en HubSpot vs
+    'Computer Science Teacher' en el hub). Sin esto, el sync crea una duplicada
+    por cada opp que la recruiter ya habia cargado.
+
+    Escribe SOLO las tres columnas hubspot_* : el stage y las fechas las decide el
+    sync siguiente pasando por decide_stage_transition(), que ya impide retroceder.
+    Mover el stage desde aca saltearia _unmark_signed_hire_active.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    body = request.get_json(silent=True) or {}
+    deal_id = str(body.get("deal_id") or "").strip()
+    if not deal_id:
+        return jsonify({"success": False, "error": "deal_id es obligatorio"}), 400
+
+    conn = None
+    try:
+        client = HubSpotClient()
+        # No hay get_deal() a secas; este trae dealname/pipeline/dealstage, que es
+        # todo lo que hace falta. Un deal inexistente sale como HubSpotError.
+        try:
+            deal = client.get_deal_with_associations(deal_id)
+        except HubSpotError as exc:
+            if "404" in str(exc):
+                return jsonify({
+                    "success": False,
+                    "error": f"el deal {deal_id} no existe en HubSpot",
+                }), 404
+            raise
+        props = (deal or {}).get("properties") or {}
+        pipeline_id = str(props.get("pipeline") or "").strip() or None
+        dealstage_id = str(props.get("dealstage") or "").strip() or None
+
+        # Un deal de un pipeline que no sincronizamos quedaria atado y mudo: el
+        # sync no lo mira nunca, y la opp queda marcada como si estuviera al dia.
+        pipeline_map = hs_opps.resolve_pipeline_stage_map(client)
+        conocidos = set(pipeline_map["pipeline_id_by_key"].values())
+        if conocidos and pipeline_id not in conocidos:
+            return jsonify({
+                "success": False,
+                "error": "ese deal esta en un pipeline que no sincronizamos",
+                "pipeline_id": pipeline_id,
+            }), 400
+
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            _ensure_hubspot_opportunity_columns(cursor)
+            conn.commit()
+
+            cursor.execute(
+                """
+                SELECT opportunity_id, opp_stage, opp_position_name, hubspot_deal_id
+                  FROM opportunity
+                 WHERE opportunity_id = %s
+                """,
+                (opportunity_id,),
+            )
+            opp = cursor.fetchone()
+            if not opp:
+                return jsonify({
+                    "success": False,
+                    "error": f"no existe la opportunity #{opportunity_id}",
+                }), 404
+
+            ya = str(opp["hubspot_deal_id"] or "").strip()
+            if ya and ya == deal_id:
+                return jsonify({
+                    "success": True,
+                    "already_linked": True,
+                    "opportunity_id": opportunity_id,
+                    "deal_id": deal_id,
+                })
+            if ya:
+                return jsonify({
+                    "success": False,
+                    "error": f"la opportunity #{opportunity_id} ya esta atada al deal {ya}",
+                }), 409
+
+            if str(opp["opp_stage"] or "").strip().lower() in hs_opps.HUB_TERMINAL_STAGES:
+                return jsonify({
+                    "success": False,
+                    "error": f"la opportunity esta en '{opp['opp_stage']}' y el sync no la puede mover",
+                }), 409
+
+            cursor.execute(
+                """
+                SELECT opportunity_id FROM opportunity
+                 WHERE NULLIF(hubspot_deal_id, '') = %s
+                 LIMIT 1
+                """,
+                (deal_id,),
+            )
+            otra = cursor.fetchone()
+            if otra:
+                return jsonify({
+                    "success": False,
+                    "error": f"el deal {deal_id} ya esta atado a la opportunity #{otra['opportunity_id']}",
+                }), 409
+
+            # Mismo UPDATE que la adopcion automatica, con la misma guarda contra
+            # una corrida del sync que llegue en el medio.
+            cursor.execute(
+                """
+                UPDATE opportunity
+                   SET hubspot_deal_id = %s,
+                       hubspot_pipeline_id = %s,
+                       hubspot_dealstage_id = %s,
+                       hubspot_synced_at = NOW()
+                 WHERE opportunity_id = %s
+                   AND NULLIF(hubspot_deal_id, '') IS NULL
+                """,
+                (deal_id, pipeline_id, dealstage_id, opportunity_id),
+            )
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": "el sync la vinculo primero; recarga el reporte",
+                }), 409
+            _forget_waiting_deal(cursor, deal_id)
+            conn.commit()
+
+        return jsonify({
+            "success": True,
+            "opportunity_id": opportunity_id,
+            "deal_id": deal_id,
+            "dealname": props.get("dealname"),
+            "opp_position_name": opp["opp_position_name"],
+            "opp_stage": opp["opp_stage"],
+        })
+    except HubSpotError as exc:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        if conn:
+            conn.rollback()
+        logging.exception("No se pudo vincular la opportunity con el deal")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/deals/waiting", methods=["GET", "OPTIONS"])
+def hubspot_deals_waiting():
+    """Deals frenados esperando una decision. Lee una tabla: no toca HubSpot.
+
+    La pagina lo consulta al abrirse, asi que tiene que ser barato y no depender
+    de la ventana incremental del sync.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("SELECT to_regclass('public.hubspot_deals_waiting') AS t")
+            if not (cursor.fetchone() or {}).get("t"):
+                return jsonify({"success": True, "count": 0, "deals": []})
+            cursor.execute(
+                """
+                SELECT deal_id, dealname, role_to_hire, account_id, account_name,
+                       opp_model, candidates, first_seen_at, last_seen_at
+                  FROM hubspot_deals_waiting
+                 ORDER BY first_seen_at
+                """
+            )
+            filas = cursor.fetchall()
+        return jsonify({
+            "success": True,
+            "count": len(filas),
+            "deals": [dict(f) for f in filas],
+        })
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("No se pudo leer la cola de deals frenados")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/deals/<deal_id>/mark-new", methods=["POST", "OPTIONS"])
+def mark_hubspot_deal_as_new(deal_id):
+    """"Ninguna de las candidatas es: es una busqueda nueva, creala."
+
+    Sin esto el deal se queda frenado para siempre: el sync no crea cuando hay
+    candidatas, y la unica otra salida es atarlo a una opp existente. Con la
+    marca puesta, la proxima corrida lo crea como cualquier deal nuevo.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    deal_id = str(deal_id or "").strip()
+    if not deal_id:
+        return jsonify({"success": False, "error": "deal_id es obligatorio"}), 400
+    quien = (request.headers.get("X-User-Email")
+             or (request.get_json(silent=True) or {}).get("user_email") or None)
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            _ensure_hubspot_deal_decisions_table(cursor)
+            cursor.execute(
+                """
+                INSERT INTO hubspot_deal_decisions (deal_id, decision, decided_by, decided_at)
+                     VALUES (%s, 'new', %s, NOW())
+                ON CONFLICT (deal_id) DO UPDATE
+                        SET decision = 'new', decided_by = EXCLUDED.decided_by,
+                            decided_at = NOW()
+                """,
+                (deal_id, quien),
+            )
+            _forget_waiting_deal(cursor, deal_id)
+            conn.commit()
+        return jsonify({"success": True, "deal_id": deal_id, "decision": "new"})
+    except Exception as exc:  # noqa: BLE001
+        if conn:
+            conn.rollback()
+        logging.exception("No se pudo marcar el deal como nuevo")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/deals/<deal_id>/mark-new", methods=["DELETE"])
+def unmark_hubspot_deal_as_new(deal_id):
+    """Deshace la marca, por si se apreto de mas ANTES de que el sync la cree."""
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            _ensure_hubspot_deal_decisions_table(cursor)
+            cursor.execute("DELETE FROM hubspot_deal_decisions WHERE deal_id = %s",
+                           (str(deal_id).strip(),))
+            conn.commit()
+        return jsonify({"success": True, "deal_id": str(deal_id).strip()})
+    except Exception as exc:  # noqa: BLE001
+        if conn:
+            conn.rollback()
+        logging.exception("No se pudo borrar la marca del deal")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/hubspot/opportunities/<int:opportunity_id>/unlink-deal", methods=["POST", "OPTIONS"])
+def unlink_opportunity_from_hubspot_deal(opportunity_id):
+    """Deshace una vinculacion equivocada. Sin esto solo se arregla por SQL."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            _ensure_hubspot_opportunity_columns(cursor)
+            conn.commit()
+            cursor.execute(
+                """
+                UPDATE opportunity
+                   SET hubspot_deal_id = NULL,
+                       hubspot_pipeline_id = NULL,
+                       hubspot_dealstage_id = NULL
+                 WHERE opportunity_id = %s
+                RETURNING opportunity_id
+                """,
+                (opportunity_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                conn.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": f"no existe la opportunity #{opportunity_id}",
+                }), 404
+            conn.commit()
+        return jsonify({"success": True, "opportunity_id": opportunity_id})
+    except Exception as exc:  # noqa: BLE001
+        if conn:
+            conn.rollback()
+        logging.exception("No se pudo desvincular la opportunity")
         return jsonify({"success": False, "error": str(exc)}), 500
     finally:
         if conn:

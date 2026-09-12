@@ -69,6 +69,13 @@ jobs:
               print(f"::warning::{r.get('dealname')} retrocedio en HubSpot: "
                     f"habia llegado a {hs.get('habia_llegado_a')} y ahora esta en "
                     f"{hs.get('ahora_en')}; el hub quedo como estaba")
+          # Frenados esperando una decision: el aviso de verdad es el mail y el
+          # panel de Opportunities, pero que quede en el log ayuda a datar cuando
+          # aparecio cada uno.
+          frenados = [i for i in d.get("items", []) if i.get("reason") == "waiting_for_decision"]
+          if frenados:
+              print(f"::warning::{len(frenados)} deal(s) frenados esperando decision: "
+                    + ", ".join(str(i.get("dealname")) for i in frenados[:10]))
           errs = d.get("errors") or []
           if errs:
               for e in errs[:10]:

@@ -19,6 +19,7 @@ import os
 import re
 import time
 import unicodedata
+from difflib import SequenceMatcher
 from decimal import Decimal, InvalidOperation
 
 
@@ -51,6 +52,32 @@ def normalize_position_name(value):
     encuentra cosas distintas segun quien normalice.
     """
     return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def position_similarity(a, b):
+    """0..1, SOLO para ordenar las candidatas que ve una persona.
+
+    No hay umbral y no decide nada: el sync nunca adopta por parecido. En la
+    practica los puestos se escriben distinto en cada sistema ('Tutor' en HubSpot
+    vs 'Computer Science Teacher' en el hub), y ahi ningun puntaje alcanza — por
+    eso la vinculacion la confirma una persona y esto solo pone arriba lo probable.
+
+    El criterio de subconjunto es el mismo que companies_match() de
+    reference_matching.py: 'Graphic Designer' dentro de 'Part Time Graphic
+    Designer' es la misma busqueda, aunque el ratio de texto sea bajo.
+    """
+    ta, tb = tokens(a), tokens(b)
+    if not ta or not tb:
+        return 0.0
+    if normalize_position_name(a) == normalize_position_name(b):
+        return 1.0
+    if ta <= tb or tb <= ta:
+        # Cuanto menos sobra, mas se parece: 0.90 para 'Accountant' dentro de
+        # 'Accountant', 0.75 para uno metido en un titulo de cuatro palabras.
+        sobran = abs(len(ta) - len(tb))
+        return max(0.70, 0.95 - 0.05 * sobran)
+    compartidos = len(ta & tb) / len(ta | tb)
+    return max(compartidos, SequenceMatcher(None, fold(a), fold(b)).ratio())
 
 
 def parse_money(value):

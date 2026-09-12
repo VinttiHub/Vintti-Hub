@@ -141,6 +141,75 @@ Tres cosas que no son obvias:
 - **Adopta en vez de duplicar.** Si ya hay una opp abierta de esa cuenta con el mismo
   `opp_position_name` normalizado y sin deal atado, le pega el `hubspot_deal_id`.
 
+### Vincular a mano: la adopción automática casi nunca alcanza
+
+El puesto tiene que coincidir **letra por letra**, y entre los dos sistemas casi nunca
+coincide: "Tutor" vs "Computer Science Teacher", "Graphic Designer" vs "Part Time Graphic
+Designer", "Pep Talk" vs "Finance Manager" (casos reales del 2026-09-11). Encima
+`_adopt_existing_opportunity()` excluye `close win`, y la mitad de las opps que la recruiter
+ya había cargado están cerradas. Sin ayuda, el sync crea una duplicada por cada una.
+
+La salida **no** es emparejar por parecido: un rol repetido de la misma cuenta (Criterium-Dudka
+tiene dos "Admin Assistant / Bookkeeper") puede ser un deal genuinamente nuevo, y tragarlo
+dentro de la opp vieja borra una contratación del funnel. Es **sugerencia + un click**, igual
+que los montos de Closed Win:
+
+- En `dry_run`, cada item que diría "se crearía" (y los `ambiguous_position_match`) trae
+  `link_candidates`: las opps de esa cuenta sin deal atado, con Close Win adentro y Closed
+  Lost/Stop afuera, ordenadas por `hs_opps.position_similarity()`. **Ese puntaje sólo ordena,
+  no decide nada** — no hay umbral en ningún lado.
+- El botón **Simular** de `docs/opportunities.html` pinta el reporte con un `<select>` por fila;
+  **Vincular** pega `POST /hubspot/opportunities/<id>/link-deal`, que escribe **sólo** las tres
+  columnas `hubspot_*`. El stage y las fechas las sigue decidiendo el sync siguiente vía
+  `decide_stage_transition()` — moverlas desde acá saltearía `_unmark_signed_hire_active`.
+  `POST .../unlink-deal` deshace un click equivocado.
+
+### El cron no crea si hay candidata: la freca y espera
+
+Un botón "Simular" no alcanzaba: el cron corre **cada 30 minutos** y creaba igual, así que
+sólo te salvaba si simulabas en la ventana justa. Por eso el freno está **en el sync**, no en
+la UI: si el deal fuera a crear una opp y la cuenta tiene alguna candidata, **no crea** —
+devuelve `waiting_for_decision` con las candidatas y no toca nada. Aplica igual en dry run,
+porque el reporte tiene que decir lo que va a pasar de verdad.
+
+Las dos salidas, las dos desde el panel:
+
+- **Vincular** con una candidata → `POST /hubspot/opportunities/<id>/link-deal`.
+- **"Es nueva, creala"** → `POST /hubspot/deals/<deal_id>/mark-new`, que guarda la decisión en
+  `hubspot_deal_decisions` (se autocrea, no hay migración a mano) y deja que el próximo sync la
+  cree. `DELETE` sobre la misma ruta deshace la marca. **Sin esta segunda salida el deal queda
+  frenado para siempre.**
+
+Sólo se guarda la decisión "es nueva": la contraria ya queda registrada sola en
+`opportunity.hubspot_deal_id`.
+
+Cuánto frena en la práctica: de las 6 opps que el cron creó el 2026-09-11, sólo 2 habrían
+esperado (las dos que efectivamente había que revisar). Las cuentas nuevas no tienen
+candidatas y se crean solas como siempre.
+
+**La cola de frenados es una tabla, no el reporte de la última corrida.** El sync es
+incremental: un deal frenado hoy se cae de la ventana apenas pasan 24 h sin que lo toquen en
+HubSpot, y desaparecería de todos los reportes siguientes — frenado y olvidado, exactamente
+lo que le pasó a Nsync. Por eso cada freno se guarda en `hubspot_deals_waiting` (se autocrea)
+y se borra solo cuando el deal se resuelve por cualquier vía: vinculado, marcado como nuevo o
+adoptado por el propio sync.
+
+Cómo se entera una persona, porque el cron corre en GitHub Actions y no lo mira nadie:
+
+- **Al abrir `docs/opportunities.html`**, `mostrarDealsFrenados()` pega a
+  `GET /hubspot/deals/waiting` (lee la tabla, no toca HubSpot) y pinta el panel con los
+  desplegables si hay algo. No corre ningún sync.
+- **Un mail por deal frenado, una sola vez.** Sólo por los que tienen `notified_at IS NULL`,
+  reclamados con un `UPDATE ... RETURNING` para que dos corridas solapadas no lo dupliquen. Sin
+  frenos nuevos no sale ningún mail: avisar por los que siguen esperando serían 48 mails
+  iguales por día. Destinatarios hardcodeados en `RECIPIENTS` de `utils/hubspot_waiting_alert.py`
+  (`pgonzales@` + `mariano@`), mismo criterio que el auditor.
+- Un `::warning::` en el log del cron, para datar cuándo apareció cada uno.
+
+Para probar el panel sin correr nada: `docs/opportunities.html?hs_deals=<id>,<id>` hace que el
+botón **Simular** mire sólo esos deals, salteando la ventana incremental. Lo lee únicamente el
+dry run.
+
 Campos que HubSpot pide al pasar a NDA Sent, todos **sólo si la columna del hub está
 en NULL** — nunca pisan lo que cargó la recruiter, porque budget y salario se
 renegocian dentro del hub:

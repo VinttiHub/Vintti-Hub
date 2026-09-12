@@ -2104,11 +2104,16 @@ function resumenHubspotSync(payload) {
   const items = Array.isArray(payload.items) ? payload.items : [];
   const liviano = i => ({
     deal: i.dealname || i.deal_id,
+    deal_id: i.deal_id || null,
     opp: i.opportunity_id || null,
     posicion: i.role_to_hire || null,
     model: i.opp_model || null,
     stage: i.hub_stage_after || i.hub_stage_before || null,
     motivo: i.reason || null,
+    cuenta: i.account_name || null,
+    cuenta_nueva: i.account_action === 'would_create',
+    // Opps de esa cuenta sin deal atado: el backend las sugiere, vincula una persona.
+    candidatas: Array.isArray(i.link_candidates) ? i.link_candidates : [],
   });
   return {
     dry_run: !!payload.dry_run,
@@ -2126,7 +2131,9 @@ function resumenHubspotSync(payload) {
     creadas:  items.filter(i => (i.action || i.would_action) === 'created').map(liviano),
     adoptadas: items.filter(i => (i.action || i.would_action) === 'adopted').map(liviano),
     actualizadas: items.filter(i => (i.action || i.would_action) === 'updated').map(liviano),
-    salteadas: items.filter(i => i.action === 'skipped').map(liviano),
+    // Frenadas a proposito: el sync NO las crea hasta que una persona decide.
+    esperando: items.filter(i => i.reason === 'waiting_for_decision').map(liviano),
+    salteadas: items.filter(i => i.action === 'skipped' && i.reason !== 'waiting_for_decision').map(liviano),
   };
 }
 
@@ -2141,6 +2148,7 @@ const HS_MOTIVOS = {
   pipeline_not_tracked: 'pipeline que no sincronizamos',
   no_role_to_hire: 'sin Role to hire cargado',
   ambiguous_position_match: 'hay más de una opp con esa posición',
+  waiting_for_decision: 'esperando que decidas',
   hub_stage_is_terminal: 'la opp está cerrada en el hub',
   unknown_hub_stage: 'el stage del hub no se reconoce',
   stage_changed_concurrently: 'alguien la movió al mismo tiempo',
@@ -2157,10 +2165,12 @@ function renderHubspotSyncReport(r) {
   panel.id = 'hsSyncReport';
   panel.className = 'hs-report' + (r.errores.length ? ' has-errors' : '');
 
-  const titulo = r.dry_run ? 'Simulación de sync (no se escribió nada)' : 'Sync con HubSpot';
+  const titulo = r.esVistaFrenados ? 'HubSpot está esperando que decidas'
+               : r.dry_run ? 'Simulación de sync (no se escribió nada)' : 'Sync con HubSpot';
   const verbo = r.dry_run ? 'Se crearían' : 'Creadas';
 
   const grupos = [
+    ['Esperando que decidas: ¿ya existe o es nueva?', r.esperando || [], 'warn'],
     [verbo, r.creadas, 'ok'],
     [r.dry_run ? 'Ya existen en el hub: se vincularían con su deal'
                : 'Ya existían en el hub: se vincularon con su deal', r.adoptadas, 'ok'],
@@ -2168,9 +2178,42 @@ function renderHubspotSyncReport(r) {
     ['Sin cambios', r.salteadas, 'muted'],
   ].filter(([, filas]) => filas.length);
 
-  const fila = i => `<li><b>${i.deal || '—'}</b>${i.posicion ? ` · ${i.posicion}` : ''}`
-    + `${i.model ? ` · ${i.model}` : ''}${i.stage ? ` · ${i.stage}` : ''}`
-    + `${i.opp ? ` · opp #${i.opp}` : ''}${i.motivo ? ` <span class="hs-report-why">${HS_MOTIVOS[i.motivo] || i.motivo}</span>` : ''}</li>`;
+  const fila = i => `<li${i.deal_id ? ` data-deal-id="${escapeHtml(i.deal_id)}"` : ''}>`
+    + `<b>${escapeHtml(i.deal || '—')}</b>${i.posicion ? ` · ${escapeHtml(i.posicion)}` : ''}`
+    + `${i.model ? ` · ${escapeHtml(i.model)}` : ''}${i.stage ? ` · ${escapeHtml(i.stage)}` : ''}`
+    + `${i.opp ? ` · opp #${i.opp}` : ''}${i.motivo ? ` <span class="hs-report-why">${HS_MOTIVOS[i.motivo] || i.motivo}</span>` : ''}`
+    + picker(i) + `</li>`;
+
+  // El sync solo adopta si el puesto coincide LETRA POR LETRA, y entre HubSpot y
+  // el hub casi nunca coincide ("Tutor" vs "Computer Science Teacher"). Por eso
+  // el backend sugiere las opps de esa cuenta que no tienen deal atado y la
+  // vinculacion la confirma una persona: emparejar por parecido seria adivinar.
+  const picker = i => {
+    if (!i.deal_id) return '';
+    if (i.cuenta_nueva) {
+      return `<div class="hs-link-note">la cuenta${i.cuenta ? ` <b>${escapeHtml(i.cuenta)}</b>` : ''} todavía no existe en el hub: no hay opps para vincular</div>`;
+    }
+    if (!i.candidatas || !i.candidatas.length) return '';
+    const opciones = i.candidatas.map(c =>
+      `<option value="${c.opportunity_id}">#${c.opportunity_id} · ${escapeHtml(c.opp_position_name || 'sin puesto')} · ${escapeHtml(c.opp_stage || 'sin stage')}${c.opp_model ? ` · ${escapeHtml(c.opp_model)}` : ''}${c.opp_type ? ` · ${escapeHtml(c.opp_type)}` : ''}</option>`
+    ).join('');
+    // El primer <option> de un select viene SELECCIONADO. Sin este placeholder,
+    // apretar "Vincular" sin tocar nada ataba el deal a la candidata que el
+    // puntaje puso arriba — justo el adivinar que este flujo existe para evitar.
+    return `
+      <details class="hs-link">
+        <summary>¿Ya existe en el hub? (${i.candidatas.length})</summary>
+        <div class="hs-link-row">
+          <select class="hs-link-select">
+            <option value="" selected>— elegí cuál de las ${i.candidatas.length} es —</option>
+            ${opciones}
+          </select>
+          <button type="button" class="hs-link-btn" disabled>Vincular</button>
+          <button type="button" class="hs-new-btn">Es nueva, creala</button>
+        </div>
+        <p class="hs-link-status" role="status">Ninguna está elegida todavía.</p>
+      </details>`;
+  };
 
   panel.innerHTML = `
     <div class="hs-report-head">
@@ -2178,26 +2221,108 @@ function renderHubspotSyncReport(r) {
       <button type="button" class="hs-report-close" aria-label="Cerrar">×</button>
     </div>
     <p class="hs-report-counts">
-      ${r.deals} deal(s) mirados · <b>${r.created}</b> ${r.dry_run ? 'se crearían' : 'creadas'}
+      ${r.esVistaFrenados ? `${r.deals} deal(s) frenados por el sync. No se creó nada.` : `${r.deals} deal(s) mirados · <b>${r.created}</b> ${r.dry_run ? 'se crearían' : 'creadas'}
       · <b>${r.adopted}</b> ${r.dry_run ? 'se vincularían' : 'vinculadas'}
       · <b>${r.updated}</b> ${r.dry_run ? 'se actualizarían' : 'actualizadas'}
-      · ${r.skipped} sin cambios · ${r.errores.length} error(es)
+      · ${r.skipped} sin cambios · ${r.errores.length} error(es)`}
     </p>
+    ${(r.esperando || []).length ? `<p class="hs-report-note">El sync <b>no crea</b> estas ${r.esperando.length}: la cuenta ya tiene opportunities sin deal atado y podría ser la misma búsqueda escrita distinto. Elegí cuál es, o marcala como nueva. Hasta entonces no se toca nada.</p>` : ''}
     ${r.adoptadas.length ? `<p class="hs-report-note">Vincular = la opportunity ya está cargada en el hub y el sync la amarra a su deal de HubSpot en vez de crear una duplicada. No le toca el stage.</p>` : ''}
     ${r.retrocesos.length ? `<p class="hs-report-warn">${r.retrocesos.length} deal(s) retrocedieron de etapa en HubSpot; el hub quedó como estaba: ${r.retrocesos.map(x => `${x.deal} (${x.habia_llegado_a} → ${x.ahora_en})`).join(', ')}</p>` : ''}
     ${r.errores.length ? `<ul class="hs-report-errors">${r.errores.map(e => `<li>deal ${e.deal}: ${e.error}</li>`).join('')}</ul>` : ''}
     ${grupos.map(([t, filas, cls]) => `
-      <details class="hs-report-group ${cls}"${cls === 'ok' ? ' open' : ''}>
+      <details class="hs-report-group ${cls}"${cls === 'muted' ? '' : ' open'}>
         <summary>${t} (${filas.length})</summary>
         <ul>${filas.map(fila).join('')}</ul>
       </details>`).join('')}
   `;
   panel.querySelector('.hs-report-close').addEventListener('click', () => panel.remove());
+  wireHubspotLinkButtons(panel);
 
   const header = document.querySelector('.main-content .page-header');
   if (header && header.parentNode) header.parentNode.insertBefore(panel, header.nextSibling);
   else document.body.prepend(panel);
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Vincular = atar una opp que YA existe en el hub a su deal de HubSpot, para que
+// el sync no cree una duplicada. Escribe solo hubspot_deal_id: el stage y las
+// fechas las sigue decidiendo el sync, que nunca retrocede una opp.
+function wireHubspotLinkButtons(panel) {
+  panel.querySelectorAll('.hs-link').forEach(box => {
+    const li = box.closest('li');
+    const dealId = li && li.dataset.dealId;
+    const btn = box.querySelector('.hs-link-btn');
+    const btnNueva = box.querySelector('.hs-new-btn');
+    const select = box.querySelector('.hs-link-select');
+    const status = box.querySelector('.hs-link-status');
+    if (!dealId || !btn || !select) return;
+
+    select.addEventListener('change', () => {
+      btn.disabled = !select.value;
+      if (select.value) status.textContent = '';
+    });
+
+    btn.addEventListener('click', async () => {
+      const oppId = select.value;
+      if (!oppId) return;
+      const etiqueta = select.options[select.selectedIndex]?.textContent || `#${oppId}`;
+      if (!confirm(`¿Atar el deal de HubSpot a la opportunity ${etiqueta}?\n\nNo le cambia el stage: solo evita que el sync cree una duplicada.`)) return;
+
+      btn.disabled = true;
+      select.disabled = true;
+      status.textContent = 'Vinculando…';
+      try {
+        const res = await fetch(`${API_BASE}/hubspot/opportunities/${oppId}/link-deal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deal_id: dealId }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || payload.success === false) {
+          throw new Error(payload.error || `falló (${res.status})`);
+        }
+        box.classList.add('hs-link-done');
+        if (btnNueva) btnNueva.disabled = true;
+        status.textContent = `Vinculada con #${oppId}. Volvé a "Simular" para ver qué le va a traer.`;
+      } catch (err) {
+        console.error('No se pudo vincular la opportunity:', err);
+        status.textContent = `No se pudo vincular: ${err.message || err}`;
+        btn.disabled = false;
+        select.disabled = false;
+      }
+    });
+
+    // La otra salida. Sin esto el deal queda frenado para siempre: el sync no
+    // crea mientras haya candidatas y nadie haya dicho que ninguna es.
+    if (btnNueva) btnNueva.addEventListener('click', async () => {
+      if (!confirm('¿Ninguna de las opportunities de esa cuenta es esta búsqueda?\n\nSe va a crear una nueva en el próximo sync.')) return;
+      btnNueva.disabled = true;
+      btn.disabled = true;
+      select.disabled = true;
+      status.textContent = 'Marcando…';
+      try {
+        const res = await fetch(`${API_BASE}/hubspot/deals/${encodeURIComponent(dealId)}/mark-new`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Email': localStorage.getItem('user_email') || '',
+          },
+          body: '{}',
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || payload.success === false) throw new Error(payload.error || `falló (${res.status})`);
+        box.classList.add('hs-link-done');
+        status.textContent = 'Marcada como nueva. El próximo sync la crea.';
+      } catch (err) {
+        console.error('No se pudo marcar el deal como nuevo:', err);
+        status.textContent = `No se pudo marcar: ${err.message || err}`;
+        btnNueva.disabled = false;
+        select.disabled = false;
+        btn.disabled = !select.value;
+      }
+    });
+  });
 }
 
 // Si la corrida anterior recargo la pagina, el reporte quedo guardado: se pinta y
@@ -2223,8 +2348,54 @@ const OPP_HUBSPOT_SYNC_ALLOWED = [
   'agustin@vintti.com',
 ];
 
-function initOpportunitiesHubSpotSyncButton() {
-  const btn = document.getElementById('oppHubSpotSyncBtn');
+// dryRun=true simula y no escribe nada: es el paso previo obligado, porque ahi
+// se ve cuales de los deals que "se crearian" en realidad ya estan en el hub y
+// hay que vincular a mano antes de correr el sync de verdad.
+// Al abrir la pagina: ¿quedo algo frenado esperando una decision? Lee una tabla,
+// no corre el sync ni toca HubSpot. Sin esto el freno es invisible: el cron los
+// para en silencio y nadie se entera hasta que a alguien se le ocurre simular.
+async function mostrarDealsFrenados() {
+  try {
+    // Si ya hay un panel (el reporte de un sync recien corrido), no lo pisamos:
+    // ese reporte ya trae su propio grupo de frenados.
+    if (document.getElementById('hsSyncReport')) return;
+    const res = await fetch(`${API_BASE}/hubspot/deals/waiting`);
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || !payload.count) return;
+
+    const esperando = (payload.deals || []).map(d => ({
+      deal: d.dealname || d.deal_id,
+      deal_id: d.deal_id,
+      posicion: d.role_to_hire || null,
+      model: d.opp_model || null,
+      stage: null,
+      motivo: 'waiting_for_decision',
+      cuenta: d.account_name || null,
+      cuenta_nueva: false,
+      candidatas: Array.isArray(d.candidates) ? d.candidates : [],
+    }));
+
+    renderHubspotSyncReport({
+      dry_run: true, esVistaFrenados: true,
+      deals: payload.count, created: 0, adopted: 0, updated: 0, skipped: payload.count,
+      errores: [], retrocesos: [],
+      creadas: [], adoptadas: [], actualizadas: [], salteadas: [],
+      esperando,
+    });
+  } catch (e) {
+    console.warn('No se pudo leer la cola de deals frenados', e);
+  }
+}
+
+function dealsDeLaUrl() {
+  const crudo = new URLSearchParams(location.search).get('hs_deals');
+  if (!crudo) return null;
+  const ids = crudo.split(',').map(s => s.trim()).filter(Boolean);
+  return ids.length ? { deal_ids: ids } : null;
+}
+
+function initOpportunitiesHubSpotSyncButton(botonId = 'oppHubSpotSyncBtn', dryRun = false) {
+  const btn = document.getElementById(botonId);
   if (!btn) return;
   // Este bloque vive dentro de la funcion que pinta la tabla, que puede correr
   // mas de una vez: sin la marca el click dispararia N syncs en paralelo.
@@ -2241,8 +2412,9 @@ function initOpportunitiesHubSpotSyncButton() {
 
   btn.addEventListener('click', async () => {
     if (btn.disabled) return;
-    const restoreBtn = setBtnBusy(btn, 'Syncing…');
-    showOppBusy('Sincronizando con HubSpot…', 'Puede tardar hasta un minuto');
+    const restoreBtn = setBtnBusy(btn, dryRun ? 'Simulando…' : 'Syncing…');
+    showOppBusy(dryRun ? 'Simulando el sync con HubSpot…' : 'Sincronizando con HubSpot…',
+                'Puede tardar hasta un minuto');
 
     try {
       // Body vacio = sync incremental: solo los deals modificados desde la ultima
@@ -2250,7 +2422,11 @@ function initOpportunitiesHubSpotSyncButton() {
       const response = await fetch(`${API_BASE}/hubspot/sync/opportunities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}'
+        // ?hs_deals=123,456 simula SOLO esos deals, salteando la ventana
+        // incremental. Sirve para ver el panel cuando la ventana esta vacia, y
+        // para revisar un deal viejo del backlog sin esperar a que lo toquen.
+        // Solo en dry run: la corrida real nunca lee este parametro.
+        body: dryRun ? JSON.stringify({ dry_run: true, ...(dealsDeLaUrl() || {}) }) : '{}'
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -2275,7 +2451,7 @@ function initOpportunitiesHubSpotSyncButton() {
       }
     } catch (err) {
       console.error('HubSpot opportunity sync failed:', err);
-      alert(`HubSpot sync failed: ${err.message || err}`);
+      alert(`HubSpot ${dryRun ? 'dry run' : 'sync'} failed: ${err.message || err}`);
     } finally {
       hideOppBusy();
       restoreBtn();
@@ -2283,7 +2459,11 @@ function initOpportunitiesHubSpotSyncButton() {
   });
 }
 
+initOpportunitiesHubSpotSyncButton('oppHubSpotDryRunBtn', true);
 initOpportunitiesHubSpotSyncButton();
+if (OPP_HUBSPOT_SYNC_ALLOWED.includes((localStorage.getItem('user_email') || '').toLowerCase().trim())) {
+  mostrarDealsFrenados();
+}
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
 if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
   try {
