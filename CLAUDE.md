@@ -230,6 +230,14 @@ Cómo se entera una persona, porque el cron corre en GitHub Actions y no lo mira
   frenos nuevos no sale ningún mail: avisar por los que siguen esperando serían 48 mails
   iguales por día. Destinatarios hardcodeados en `RECIPIENTS` de `utils/hubspot_waiting_alert.py`
   (`pgonzales@` + `mariano@`), mismo criterio que el auditor.
+- **Sábado y domingo no se avisa** (`alerta_en_pausa()`, hora Argentina vía `today_ar()`). El
+  cron corre igual los 7 días, pero un freno sólo se resuelve desde Opportunities: el mail del
+  sábado a la madrugada sólo logra que el lunes ya nadie lo lea. **No se pierde: se posterga.**
+  El corte va sobre el *claim*, no sobre el envío — reclamar la fila sin mandar el mail
+  perdería el aviso para siempre, que es el olvido silencioso que esta tabla existe para
+  evitar. Como `notified_at` sigue en NULL, la primera corrida del lunes manda **un solo mail**
+  con todo el fin de semana junto (el cuerpo ya es una tabla de N deals). Hora Argentina y no
+  UTC: un freno del sábado 21:00 ARG es domingo 00:00 UTC.
 - Un `::warning::` en el log del cron, para datar cuándo apareció cada uno.
 
 Para probar el panel sin correr nada: `docs/opportunities.html?hs_deals=<id>,<id>` hace que el

@@ -16,6 +16,14 @@ import logging
 
 from utils.transactional_email import email_detail_table, email_shell, post_transactional_email
 
+try:  # today en hora Argentina (mismo criterio que los datasets)
+    from dashboards.datasets._now import today_ar
+except Exception:  # pragma: no cover - fallback defensivo
+    from datetime import date, datetime, timedelta, timezone
+
+    def today_ar() -> "date":
+        return (datetime.now(timezone.utc) - timedelta(hours=3)).date()
+
 # pgonzales = owner; mariano = el que carga las opps a mano y por lo tanto el
 # unico que sabe si el deal es una busqueda nueva o la que ya tenia cargada.
 # Agregado 2026-09-11 a pedido de la owner.
@@ -25,6 +33,27 @@ from utils.transactional_email import email_detail_table, email_shell, post_tran
 RECIPIENTS = ["pgonzales@vintti.com", "mariano@vintti.com"]
 
 HUB_URL = "https://vinttihub.vintti.com/opportunities.html"
+
+
+def alerta_en_pausa(hoy=None):
+    """True si hoy no se avisa: sabado o domingo, hora Argentina.
+
+    El aviso no se PIERDE, se POSTERGA. El freno ya quedo guardado en
+    `hubspot_deals_waiting` con `notified_at` en NULL, asi que la primera corrida
+    del lunes lo reclama y manda UN solo mail con todo lo que se acumulo el fin de
+    semana — el cuerpo ya es una tabla de N deals, no hace falta nada mas.
+
+    Por eso el corte tiene que ir sobre el CLAIM y no sobre el envio: reclamar la
+    fila (marcar notified_at) sin mandar el mail perderia el aviso para siempre,
+    que es exactamente el olvido silencioso que esta tabla existe para evitar.
+
+    Hora Argentina y no UTC a proposito: un deal frenado el sabado a las 21:00 ARG
+    es domingo 00:00 UTC, y con UTC el mail saldria igual. El cron corre cada 30
+    minutos los 7 dias, y un aviso que nadie puede resolver hasta el lunes solo
+    sirve para que el lunes ya nadie lo lea.
+    """
+    hoy = hoy or today_ar()
+    return hoy.weekday() >= 5  # 5 = sabado, 6 = domingo
 
 
 def _fila(deal):

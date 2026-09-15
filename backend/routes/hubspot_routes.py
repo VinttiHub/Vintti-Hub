@@ -23,7 +23,7 @@ from utils.hubspot import (
     strip_tracking_params,
 )
 from utils import hubspot_opportunities as hs_opps
-from utils.hubspot_waiting_alert import send_waiting_deals_alert
+from utils.hubspot_waiting_alert import alerta_en_pausa, send_waiting_deals_alert
 from dashboards.datasets._now import today_ar
 
 
@@ -3301,7 +3301,15 @@ def sync_hubspot_opportunities():
 
         # Un mail por deal frenado, una sola vez. Sin frenos nuevos no sale nada:
         # avisar por los que siguen esperando serian 48 mails por dia iguales.
-        if not dry_run and send_emails:
+        #
+        # Sabado y domingo no se avisa: el cron corre igual los 7 dias, pero estos
+        # frenos solo se resuelven desde Opportunities y un mail del sabado a la
+        # madrugada solo consigue que el lunes ya nadie lo lea. No se pierde nada —
+        # al no reclamar la fila, `notified_at` sigue en NULL y la primera corrida
+        # del lunes manda UN mail con todo el fin de semana junto.
+        if not dry_run and send_emails and alerta_en_pausa():
+            report["waiting_alert"] = {"sent": False, "reason": "fin_de_semana"}
+        elif not dry_run and send_emails:
             try:
                 nuevos = _claim_unnotified_waiting_deals(cursor)
                 conn.commit()
