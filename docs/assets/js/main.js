@@ -2184,6 +2184,18 @@ function renderHubspotSyncReport(r) {
     + `${i.opp ? ` · opp #${i.opp}` : ''}${i.motivo ? ` <span class="hs-report-why">${HS_MOTIVOS[i.motivo] || i.motivo}</span>` : ''}`
     + picker(i) + `</li>`;
 
+  // La fecha de Deep Dive es la senal mas fuerte para reconocer la misma busqueda
+  // escrita distinto: en las 9 duplicadas que el sync creo en septiembre coincidia
+  // dia por dia. Se muestra para que la persona la vea; no decide nada.
+  const etiquetaDeepDive = c => {
+    if (!c.deep_dive_date) return '';
+    const [, m, d] = String(c.deep_dive_date).slice(0, 10).split('-');
+    if (!d) return '';
+    const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const fecha = `${d}-${MESES[Number(m) - 1] || m}`;
+    return ` · Deep Dive ${fecha}${c.mismo_deep_dive ? ' (misma fecha)' : ''}`;
+  };
+
   // El sync solo adopta si el puesto coincide LETRA POR LETRA, y entre HubSpot y
   // el hub casi nunca coincide ("Tutor" vs "Computer Science Teacher"). Por eso
   // el backend sugiere las opps de esa cuenta que no tienen deal atado y la
@@ -2195,7 +2207,7 @@ function renderHubspotSyncReport(r) {
     }
     if (!i.candidatas || !i.candidatas.length) return '';
     const opciones = i.candidatas.map(c =>
-      `<option value="${c.opportunity_id}">#${c.opportunity_id} · ${escapeHtml(c.opp_position_name || 'sin puesto')} · ${escapeHtml(c.opp_stage || 'sin stage')}${c.opp_model ? ` · ${escapeHtml(c.opp_model)}` : ''}${c.opp_type ? ` · ${escapeHtml(c.opp_type)}` : ''}</option>`
+      `<option value="${c.opportunity_id}"${c.cerrada ? ' data-cerrada="1"' : ''}>#${c.opportunity_id} · ${escapeHtml(c.opp_position_name || 'sin puesto')} · ${escapeHtml(c.opp_stage || 'sin stage')}${c.opp_model ? ` · ${escapeHtml(c.opp_model)}` : ''}${c.opp_type ? ` · ${escapeHtml(c.opp_type)}` : ''}${etiquetaDeepDive(c)}</option>`
     ).join('');
     // El primer <option> de un select viene SELECCIONADO. Sin este placeholder,
     // apretar "Vincular" sin tocar nada ataba el deal a la candidata que el
@@ -2226,7 +2238,7 @@ function renderHubspotSyncReport(r) {
       · <b>${r.updated}</b> ${r.dry_run ? 'se actualizarían' : 'actualizadas'}
       · ${r.skipped} sin cambios · ${r.errores.length} error(es)`}
     </p>
-    ${(r.esperando || []).length ? `<p class="hs-report-note">El sync <b>no crea</b> estas ${r.esperando.length}: la cuenta ya tiene opportunities sin deal atado y podría ser la misma búsqueda escrita distinto. Elegí cuál es, o marcala como nueva. Hasta entonces no se toca nada.</p>` : ''}
+    ${(r.esperando || []).length ? `<p class="hs-report-note">El sync <b>no crea</b> estas ${r.esperando.length}: la cuenta ya tiene opportunities sin deal atado y podría ser la misma búsqueda escrita distinto. Elegí cuál es, o marcala como nueva. Hasta entonces no se toca nada.<br>Las <b>cerradas</b> (Closed Lost / Stop) también aparecen en la lista: vincular una la deja cerrada, solo evita la duplicada. Si dice <b>misma fecha</b> de Deep Dive, casi seguro es esa.</p>` : ''}
     ${r.adoptadas.length ? `<p class="hs-report-note">Vincular = la opportunity ya está cargada en el hub y el sync la amarra a su deal de HubSpot en vez de crear una duplicada. No le toca el stage.</p>` : ''}
     ${r.retrocesos.length ? `<p class="hs-report-warn">${r.retrocesos.length} deal(s) retrocedieron de etapa en HubSpot; el hub quedó como estaba: ${r.retrocesos.map(x => `${x.deal} (${x.habia_llegado_a} → ${x.ahora_en})`).join(', ')}</p>` : ''}
     ${r.errores.length ? `<ul class="hs-report-errors">${r.errores.map(e => `<li>deal ${e.deal}: ${e.error}</li>`).join('')}</ul>` : ''}
@@ -2266,8 +2278,16 @@ function wireHubspotLinkButtons(panel) {
     btn.addEventListener('click', async () => {
       const oppId = select.value;
       if (!oppId) return;
-      const etiqueta = select.options[select.selectedIndex]?.textContent || `#${oppId}`;
-      if (!confirm(`¿Atar el deal de HubSpot a la opportunity ${etiqueta}?\n\nNo le cambia el stage: solo evita que el sync cree una duplicada.`)) return;
+      const opcion = select.options[select.selectedIndex];
+      const etiqueta = opcion?.textContent || `#${oppId}`;
+      // Atar una opp cerrada es el caso que mas importa (el hub ya cerro la
+      // busqueda y HubSpot quedo atrasado), pero tiene que estar dicho: NO la
+      // reabre. El sync no vuelve a tocar una Closed Lost / Stop nunca.
+      const cerrada = opcion?.dataset?.cerrada === '1';
+      const aviso = cerrada
+        ? `¿Atar el deal de HubSpot a la opportunity ${etiqueta}?\n\nEsa opportunity está CERRADA y queda cerrada: no se reabre ni vuelve al funnel. Atarla solo evita que el sync siga creando una duplicada por día.`
+        : `¿Atar el deal de HubSpot a la opportunity ${etiqueta}?\n\nNo le cambia el stage: solo evita que el sync cree una duplicada.`;
+      if (!confirm(aviso)) return;
 
       btn.disabled = true;
       select.disabled = true;
@@ -2284,7 +2304,9 @@ function wireHubspotLinkButtons(panel) {
         }
         box.classList.add('hs-link-done');
         if (btnNueva) btnNueva.disabled = true;
-        status.textContent = `Vinculada con #${oppId}. Volvé a "Simular" para ver qué le va a traer.`;
+        status.textContent = payload.opp_cerrada
+          ? `Vinculada con #${oppId}. Queda cerrada: el sync no la mueve, solo deja de crear duplicadas.`
+          : `Vinculada con #${oppId}. Volvé a "Simular" para ver qué le va a traer.`;
       } catch (err) {
         console.error('No se pudo vincular la opportunity:', err);
         status.textContent = `No se pudo vincular: ${err.message || err}`;

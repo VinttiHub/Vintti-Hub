@@ -155,14 +155,40 @@ dentro de la opp vieja borra una contratación del funnel. Es **sugerencia + un 
 que los montos de Closed Win:
 
 - En `dry_run`, cada item que diría "se crearía" (y los `ambiguous_position_match`) trae
-  `link_candidates`: las opps de esa cuenta sin deal atado, con Close Win adentro y Closed
-  Lost/Stop afuera, ordenadas por `hs_opps.position_similarity()`. **Ese puntaje sólo ordena,
-  no decide nada** — no hay umbral en ningún lado.
+  `link_candidates`: **todas** las opps de esa cuenta sin deal atado, sin filtro de stage —
+  Close Win, Closed Lost y Stop incluidas. Ordenadas por `mismo_deep_dive` y después por
+  `hs_opps.position_similarity()`. **Ni la fecha ni el puntaje deciden nada** — no hay umbral
+  en ningún lado, sólo ordenan para que la correcta quede arriba y no se caiga del `limit=8`.
 - El botón **Simular** de `docs/opportunities.html` pinta el reporte con un `<select>` por fila;
   **Vincular** pega `POST /hubspot/opportunities/<id>/link-deal`, que escribe **sólo** las tres
   columnas `hubspot_*`. El stage y las fechas las sigue decidiendo el sync siguiente vía
   `decide_stage_transition()` — moverlas desde acá saltearía `_unmark_signed_hire_active`.
   `POST .../unlink-deal` deshace un click equivocado.
+
+#### Vincular una opp cerrada la deja cerrada (y es el caso que más se usa)
+
+Hasta el 2026-09-14 las cerradas quedaban afuera de `link_candidates` y `/link-deal` las
+rechazaba con 409, con el argumento de que el sync no podría moverlas igual. Era al revés:
+cuando la gemela Closed Lost era la **única** opp de la cuenta, la lista volvía vacía, el
+freno leía esa lista vacía como "no hay nada que consultar" y el sync **creaba en silencio**,
+sin mail y sin panel. Así nacieron 9 duplicadas entre el 11 y el 14 de septiembre (Flamingo,
+Dolsten, Advisant, Rodgers, Catchy, The Art of Broth, The Email Marketers, Arcady, PQ Meats).
+
+Atarla no la revive: `decide_stage_transition()` devuelve `hub_stage_is_terminal` y el sync no
+le toca el stage. Y es justo lo que se quiere, porque el patrón real es que **el hub tiene
+razón y HubSpot quedó atrasado** — Flamingo se cerró en el hub el 16-jun y el deal sigue
+parado en NDA Signed de mayo. Atar el deal es lo único que frena al cron de crear una
+duplicada por día.
+
+Una sola salvedad: en una opp cerrada las fechas **no se pisan**, sólo se rellenan los NULL.
+La fecha de HubSpot ahí es la vieja, y `nda_signature_or_start_date` es ancla de ~10 datasets.
+
+La señal que decide en la práctica es la **fecha de Deep Dive**: en las 9 duplicadas coincidía
+día por día o a menos de 5 días, incluso donde el texto no se parecía en nada ("Tax Specialist"
+vs "Part Time Senior Tax Professional", parecido 0.34). Se muestra en el `<select>` y ordena,
+pero no decide. La limpieza de esas 9 quedó en
+`backend/scripts/dedupe_hubspot_opportunities.py` (pares hardcodeados, dry-run por defecto):
+**borrar la duplicada sin atarle el deal a la vieja no sirve, el cron la recrea a los 30 min.**
 
 ### El cron no crea si hay candidata: la freca y espera
 
