@@ -18,7 +18,7 @@ from . import people
 # env, para poder apuntar los links a un entorno de prueba.
 FRONT_BASE_URL = os.environ.get("FRONT_BASE_URL", "https://vinttihub.vintti.com")
 
-_DIAS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
+_DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
           "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 
@@ -48,8 +48,8 @@ def antiguedad(days: int | None) -> str:
     if days == 1:
         return "desde ayer"
     if days > 60:
-        return "hace mas de 2 meses"
-    return f"hace {days} dias"
+        return "hace más de 2 meses"
+    return f"hace {days} días"
 
 
 def url_item(item: dict) -> str:
@@ -70,21 +70,54 @@ def _etiqueta(item: dict) -> str:
     return " - ".join(partes) or f"Opp {item['opportunity_id']}"
 
 
-def _linea(item: dict) -> str:
-    rule = item["rule"]
+def _titulo_grupo(rule: str, missing: tuple) -> str:
+    """El encabezado que se escribe UNA vez por grupo."""
     if rule == "base":
-        titulo = "Faltan " + ", ".join(item.get("missing") or [])
-    elif rule == "pricing":
-        titulo = TITULO[rule] + " (" + ", ".join(item.get("missing") or []) + ")"
-    else:
-        titulo = TITULO[rule]
+        # "Falta Client Budget" vs "Faltan Client Budget, Candidate Salary Range".
+        verbo = "Falta" if len(missing) == 1 else "Faltan"
+        return f"{verbo} {', '.join(missing)}"
+    if rule == "pricing":
+        return TITULO[rule] + (f" ({', '.join(missing)})" if missing else "")
+    return TITULO[rule]
 
-    trozos = [f"{EMOJI.get(rule, ':small_blue_diamond:')} {esc(titulo)}",
-              link(url_item(item), _etiqueta(item))]
+
+def _item(item: dict) -> str:
+    """Una opp dentro de un grupo: primero el link, que es lo que se clickea.
+
+    La antiguedad va al final y en italica para que no compita con el nombre.
+    Antes cada linea repetia el titulo adelante, asi que lo unico accionable
+    quedaba en el medio y las lineas eran tan largas que Slack las cortaba.
+    """
+    trozos = [link(url_item(item), _etiqueta(item))]
     if item.get("candidate_name"):
         trozos.append(f"({esc(item['candidate_name'])})")
-    trozos.append(antiguedad(item.get("days")))
-    return "  \u2022 " + " \u00b7 ".join(trozos)
+    trozos.append(f"_{antiguedad(item.get('days'))}_")
+    return "        \u2022 " + " \u00b7 ".join(trozos)
+
+
+def lineas_persona(items: list[dict]) -> list[str]:
+    """Agrupa los pendientes de una persona por el conjunto de campos que falta.
+
+    Tres opps a las que les falta lo mismo repetian la misma frase tres veces y
+    empujaban el nombre de la opp fuera del ancho del mensaje. Agrupadas, el
+    titulo se escribe una vez y cada linea queda corta.
+    """
+    grupos: dict[tuple, list] = {}
+    for i in items:
+        grupos.setdefault((i["rule"], tuple(i.get("missing") or [])), []).append(i)
+
+    def antiguedad_max(its):
+        return max((x.get("days") or 0) for x in its)
+
+    lineas: list[str] = []
+    # El grupo con el pendiente mas viejo va primero; adentro, igual.
+    for (rule, missing), its in sorted(grupos.items(),
+                                       key=lambda kv: (-antiguedad_max(kv[1]), kv[0][0])):
+        its.sort(key=lambda x: -(x.get("days") or 0))
+        lineas.append(f"  {EMOJI.get(rule, ':small_blue_diamond:')} "
+                      f"*{esc(_titulo_grupo(rule, missing))}*")
+        lineas.extend(_item(i) for i in its)
+    return lineas
 
 
 def agrupar(findings: list[dict]) -> tuple[list[tuple[str, list]], list[dict]]:
@@ -118,17 +151,17 @@ def build(findings: list[dict], *, fallos: list[str] | None = None,
         if not heartbeat:
             return [], ""
         return ([{"type": "section", "text": {"type": "mrkdwn",
-                  "text": (f"{people.EMOJI_TODO_AL_DIA} *Todo al dia* - "
+                  "text": (f"{people.EMOJI_TODO_AL_DIA} *Todo al día* — "
                            f"{fecha_larga()}\nNo hay nada pendiente de cargar. "
                            "Bien hecho.")}}],
-                "Todo al dia: no hay nada pendiente de cargar")
+                "Todo al día: no hay nada pendiente de cargar")
 
     total = len(findings)
     blocks: list = [
         {"type": "header", "text": {"type": "plain_text",
          "text": f"Pendientes de carga - {fecha_larga()}", "emoji": True}},
         {"type": "context", "elements": [{"type": "mrkdwn",
-         "text": f"{total} pendientes - {len(orden)} personas"}]},
+         "text": f"{total} pendientes · {len(orden)} personas"}]},
         {"type": "divider"},
     ]
 
@@ -140,9 +173,9 @@ def build(findings: list[dict], *, fallos: list[str] | None = None,
             sin_slack_id.append(email)
 
         visibles = items[:people.MAX_ITEMS_PER_PERSON]
-        lineas = [_linea(i) for i in visibles]
+        lineas = lineas_persona(visibles)
         if len(items) > len(visibles):
-            lineas.append(f"  \u2022 _y {len(items) - len(visibles)} mas \u2014 estan en el hilo_ :thread:")
+            lineas.append(f"  _y {len(items) - len(visibles)} más \u2014 están en el hilo_ :thread:")
 
         cuenta = "1 pendiente" if len(items) == 1 else f"{len(items)} pendientes"
         cuerpo = f"{mention(mid, nombre)}  *{cuenta}*\n" + "\n".join(lineas)
@@ -152,18 +185,18 @@ def build(findings: list[dict], *, fallos: list[str] | None = None,
     pie: list[str] = []
     if len(orden) > people.MAX_PEOPLE:
         resto = sum(len(i) for _e, i in orden[people.MAX_PEOPLE:])
-        pie.append(f"+{len(orden) - people.MAX_PEOPLE} personas mas "
+        pie.append(f"+{len(orden) - people.MAX_PEOPLE} personas más "
                    f"({resto} pendientes) sin listar.")
     if huerfanos:
-        cuentas = sorted({(h.get("owner_email") or "sin duenio") for h in huerfanos})
-        pie.append(f":warning: {len(huerfanos)} pendientes *sin duenio activo* "
+        cuentas = sorted({(h.get("owner_email") or "sin dueño") for h in huerfanos})
+        pie.append(f":warning: {len(huerfanos)} pendientes *sin dueño activo* "
                    f"({esc(', '.join(cuentas))}) - hay que reasignarlos.")
     if sin_slack_id:
         pie.append(f"Sin Slack ID (se muestran, no se mencionan): "
                    f"{esc(', '.join(sin_slack_id))}")
     if fallos:
         pie.append(f":warning: no se pudo calcular: {esc(', '.join(fallos))}")
-    pie.append("Se repite todos los dias hasta que el dato este cargado.")
+    pie.append("Se repite todos los días hasta que el dato esté cargado.")
 
     blocks.append({"type": "divider"})
     blocks.append({"type": "context",
@@ -212,10 +245,10 @@ def build_detalle(findings: list[dict]) -> list[tuple[list, str]]:
         # Nombre en negrita, NO mencion: en el mensaje principal ya se los
         # menciono, y `<@U...>` dentro del hilo vuelve a notificar. Dos pings por
         # persona por dia es exactamente el ruido que este digest tiene que evitar.
-        cabecera = f"*{esc(nombre)}* - los {len(items)} pendientes"
+        cabecera = f"*{esc(nombre)}* \u2014 los {len(items)} pendientes"
         # Se parte en trozos que entren en un section (3000 chars de techo).
         trozo: list[str] = [cabecera]
-        for linea in (_linea(i) for i in items):
+        for linea in lineas_persona(items):
             tentativo = "\n".join(trozo + [linea])
             if len(tentativo) > 2800:
                 bloques.append({"type": "section",
@@ -239,7 +272,7 @@ def _compacto(orden, huerfanos, total) -> list:
     lineas = [f"{mention(people.slack_id(e), items[0].get('owner_name') or e)}: "
               f"{len(items)}" for e, items in orden]
     if huerfanos:
-        lineas.append(f":warning: sin duenio activo: {len(huerfanos)}")
+        lineas.append(f":warning: sin dueño activo: {len(huerfanos)}")
     return [
         {"type": "header", "text": {"type": "plain_text",
          "text": f"Pendientes de carga - {fecha_larga()}", "emoji": True}},
@@ -258,9 +291,9 @@ def to_text(findings: list[dict], *, fallos=None) -> str:
             det = ", ".join(i.get("missing") or [])
             out.append(f"   [{i['rule']:7}] {_etiqueta(i)} | {det} | {antiguedad(i.get('days'))}")
     if huerfanos:
-        out.append(f"\nSIN DUENIO ACTIVO ({len(huerfanos)}):")
+        out.append(f"\nSIN DUEÑO ACTIVO ({len(huerfanos)}):")
         for h in huerfanos:
-            out.append(f"   {h.get('owner_email') or '(vacio)'} - {_etiqueta(h)}")
+            out.append(f"   {h.get('owner_email') or '(vacío)'} - {_etiqueta(h)}")
     for f in (fallos or []):
         out.append(f"\nREGLA CAIDA: {f}")
     return "\n".join(out)
