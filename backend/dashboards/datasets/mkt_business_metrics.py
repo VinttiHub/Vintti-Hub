@@ -27,7 +27,7 @@ import os
 from calendar import monthrange
 from datetime import date, timedelta
 
-from .mkt_sqls_by_origin import period_bounds
+from .mkt_sqls_by_origin import period_bounds, LABEL_SEMANA_VENCIDA
 from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # Definición de SQL = etapa ALCANZADA en HubSpot (idéntica a mkt_funnel_mql_sql_cw):
@@ -55,7 +55,7 @@ def _prev_bounds(ini: date, fin: date, label: str) -> tuple[date, date]:
     período atrás y el fin = inicio + (fin-ini), garantizando la misma cantidad de días.
     """
     span = fin - ini  # timedelta exacto
-    if label == "Semana":
+    if label in ("Semana", LABEL_SEMANA_VENCIDA):
         p_ini = ini - timedelta(days=7)
     elif label == "Trimestre":
         p_ini = _minus_months(ini, 3)
@@ -64,6 +64,21 @@ def _prev_bounds(ini: date, fin: date, label: str) -> tuple[date, date]:
     else:  # Mes
         p_ini = _minus_months(ini, 1)
     return p_ini, p_ini + span
+
+
+_MES_ABREV = ("ene", "feb", "mar", "abr", "may", "jun",
+              "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _fmt_range(ini: date, fin: date) -> str:
+    """'7-13 sep' | '31 ago - 6 sep' | '28 dic 2025 - 3 ene 2026'."""
+    if ini.year != fin.year:
+        return (f"{ini.day} {_MES_ABREV[ini.month - 1]} {ini.year} - "
+                f"{fin.day} {_MES_ABREV[fin.month - 1]} {fin.year}")
+    if ini.month != fin.month:
+        return (f"{ini.day} {_MES_ABREV[ini.month - 1]} - "
+                f"{fin.day} {_MES_ABREV[fin.month - 1]}")
+    return f"{ini.day}-{fin.day} {_MES_ABREV[fin.month - 1]}"
 
 
 def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, int]:
@@ -280,6 +295,10 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         "close_rate_delta": rec.get("close_rate_delta"),
         "net_rev_delta": rec.get("net_rev_delta"),
         "period_label": label,
+        # Rango real del periodo, ya formateado. Existe para que la UI pueda rotular
+        # "Semana vencida (7-13 sep)" sin recalcular las bounds en JS y arriesgar que
+        # la etiqueta diga una semana distinta de la que se conto.
+        "period_range": _fmt_range(ini, fin),
     }]
 
 
@@ -288,6 +307,7 @@ DATASET = {
     "label": "Marketing · Métricas de negocio (strip KPIs, período)",
     "dimensions": [
         {"key": "period_label", "label": "Período", "type": "string"},
+        {"key": "period_range", "label": "Rango del período", "type": "string"},
     ],
     "measures": [
         {"key": "sqls", "label": "SQLs totales", "type": "number"},

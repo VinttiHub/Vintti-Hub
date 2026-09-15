@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=121">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=122">
 </head>
 <body>
 
@@ -5552,6 +5552,18 @@
         <div class="skpi-tile__delta skpi-tile__delta--arrow">
           <span data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="sqls_delta" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs ant.
         </div>
+        <!-- Semana vencida (Lun–Dom ya cerrada) = el número que va al sheet de OKRs
+             (O3·KR4 "SQL Marketing"). `data-period-locked` lo deja FUERA del toggle
+             general de período: el valor grande sigue el toggle, éste no se mueve.
+             `data-period-detail-periodo` abre el mismo drawer forzado a esa semana. -->
+        <button type="button" class="skpi-tile__wk" data-period-detail-open="mkt-sqls-detail"
+                data-period-detail-periodo="semana_vencida"
+                aria-label="Ver detalle de los SQLs de la semana vencida">
+          <span class="skpi-tile__wk-lab">Sem. vencida
+            <span class="skpi-tile__wk-range" data-chart="mk_business_metrics" data-period-locked data-override-periodo="semana_vencida" data-bind="text" data-field="period_range" data-reduce="first" data-fmt="raw"></span>
+          </span>
+          <strong class="skpi-tile__wk-val" data-chart="mk_business_metrics" data-period-locked data-override-periodo="semana_vencida" data-bind="text" data-field="sqls" data-reduce="first" data-fmt="int">—</strong>
+        </button>
       </div>
 
       <div class="skpi-tile skpi-tile--clickable" data-period-detail-open="mkt-clients-detail">
@@ -8380,7 +8392,11 @@
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">SQLs del período</h4>
+              <h4 class="kpi-drawer__section-title">SQLs del período
+                <!-- Lo rellena openPeriodDrawer con el `period_range` que ya devolvió el
+                     backend; queda vacío (hidden) si el drawer se abre por el toggle general. -->
+                <span class="kpi-drawer__range" data-period-range-label hidden></span>
+              </h4>
               <div class="dtable-wrap" data-chart="mk_table_sqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
                    data-cols="meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lead_life|Etapa|raw,created|Creación|raw"
                    data-empty-text="Sin SQLs en el período."></div>
@@ -9636,7 +9652,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=152" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=154" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

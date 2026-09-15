@@ -38,11 +38,32 @@ def _parse_date(value):
     return None
 
 
+# Etiqueta del período "semana vencida" — se compara en `_prev_bounds` de
+# mkt_business_metrics para decidir cuánto retroceder. Si la cambiás, cambiá allá.
+LABEL_SEMANA_VENCIDA = "Semana vencida"
+
+
+def prev_full_week(corte: date) -> tuple[date, date]:
+    """Semana COMPLETA anterior (Lun–Dom) a `corte`. MISMA fórmula que
+    `okr_snapshot_routes._prev_full_week`, que es la que alimenta la columna semanal
+    del sheet de OKRs: si los dos no coinciden, la card y el sheet dejan de reconciliar.
+    Un `corte` en domingo sigue siendo semana EN CURSO → devuelve la anterior."""
+    dom = corte - timedelta(days=corte.weekday() + 1)
+    return dom - timedelta(days=6), dom
+
+
 def period_bounds(filters: dict) -> tuple[date, date, str]:
-    """(ini, fin=corte, label) para el período en curso a la fecha."""
+    """(ini, fin=corte, label) para el período en curso a la fecha.
+
+    `semana_vencida` es la excepción: NO termina en `corte` sino en el domingo
+    anterior — es la semana ya cerrada, la que se reporta en el sheet de OKRs.
+    """
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
              or today_ar())
     p = str(filters.get("periodo") or filters.get("period") or "mes").strip().lower()
+    if p in ("semana_vencida", "semana-vencida", "semana_anterior", "prev_week", "last_week"):
+        lun, dom = prev_full_week(corte)
+        return lun, dom, LABEL_SEMANA_VENCIDA
     if p in ("semana", "week", "w"):
         return corte - timedelta(days=corte.weekday()), corte, "Semana"
     if p in ("q", "trimestre", "quarter"):

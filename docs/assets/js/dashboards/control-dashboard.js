@@ -3618,7 +3618,11 @@
 
   // Aplica periodicidad y/o corte a todas las cards período-aware de la sección.
   async function applyPeriodToSection(section, { periodo, corte }) {
-    const els = [...section.querySelectorAll('[data-chart][data-override-periodo]')];
+    // `data-period-locked` = el elemento declara su propio período y el toggle general
+    // no lo toca (ej. el "Sem. vencida" del tile de SQLs, que tiene que seguir siendo la
+    // semana cerrada aunque el toggle esté en Mes/Q/Año).
+    const els = [...section.querySelectorAll('[data-chart][data-override-periodo]')]
+      .filter(el => !el.hasAttribute('data-period-locked'));
     els.forEach(el => {
       if (periodo != null) el.dataset.overridePeriodo = periodo;
       if (corte) el.setAttribute('data-override-corte', corte);
@@ -3867,13 +3871,20 @@
     });
 
     // Drill por período (Marketing): igual que week, con data-override-periodo.
-    openPeriodDrawer = (panelKey, periodo, corte) => {
+    openPeriodDrawer = (panelKey, periodo, corte, rangeLabel) => {
       const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
       if (panel) {
         panel.querySelectorAll('[data-period-aware]').forEach(el => {
           el.dataset.overridePeriodo = periodo;
           if (corte) el.setAttribute('data-override-corte', corte);
           else el.removeAttribute('data-override-corte');
+        });
+        // Rango del período: NO se recalcula acá. Es el string que ya devolvió el
+        // backend (`period_range`) y que el tile tiene pintado — así el encabezado del
+        // drawer no puede decir una semana distinta de la que se contó.
+        panel.querySelectorAll('[data-period-range-label]').forEach(el => {
+          el.textContent = rangeLabel || '';
+          el.hidden = !rangeLabel;
         });
       }
       openDrawer(panelKey);
@@ -3964,7 +3975,20 @@
     document.querySelectorAll('[data-period-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
+        // Un botón de detalle anidado dentro de un tile que también es
+        // [data-period-detail-open] (el "Sem. vencida" del tile de SQLs): el de
+        // adentro gana y el del tile no se dispara además.
+        e.stopPropagation();
         const section = btn.closest('.channel');
+        // `data-period-detail-periodo` fija el período del drawer e ignora el toggle
+        // general (y su corte, que sería de otro período).
+        const forced = btn.getAttribute('data-period-detail-periodo');
+        if (forced) {
+          const rangeEl = btn.querySelector('[data-field="period_range"]');
+          const range = rangeEl ? (rangeEl.textContent || '').trim() : '';
+          openPeriodDrawer(btn.getAttribute('data-period-detail-open'), forced, '', range);
+          return;
+        }
         const active = (section || document).querySelector('[data-period-global] [data-period-set].is-active');
         const periodo = active ? active.dataset.periodSet : 'mes';
         const specSel = (section || document).querySelector('[data-period-specific]');
@@ -4907,12 +4931,24 @@
       }).join('');
       const badRows = bad.length ? `<p style="margin:6px 0 0;color:#c0392b;font-size:12px;">
           ⚠ ${bad.length} sin resolver: ${bad.map(b => escapeHtml(b.key + (b.error ? ' (' + b.error + ')' : ''))).join(', ')}</p>` : '';
+      // La columna elegida es siempre "la última fecha <= hoy". Si a la fila de fechas
+      // del sheet le faltan columnas, eso NO falla: escribe sobre una semana vieja y la
+      // pisa en silencio. weeks_behind > 0 = eso está por pasar.
+      const behind = Number(t.weeks_behind || 0);
+      const weekStyle = behind > 0 ? 'color:#c0392b;font-weight:700;' : '';
+      const behindWarn = behind > 0 ? `
+        <p style="margin:0 0 6px;padding:7px 10px;border-radius:8px;background:#fdecea;border:1px solid #f5c6c2;color:#c0392b;font-size:12px;">
+          ⚠ Esa columna es de hace ${behind} semana${behind === 1 ? '' : 's'}: al sheet le faltan
+          columnas de fecha en esta pestaña. Si escribís, <b>pisás esa semana vieja</b>.
+          Agregá las columnas que faltan hasta el lunes de esta semana y volvé a simular.
+        </p>` : '';
       return `
         <div style="margin-top:14px;">
           <p style="margin:0 0 6px;color:#555;font-size:13px;">
             Pestaña <b>${escapeHtml(t.tab)}</b> · columna <b>${escapeHtml(t.column)}</b>
-            (semana <b>${escapeHtml(String(t.week_label || t.week_date || '—'))}</b>)
+            (semana <b style="${weekStyle}">${escapeHtml(String(t.week_label || t.week_date || '—'))}</b>)
           </p>
+          ${behindWarn}
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="text-align:left;border-bottom:1px solid #eee;color:#999;font-size:11px;text-transform:uppercase;">
               <th style="padding:5px 10px;">Métrica</th><th style="padding:5px 10px;">Nuevo valor</th>

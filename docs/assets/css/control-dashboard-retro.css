@@ -2106,6 +2106,52 @@ body.is-loading .kpi-card::after {
   margin-top: auto;
   padding-top: 6px;
 }
+/* Sub-línea del tile: una métrica fija (semana vencida) que convive con el valor
+   grande, que sí sigue el toggle de período. Es un <button>: abre el mismo drawer
+   forzado a esa ventana, por eso se resetea el estilo nativo. */
+.skpi-tile__wk {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-violet, #6c38ff) 5%, transparent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.skpi-tile__wk:hover,
+.skpi-tile__wk:focus-visible {
+  background: color-mix(in srgb, var(--c-violet, #6c38ff) 12%, transparent);
+  border-color: color-mix(in srgb, var(--c-violet, #6c38ff) 35%, transparent);
+}
+.skpi-tile__wk-lab {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.skpi-tile__wk-range {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+  opacity: 0.85;
+}
+.skpi-tile__wk-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
 .skpi-tile__delta--pos { color: var(--pos); }
 .skpi-tile__delta--neg { color: var(--neg); }
 .skpi-tile__delta--muted { color: var(--ink-3); }
@@ -2465,6 +2511,13 @@ button.skpi-sub--clickable:hover {
 .kpi-drawer__section-title .count {
   color: var(--ink);
   font-weight: 800;
+}
+/* Rango del período cuando el drawer se abre con período forzado (ej. "7-13 sep"). */
+.kpi-drawer__range {
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 .kpi-drawer__month-chip {
   font-size: 10px;

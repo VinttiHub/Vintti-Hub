@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, request
 
@@ -145,12 +145,19 @@ OKR_METRICS = [
     {"key": "replacements_placed", "match": "kr11 de reemplazos colocados",
      "dataset": "replacement_coverage_30d", "field": "placed_pct", "reduce": "first", "fmt": "pct", "filters": {}},
     # Objetivo 3 · Pipeline Explotion
-    {"key": "active_pipeline_new", "match": "kr1 active pipeline",
+    # La fila del sheet dice "KR1: New Active Pipeline" (fila 28 de "OKR 2 - 2026"),
+    # no "KR1: Active Pipeline" — con el match viejo caía siempre en "sin resolver".
+    {"key": "active_pipeline_new", "match": "kr1 new active pipeline",
      "dataset": "active_pipeline", "field": "pipeline_count_new", "reduce": "first", "fmt": "int", "filters": {}},
     {"key": "expected_pipeline_rev", "match": "kr2 expected pipeline revenue",
      "dataset": "pipeline_cr_minus_churn", "field": "net_mrr_fee_staffing_30d", "reduce": "first", "fmt": "money", "filters": {}},
-    {"key": "sql_marketing", "match": "kr4 sql marketing",
-     "dataset": "mkt_business_metrics", "field": "sqls", "reduce": "first", "fmt": "int", "filters": {"periodo": "mes"}},
+    # O3·KR4 = card "SQLs totales" del strip de Marketing, pero por SEMANA VENCIDA
+    # (Lun–Dom anterior), no MTD: la columna del sheet es semanal y el pedido es leer
+    # la semana ya cerrada. `prev_week` inyecta desde/hasta; `period_bounds` de
+    # mkt_sqls_by_origin toma `hasta` como corte y con periodo=semana retrocede al
+    # lunes de esa misma semana → bounds exactas [lun, dom].
+    {"key": "sql_marketing", "match": "kr4 sql marketing", "prev_week": True,
+     "dataset": "mkt_business_metrics", "field": "sqls", "reduce": "first", "fmt": "int", "filters": {"periodo": "semana"}},
     {"key": "new_opps_am", "match": "kr5 new opportunities by am",
      "dataset": "new_opps_am_windows", "field": "opps_last_week", "reduce": "first", "fmt": "int", "filters": {}},
     # Objetivo 4 · Operations Excellence
@@ -256,7 +263,6 @@ def _norm(s) -> str:
 def _prev_full_week(today: date) -> tuple[str, str]:
     """Semana anterior completa (Lun–Dom), MISMA fórmula que el `window=week` de los
     datasets de Staffing (new_clients_30d_total._window_bounds). Devuelve ISO strings."""
-    from datetime import timedelta
     prev_sunday = today - timedelta(days=today.weekday() + 1)
     prev_monday = prev_sunday - timedelta(days=6)
     return prev_monday.isoformat(), prev_sunday.isoformat()
@@ -278,6 +284,20 @@ def _metric_filters(metric, ref_date, inject_cutoff=False):
         for k in ("corte", "cutoff", "fecha_corte"):
             filters.setdefault(k, iso)
     return filters
+
+
+def _weeks_behind(best_date, today) -> int:
+    """Semanas entre la columna elegida y el lunes de la semana en curso.
+
+    0 = la columna es la de esta semana (lo normal). >0 = al sheet le FALTAN columnas:
+    el botón escribe siempre en la última fecha ≤ hoy, así que con la fila de fechas
+    cortada te pisa una semana vieja sin avisar. Le pasó a la pestaña Sales, que quedó
+    frenada en el 17-ago mientras la de OKRs llegaba hasta diciembre.
+    """
+    if not best_date:
+        return 0
+    lunes = today - timedelta(days=today.weekday())
+    return max(0, (lunes - best_date).days // 7)
 
 
 def _col_letter(idx0: int) -> str:
@@ -557,6 +577,7 @@ def _build_tab_snapshot(svc, tab, cfg, today, dataset_cache, inject_cutoff=False
         "column": col_letter,
         "week_label": week_label,
         "week_date": best_date.isoformat() if best_date else None,
+        "weeks_behind": _weeks_behind(best_date, today),
         "cells": cells,
     }
 
