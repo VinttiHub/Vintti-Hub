@@ -807,6 +807,7 @@
     drawer.title.textContent = row.candidate_name;
     drawer.sub.textContent = [row.client_name, row.position_name].filter(Boolean).join(" · ");
     drawer.save.style.display = "";
+    drawer.save.disabled = false;
 
     drawer.body.innerHTML =
       '<div class="stf-section-label">Filled in by hand</div>' +
@@ -840,6 +841,7 @@
     drawer.title.textContent = row.candidate_name;
     drawer.sub.textContent = [row.client_name, fmtDate(row.end_date)].filter(Boolean).join(" · ");
     drawer.save.style.display = "";
+    drawer.save.disabled = false;
 
     var overrideRaw = row.churn_m3_override;
     drawer.body.innerHTML =
@@ -866,17 +868,51 @@
     openDrawer();
   }
 
+  // Los contractors que pueden recibir un bono son los vigentes de la pestaña
+  // Database: mismo criterio que `renderDatabaseKpis` (Active + Onboarding), o sea
+  // el que ya firmó aunque todavía no haya arrancado.
+  //
+  // Cada opción lleva pegado el par (candidate_id, account_id) y no sólo el nombre:
+  // `bonus_requests.account_id` es NOT NULL, y el cliente lo decide el hire, no la
+  // persona — alguien puede estar en dos cuentas y son dos bonos distintos.
+  // Las filas huérfanas quedan afuera a propósito: no tienen ids, que es justo lo
+  // que hace falta.
+  function bonusCandidateOptions() {
+    return state.database
+      .filter(function (r) {
+        return !r.orphan && r.candidate_id && r.account_id &&
+               (r.status === "Active" || r.status === "Onboarding");
+      })
+      .sort(function (a, b) {
+        return String(a.candidate_name || "").toLowerCase()
+          .localeCompare(String(b.candidate_name || "").toLowerCase());
+      })
+      .map(function (r) {
+        var label = r.candidate_name || "Candidate #" + r.candidate_id;
+        if (r.client_name) label += " — " + r.client_name;
+        if (r.status === "Onboarding") label += " (Onboarding)";
+        return { value: r.candidate_id + ":" + r.account_id, label: label };
+      });
+  }
+
   function openBonoDrawer(row) {
     state.editing = { kind: "bono", row: row };
     drawer.eyebrow.textContent = row.bonus_id ? "Bonus" : "New bonus";
     drawer.title.textContent = row.candidate_name || "New bonus";
     drawer.sub.textContent = row.client_name || "";
     drawer.save.style.display = "";
+    drawer.save.disabled = false;
+
+    // El candidato sólo se elige al crear: cambiárselo a un bono ya cargado movería
+    // la plata de cuenta, y el PATCH no acepta esas columnas. En uno existente se
+    // muestra de quién es, nada más.
+    var candidateBlock = row.bonus_id
+      ? readonlyList([["Candidate", row.candidate_name], ["Client", row.client_name]])
+      : '<div id="stfBonusCandidate">' + bonusCandidateField() + "</div>";
 
     var payOptions = ["", "Paid", "Sent, not paid"];
     drawer.body.innerHTML =
-      (row.bonus_id ? "" :
-        field("Candidate", '<input type="text" data-edit="candidate_name" value="">')) +
+      candidateBlock +
       field("Amount (USD)", '<input type="number" step="0.01" data-edit="amount" value="' + esc(row.amount || "") + '">') +
       field("Date *", '<input type="date" required data-edit="payout_date" value="' + esc((row.payout_date || "").slice(0, 10)) + '">') +
       field("Concept", '<input type="text" data-edit="reason" value="' + esc(row.reason || "") + '">') +
@@ -884,7 +920,63 @@
       selectField("Paid to candidate", "candidate_status", ["", "Paid", "Not Paid"], row.candidate_status) +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>");
 
+    bindBonusCandidatePicker();
+
+    // El fetch de /staffing/database sale en el init, pero con el backend frío puede
+    // tardar: si todavía no volvió se repinta sólo ese bloque cuando llega, para no
+    // perder lo que ya se haya tipeado en el resto del formulario.
+    if (!row.bonus_id && !state.loaded.database) {
+      loadTab("database").then(function () {
+        var host = drawer.body.querySelector("#stfBonusCandidate");
+        if (!host) return;
+        host.innerHTML = bonusCandidateField();
+        bindBonusCandidatePicker();
+      });
+    }
+
     openDrawer();
+  }
+
+  // El campo Candidate de un bono nuevo, en sus tres estados. Deshabilita el Save
+  // mientras no haya de dónde elegir: volver al texto libre es exactamente el bug
+  // que hacía que ningún bono se pudiera guardar.
+  function bonusCandidateField() {
+    if (!state.loaded.database) {
+      drawer.save.disabled = true;
+      return field("Candidate", '<div class="stf-empty">Loading contractors…</div>');
+    }
+    var options = bonusCandidateOptions();
+    drawer.save.disabled = !options.length;
+    if (!options.length) {
+      return field("Candidate", '<div class="stf-empty">Could not load the contractor ' +
+        "list. Reload the page and try again.</div>");
+    }
+    return selectField("Candidate", "candidate_ref",
+      [{ value: "", label: "Select a candidate…" }].concat(options), "");
+  }
+
+  // El encabezado del drawer arranca en "New bonus"; una vez elegido el candidato
+  // dice de quién es el bono, igual que cuando se abre uno existente.
+  function bindBonusCandidatePicker() {
+    var picker = drawer.body.querySelector('[data-edit="candidate_ref"]');
+    if (!picker) return;
+    picker.addEventListener("change", function () {
+      var parts = bonusCandidateLabel(picker);
+      drawer.title.textContent = parts.name || "New bonus";
+      drawer.sub.textContent = parts.client || "";
+    });
+  }
+
+  // Deshace el label de la opción elegida. El nombre se sigue mandando al backend
+  // como `employee_name_manual`: es el respaldo del COALESCE con el que la tabla
+  // muestra el bono si el candidato se borrara de `candidates`.
+  function bonusCandidateLabel(select) {
+    var text = select && select.selectedIndex > 0
+      ? select.options[select.selectedIndex].text : "";
+    text = text.replace(/ \(Onboarding\)$/, "");
+    var cut = text.indexOf(" — ");
+    if (cut === -1) return { name: text, client: "" };
+    return { name: text.slice(0, cut), client: text.slice(cut + 3) };
   }
 
   function collectEdits() {
@@ -906,6 +998,21 @@
 
     var request;
     if (kind === "bono") {
+      // Se valida en el orden en que están los campos: primero el candidato, que es
+      // el de arriba de todo, y recién después la fecha.
+      //
+      // `account_id` es NOT NULL en bonus_requests y el backend rechaza el POST sin
+      // él; por eso el par viaja junto en el value de la opción, para que no haya
+      // forma de mandar uno sin el otro.
+      var ref = [];
+      if (!row.bonus_id) {
+        ref = String(edits.candidate_ref || "").split(":");
+        if (ref.length !== 2 || !ref[0] || !ref[1]) {
+          drawer.save.disabled = false;
+          drawer.status.textContent = "Pick a candidate from the list.";
+          return;
+        }
+      }
       if (!edits.payout_date) {
         drawer.save.disabled = false;
         drawer.status.textContent = "The bonus date is required.";
@@ -919,12 +1026,20 @@
         invoice_status: edits.invoice_status || null,
         candidate_status: edits.candidate_status || null
       };
-      request = row.bonus_id
-        ? api("/staffing/bonuses/" + row.bonus_id, { method: "PATCH", body: JSON.stringify(payload) })
-        : api("/staffing/bonuses", {
-            method: "POST",
-            body: JSON.stringify(Object.assign(payload, { candidate_name: edits.candidate_name }))
-          });
+      if (row.bonus_id) {
+        request = api("/staffing/bonuses/" + row.bonus_id,
+          { method: "PATCH", body: JSON.stringify(payload) });
+      } else {
+        var who = bonusCandidateLabel(drawer.body.querySelector('[data-edit="candidate_ref"]'));
+        request = api("/staffing/bonuses", {
+          method: "POST",
+          body: JSON.stringify(Object.assign(payload, {
+            candidate_id: ref[0],
+            account_id: ref[1],
+            candidate_name: who.name
+          }))
+        });
+      }
     } else {
       if (row.orphan) {
         drawer.save.disabled = false;
