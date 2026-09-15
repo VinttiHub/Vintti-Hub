@@ -1740,3 +1740,34 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
     grid-column: span 1;
   }
 }
+
+/* ===== Billing email (tab Invoice) ===== */
+/* Scoped al #billingEmailSection a proposito: .card-header no existe en esta hoja,
+   asi que definirla suelta tocaria tambien la card de bonus requests. */
+#billingEmailSection .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+#billingEmailSection .card-header h3 {
+  margin: 0;
+}
+
+.billing-email-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.billing-email-current strong {
+  font-size: 16px;
+  word-break: break-all;
+}
+
+#billingEmailSection .subtle {
+  margin: 0 0 12px;
+}

@@ -1619,6 +1619,7 @@ def update_account_fields(account_id):
         'referal_source',
         'outsource',
         'vintti_ai',
+        'billing_email',
     ]
 
 

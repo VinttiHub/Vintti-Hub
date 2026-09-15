@@ -38,6 +38,7 @@ from routes.users_routes import bp as users_api_bp
 from routes.moods_routes import bp as moods_bp
 from routes.to_do_routes import bp as to_do_bp
 from routes.public_bonus_routes import bp as public_bonus_bp
+from routes.public_billing_routes import bp as public_billing_bp
 from routes.public_candidate_references_routes import bp as public_candidate_references_bp
 from routes.public_reference_feedback_routes import bp as public_reference_feedback_bp
 from routes.reference_feedback_ai_routes import bp as reference_feedback_ai_bp
@@ -125,6 +126,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_candidate_search, url_prefix="")
     app.register_blueprint(hunter_bp)
     app.register_blueprint(public_bonus_bp)
+    app.register_blueprint(public_billing_bp)
     app.register_blueprint(public_candidate_references_bp)
     app.register_blueprint(public_reference_feedback_bp)
     app.register_blueprint(reference_feedback_ai_bp)

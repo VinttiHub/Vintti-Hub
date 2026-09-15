@@ -106,6 +106,28 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Pinta un <a> como mailto, o como placeholder si no hay direccion.
+// Top-level a proposito: lo usan fillAccountDetails() y el panel de billing del
+// tab Invoice, que viven en scopes distintos.
+function setMailLink(elementId, email) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  const clean = (email || '').trim();
+  if (clean) {
+    el.textContent = clean;
+    el.href = `mailto:${clean}`;
+    el.removeAttribute('aria-disabled');
+    el.classList.remove('placeholder');
+  } else {
+    el.textContent = 'Not available';
+    el.removeAttribute('href');
+    el.removeAttribute('target');
+    el.setAttribute('aria-disabled', 'true');
+    el.classList.add('placeholder');
+  }
+}
+
 function formatDateLabel(value) {
   if (!value) return '—';
   const ymd = dateInputValue(value);
@@ -289,6 +311,7 @@ document.body.style.backgroundColor = 'var(--bg)';
 
       if (target === 'invoice') {
         loadBonusRequests().catch(console.error);
+        loadBillingEmail().catch(console.error);
       }
       if (target === 'credit-loop') {
         const accountId = getIdFromURL();
@@ -574,22 +597,8 @@ function fillAccountDetails(data) {
 
   setFieldText('account-contract', data.contract);
 
-  const mailLink = document.getElementById('account-mail-link');
-  if (mailLink) {
-    const email = (data.mail || '').trim();
-    if (email) {
-      mailLink.textContent = email;
-      mailLink.href = `mailto:${email}`;
-      mailLink.removeAttribute('aria-disabled');
-      mailLink.classList.remove('placeholder');
-    } else {
-      mailLink.textContent = 'Not available';
-      mailLink.removeAttribute('href');
-      mailLink.removeAttribute('target');
-      mailLink.setAttribute('aria-disabled', 'true');
-      mailLink.classList.add('placeholder');
-    }
-  }
+  setMailLink('account-mail-link', data.mail);
+  setMailLink('account-billing-mail-link', data.billing_email);
 
   const linkedinLink = document.getElementById('linkedin-link');
   if (linkedinLink) linkedinLink.href = data.linkedin || '#';
@@ -3110,6 +3119,17 @@ document.getElementById("requestBonusBtn")?.addEventListener("click", () => {
   window.open(url, "_blank", "noopener,noreferrer");
 });
 
+document.getElementById("requestBillingBtn")?.addEventListener("click", () => {
+  const accountId = getAccountIdFromUrl();
+  if (!accountId) {
+    alert("Account id missing in Account Details URL");
+    return;
+  }
+
+  const url = `billing-form.html?account_id=${encodeURIComponent(accountId)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+});
+
 //FORM DATAAA
 
 
@@ -3217,6 +3237,83 @@ const accLabel =
 
 }
 
+// ===== Billing email =====
+// Mismo endpoint publico que alimenta docs/billing-form.html. A diferencia de
+// loadBonusRequests(), este no crea ToDos: es un dato de la cuenta, no una tarea.
+async function loadBillingEmail(){
+  const tbody = document.getElementById("billingEmailTbody");
+  const current = document.getElementById("billingEmailCurrent");
+  if (!tbody || !current) return;
+
+  const accountId = getAccountId();
+  if (!accountId) {
+    tbody.innerHTML = `<tr><td colspan="2">Missing account id</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = `<tr><td colspan="2">Loading…</td></tr>`;
+
+  const url = `${API_BASE_URL}/public/billing_email/account/${encodeURIComponent(accountId)}`;
+  const res = await fetch(url, { credentials: "include" });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    tbody.innerHTML = `<tr><td colspan="2">Error ${res.status}: ${txt}</td></tr>`;
+    return;
+  }
+
+  const data = await res.json();
+  renderBillingEmailCurrent(data.billing_email || "");
+
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="2">No submissions yet</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = items.map(it => `
+    <tr>
+      <td>${escapeHtml(it.created_date || "")}</td>
+      <td>${escapeHtml(it.billing_email || "")}</td>
+    </tr>
+  `).join("");
+}
+
+function renderBillingEmailCurrent(email){
+  const clean = (email || "").trim();
+
+  const current = document.getElementById("billingEmailCurrent");
+  if (current) {
+    current.textContent = clean || "Not available";
+    current.classList.toggle("placeholder", !clean);
+  }
+
+  // El mismo dato se muestra en Account Info (tab Overview): si se edita aca,
+  // alla tiene que cambiar sin recargar la pagina.
+  setMailLink('account-billing-mail-link', clean);
+}
+
+// patchAccountField vive dentro del DOMContentLoaded de arriba y no llega hasta aca,
+// asi que este PATCH se hace suelto (misma ruta, mismo shape).
+async function saveBillingEmail(value){
+  const accountId = getAccountId();
+  if (!accountId) return;
+
+  const res = await fetch(`${API_BASE_URL}/accounts/${encodeURIComponent(accountId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ billing_email: value }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    alert(`Could not update billing email.\n${txt}`);
+    return;
+  }
+
+  renderBillingEmailCurrent(value);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Si invoice ya está activo al cargar, carga bonus de una vez
   const activeTab = document.querySelector(".tab-btn.active")?.dataset?.tab;
@@ -3227,6 +3324,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // Botón Reload
   document.getElementById("btnReloadBonus")?.addEventListener("click", () => {
     loadBonusRequests().catch(err => console.error("reload failed:", err));
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const activeTab = document.querySelector(".tab-btn.active")?.dataset?.tab;
+  if (activeTab === "invoice") {
+    loadBillingEmail().catch(err => console.error("loadBillingEmail failed:", err));
+  }
+
+  document.getElementById("btnReloadBillingEmail")?.addEventListener("click", () => {
+    loadBillingEmail().catch(err => console.error("billing reload failed:", err));
+  });
+
+  document.getElementById("btnEditBillingEmail")?.addEventListener("click", () => {
+    const current = document.getElementById("billingEmailCurrent");
+    const shown = (current?.textContent || "").trim();
+    const value = prompt("Billing email for this account:", shown === "Not available" ? "" : shown);
+    if (value === null) return;
+    saveBillingEmail(value.trim().toLowerCase()).catch(err => console.error("save billing email failed:", err));
   });
 });
 

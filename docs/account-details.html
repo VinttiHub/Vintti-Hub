@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet" />
 
   <!-- === Styles === -->
-  <link rel="stylesheet" href="./assets/css/account-details.css?v=20260715" />
+  <link rel="stylesheet" href="./assets/css/account-details.css?v=20260915" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <!-- Litepicker styles (calendar UI used elsewhere by your JS) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css" />
@@ -38,6 +38,7 @@
       <button class="tab-btn" data-tab="credit-loop" role="tab" aria-selected="false" aria-controls="credit-loop">Credit Loop</button>
       <button class="tab-btn" data-tab="invoice" role="tab" aria-selected="false" aria-controls="invoice">Invoice</button>    
     <button class="tab-btn" id="requestBonusBtn" type="button">Request bonus</button>
+    <button class="tab-btn" id="requestBillingBtn" type="button">Request billing email</button>
     </div>
 
     <!-- <button class="btn btn-primary" id="btnBonusForm">
@@ -70,6 +71,10 @@
             <p>
               <strong>Email:</strong>
               <a id="account-mail-link" href="#" class="placeholder" aria-label="Send email to point of contact">Not available</a>
+            </p>
+            <p>
+              <strong>Billing Email:</strong>
+              <a id="account-billing-mail-link" href="#" class="placeholder" aria-label="Send email to billing contact">Not available</a>
             </p>
             <p><strong>Industry:</strong> <span id="account-industry" class="placeholder">Not available</span></p>
             <p><strong>Lead Source:</strong> <span id="account-lead-source" class="placeholder">Not available</span></p>
@@ -264,6 +269,31 @@
   <div class="card">
     <h2>Invoice</h2>
 
+    <section id="billingEmailSection" class="card">
+      <div class="card-header">
+        <h3>Billing email</h3>
+        <button id="btnReloadBillingEmail" type="button" class="btn btn-ghost">Reload</button>
+      </div>
+
+      <p class="billing-email-current">
+        <strong id="billingEmailCurrent" class="placeholder">Not available</strong>
+        <button class="edit-btn" type="button" id="btnEditBillingEmail" aria-label="Edit billing email">✎</button>
+      </p>
+      <p class="subtle">Where invoices for this account are sent. Clients fill it in from the public form.</p>
+
+      <table class="bonus-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Email submitted</th>
+          </tr>
+        </thead>
+        <tbody id="billingEmailTbody">
+          <tr><td colspan="2">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+
     <section id="bonusSection" class="card">
       <div class="card-header">
         <h3>Bonus requests</h3>
@@ -355,7 +385,7 @@
   <script src="./assets/js/inactive-info-dialog.js" defer></script>
   <script src="./assets/js/to-do-chat.js" defer></script>
   <!-- Page logic (kept path & name). Defer improves first paint and keeps execution order. -->
-  <script src="./assets/js/account-details.js?v=20260803" defer></script>
+  <script src="./assets/js/account-details.js?v=20260915" defer></script>
 
   <!-- Fallback for users without JS -->
   <noscript>This page requires JavaScript enabled to load account data.</noscript>

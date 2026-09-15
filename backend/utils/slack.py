@@ -57,9 +57,14 @@ def mention(member_id: str | None, fallback_name: str) -> str:
     return f"<@{member_id}>" if member_id else f"*{esc(fallback_name)}*"
 
 
-def configured() -> str | None:
-    """'bot', 'webhook' o None. Para poder avisar antes de calcular nada."""
-    if os.environ.get("SLACK_BOT_TOKEN") and os.environ.get("SLACK_CHANNEL_ID"):
+def configured(channel_override: str | None = None) -> str | None:
+    """'bot', 'webhook' o None. Para poder avisar antes de calcular nada.
+
+    Con `channel_override` alcanza el token: el canal ya viene dado, asi que
+    exigir tambien `SLACK_CHANNEL_ID` (el del digest) dejaria a un aviso que
+    postea a SU canal sin mandar nada por una variable que no usa.
+    """
+    if os.environ.get("SLACK_BOT_TOKEN") and (channel_override or os.environ.get("SLACK_CHANNEL_ID")):
         return "bot"
     if os.environ.get("SLACK_WEBHOOK_URL"):
         return "webhook"
@@ -73,7 +78,7 @@ def post_blocks(blocks: list, text: str, *, channel_override: str | None = None)
     del cron. Quien llama mira `sent` y decide (el digest avisa por mail, que es
     un canal independiente: si lo roto es Slack, avisar por Slack no sirve).
     """
-    transport = configured()
+    transport = configured(channel_override)
     payload = {"blocks": blocks, "text": text,
                "unfurl_links": False, "unfurl_media": False}
 

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Billing Email • Vintti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Reusa el mismo sistema de clases del formulario publico de bonus -->
+  <link rel="stylesheet" href="./assets/css/bonus-form.css" />
+  <link rel="stylesheet" href="./assets/css/billing-form.css?v=1" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4" />
+</head>
+<body>
+  <main class="page">
+    <section class="shell">
+      <header class="hero">
+        <div class="brand">
+          <img class="logo" src="./assets/img/vintti_logo.png" alt="Vintti logo" width="96" height="54" />
+          <div>
+            <h1>Billing email</h1>
+            <p>Tell us the email address where we should send your invoices.</p>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="meta-card">
+            <span class="meta-label">Estimated time</span>
+            <strong>30 sec</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Support</span>
+            <strong>finance@vintti.com</strong>
+          </div>
+        </div>
+      </header>
+
+      <div class="form-error hidden" id="formError" role="alert"></div>
+
+      <form class="form" id="billingForm">
+        <!-- 1) Account details (read-only, prefilled) -->
+        <section class="card">
+          <div class="card-head">
+            <h2>1) Account details</h2>
+            <p>We already have this on file — nothing to do here.</p>
+          </div>
+
+          <div class="review-grid readonly-grid" id="accountBox">
+            <div class="review-item hidden" data-row="client_name">
+              <span class="k">Account</span>
+              <strong class="v" data-field="client_name">—</strong>
+            </div>
+            <div class="review-item hidden" data-row="contact_name">
+              <span class="k">Main contact</span>
+              <strong class="v" data-field="contact_name">—</strong>
+            </div>
+            <div class="review-item hidden" data-row="contact_mail">
+              <span class="k">Contact email</span>
+              <strong class="v" data-field="contact_mail">—</strong>
+            </div>
+            <div class="review-item hidden" data-row="state">
+              <span class="k">State</span>
+              <strong class="v" data-field="state">—</strong>
+            </div>
+            <div class="review-item hidden" data-row="industry">
+              <span class="k">Industry</span>
+              <strong class="v" data-field="industry">—</strong>
+            </div>
+            <div class="review-item hidden" data-row="contract">
+              <span class="k">Contract</span>
+              <strong class="v" data-field="contract">—</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2) The only thing we need -->
+        <section class="card">
+          <div class="card-head">
+            <h2>2) Where should we send invoices?</h2>
+            <p>This is the only field we need from you.</p>
+          </div>
+
+          <div class="grid">
+            <label class="field field-full">
+              <span>Billing email</span>
+              <input
+                name="billing_email"
+                id="billingEmailInput"
+                type="email"
+                placeholder="e.g., accounting@company.com"
+                autocomplete="email"
+                required
+              />
+              <small class="hint" id="billingEmailHint">
+                It can be a shared accounting inbox — it doesn’t have to be a personal address.
+              </small>
+            </label>
+          </div>
+
+          <label class="checkbox">
+            <input type="checkbox" name="confirm" required />
+            <span>I confirm this is the correct address to receive invoices.</span>
+          </label>
+        </section>
+
+        <footer class="actions">
+          <button type="button" class="btn ghost" id="btnClear">Clear</button>
+          <button type="submit" class="btn primary" id="btnSubmit">Submit</button>
+        </footer>
+
+        <p class="fineprint">
+          By submitting, you authorize Vintti to send invoices for this account to the address above.
+        </p>
+      </form>
+    </section>
+  </main>
+
+  <script src="./assets/js/billing-form.js?v=1"></script>
+</body>
+</html>

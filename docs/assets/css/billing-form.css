@@ -1,0 +1,43 @@
+/* Complemento chico de bonus-form.css, solo para lo propio de este formulario.
+   Todo lo demas (.page, .shell, .hero, .card, .field, .btn, .success-box) sale de ahi. */
+
+/* Datos de la cuenta: se ven como dato en firme, no como campo a completar. */
+.readonly-grid{
+  padding: 18px;
+}
+.readonly-grid .review-item{
+  background: var(--fieldBg);
+}
+.readonly-grid .review-item .v{
+  font-weight: 700;
+  word-break: break-word;
+}
+
+/* Banner de error cuando falta el account_id o la cuenta no existe. */
+.form-error{
+  background: #fdecec;
+  color: #a12b2b;
+  border: 1px solid #f5c6c6;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* Sin cuenta valida no se puede enviar: el boton lo dice, no solo falla al click. */
+.btn[disabled]{
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn[disabled]:hover{
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* Aviso de que ya habia un correo cargado y este lo reemplaza. */
+.hint.replacing{
+  color: #92600e;
+  font-weight: 600;
+}
