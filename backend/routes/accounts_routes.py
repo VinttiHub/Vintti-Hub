@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 import threading
 import traceback
@@ -12,6 +13,7 @@ from psycopg2.extras import RealDictCursor, execute_values
 from db import get_connection
 from utils import services
 from utils.account_status import derive_account_status
+from utils.alex import check_screening_questions, screening_question_texts
 from utils.client_inactive_alert import (
     TRIGGER_OPPORTUNITY_LOST,
     became_inactive_from_stage_change,
@@ -3031,47 +3033,130 @@ def get_alex_interviews(opportunity_id):
     })
 
 
-def _create_alex_job_bg(opportunity_id, jd_text, title=None):
-    """Corre en un hilo: hace el createJob (que en Apriora tarda ~1-2 min) sin
-    bloquear la respuesta HTTP. El front detecta que quedó lista cuando la position
-    aparece en Apriora (polling), así que aquí solo disparamos y logueamos."""
-    try:
-        from utils.alex import AlexClient
-        AlexClient().create_job(
-            external_job_id=opportunity_id,
-            job_description=jd_text,
-            job_title=title,
-            additional_questions=DEFAULT_APRIORA_QUESTIONS,
-            additional_generation_context=DEFAULT_APRIORA_GENERATION_CONTEXT,
-        )
-        logging.info("Apriora createJob OK (bg) opp %s title=%r (jd %s chars)",
-                     opportunity_id, title, len(jd_text))
-    except Exception as e:
-        logging.warning("Apriora createJob (bg) falló opp %s: %s", opportunity_id, e)
-
-
-# Preguntas fijas que se agregan a TODA entrevista creada en Apriora desde el Hub
-# (campo additionalQuestions de createJob). Abiertas, sin orden inteligente.
-DEFAULT_APRIORA_QUESTIONS = [
-    "Having in mind that this position has a Independent contractor, could you please tell me your Net Monthly Salary expectations in USD?",
-    "Do you have any vacations planned or some days you know that you are going to be out of office?",
-    "Just so you know, if you continue moving forward in the process, we'll be asking for references and, at the final stage, a resignation letter. Are you comfortable with both of these?",
-    "Are you participating in other processes?",
-    "Do you have your own computer to work? this is very important since you will be working with your own computer",
-    # Lleva el contexto adentro a propósito: Apriora deriva la instrucción que le da
-    # a Alex del TEXTO de la pregunta (no hay campo de instructions por pregunta en la
-    # API), así que una pregunta pelada — "Are you a USA Citizen?" — producía una
-    # instrucción mínima y la pregunta sonaba fuera de lugar en la entrevista.
-    "Because this position is hired as an independent contractor based outside the United States, we are not able to move forward with candidates who hold U.S. citizenship. Just so we can confirm — are you a U.S. citizen?",
-]
+# Las 6 preguntas fijas de screening. La definición vive en utils/alex.py, que es
+# de donde también sale el template de Apriora y la verificación posterior.
+DEFAULT_APRIORA_QUESTIONS = screening_question_texts()
 
 # Contexto extra para sesgar la generación (campo additionalGenerationContext de
-# createJob): refuerza el criterio de inglés que va anexado a la JD, porque Apriora
-# no tiene un campo de rubric propiamente dicho.
+# createJob): refuerza el criterio de inglés que va anexado a la JD. Sólo se usa
+# en el camino SIN template; con template el criterio es un criterio de verdad.
 DEFAULT_APRIORA_GENERATION_CONTEXT = (
     "Always include a grading criterion named \"C1 Level of English\" that scores the "
     "candidate's spoken English against CEFR C1. Do not add a separate question about it."
 )
+
+
+# TTLs del chequeo de preguntas: corto mientras no hay nada que mirar (la
+# respuesta cambia sola cuando termina el primer candidato), largo una vez que hay
+# al menos una entrevista hecha (el guion de la position ya no cambia).
+_QCHECK_TTL_PENDING = 120
+_QCHECK_TTL_DONE = 3600
+
+
+def _apriora_template_id():
+    """Id del interview guide template con las 6 preguntas obligatorias, o None.
+    Se crea con `python scripts/create_apriora_template.py --apply`; el id va a la
+    env en `backend/.env` y en App Runner. Sin env, el sync cae al camino viejo
+    (`additionalQuestions`), que Apriora trata como sugerencias."""
+    return (os.environ.get("APRIORA_TEMPLATE_ID") or "").strip() or None
+
+
+def _ensure_apriora_creations_table(cursor):
+    """Bitácora de los createJob. Se autocrea, igual que `hubspot_deals_waiting`:
+    el Hub tiene que poder correr local sin migraciones a mano."""
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS apriora_job_creations (
+            opportunity_id INTEGER PRIMARY KEY,
+            job_title      TEXT,
+            template_id    TEXT,
+            status         TEXT NOT NULL,
+            error_message  TEXT,
+            interviewer_id TEXT,
+            created_at     TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
+
+def _record_alex_job_creation(opportunity_id, status, title=None, template_id=None,
+                              error_message=None, interviewer_id=None):
+    """Deja registrado cómo salió el createJob.
+
+    Sin esto el fallo es mudo: el endpoint devuelve 202 antes de que el hilo
+    arranque, la excepción muere en un logging.warning, y el notificador del front
+    se rinde a los 8 minutos sin decir nada. Así fue como la opp 790 terminó
+    cargada a mano en la UI de Apriora sin que nadie se enterara de que el botón
+    había fallado."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        _ensure_apriora_creations_table(cursor)
+        cursor.execute(
+            """
+            INSERT INTO apriora_job_creations
+                (opportunity_id, job_title, template_id, status, error_message,
+                 interviewer_id, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (opportunity_id) DO UPDATE SET
+                job_title      = EXCLUDED.job_title,
+                template_id    = EXCLUDED.template_id,
+                status         = EXCLUDED.status,
+                error_message  = EXCLUDED.error_message,
+                interviewer_id = EXCLUDED.interviewer_id,
+                created_at     = NOW()
+            """,
+            (opportunity_id, title, template_id, status,
+             (error_message or None), interviewer_id),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        # La bitácora nunca puede tumbar la creación de la entrevista.
+        logging.warning("No se pudo registrar el createJob de la opp %s: %s",
+                        opportunity_id, e)
+
+
+def _create_alex_job_bg(opportunity_id, jd_text, title=None):
+    """Corre en un hilo: hace el createJob (que en Apriora tarda ~1-2 min) sin
+    bloquear la respuesta HTTP. El front detecta que quedó lista cuando la position
+    aparece en Apriora (polling); el resultado queda en `apriora_job_creations`
+    para que un fallo no pase inadvertido."""
+    template_id = _apriora_template_id()
+    try:
+        from utils.alex import AlexClient
+        kwargs = {}
+        if template_id:
+            # Con template las preguntas obligatorias son parte del guion. Mandar
+            # además `additionalQuestions` las haría dos veces.
+            kwargs["template_id"] = template_id
+        else:
+            kwargs["additional_questions"] = DEFAULT_APRIORA_QUESTIONS
+            kwargs["additional_generation_context"] = DEFAULT_APRIORA_GENERATION_CONTEXT
+        created = AlexClient().create_job(
+            external_job_id=opportunity_id,
+            job_description=jd_text,
+            job_title=title,
+            **kwargs,
+        )
+        # La doc dice que el payload de createJob es el interviewerId, pero según la
+        # corrida viene suelto o envuelto: probamos las tres formas y si no, None.
+        interviewer_id = None
+        if isinstance(created, dict):
+            payload = created.get("payload")
+            if isinstance(payload, dict):
+                payload = payload.get("interviewerId")
+            if not isinstance(payload, str):
+                payload = None
+            interviewer_id = created.get("interviewerId") or payload
+        _record_alex_job_creation(opportunity_id, "ok", title=title,
+                                  template_id=template_id,
+                                  interviewer_id=interviewer_id)
+        logging.info("Apriora createJob OK (bg) opp %s title=%r template=%s (jd %s chars)",
+                     opportunity_id, title, template_id or "-", len(jd_text))
+    except Exception as e:
+        _record_alex_job_creation(opportunity_id, "error", title=title,
+                                  template_id=template_id, error_message=str(e))
+        logging.warning("Apriora createJob (bg) falló opp %s: %s", opportunity_id, e)
 
 
 @bp.route('/opportunities/<int:opportunity_id>/alex/create_position', methods=['POST'])
@@ -3131,19 +3216,147 @@ def create_alex_position(opportunity_id):
 
     # Criterios de grading fijos (inglés C1). Van AL FINAL y DESPUÉS del guard de
     # largo mínimo, para que el guard siga midiendo la JD real.
-    jd_text = append_grading_criteria(jd_text)
+    # Con template no hacen falta: ahí el C1 es un `criteria` de verdad, y pegarlo
+    # además a la JD lo duplicaría.
+    if not _apriora_template_id():
+        jd_text = append_grading_criteria(jd_text)
 
     # Fire-and-forget: la generación en Apriora tarda ~1-2 min. En vez de bloquear
     # la respuesta, disparamos el createJob en un hilo y devolvemos 202 al instante.
     # El front detecta que quedó lista cuando la position aparece en Apriora (polling).
     # (No hace falta pre-chequear duplicados: el externalJobId es único y Apriora los
     # rechaza; además el botón se deshabilita en la UI si ya existe.)
+    # Dejar la fila en "pending" ANTES de arrancar el hilo: así /alex/create_status
+    # nunca devuelve el error de un intento anterior mientras este está en curso.
+    _record_alex_job_creation(opportunity_id, "pending", title=title,
+                              template_id=_apriora_template_id())
     threading.Thread(
         target=_create_alex_job_bg,
         args=(opportunity_id, jd_text, title),
         daemon=True,
     ).start()
     return jsonify({"started": True, "opportunity_id": opportunity_id}), 202
+
+
+@bp.route('/opportunities/<int:opportunity_id>/alex/create_status', methods=['GET'])
+def get_alex_create_status(opportunity_id):
+    """Cómo salió el último createJob de esta opportunity.
+
+    Lo consulta `apriora-notifier.js`: antes, cuando el createJob fallaba, el front
+    se quedaba poleando 8 minutos y después se rendía sin decir nada — la creación
+    parecía "en curso" para siempre y la recruiter terminaba armando la entrevista
+    a mano en Apriora (opp 790). Ahora puede mostrar el error real.
+
+    `status`: 'pending' | 'ok' | 'error' | 'unknown' (sin registro: creada antes de
+    que existiera esta tabla, o desde otro lado)."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        _ensure_apriora_creations_table(cursor)
+        cursor.execute(
+            """
+            SELECT opportunity_id, job_title, template_id, status, error_message,
+                   interviewer_id, created_at
+            FROM apriora_job_creations
+            WHERE opportunity_id = %s
+            """,
+            (opportunity_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.warning("create_status opp %s falló: %s", opportunity_id, e)
+        return jsonify({"opportunity_id": opportunity_id, "status": "unknown"}), 200
+
+    if not row:
+        return jsonify({"opportunity_id": opportunity_id, "status": "unknown"})
+
+    created_at = row.get("created_at")
+    return jsonify({
+        "opportunity_id": opportunity_id,
+        "status": row.get("status") or "unknown",
+        "job_title": row.get("job_title"),
+        "template_id": row.get("template_id"),
+        "error": row.get("error_message"),
+        "interviewer_id": row.get("interviewer_id"),
+        "created_at": created_at.isoformat() if created_at else None,
+    })
+
+
+@bp.route('/opportunities/<int:opportunity_id>/alex/question_check', methods=['GET'])
+def get_alex_question_check(opportunity_id):
+    """¿Apriora hizo las 6 preguntas obligatorias en esta búsqueda?
+
+    Hace falta porque Apriora puede dropear una en silencio: la opp 792 quedó sin
+    la de la computadora propia y las 10 entrevistas salieron así. Como no hay
+    endpoint para leer ni editar el guion de una position, lo único que se puede
+    hacer es mirar lo que efectivamente se preguntó, y arreglarlo borrando y
+    recreando la position a mano en Apriora — o sea que conviene enterarse con el
+    primer candidato, no con el décimo.
+
+    Sólo se puede responder cuando hay al menos una entrevista COMPLETADA:
+    `questionSummary` no existe antes."""
+    from utils import shared_cache
+    from utils.alex import AlexClient, AlexError
+
+    # Lo pide pipeline.js en cada carga de Opportunity Detail, y `list_reports` no
+    # está cacheado (el de la opp 792 son 200 KB). El guion de una position no
+    # cambia nunca una vez generado, así que se puede cachear tranquilo; lo único
+    # que se mueve es el conteo de entrevistas.
+    cache_key = f"alex__qcheck__{opportunity_id}"
+    hit, cached = shared_cache.get(cache_key)
+    if hit:
+        return jsonify(cached)
+
+    try:
+        client = AlexClient()
+    except AlexError:
+        return jsonify({"opportunity_id": opportunity_id, "configured": False,
+                        "matched": False, "questions": []})
+
+    try:
+        position = client.find_position_for_opportunity(opportunity_id)
+        if not position:
+            # Sin position todavía (recién creada o creada a mano con otro nombre):
+            # TTL corto, para que el badge aparezca apenas exista.
+            out = {"opportunity_id": opportunity_id, "configured": True,
+                   "matched": False, "questions": []}
+            shared_cache.set(cache_key, out, _QCHECK_TTL_PENDING)
+            return jsonify(out)
+        position_id = position.get("positionId") or position.get("id")
+        reports = client.list_reports(position_id)
+    except AlexError as e:
+        return jsonify({"opportunity_id": opportunity_id, "configured": True,
+                        "matched": False, "questions": [], "error": str(e)}), 502
+
+    if not reports:
+        # Sin entrevistas completadas no hay nada que mirar todavía. TTL corto: la
+        # respuesta cambia en cuanto el primer candidato termina.
+        out = {
+            "opportunity_id": opportunity_id, "configured": True, "matched": True,
+            "position_id": position_id, "reports": 0, "questions": [],
+        }
+        shared_cache.set(cache_key, out, _QCHECK_TTL_PENDING)
+        return jsonify(out)
+
+    questions = check_screening_questions(reports)
+    missing = [q for q in questions if not q["asked"]]
+    out = {
+        "opportunity_id": opportunity_id,
+        "configured": True,
+        "matched": True,
+        "position_id": position_id,
+        "reports": len(reports),
+        "asked": len(questions) - len(missing),
+        "total": len(questions),
+        "missing": [q["key"] for q in missing],
+        "questions": questions,
+    }
+    # Con al menos una entrevista hecha la respuesta ya es estable: el guion es el
+    # mismo para todos los candidatos de la position.
+    shared_cache.set(cache_key, out, _QCHECK_TTL_DONE)
+    return jsonify(out)
 
 
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])

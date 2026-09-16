@@ -377,6 +377,90 @@ Env opcionales: `HUBSPOT_OPP_PIPELINE_IDS`, `HUBSPOT_OPP_STAGE_IDS`, `HUBSPOT_OP
 `HUBSPOT_OPP_SYNC_BOOTSTRAP` (default: 24 h atrás — un bootstrap ancho crearía una opp por cada
 deal histórico), `HUBSPOT_OPP_SYNC_OVERLAP_MINUTES` (10), `HUBSPOT_OPP_SYNC_SEND_EMAILS` (true).
 
+## Apriora: las 6 preguntas obligatorias de screening
+
+El botón **Create Job in Apriora** de `docs/opportunity-detail.html` (pestaña Job Description)
+crea la entrevista vía `POST /opportunities/<id>/alex/create_position`. Toda entrevista creada
+desde el Hub lleva 6 preguntas fijas de screening + el criterio de inglés C1. La definición
+única está en **`backend/utils/alex.py::APRIORA_SCREENING_QUESTIONS`**: de ahí salen el template
+de Apriora, el fallback por `additionalQuestions` y la verificación posterior. Tocar una lista y
+no la otra es el error a evitar.
+
+**`additionalQuestions` es una sugerencia, no un mandato.** La doc de Apriora lo dice literal
+("optional free-text questions to *append* to the generated interview") y se comprobó contra las
+31 positions que creó el Hub: las reescribe (la opp 799 preguntó "Are you *currently*
+participating in other *hiring* processes?"), las intercala aunque se mande
+`intelligentlyOrderQuestions=false` (la opp 800 las tiene en las posiciones 1, 2, 3, 6, 7 y 9), y
+**a veces dropea una**: la opp 792 quedó sin la de la computadora propia en sus 10 entrevistas.
+Es a nivel del guion generado, no algo que Alex saltee por tiempo — todos los candidatos de una
+position reciben exactamente las mismas preguntas.
+
+Por eso el camino bueno es un **interview guide template** (`POST /templates`), donde las
+preguntas son parte del guion y no sugerencias:
+
+```bash
+cd backend
+python scripts/create_apriora_template.py            # dry-run: imprime el payload
+python scripts/create_apriora_template.py --apply    # lo crea
+```
+
+El id que devuelve va a la env **`APRIORA_TEMPLATE_ID`** (`backend/.env` **y** App Runner).
+Sin esa env el Hub sigue por el camino viejo, así que un deploy sin setearla no rompe nada —
+pero tampoco arregla nada.
+
+Tres cosas que no son obvias:
+
+- **`/templates` sólo tiene GET y POST.** No hay PATCH ni DELETE, y el `name` es único por
+  company. Cambiar una pregunta = template nuevo con otro nombre + repuntar la env. Lo mismo
+  vale para las positions: `createJob` rechaza `externalJobId` duplicado y no existe update, así
+  que una entrevista mal generada sólo se arregla **borrándola a mano en la UI de Apriora** y
+  volviéndola a crear desde el botón.
+- **Con template no se manda `additionalQuestions`** (se harían dos veces) ni se llama a
+  `append_grading_criteria()` sobre la JD: el C1 pasa a ser un `criteria` de verdad, con
+  `priority`, en vez de un bloque de texto pegado al final de la job description.
+- **`questionLimit` no se setea.** La doc dice que `0` "adds none beyond the template questions":
+  pondría en cero las preguntas del rol que Apriora genera desde la JD, que son el grueso de la
+  entrevista.
+
+### Verificar que efectivamente las hizo
+
+`GET /opportunities/<id>/alex/question_check` cruza las 6 contra lo que se preguntó de verdad y
+lo pinta un badge en la pestaña **Pipeline** (`#apriora-question-check`, lo llena `pipeline.js`).
+Dos caminos de match, porque hay dos generaciones de positions:
+
+- **Por tag**, exacto, para las creadas con el template: los nombres de los tags los fijamos
+  nosotros. **Un tag sin valor no cuenta**: Apriora lo crea igual y lo deja en `null` cuando la
+  pregunta no llegó a hacerse (la opp 776 tiene `US Citizenship = null` y en sus 14 preguntas no
+  hay ninguna de ciudadanía).
+- **Por texto** (regex sobre `questionSummary`) para las anteriores, calibrado contra las 31
+  positions reales. Sin template Apriora **se inventa el nombre del tag en cada entrevista** — la
+  misma pregunta salía como "Planned Absences", "Planned Time Off" y "Planned Vacations" — así
+  que ahí el tag no sirve de clave.
+
+Sólo se puede responder cuando hay **al menos una entrevista completada**: `questionSummary` no
+existe antes, y no hay ningún endpoint que devuelva el guion de una position. Como el guion es
+idéntico para todos los candidatos, con el primero alcanza — y conviene, porque arreglarlo
+implica rehacer la position. La respuesta se cachea en `app_cache` (1 h con entrevistas hechas,
+2 min sin ellas): `list_reports` no está cacheado y el de la opp 792 son 200 KB.
+
+### El fallo del createJob ya no es mudo
+
+`create_position` devuelve **202 antes de que arranque el hilo** que hace el `createJob` (Apriora
+tarda ~1-2 min). Hasta el 2026-09-16 la excepción moría en un `logging.warning` y
+`apriora-notifier.js` se rendía a los 8 minutos **sin decir nada**, con la lista de pendientes en
+`localStorage` (o sea que además moría al cerrar la pestaña). Resultado: la entrevista nunca
+creada parecía estar generándose para siempre. Así fue como la opp 790 terminó cargada a mano en
+la UI de Apriora sin que nadie supiera que el botón había fallado.
+
+Ahora cada intento queda en **`apriora_job_creations`** (`pending` → `ok` | `error`, se autocrea
+con `CREATE TABLE IF NOT EXISTS`, sin migración a mano), `GET /opportunities/<id>/alex/create_status`
+la expone, y el notificador muestra el error real de Apriora en vez de callarse.
+
+Contexto que conviene tener a mano: de las **348 positions** que hay en Apriora sólo **31** tienen
+`externalJobId`, o sea salieron del Hub. Las otras 317 se crearon a mano en la UI y promedian
+**2 de 6** preguntas obligatorias. El template las arregla sólo si la recruiter lo elige al crear
+la job, o si se lo pone como default de la company — y eso se hace en Apriora, no acá.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):

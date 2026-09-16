@@ -155,6 +155,36 @@
     } catch (e) {}
   }
 
+  function announceFailed(item, message) {
+    const name = item.name || 'La entrevista';
+    // Persistente (duration:0): un fallo no se puede perder. Antes esto no existía
+    // — el polling se rendía a los 8 minutos "sin ruido" y la entrevista nunca
+    // creada parecía estar todavía generándose. Así terminó la opp 790 cargada a
+    // mano en Apriora sin que nadie supiera que el botón había fallado.
+    // El mensaje de AlexError trae el body entero de la respuesta de Apriora, que
+    // puede ser kilobytes: en el toast entra recortado.
+    const short = String(message || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const detail = short ? ` (${short})` : '';
+    toast(`No se pudo crear "${name}" en Apriora${detail}`, {
+      duration: 0, icon: '⚠️', accent: 'linear-gradient(180deg,#f59e0b,#d97706)', sound: false
+    });
+    browserNotify(`No se pudo crear "${name}" en Apriora`);
+  }
+
+  // Cómo salió el createJob del lado del backend. Devuelve 'pending' | 'ok' |
+  // 'error' | 'unknown' — 'unknown' es lo normal para creaciones anteriores a que
+  // existiera la bitácora, y ahí no se asume nada.
+  async function createStatus(oppId) {
+    try {
+      const res = await fetch(
+        `${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/create_status`,
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) { return null; }
+  }
+
   async function isReady(oppId) {
     // Está lista cuando la position ya existe en Apriora (matched=true).
     // ?fresh=1 => el backend saltea su cache de 60s y la detecta al instante.
@@ -182,11 +212,23 @@
         try { ready = await isReady(item.oppId); } catch (e) {}
         if (ready) {
           announceReady(item);
-        } else if (now - (item.startedAt || 0) > GIVE_UP_MS) {
-          // se venció el tiempo de espera: dejar de vigilar (sin ruido).
-        } else {
-          still.push(item);
+          continue;
         }
+        // No está lista: preguntar si directamente falló, en vez de seguir
+        // esperando algo que no va a llegar.
+        const st = await createStatus(item.oppId);
+        if (st && st.status === 'error') {
+          announceFailed(item, st.error);
+          continue;
+        }
+        if (now - (item.startedAt || 0) > GIVE_UP_MS) {
+          // Se venció la espera sin position y sin error registrado: tampoco se
+          // calla, porque el resultado para la recruiter es el mismo (no hay
+          // entrevista) y es justo el caso que antes se perdía.
+          announceFailed(item, st && st.status === 'pending' ? 'sigue sin aparecer en Apriora' : '');
+          continue;
+        }
+        still.push(item);
       }
       writePending(still);
     } finally {

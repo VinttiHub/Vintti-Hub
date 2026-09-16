@@ -1185,6 +1185,63 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
     });
   }
 
+  // ✅ ¿Apriora hizo las 6 preguntas obligatorias de screening?
+  // Hace falta porque las puede dropear al generar el guion: la opp 792 quedó sin
+  // la de la computadora propia y las 10 entrevistas salieron así. No se puede
+  // editar una position ya creada, sólo borrarla y rehacerla, o sea que conviene
+  // verlo apenas termina el primer candidato.
+  const qcheckEl = document.getElementById('apriora-question-check');
+  if (qcheckEl) {
+    const QCHECK_LABELS = {
+      salary_expectation_usd: 'expectativa salarial en USD',
+      vacations_planned: 'vacaciones planeadas',
+      refs_and_resignation_ok: 'referencias y carta de renuncia',
+      other_processes: 'otros procesos',
+      own_computer: 'computadora propia',
+      us_citizen: 'ciudadanía de EE.UU.',
+    };
+
+    const renderQuestionCheck = (d) => {
+      // Sin entrevistas completadas no hay nada que mirar: `questionSummary` sólo
+      // existe cuando el candidato termina.
+      if (!d || d.configured === false || !d.matched || !d.reports) return;
+
+      const missing = d.missing || [];
+      qcheckEl.hidden = false;
+      qcheckEl.classList.toggle('is-ok', missing.length === 0);
+      qcheckEl.classList.toggle('is-missing', missing.length > 0);
+
+      if (!missing.length) {
+        qcheckEl.innerHTML =
+          `<span aria-hidden="true">✅</span><span>Apriora hizo las <b>${d.total}</b> preguntas ` +
+          `obligatorias de screening <span class="apriora-qcheck-hint">Verificado sobre ` +
+          `${d.reports} entrevista${d.reports === 1 ? '' : 's'} completada${d.reports === 1 ? '' : 's'}.</span></span>`;
+        return;
+      }
+
+      const faltan = missing.map(k => QCHECK_LABELS[k] || k).join(', ');
+      qcheckEl.innerHTML =
+        `<span aria-hidden="true">⚠️</span><span>Apriora hizo <b>${d.asked} de ${d.total}</b> ` +
+        `preguntas obligatorias. Falta: <b>${faltan}</b>.` +
+        `<span class="apriora-qcheck-hint">Quedó así al generarse la entrevista y no se puede ` +
+        `editar: para corregirlo hay que borrar la position en Apriora y volver a crearla desde ` +
+        `el botón "Create Job in Apriora".</span></span>`;
+    };
+
+    (function loadQuestionCheck(tries) {
+      const el = document.getElementById('opportunity-id-text');
+      const oppId = (el?.getAttribute('data-id') || el?.textContent || '').trim();
+      if (!oppId || oppId === '—') {
+        if (tries > 0) setTimeout(() => loadQuestionCheck(tries - 1), 500);
+        return;
+      }
+      fetch(`${API_BASE}/opportunities/${encodeURIComponent(oppId)}/alex/question_check`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(renderQuestionCheck)
+        .catch(() => {});
+    })(20);
+  }
+
 }); //  cierre del DOMContentLoaded
 
 // Iniciales del nombre de la account ('Elevate Clinics' -> 'EC'). Igual que el

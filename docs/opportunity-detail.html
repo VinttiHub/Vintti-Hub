@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260911-hs-closedwin" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260916-qcheck" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -386,6 +386,13 @@
             >🔄 Traer de Apriora</button>
             <span id="interviewed-count-status" class="interview-count-status"></span>
           </div>
+
+          <!-- Verificación de las 6 preguntas obligatorias de screening. Apriora
+               puede dropear alguna al generar el guion (la opp 792 quedó sin la de
+               la computadora propia en sus 10 entrevistas) y no hay forma de
+               editarla después: se arregla borrando y recreando la position. Por
+               eso conviene verlo con el primer candidato. Lo pinta pipeline.js. -->
+          <div id="apriora-question-check" class="apriora-qcheck" hidden></div>
 
           <button id="pipelineAddCandidateBtn">+ Add Candidate</button>
         </div>
@@ -1093,8 +1100,8 @@
 
   <!-- Your app bundles -->
   <script src="./assets/js/rich-comment-box.js" defer></script>
-  <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
-  <script src="./assets/js/pipeline.js?v=20260903-signoff-toggle" defer></script>
+  <script src="./assets/js/apriora-notifier.js?v=20260916-qcheck" defer></script>
+  <script src="./assets/js/pipeline.js?v=20260916-qcheck" defer></script>
   <script src="./assets/js/opportunity-detail.js?v=20260911-hs-closedwin" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 

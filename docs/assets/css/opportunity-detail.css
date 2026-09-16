@@ -4737,6 +4737,45 @@ input:checked + .slider::before {
   white-space: nowrap;
 }
 
+/* ✅ Verificación de las 6 preguntas obligatorias de screening.
+   Va en su propia fila (flex-basis 100%) porque cuando falta alguna el texto es
+   una frase, no una etiqueta. */
+.apriora-qcheck {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #dddddd;
+  background: #fafafa;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.apriora-qcheck[hidden] { display: none; }
+
+.apriora-qcheck.is-ok {
+  border-color: #c1ff72;
+  background: #f6ffe9;
+  color: #3a6b00;
+}
+
+.apriora-qcheck.is-missing {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.apriora-qcheck b { font-weight: 700; }
+
+.apriora-qcheck .apriora-qcheck-hint {
+  display: block;
+  margin-top: 2px;
+  opacity: .85;
+}
+
 /* Opcional: ocultar flechitas de number para que se vea más limpio */
 .pipeline-section #interviewed-count-input::-webkit-outer-spin-button,
 .pipeline-section #interviewed-count-input::-webkit-inner-spin-button {

@@ -81,6 +81,223 @@ def append_grading_criteria(jd_text, criteria=APRIORA_GRADING_CRITERIA):
     return f"{str(jd_text or '').rstrip()}\n\n" + "\n".join(lines)
 
 
+# ─── Screening obligatorio ────────────────────────────────────────────────────
+# Las 6 preguntas que lleva TODA entrevista creada desde el Hub. Definición
+# única: la usan el template de Apriora (scripts/create_apriora_template.py), el
+# fallback por `additionalQuestions` y la verificación posterior.
+#
+# Por qué un template y no `additionalQuestions`: la doc de Apriora llama a ese
+# campo "optional free-text questions to append to the generated interview", y
+# eso es exactamente lo que hace — las reescribe, las intercala aunque se mande
+# `intelligentlyOrderQuestions=false`, y a veces dropea una (la opp 792 perdió la
+# de la computadora propia en las 10 entrevistas). En un template las preguntas
+# son del guion, no sugerencias, y además admiten instrucciones por pregunta.
+#
+# `match` es para verificar contra entrevistas YA hechas, donde Apriora reescribió
+# el texto: los patrones están calibrados contra las 31 positions reales que creó
+# el Hub (de ahí "other hiring processes", "own laptop", etc.).
+APRIORA_SCREENING_QUESTIONS = [
+    {
+        "key": "salary_expectation_usd",
+        # "has a Independent contractor" era un error de tipeo. Hasta ahora Apriora
+        # lo corregía sola al reescribir la pregunta; con el template se hace
+        # textual, así que el arreglo tiene que estar acá. La corrección es la que
+        # venía usando Apriora en la práctica (ver la opp 792).
+        "content": (
+            "Having in mind that this position has an independent contractor status, "
+            "could you please tell me your Net Monthly Salary expectations in USD?"
+        ),
+        "interview_instructions": (
+            "Ask this question verbatim. If the candidate answers in another currency or "
+            "in annual terms, ask them to restate it as a net monthly amount in USD."
+        ),
+        "tag_name": "Net Monthly Salary Expectation (USD)",
+        "tag_instructions": (
+            "The net monthly amount in USD the candidate expects, as a number. Leave empty "
+            "if they refused or never gave a figure."
+        ),
+        "tag_options": None,
+        "match": r"salary expectation|monthly salary|salary\b.{0,20}\busd",
+    },
+    {
+        "key": "vacations_planned",
+        "content": (
+            "Do you have any vacations planned or some days you know that you are going to "
+            "be out of office?"
+        ),
+        "interview_instructions": "Ask this question verbatim.",
+        "tag_name": "Planned Time Off",
+        "tag_instructions": "Yes if the candidate mentioned any planned absence, No otherwise.",
+        "tag_options": ["Yes", "No"],
+        "match": r"vacation|time off|out of office|days off|unavailab",
+    },
+    {
+        "key": "refs_and_resignation_ok",
+        "content": (
+            "Just so you know, if you continue moving forward in the process, we'll be "
+            "asking for references and, at the final stage, a resignation letter. Are you "
+            "comfortable with both of these?"
+        ),
+        "interview_instructions": (
+            "Ask this question verbatim. It sets an expectation about our process, so the "
+            "wording matters — do not soften it or split it into two questions."
+        ),
+        "tag_name": "References and Resignation Letter",
+        "tag_instructions": "Yes if the candidate is comfortable with both, No otherwise.",
+        "tag_options": ["Yes", "No"],
+        "match": r"resignation|references and",
+    },
+    {
+        "key": "other_processes",
+        "content": "Are you participating in other processes?",
+        "interview_instructions": "Ask this question verbatim.",
+        "tag_name": "Other Hiring Processes",
+        "tag_instructions": "Yes if the candidate is in other hiring processes, No otherwise.",
+        "tag_options": ["Yes", "No"],
+        "match": r"other (hiring )?process|other interview|other opportunit",
+    },
+    {
+        "key": "own_computer",
+        "content": (
+            "Do you have your own computer to work? this is very important since you will "
+            "be working with your own computer"
+        ),
+        "interview_instructions": (
+            "Ask this question verbatim, even if the job description mentions that "
+            "equipment is provided — we hire independent contractors who use their own."
+        ),
+        "tag_name": "Own Computer",
+        "tag_instructions": "Yes if the candidate has their own working computer, No otherwise.",
+        "tag_options": ["Yes", "No"],
+        "match": r"own computer|own laptop|your computer|computer to work",
+    },
+    {
+        # Lleva el contexto adentro a propósito: una pregunta pelada — "Are you a
+        # USA Citizen?" — sonaba fuera de lugar en la entrevista.
+        "key": "us_citizen",
+        "content": (
+            "Because this position is hired as an independent contractor based outside the "
+            "United States, we are not able to move forward with candidates who hold U.S. "
+            "citizenship. Just so we can confirm \u2014 are you a U.S. citizen?"
+        ),
+        "interview_instructions": (
+            "Ask this question verbatim, including the explanation. It is a hard "
+            "requirement and the phrasing is deliberate \u2014 do not paraphrase it."
+        ),
+        "tag_name": "US Citizenship",
+        "tag_instructions": "Yes if the candidate is a U.S. citizen, No otherwise.",
+        "tag_options": ["Yes", "No"],
+        "match": r"citizen",
+    },
+]
+
+# Nombre del template en Apriora. Tiene que ser único por company y NO se puede
+# renombrar ni borrar por API (sólo hay GET y POST), así que un cambio en las
+# preguntas = template nuevo con otro nombre + repuntar APRIORA_TEMPLATE_ID.
+APRIORA_TEMPLATE_NAME = "Vintti Hub - Screening obligatorio"
+
+
+def screening_question_texts():
+    """Las 6 preguntas como lista de strings (campo `additionalQuestions`).
+    Es el camino de fallback, para cuando no hay APRIORA_TEMPLATE_ID seteada."""
+    return [q["content"] for q in APRIORA_SCREENING_QUESTIONS]
+
+
+def build_template_payload(name=None):
+    """Body de `POST /templates`: las 6 preguntas obligatorias + el criterio de
+    inglés C1 + un tag por pregunta.
+
+    Dos decisiones que no son obvias:
+
+    - **`questionLimit` no se manda.** La doc dice que `0` "adds none beyond the
+      template questions": pondría en cero las preguntas del rol que Apriora
+      genera desde la job description, que son el grueso de la entrevista.
+    - **El criterio C1 viaja acá y no pegado a la JD.** `append_grading_criteria()`
+      existía porque `createJob` no tiene campo de rubric; un template sí.
+    """
+    return {
+        "name": name or APRIORA_TEMPLATE_NAME,
+        "language": "en",
+        "interviewCreationNotes": (
+            "The questions in this template are mandatory screening questions for every "
+            "Vintti role. Ask all of them, word for word, in addition to the questions "
+            "generated from the job description. Never drop, merge, shorten or rephrase "
+            "them, even if the job description seems to make one of them redundant."
+        ),
+        "additionalInterviewInstructions": (
+            "All candidates are hired as independent contractors based outside the United "
+            "States."
+        ),
+        "questions": [
+            {"content": q["content"], "interviewInstructions": q["interview_instructions"]}
+            for q in APRIORA_SCREENING_QUESTIONS
+        ],
+        "criteria": [
+            {"name": name_, "evaluationInstructions": instructions, "priority": "High"}
+            for name_, instructions in APRIORA_GRADING_CRITERIA
+        ],
+        "tags": [
+            {
+                "name": q["tag_name"],
+                "outputType": "string",
+                "instructions": q["tag_instructions"],
+                **({"outputOptions": q["tag_options"]} if q["tag_options"] else {}),
+            }
+            for q in APRIORA_SCREENING_QUESTIONS
+        ],
+    }
+
+
+def _norm_tag(value):
+    return " ".join(str(value or "").lower().split())
+
+
+def check_screening_questions(reports):
+    """¿Apriora hizo las 6 obligatorias? Devuelve una lista por pregunta con
+    `asked` y `how` ('tag' | 'text' | None).
+
+    Dos caminos porque hay dos generaciones de positions:
+
+    - **Por tag**, exacto, para las creadas con el template: los nombres de los
+      tags los fijamos nosotros.
+    - **Por texto** (regex sobre `questionSummary`) para las anteriores. Sin
+      template Apriora se inventa el nombre del tag en cada entrevista — la misma
+      pregunta salía como "Planned Absences", "Planned Time Off" y "Planned
+      Vacations" \u2014 así que ahí el tag no sirve de clave.
+
+    Alcanza con el primer reporte completado: el guion es el mismo para todos los
+    candidatos de la position (la 792 dio las mismas 13 preguntas en las 10
+    entrevistas). Igual se mira la unión, por si alguna se corta por tiempo.
+    """
+    asked_text = " || ".join(
+        str(q.get("question") or "")
+        for r in (reports or [])
+        for q in (r.get("questionSummary") or [])
+    ).lower()
+    # Un tag SIN valor no cuenta como preguntada: Apriora crea el tag igual y lo
+    # deja en null cuando la pregunta no llegó a hacerse. La opp 776 tiene
+    # "US Citizenship = null" y en las 14 preguntas no hay ninguna de ciudadanía.
+    tag_values = {}
+    for r in (reports or []):
+        for t in (r.get("tags") or []):
+            value = t.get("value")
+            if value in (None, "", "null"):
+                continue
+            tag_values.setdefault(_norm_tag(t.get("name")), value)
+
+    out = []
+    for q in APRIORA_SCREENING_QUESTIONS:
+        by_tag = _norm_tag(q["tag_name"]) in tag_values
+        by_text = bool(re.search(q["match"], asked_text))
+        out.append({
+            "key": q["key"],
+            "question": q["content"],
+            "tag_name": q["tag_name"],
+            "asked": by_tag or by_text,
+            "how": "tag" if by_tag else ("text" if by_text else None),
+        })
+    return out
+
 # Sufijos legales que no aportan a las iniciales (Elevate Clinics Inc -> EC).
 _INITIALS_SKIP = {"inc", "llc", "ltd", "corp", "co", "sa", "srl", "sas", "sl", "plc", "the"}
 
@@ -173,9 +390,22 @@ class AlexClient:
         payload = self._request("GET", "/reports", params={"positionId": position_id})
         return _extract_list(payload)
 
+    def list_templates(self, template_id=None):
+        """Interview guide templates de la company. `GET /templates` devuelve sólo
+        metadata (id, name, fechas, duración): las preguntas del template NO se
+        pueden leer por API, sólo en la UI de Apriora."""
+        params = {"id": template_id} if template_id else {}
+        return _extract_list(self._request("GET", "/templates", params=params))
+
+    def create_template(self, payload):
+        """Crea un interview guide template. El `name` tiene que ser único por
+        company y NO hay PATCH ni DELETE: cambiar una pregunta = template nuevo."""
+        return self._request("POST", "/templates", json=payload)
+
     def create_job(self, external_job_id, job_description, additional_questions=None,
                    intelligently_order_questions=False, active=None,
-                   additional_generation_context=None, job_title=None):
+                   additional_generation_context=None, job_title=None,
+                   template_id=None):
         """Crea una job (interviewer) en Apriora desde una job description.
         `external_job_id` debe ser único por company (usamos el opportunity_id del
         Hub, que además sirve para enlazar después por externalJobId).
@@ -186,6 +416,10 @@ class AlexClient:
         final en el orden dado (no las intercala Apriora).
         `additional_generation_context` sesga la generación de la entrevista (texto
         libre); lo usamos para reforzar los criterios de grading fijos.
+        `template_id` aplica un interview guide template (ver build_template_payload):
+        ahí las preguntas obligatorias son parte del guion y no sugerencias, así que
+        cuando viene NO hay que mandar también `additional_questions` — se harían dos
+        veces.
         Devuelve el dict de respuesta (payload = interviewerId)."""
         body = {
             "externalJobId": str(external_job_id),
@@ -193,6 +427,8 @@ class AlexClient:
         }
         if job_title:
             body["jobTitle"] = job_title
+        if template_id:
+            body["templateId"] = template_id
         if additional_questions:
             body["additionalQuestions"] = additional_questions
             # Enviar explícito para que NO reordene/intercale las preguntas extra.
