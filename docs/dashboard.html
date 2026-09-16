@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=122">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=123">
 </head>
 <body>
 
@@ -2827,6 +2827,97 @@
                       data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
                       data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
                 <span class="wrchan-bar__xy"><span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="ref_nda" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="ref_dd" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ============================================================
+           SQL → NDA Signed · TASA COMPUESTA (AE · ventana).
+           NO es una cohorte: es el producto de las dos cards de la izquierda,
+           (SQL → Deep Dive) × (Deep Dive → NDA Signed), por canal y total.
+           Cada factor viene de SU propia cohorte (paso 1 ancla en sql_meeting_date,
+           paso 2 en deep_dive_date), así que esta card NO tiene numerador ni
+           denominador propios — por eso abajo del número van los dos factores
+           ("100% × 65%") y no un "N / M". El detalle abre el cálculo paso a paso.
+           ============================================================ -->
+        <div class="card wrchan-card wrchan-card--compound wr-cyan setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">SQL → NDA Signed <span data-window-label>30d</span></h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-sql-ndasigned"
+                  aria-label="Ver detalle SQL a NDA Signed">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <!-- Total · gauge + los dos factores -->
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                    data-field="total_step1_pct" data-reduce="first" data-fmt="percent">—</span> ×
+              <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                    data-field="total_step2_pct" data-reduce="first" data-fmt="percent">—</span>
+            </span>
+          </div>
+
+          <!-- Desglose por origen -->
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="sales_step1_pct" data-reduce="first" data-fmt="percent">—</span>×<span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="sales_step2_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="mkt_step1_pct" data-reduce="first" data-fmt="percent">—</span>×<span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="mkt_step2_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="ref_step1_pct" data-reduce="first" data-fmt="percent">—</span>×<span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text" data-field="ref_step2_pct" data-reduce="first" data-fmt="percent">—</span></span>
               </span>
             </div>
           </div>
@@ -8942,6 +9033,55 @@
                    data-chart="sa_table_deepdive_to_nda_30d_detail" data-bind="dtable"
                    data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cliente|raw,opps|Opps|int,status|Estado|raw"
                    data-empty-text="Ningún SQL de la ventana llegó a Deep Dive."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · SQL → NDA Signed (compuesta) · <span data-window-label>30d</span> -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-ndasigned">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE's</span>
+            <h3 class="kpi-drawer__title">SQL → NDA Signed · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">El producto de los dos pasos: (SQL → Deep Dive) × (Deep Dive → NDA Signed). Cada paso tiene su propia cohorte, por eso la compuesta no tiene un N / M propio.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">SQL → NDA Signed · <span data-window-label>30d</span></span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="step1_num" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="step1_den" data-reduce="first" data-fmt="int">—</span> SQLs llegaron a Deep Dive ·
+                <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="step2_num" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_sql_to_ndasigned_30d" data-bind="text"
+                      data-field="step2_den" data-reduce="first" data-fmt="int">—</span> clientes con deep dive firmaron NDA
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">El cálculo, paso a paso</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_to_ndasigned_30d_steps" data-bind="dtable"
+                   data-cols="paso|Paso|raw,numerador|Numerador|int,denominador|Denominador|int,pct|%|percent"
+                   data-empty-text="Sin datos (M+B) en la ventana."></div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Paso 1 · SQLs de la ventana, por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_to_deepdive_30d_detail" data-bind="dtable"
+                   data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cliente|raw,status|Estado|raw"
+                   data-empty-text="Sin SQLs (M+B) en la ventana."></div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Paso 2 · Clientes con Deep Dive en la ventana, por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_deepdive_to_nda_30d_detail" data-bind="dtable"
+                   data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cliente|raw,opps|Opps|int,status|Estado|raw"
+                   data-empty-text="Sin deep dives (M+B) en la ventana."></div>
             </section>
           </div>
         </div>

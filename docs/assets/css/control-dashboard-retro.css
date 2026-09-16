@@ -4326,24 +4326,33 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .wr-magenta { --wr: #ff1fdb; }
 .wr-blue    { --wr: #003bff; }
 
-/* Fila del funnel — 3 arriba y 2 abajo, las 2 de abajo centradas. */
+/* Con 5 cards en la fila el contenido baja a ~215px: si las columnas fijas de
+   .wrchan-bar quedan en 56/58px, la barra se queda con ~55px y deja de leerse.
+   Se achican SOLO dentro del funnel — la card per Opportunity vive fuera de la fila
+   y conserva el espaciado original. */
+.funnel-row .wrchan-bar { grid-template-columns: 10px 42px 1fr 54px; gap: 9px; }
+/* Y el "Ver detalle" se partía en dos renglones sólo en la card de título más largo
+   (Deep Dive → NDA Signed), que quedaba distinta de las otras cuatro. */
+.funnel-row .skpi-tile__detail-btn { white-space: nowrap; }
+
+/* Card compuesta (SQL → NDA Signed): la línea de valor es "A%×B%", no "x/y". El peor
+   caso, "100%×100%", mide 71px, de ahí los 72 (medido en Chrome, no estimado). */
+.funnel-row .wrchan-card--compound .wrchan-bar { grid-template-columns: 10px 36px 1fr 72px; gap: 8px; }
+.wrchan-card--compound .wrchan-bar__xy { white-space: nowrap; }
+
+/* Fila del funnel — las 5 cards en una línea cuando entran.
+   auto-fit + minmax en vez de `repeat(5, 1fr)` con breakpoints a mano: el gauge
+   mide 168px fijos y con 26px de padding a cada lado la card no puede bajar de
+   220px sin que el semicírculo se salga. Medido en Chrome: con 5 columnas duras,
+   abajo de ~1230px de viewport el gauge desborda en las CINCO cards. El minmax lo
+   hace imposible — el navegador saca una columna antes de achicar de 220px. */
 .funnel-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   align-items: stretch;
 }
-.funnel-row > .card { grid-column: span 1; }                    /* 4 en una sola línea */
-@media (max-width: 980px) {
-  .funnel-row { grid-template-columns: repeat(2, 1fr); }
-  .funnel-row > .card,
-  .funnel-row > .card:nth-of-type(4) { grid-column: auto; }
-}
-@media (max-width: 620px) {
-  .funnel-row { grid-template-columns: 1fr; }
-  .funnel-row > .card,
-  .funnel-row > .card:nth-of-type(4) { grid-column: auto; }
-}
+.funnel-row > .card { grid-column: span 1; }
 /* Fila de una sola card (NDA Signed → Closed Win per opportunity): mismo grid de 4
    columnas que el funnel, así la card conserva el ancho de las de arriba. */
 .funnel-row--single { margin-top: 16px; }

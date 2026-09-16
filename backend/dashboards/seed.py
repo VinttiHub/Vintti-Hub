@@ -136,6 +136,8 @@ RESET_CHART_KEYS = {
         "sa_table_sql_to_deepdive_30d_detail",
         "sa_kpi_deepdive_to_nda_30d",
         "sa_table_deepdive_to_nda_30d_detail",
+        "sa_kpi_sql_to_ndasigned_30d",
+        "sa_table_sql_to_ndasigned_30d_steps",
         "sa_kpi_nda_to_clientwin_30d",
         "sa_table_nda_to_clientwin_30d_detail",
         "sa_kpi_sql_to_clientwin_30d",
@@ -1707,6 +1709,32 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 40, "w": 12, "h": 5},
         "sort_order": 90,
+    },
+    {
+        # Tasa COMPUESTA: (SQL→Deep Dive) x (Deep Dive→NDA Signed). No es una cohorte,
+        # no tiene N/M propio — la card muestra los dos factores.
+        "chart_key": "sa_kpi_sql_to_ndasigned_30d",
+        "tab_key": "sales",
+        "title": "SQL → NDA Signed por canal, per client (compuesta) - 30d",
+        "type": "kpi",
+        "dataset_key": "sql_to_ndasigned_30d",
+        "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
+        "position": {"x": 0, "y": 40, "w": 12, "h": 4},
+        "sort_order": 89.5,
+    },
+    {
+        "chart_key": "sa_table_sql_to_ndasigned_30d_steps",
+        "tab_key": "sales",
+        "title": "SQL → NDA Signed - Cálculo paso a paso 30d",
+        "type": "table",
+        "dataset_key": "sql_to_ndasigned_30d_steps",
+        "config": {
+            "mapping": {
+                "columns": ["paso", "numerador", "denominador", "pct"],
+            },
+        },
+        "position": {"x": 0, "y": 40, "w": 12, "h": 3},
+        "sort_order": 89.6,
     },
     {
         "chart_key": "sa_kpi_nda_to_clientwin_30d",
