@@ -339,6 +339,14 @@ def _ensure_hubspot_opportunity_columns(cursor):
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_hire_applied_at TIMESTAMPTZ")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+    # Los 2 links de grabacion. En prod ya existen (son los inputs de Opportunity
+    # Detail); esto es solo para que arranque un entorno nuevo. A proposito NO van
+    # en _HUBSPOT_OPPORTUNITY_COLUMNS: esa tupla la mira
+    # _hubspot_opportunity_schema_is_ready, y si le falta una columna el dry run
+    # corre con schema_ready=False, que apaga _load_opportunity_by_deal entero y
+    # hace parecer que la migracion se desaplico.
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS first_meeting_recording TEXT")
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deepdive_recording TEXT")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_opportunity_hubspot_deal_id
@@ -2592,7 +2600,8 @@ def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
 _OPP_BASE_COLUMNS = """opportunity_id, account_id, opp_stage, opp_position_name, opp_model,
                deep_dive_date, nda_sent_date, nda_signature_or_start_date,
                min_budget, max_budget, min_salary, max_salary, years_experience,
-               fee, expected_fee"""
+               fee, expected_fee,
+               first_meeting_recording, deepdive_recording"""
 _OPP_HUBSPOT_COLUMNS = """,
                hubspot_setup_fee, hubspot_final_fee, hubspot_final_salary,
                hubspot_role_hired, hubspot_mkt_collab"""
@@ -2655,6 +2664,45 @@ def _apply_business_fields(cursor, opportunity_id, business, opp_row, dry_run):
         list(faltantes.values()) + [opportunity_id],
     )
     return faltantes
+
+
+def _apply_recording_fields(cursor, opportunity_id, recordings, opp_row, dry_run):
+    """Completa los 2 links de grabacion con lo que traiga HubSpot.
+
+    Hermana de _apply_business_fields y no un parametro mas de aquella, porque la
+    condicion de "esta vacio" es DISTINTA: estas dos columnas son varchar y el
+    blur del input de Opportunity Detail guarda '' cuando lo dejas en blanco, asi
+    que hay 276 opps con first_meeting_recording = '' y 71 con deepdive_recording
+    = ''. Un `is None` las leeria como "ya cargado" y no escribiria nunca.
+
+    Mismo criterio que el resto del sync: NUNCA pisa lo que ya hay (una de esas
+    columnas llego a tener un transcript de 29 KB pegado a mano) y no toca las
+    opps creadas desde el modal (hubspot_deal_id NULL).
+    """
+    faltantes = {
+        column: value
+        for column, value in recordings.items()
+        if not str((opp_row or {}).get(column) or "").strip()
+    }
+    if not faltantes or dry_run:
+        return faltantes
+    # NULLIF ademas del COALESCE: del lado del SQL el '' tampoco cuenta como cargado.
+    sets = ", ".join(f"{col} = COALESCE(NULLIF({col}, ''), %s)" for col in faltantes)
+    cursor.execute(
+        f"UPDATE opportunity SET {sets}, hubspot_synced_at = NOW() "
+        f"WHERE opportunity_id = %s AND NULLIF(hubspot_deal_id, '') IS NOT NULL",
+        list(faltantes.values()) + [opportunity_id],
+    )
+    return faltantes
+
+
+def _recordings_para_reporte(faltantes):
+    """Los links se truncan: el reporte va al JSON de /last y al mail, y una de
+    estas columnas ya tuvo 29 KB de transcript pegado."""
+    return {
+        col: (valor[:120] + "…") if len(valor) > 120 else valor
+        for col, valor in faltantes.items()
+    }
 
 
 def _insert_opportunity_from_deal(cursor, values):
@@ -2741,6 +2789,11 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
     # Budget, salario, experiencia y fees esperados: HubSpot los pide al pasar a
     # NDA Sent, y son los mismos campos que el hub muestra en Opportunity Detail.
     business = hs_opps.business_fields_from_deal(props, opp_property_map)
+    # Los 2 links de grabacion (Intro Call / Deep Dive). Se aplican en cualquier
+    # stage, no solo en el que HubSpot los pide: el cron corre cada 30 min, asi que
+    # un deal puede saltar Deep Dive -> NDA Sent entre dos corridas, y el AE puede
+    # cargar el link tarde. Gatearlos por stage_key los perderia en silencio.
+    recordings = hs_opps.recording_fields_from_deal(props, opp_property_map)
 
     item = {
         "deal_id": deal_id,
@@ -2904,8 +2957,11 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             # La opp recien nacida tiene todo en NULL, asi que entra todo lo que
             # HubSpot tenga cargado.
             completados = _apply_business_fields(cursor, new_id, business, None, dry_run)
-            if completados:
-                item["campos_completados"] = completados
+            grabaciones = _apply_recording_fields(cursor, new_id, recordings, None, dry_run)
+            if completados or grabaciones:
+                item["campos_completados"] = dict(
+                    completados, **_recordings_para_reporte(grabaciones)
+                )
 
             try:
                 create_stage_todos(cursor, new_id, initial_stage)
@@ -2999,8 +3055,11 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             )
 
     completados = _apply_business_fields(cursor, opportunity_id, business, opp, dry_run)
-    if completados:
-        item["campos_completados"] = completados
+    grabaciones = _apply_recording_fields(cursor, opportunity_id, recordings, opp, dry_run)
+    if completados or grabaciones:
+        item["campos_completados"] = dict(
+            completados, **_recordings_para_reporte(grabaciones)
+        )
         changed = True
 
     # Los 5 campos de Closed Win, todos a columnas ESPEJO de `opportunity`.
@@ -3742,6 +3801,8 @@ def preview_hubspot_opportunities():
         role_property = opp_property_map.get("role_to_hire")
         setup_property = opp_property_map.get("setup_fee")
         final_property = opp_property_map.get("final_fee")
+        intro_rec_property = opp_property_map.get("intro_call_recording")
+        deep_rec_property = opp_property_map.get("deep_dive_recording")
 
         # 1) De donde sale cada columna del hub. Si algo dice resolved=false, ese
         #    campo va a entrar vacio y hay que mirar el nombre en HubSpot.
@@ -3765,6 +3826,16 @@ def preview_hubspot_opportunities():
                 "hubspot_property": final_property,
                 "hubspot_label": labels_by_name.get(final_property or ""),
                 "resolved": bool(final_property),
+            },
+            "first_meeting_recording": {
+                "hubspot_property": intro_rec_property,
+                "hubspot_label": labels_by_name.get(intro_rec_property or ""),
+                "resolved": bool(intro_rec_property),
+            },
+            "deepdive_recording": {
+                "hubspot_property": deep_rec_property,
+                "hubspot_label": labels_by_name.get(deep_rec_property or ""),
+                "resolved": bool(deep_rec_property),
             },
             "opp_sales_lead": {
                 "hubspot_property": "(el pipeline del deal)",
@@ -3794,7 +3865,14 @@ def preview_hubspot_opportunities():
             }
 
         # 2) Traer deals reales.
-        extra = [p for p in (role_property, model_property, setup_property, final_property) if p]
+        # Aca la lista se arma A MANO (en el sync sale sola de opp_property_map):
+        # si agregas una propiedad al mapa, acordate de sumarla tambien aca.
+        extra = [
+            p for p in (
+                role_property, model_property, setup_property, final_property,
+                intro_rec_property, deep_rec_property,
+            ) if p
+        ]
         extra.extend(pipeline_map["date_properties"])
         if only_deal_id:
             deals = [client.get_deal_with_associations(only_deal_id, extra_properties=extra)]
@@ -3912,6 +3990,21 @@ def preview_hubspot_opportunities():
                 "entraria_como": str(final_fee) if final_fee is not None else None,
                 "nota": "solo se escribe en Closed Won",
             })
+            # Los 2 links de grabacion. Se truncan porque uno de estos campos ya
+            # tuvo un transcript de 29 KB pegado en vez de un link.
+            for column, prop in (
+                ("first_meeting_recording", intro_rec_property),
+                ("deepdive_recording", deep_rec_property),
+            ):
+                raw = props.get(prop or "")
+                texto = str(raw).strip() if raw not in (None, "") else None
+                fields.append({
+                    "hub_column": column,
+                    "hubspot_property": prop,
+                    "valor_en_hubspot": (texto[:120] + "…") if texto and len(texto) > 120 else texto,
+                    "entraria_como": (texto[:120] + "…") if texto and len(texto) > 120 else texto,
+                    "nota": "solo si la columna del hub esta vacia (NULL o ''): nunca pisa",
+                })
 
             for field in fields:
                 _track(field["hub_column"], field["entraria_como"])

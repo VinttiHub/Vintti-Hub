@@ -184,6 +184,10 @@ OPPORTUNITY_FIELD_ALIASES = {
     ],
     "expected_fee": ["expected_fee", "Expected Fee"],
     "expected_setup_fee": ["expected_set_up_fee", "Expected Set Up Fee"],
+    # Los links de grabacion. HubSpot los pide al pasar a Deep Dive (el de la
+    # intro call) y al pasar a NDA Sent (el del deep dive). Son texto libre.
+    "intro_call_recording": ["intro_call_recording", "Intro Call Recording"],
+    "deep_dive_recording": ["deep_dive_recording", "Deep Dive Recording"],
 }
 
 # Campos de negocio que HubSpot carga en NDA Sent -> columna del hub.
@@ -752,6 +756,36 @@ def business_fields_from_deal(deal_props, property_map):
         parsed = parse_int((deal_props or {}).get(prop))
         if parsed is not None:
             values[column] = parsed
+    return values
+
+
+# Los 2 links de grabacion -> columna del hub. Son las mismas dos que la recruiter
+# ve en Opportunity Detail como "First Meeting Recording" y "Deep Dive Recording".
+# Ningun dataset del dashboard las lee.
+RECORDING_FIELD_TO_COLUMN = {
+    "intro_call_recording": "first_meeting_recording",
+    "deep_dive_recording": "deepdive_recording",
+}
+
+
+def recording_fields_from_deal(deal_props, property_map):
+    """{columna del hub: texto} con los links de grabacion que traiga HubSpot.
+
+    Texto libre, asi que NO pasa por parse_int como los campos de negocio: va por
+    la misma rama str().strip() que usa role_hired en closed_win_fields_from_deal.
+    Omite los vacios (None, '' y solo-espacios): un blanco de HubSpot no tiene por
+    que sobrescribir nada ni figurar en el reporte como si fuera un dato.
+    """
+    values = {}
+    props = deal_props or {}
+    for field, column in RECORDING_FIELD_TO_COLUMN.items():
+        prop = property_map.get(field)
+        if not prop:
+            continue
+        raw = props.get(prop)
+        texto = str(raw).strip() if raw not in (None, "") else ""
+        if texto:
+            values[column] = texto
     return values
 
 

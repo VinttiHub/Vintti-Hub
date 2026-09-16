@@ -1463,6 +1463,11 @@ def update_opportunity_fields(opportunity_id):
         'fee',
         'opp_comments',
         'first_meeting_recording',
+        # Estaba faltando desde que se agrego el input en docs/opportunity-detail.html:
+        # el blur PATCHeaba deepdive_recording, no matcheaba ninguna columna de esta
+        # lista y la respuesta era 400 "No valid fields provided", que el JS solo
+        # loguea. Resultado: 0 de 741 opps tenian el campo cargado.
+        'deepdive_recording',
         'opp_close_date',
         'opp_sales_lead',
         'opp_hr_lead',

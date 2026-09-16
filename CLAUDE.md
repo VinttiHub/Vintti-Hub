@@ -261,6 +261,31 @@ dataset lee `o.fee` (cuidado al grepear: `o\.fee` también matchea `ho.fee`).
 Ojo que `expected_set_up_fee` y `set_up_fee` son propiedades DISTINTAS de HubSpot
 (esperada en NDA Sent vs final en Closed Win) y van a columnas distintas.
 
+#### Los 2 links de grabación
+
+HubSpot los pide en otras dos transiciones, y son **texto libre**, no números:
+
+| HubSpot | Se pide al pasar a | Hub (input de Opportunity Detail) | Datasets |
+|---|---|---|---|
+| `intro_call_recording` ("Intro Call Recording") | Intro Call → **Deep Dive** | `first_meeting_recording` ("First Meeting Recording") | ninguno |
+| `deep_dive_recording` ("Deep Dive Recording") | Deep Dive → **NDA Sent** | `deepdive_recording` ("Deep Dive Recording") | ninguno |
+
+Las columnas ya existían en `opportunity` (`varchar` sin límite) — no hubo migración.
+Tres cosas que no son obvias:
+
+- **No se gatean por stage.** El cron corre cada 30 min, así que un deal puede saltar
+  Deep Dive → NDA Sent entre dos corridas, y el AE puede cargar el link tarde. Atarlos a
+  `stage_key` los perdería en silencio, así que entran en cualquier stage donde HubSpot
+  los tenga cargados.
+- **"Vacío" acá incluye el string vacío**, no sólo NULL: el `blur` del input de
+  Opportunity Detail guarda `''` cuando lo dejás en blanco, y había 276 opps con
+  `first_meeting_recording = ''`. Por eso van por `_apply_recording_fields()` y no por
+  `_apply_business_fields()` (que decide con `is None` y se las habría comido todas), y
+  el SQL usa `COALESCE(NULLIF(col,''), %s)`.
+- **Se truncan a 120 caracteres en el reporte.** Son campos de texto libre y alguien llegó
+  a pegar un transcript de 29 KB en vez de un link; entero reventaría el JSON de
+  `/sync/opportunities/last` y el mail.
+
 ### Retrocesos en HubSpot: se detectan, no se actúan
 
 `hs_v2_date_entered_<stage>` guarda la **última** entrada a esa etapa y **no se borra al
