@@ -1064,7 +1064,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   const API_BASE =
   (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : candidatesApiBase();
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const letsGoBtn =
     document.getElementById('ai-lets-go') ||
     document.getElementById('ai-submit') ||
@@ -1242,7 +1242,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   const API_BASE =
     (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
       ? 'http://127.0.0.1:5000'
-      : candidatesApiBase();
+      : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const cid = new URLSearchParams(location.search).get('id');
 
   // helpers tooltip
@@ -3285,7 +3285,7 @@ const REFERENCE_API_BASE = (() => {
   if (override) return override.replace(/\/$/, '');
   return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : candidatesApiBase();
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 })();
 
 const REFERENCE_RUNNING_LOCAL = REFERENCE_API_BASE.includes('127.0.0.1') || REFERENCE_API_BASE.includes('localhost');
