@@ -755,7 +755,7 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
     price_type = (hire_for_opp or {}).get("price_type")
     computer = (hire_for_opp or {}).get("computer")
 
-    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL])
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL, BAHIA_EMAIL])
     ok = _send_email(
         subject=f"🎉 Close Win: {ctx.get('candidate_name') or f'Candidate #{candidate_id}'} — Start {start_date or '—'}",
         html_body=_close_win_email_html(
@@ -787,12 +787,10 @@ def _send_closed_lost_email(cur, opportunity_id: int) -> Dict[str, Any]:
     if not _is_stage_closed_lost(ctx.get("opp_stage")):
         return {"sent": False, "reason": "stage_not_closed_lost", "opportunity_id": opportunity_id}
 
-    recipients = [AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL]
-    if (
-        str(ctx.get("motive_close_lost") or "").strip().lower() == "vinttis fault"
-        and str(ctx.get("opp_sales_lead") or "").strip().lower() == "mariano@vintti.com"
-    ):
-        recipients.append(BAHIA_EMAIL)
+    # Bahía va en TODOS los Closed Lost desde el 2026-09-17 (pedido de la owner).
+    # Antes entraba sólo si el motivo era "Vinttis fault" y el sales lead era
+    # Mariano; esa condición quedó sin efecto y por eso se sacó.
+    recipients = [AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL, BAHIA_EMAIL]
 
     to_list = _dedupe_emails(recipients)
     ok = _send_email(
