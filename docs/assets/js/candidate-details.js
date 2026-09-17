@@ -172,9 +172,12 @@ async function ensureCurrentOppId(candidateId, apiBase=candidatesApiBase()){
 window.__candidateOppsCache = window.__candidateOppsCache || Object.create(null);
 
 function candidatesApiBase(){
+  // OJO: acá va la URL literal. Es LA definición del helper, así que un
+  // candidatesApiBase() en la rama de producción se llama a sí mismo y tira
+  // RangeError, matando el script entero (pasó el 2026-09-17).
   return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : candidatesApiBase();
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 }
 
 // Nada en esta página cambia la relación candidato↔oportunidad, así que cachear
