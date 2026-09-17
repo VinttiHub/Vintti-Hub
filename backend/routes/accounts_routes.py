@@ -79,6 +79,31 @@ def _stage_keeps_hire(stage):
     return str(stage or "").strip().lower() in STAGES_KEEPING_HIRE
 
 
+def _maybe_push_stage_to_hubspot(opportunity_id, new_stage):
+    """Avisa a HubSpot que la opp llegó a Signed / Close Win. NUNCA levanta.
+
+    Es la única regla que importa acá: el stage ya se guardó en el hub y la persona
+    ya lo vio moverse. Si HubSpot está caído, si falta el scope de escritura o si el
+    deal no está atado, eso es un aviso — no un error que tire abajo el cambio de
+    stage, el Credit Loop ni el mail de cliente inactivo que ya corrieron.
+
+    Se importa adentro de la función a propósito: hubspot_routes construye el
+    cliente de HubSpot a partir de env vars que init_services() puebla, así que no
+    conviene amarrarlo en el import de este módulo.
+    """
+    try:
+        from utils import hubspot_push as hs_push
+        if not hs_push.hub_stage_to_stage_key(new_stage):
+            return None      # cualquier otro stage no viaja: no es noticia
+        from routes.hubspot_routes import _push_enabled, push_opportunity_to_hubspot
+        if not _push_enabled():
+            return {'pushed': False, 'reason': 'HUBSPOT_PUSH_ENABLED esta apagado'}
+        return {'pushed': True, 'resultado': push_opportunity_to_hubspot(opportunity_id)}
+    except Exception as exc:  # noqa: BLE001
+        logging.exception('HubSpot push fallo para la opp %s', opportunity_id)
+        return {'pushed': False, 'error': str(exc)}
+
+
 def _mark_signed_hire_active(cursor, opportunity_id):
     cursor.execute(
         """
@@ -1290,11 +1315,27 @@ def update_opportunity_stage(opportunity_id):
                 logging.exception('Failed to send client inactive email')
                 client_inactive_notice = {'sent': False, 'error': str(email_error)}
 
+        # Sync INVERSO: el hub le avisa a HubSpot que la opp llegó a Signed / Close Win.
+        #
+        # Va acá abajo, fuera del `with conn`, por las mismas dos razones que el mail:
+        # una llamada HTTP de hasta 30s (con reintentos de rate limit) adentro de la
+        # transacción dejaría el cambio de stage abierto todo ese rato, y un error de
+        # HubSpot haría rollback de un stage que la persona ya movió.
+        #
+        # Y además tiene que leer los montos DESPUÉS del commit: create_credit_for_close_win
+        # corre adentro de la transacción y el Credit Loop pisa ho.fee/ho.revenue
+        # (utils/credit_loop.py:867-902). Leyendo antes le mandaríamos a HubSpot un
+        # número que el hub ya no tiene.
+        hubspot_push_notice = None
+        if stage_changed:
+            hubspot_push_notice = _maybe_push_stage_to_hubspot(opportunity_id, new_stage)
+
         return jsonify({
             'success': True,
             'credit_loop_notice': credit_notice,
             'credit_loop_created': credit_created,
             'client_inactive_email_notice': client_inactive_notice,
+            'hubspot_push': hubspot_push_notice,
         }), 200
 
     except Exception as e:
@@ -1471,6 +1512,9 @@ def update_opportunity_fields(opportunity_id):
         # loguea. Resultado: 0 de 741 opps tenian el campo cargado.
         'deepdive_recording',
         'opp_close_date',
+        # Lo carga el popup de Close Win y es lo que el push le manda a HubSpot,
+        # donde la propiedad es obligatoria al cerrar el deal.
+        'mkt_collab',
         'opp_sales_lead',
         'opp_hr_lead',
         'hr_job_description',

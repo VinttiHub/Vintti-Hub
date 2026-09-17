@@ -1341,7 +1341,8 @@ def get_hire_opportunity(candidate_id):
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT opportunity_id, opp_model
+            SELECT opportunity_id, opp_model, opp_stage,
+                   NULLIF(hubspot_deal_id, '') AS hubspot_deal_id
             FROM opportunity
             WHERE candidato_contratado = %s
             ORDER BY opportunity_id DESC
@@ -1351,7 +1352,8 @@ def get_hire_opportunity(candidate_id):
         row = cur.fetchone()
         if not row:
             cur.execute("""
-            SELECT o.opportunity_id, o.opp_model
+            SELECT o.opportunity_id, o.opp_model, o.opp_stage,
+                   NULLIF(o.hubspot_deal_id, '') AS hubspot_deal_id
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             WHERE h.candidate_id = %s

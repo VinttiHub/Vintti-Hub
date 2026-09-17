@@ -145,7 +145,7 @@ function equipmentEmoji(name){
   return EQUIP_EMOJI[String(name).toLowerCase()] || '📦';
 }
 // === Helpers para crear salary_update desde inputs ==========================
-async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com', opportunityId=null){
+async function fetchHire(candidateId, apiBase=candidatesApiBase(), opportunityId=null){
   const url = new URL(`${apiBase}/candidates/${candidateId}/hire`);
   if (opportunityId) url.searchParams.set('opportunity_id', opportunityId);
   const r = await fetch(url.toString());
@@ -155,7 +155,7 @@ async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsa
 // global cache
 window.__currentOppId = null;
 
-async function ensureCurrentOppId(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function ensureCurrentOppId(candidateId, apiBase=candidatesApiBase()){
   if (window.__currentOppId) return window.__currentOppId;
   const r = await fetch(`${apiBase}/candidates/${candidateId}/hire_opportunity`);
   const data = await r.json();
@@ -174,7 +174,7 @@ window.__candidateOppsCache = window.__candidateOppsCache || Object.create(null)
 function candidatesApiBase(){
   return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    : candidatesApiBase();
 }
 
 // Nada en esta página cambia la relación candidato↔oportunidad, así que cachear
@@ -242,13 +242,13 @@ function ymdOf(v){
 // serializar, los dos leerían la lista ANTES de que el otro postee y ninguno
 // borraría la fila del otro: volvían los duplicados que esto viene a evitar.
 let _salaryUpdateChain = Promise.resolve();
-async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function createSalaryUpdateFromInputs(source, candidateId, apiBase=candidatesApiBase()){
   const run = _salaryUpdateChain.then(() => _createSalaryUpdateFromInputs(source, candidateId, apiBase));
   _salaryUpdateChain = run.catch(() => {});   // un fallo no puede cortar la cadena
   return run;
 }
 
-async function _createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function _createSalaryUpdateFromInputs(source, candidateId, apiBase=candidatesApiBase()){
   // Modelo confiable (API/caché), NO del pill crudo
   const modelLower = await ensureOppModelLower(candidateId, apiBase);
   const isRecruiting = (modelLower === 'recruiting');
@@ -369,7 +369,7 @@ for (const u of sameDay){
 // Modelo cacheado global para no depender del texto del pill
 window.__oppModelLower = ''; // 'staffing' | 'recruiting' | ''
 
-async function ensureOppModelLower(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function ensureOppModelLower(candidateId, apiBase=candidatesApiBase()){
   if (window.__oppModelLower) return window.__oppModelLower;
   try{
     const ho = await fetch(`${apiBase}/candidates/${candidateId}/hire_opportunity`).then(r=>r.json());
@@ -447,7 +447,7 @@ function calcRevenueForStaffing(salary, fee){
 }
 
 // Aplica un salary update al HIRE vía PATCH (respeta el modelo)
-async function patchHireFromUpdate(candidateId, update, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function patchHireFromUpdate(candidateId, update, apiBase=candidatesApiBase()){
   if (!candidateId || !update) return;
 
   const oppId = await ensureCurrentOppId(candidateId, apiBase); // 🔑
@@ -493,6 +493,100 @@ function hsMoney(n){
 // Guarda lo ultimo que devolvio /hire_opportunity para que el boton no tenga que
 // volver a pedirlo.
 window.__hubspotHireSuggestion = null;
+
+/* ——— Reenviar a HubSpot (sync inverso: hub -> HubSpot) ————————————————
+   El push automático se dispara con el CAMBIO DE STAGE. Al pasar a Signed, el
+   popup mueve el stage ANTES de que se carguen salary/fee/setup fee, así que esos
+   valores no viajan solos: en producción los levanta la pasada del cron a los ~30
+   min, y en local no corre nada. Este botón hace lo mismo, ahora.
+
+   Sólo aparece cuando la opp está en Signed o Close Win, que son los dos únicos
+   stages que el hub empuja. */
+/* Nombre interno de HubSpot -> cómo se llama para una persona. Sin esto el aviso
+   decía "candidates_final_salary, set_up_fee, dealstage", que no le dice nada a
+   quien está cargando el hire. */
+const HS_CAMPO_LEGIBLE = {
+  candidates_final_salary: 'Salary',
+  final_fee: 'Fee',
+  set_up_fee: 'Set Up Fee',
+  price_type: 'Price Type',
+  computer: 'Computer',
+  candidates_start_date: 'Start Date',
+  candidates_end_date: 'End Date',
+  candidates_address: 'Address',
+  dni: 'DNI',
+  candidates_location: 'Location',
+  role_hired_deal: 'Role Hired',
+  mkt_collab: 'MKT Collab',
+  closedate: 'Close Date',
+  dealstage: 'Stage'
+};
+
+function nombresLegibles(props){
+  return Object.keys(props || {}).map(k => HS_CAMPO_LEGIBLE[k] || k);
+}
+
+/* El banner aparece si la vacante VINO DE HUBSPOT (tiene deal atado), sin mirar el
+   stage. Antes miraba opp_stage y no se veía al llegar recién desde el popup de
+   Signed. Si el stage no es de los que viajan, el backend lo explica al apretar. */
+function mostrarBotonPushHubspot(oppData){
+  const box = document.getElementById('hubspot-push');
+  if (!box) return;
+  box.hidden = !oppData?.hubspot_deal_id;
+  const msg = document.getElementById('hubspot-push-msg');
+  if (msg) { msg.hidden = true; msg.textContent = ''; }
+}
+
+function pintarMsgPush(texto, tipo){
+  const msg = document.getElementById('hubspot-push-msg');
+  if (!msg) return;
+  msg.className = 'hs-sync-msg' + (tipo ? ' is-' + tipo : '');
+  msg.textContent = texto;
+  msg.hidden = !texto;
+}
+
+async function reenviarAHubspot(apiBase){
+  const oppId = window.__currentOppId;
+  const btn = document.getElementById('hubspot-push-btn');
+  if (!oppId) { pintarMsgPush('Esta contratación no está asociada a ninguna vacante.', 'err'); return; }
+  const textoOriginal = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  pintarMsgPush('', null);
+  try {
+    const res = await fetch(`${apiBase}/hubspot/push/opportunity/${encodeURIComponent(oppId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // El 409 es el caso esperable "el push está apagado": se explica, no se grita.
+      const detalle = res.status === 409
+        ? 'El envío a HubSpot está desactivado en este entorno.'
+        : (data?.error || `No se pudo enviar (error ${res.status}).`);
+      pintarMsgPush(detalle, res.status === 409 ? 'warn' : 'err');
+      return;
+    }
+    const r = data.resultado || {};
+    const campos = nombresLegibles(r.properties);
+    if (r.accion === 'escrito') {
+      pintarMsgPush(`Listo. Se actualizó en HubSpot: ${campos.join(', ')}.`, 'ok');
+    } else if (r.accion === 'sin_cambios') {
+      pintarMsgPush('HubSpot ya tiene estos mismos datos, no hizo falta cambiar nada.', 'ok');
+    } else if (r.motivo && /hubspot_deal_id/.test(r.motivo)) {
+      pintarMsgPush('Esta vacante no está vinculada a ningún deal de HubSpot.', 'warn');
+    } else if (r.motivo && /solo Signed y Close Win/.test(r.motivo)) {
+      pintarMsgPush(`Los datos viajan a HubSpot recién en Signed o Close Win (esta vacante está en ${r.opp_stage || 'otro stage'}).`, 'warn');
+    } else {
+      pintarMsgPush(r.motivo || 'No se envió nada.', 'warn');
+    }
+  } catch (err) {
+    console.error('Enviar a HubSpot falló:', err);
+    pintarMsgPush('No se pudo conectar con el servidor.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+  }
+}
 
 function renderHubspotHireSuggestion(oppData, hireData){
   const panel  = document.getElementById('hubspot-hire-suggestion');
@@ -643,7 +737,7 @@ async function applyHubspotHireSuggestion(candidateId, apiBase){
   if (typeof window.loadHireData === 'function') window.loadHireData();
 }
 
-async function syncHireFromLatestSalaryUpdate(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+async function syncHireFromLatestSalaryUpdate(candidateId, apiBase=candidatesApiBase()){
   if (!candidateId) return;
   try {
     // 1) updates y último
@@ -967,7 +1061,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   const API_BASE =
   (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    : candidatesApiBase();
   const letsGoBtn =
     document.getElementById('ai-lets-go') ||
     document.getElementById('ai-submit') ||
@@ -1145,7 +1239,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   const API_BASE =
     (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
       ? 'http://127.0.0.1:5000'
-      : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+      : candidatesApiBase();
   const cid = new URLSearchParams(location.search).get('id');
 
   // helpers tooltip
@@ -1931,7 +2025,7 @@ async function patchHireFields(fields = {}, options = {}) {
     { opportunity_id: oppId }
   );
 
-  const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+  const r = await fetch(`${candidatesApiBase()}/candidates/${candidateId}/hire`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -2098,7 +2192,7 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
   })();
 
   // --- Overview: cargar datos del candidato ---
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
+  fetch(`${candidatesApiBase()}/candidates/${candidateId}`)
     .then(r => r.json())
     .then(data => {
       candidateOverviewData = data;
@@ -2134,7 +2228,7 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
       // === Address & DNI (tabla candidates, pestaña Hire) ===
       const hireAddressInput = document.getElementById('hire-address');
       const hireDniInput     = document.getElementById('hire-dni');
-      const API_CANDIDATES   = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+      const API_CANDIDATES   = candidatesApiBase();   // detecta localhost; antes iba siempre a producción
       const timezoneSelect = document.getElementById('timezoneSelect');
       const timezoneTrigger = document.getElementById('timezoneTrigger');
       const timezoneTriggerLabel = document.getElementById('timezoneTriggerLabel');
@@ -2272,7 +2366,7 @@ function paintWaBtn(){
         if (el.tagName === 'SELECT') {
           if (value) el.value = value;
           el.addEventListener('change', () => {
-            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+            fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ [fieldName]: el.value })
@@ -2284,7 +2378,7 @@ function paintWaBtn(){
           el.contentEditable = "true";
           el.addEventListener('blur', () => {
             const updated = el.innerText.trim();
-            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+            fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ [fieldName]: updated })
@@ -2387,7 +2481,7 @@ function paintWaBtn(){
           usStateInput.classList.remove('input-error');
           if (usStateInput.setCustomValidity) usStateInput.setCustomValidity('');
         }
-        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+        fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ country: payloadValue })
@@ -2439,7 +2533,7 @@ function paintWaBtn(){
       const ensureCandidatePatch = (field, value) => {
         if (!candidateId) return;
         const payloadValue = value === undefined || value === null ? '' : value;
-        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+        fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [field]: payloadValue })
@@ -2541,7 +2635,7 @@ function shouldSyncCoresignal(candidate, candidateId) {
 const gate = shouldSyncCoresignal(data, candidateId);
 if (gate) {
   window.__coreSyncInFlight = true;
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, {
+  fetch(`${candidatesApiBase()}/coresignal/candidates/${candidateId}/sync`, {
     method: 'POST'
   })
   .then(async (r) => {
@@ -2573,7 +2667,7 @@ function renderEquipmentChips(items){
 
 async function loadEquipmentsForCandidate(cid){
   try{
-    const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${cid}/equipments`);
+    const r = await fetch(`${candidatesApiBase()}/candidates/${cid}/equipments`);
     const data = await r.json();
     renderEquipmentChips(data);
   } catch(e){
@@ -2610,7 +2704,7 @@ if (successDiv) {
   // Guardar al salir de foco
   successDiv.addEventListener('blur', () => {
     const html = successDiv.innerHTML.trim();
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+    fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
       method: 'PATCH',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ candidate_succes: html })
@@ -2625,7 +2719,7 @@ if (successDiv) {
     .catch(err => console.error('❌ Error fetching candidate:', err));
 
   // Ocultar pestaña Hire si no está contratado
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/is_hired`)
+  fetch(`${candidatesApiBase()}/candidates/${candidateId}/is_hired`)
     .then(res => res.json())
   .then(d => {
     const hireTab = document.querySelector('.tab[data-tab="hire"]');
@@ -2650,7 +2744,7 @@ if (successDiv) {
 
   // --- Salary Updates (Hire) ---
 (function salaryUpdatesSection(){
-  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API = candidatesApiBase();
   const cid = new URLSearchParams(location.search).get('id');
 
   const box   = document.getElementById('salary-updates-box');
@@ -2793,7 +2887,7 @@ if (save){
   const check = document.getElementById('resig-ref-check');
   if (!check) return;
 
-  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API  = candidatesApiBase();
   const cid  = new URLSearchParams(window.location.search).get('id');
   if (!cid) return;
 
@@ -3188,7 +3282,7 @@ const REFERENCE_API_BASE = (() => {
   if (override) return override.replace(/\/$/, '');
   return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:5000'
-    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    : candidatesApiBase();
 })();
 
 const REFERENCE_RUNNING_LOCAL = REFERENCE_API_BASE.includes('127.0.0.1') || REFERENCE_API_BASE.includes('localhost');
@@ -3887,7 +3981,7 @@ if (hireRevenue){
     });
 
     if (isRecruiting && revenueInput) {
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+      fetch(`${candidatesApiBase()}/candidates/${candidateId}/hire`)
         .then(res => res.json())
         .then(data => { revenueInput.value = data.employee_revenue_recruiting || ''; });
 
@@ -3909,7 +4003,7 @@ if (hireRevenue){
     // Se guarda para el .then de abajo: el panel de HubSpot necesita comparar lo que
     // dice el deal contra lo que ya tiene el hire.
     let hsOppData = null;
-    fetch(`${candidatesApiBase()}/candidates/${candidateId}/hire_opportunity`)
+    fetch(`${candidatesApiBase()}/candidates/${candidateId}/hire_opportunity`, { cache: 'no-store' })
       .then(res => res.json())
       .then(async (oppData) => {
         hsOppData = oppData;
@@ -3927,7 +4021,7 @@ if (hireRevenue){
           adaptHireFieldsByModel(model);
         }
 
-        return fetchHire(candidateId, 'https://7m6mw95m8y.us-east-2.awsapprunner.com', window.__currentOppId);
+        return fetchHire(candidateId, candidatesApiBase(), window.__currentOppId);
       })
       .then(data => {
         const salaryInput = document.getElementById('hire-salary');
@@ -3939,6 +4033,8 @@ if (hireRevenue){
         if (feeInput)    feeInput.value    = data.employee_fee    || '';
         try { renderHubspotHireSuggestion(hsOppData, data); }
         catch (err) { console.warn('No se pudo pintar la sugerencia de HubSpot', err); }
+        try { mostrarBotonPushHubspot(hsOppData); }
+        catch (err) { console.warn('No se pudo pintar el botón de push', err); }
         const priceType = document.getElementById('hire-price-type'); if (priceType) priceType.value = data.price_type || '';
         const comp = document.getElementById('hire-computer');      if (comp) comp.value = data.computer || '';
         const perks = document.getElementById('hire-extraperks');   if (perks) perks.innerHTML = data.extraperks || '';
@@ -4004,6 +4100,10 @@ if (hireRevenue){
   if (hsApplyBtn) {
     hsApplyBtn.addEventListener('click', () =>
       applyHubspotHireSuggestion(candidateId, candidatesApiBase()));
+  }
+  const hsPushBtn = document.getElementById('hubspot-push-btn');
+  if (hsPushBtn) {
+    hsPushBtn.addEventListener('click', () => reenviarAHubspot(candidatesApiBase()));
   }
   const hsReopen = document.querySelector('#hubspot-hire-reopen button');
   if (hsReopen) {
@@ -4253,7 +4353,7 @@ function wireVideoLinkDedupe() {
   const check = document.getElementById('resig-ref-check');
   if (!check) return;
 
-  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API  = candidatesApiBase();
   const cid  = new URLSearchParams(window.location.search).get('id');
 
   check.addEventListener('change', async () => {
@@ -4296,7 +4396,7 @@ function wireVideoLinkDedupe() {
   const params = new URLSearchParams(window.location.search);
   const candidateParam = params.get('id');
   const candidateId = candidateParam ? Number(candidateParam) : NaN;
-  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API  = candidatesApiBase();
 
   if (!candidateParam || Number.isNaN(candidateId)) {
     checkbox.disabled = true;
@@ -4448,7 +4548,7 @@ wireVideoLinkDedupe();
   if (window.__VINTTI_WIRED.cvWidgetOnce) return;
   window.__VINTTI_WIRED.cvWidgetOnce = true;
 
-  const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const apiBase = candidatesApiBase();
   const cid     = new URLSearchParams(window.location.search).get('id');
   const drop      = document.getElementById('cv-drop');
   const input     = document.getElementById('cv-input');
@@ -4591,7 +4691,7 @@ function render(items = []) {
   if (window.__VINTTI_WIRED.testsWidgetOnce) return;
   window.__VINTTI_WIRED.testsWidgetOnce = true;
 
-  const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const apiBase = candidatesApiBase();
   const cid = new URLSearchParams(window.location.search).get('id');
 
   const drop = document.getElementById('tests-drop');
@@ -4799,7 +4899,7 @@ function render(items = []) {
   if (window.__VINTTI_WIRED.resigWidgetOnce) return;
   window.__VINTTI_WIRED.resigWidgetOnce = true;
 
-  const apiBase   = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const apiBase   = candidatesApiBase();
   const cid       = new URLSearchParams(window.location.search).get('id');
 
   const drop      = document.getElementById('resig-drop');
@@ -5055,7 +5155,7 @@ if (clientBtn && candidateId) {
     setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
 
     try {
-      const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidate/${candidateId}/events`);
+      const r = await fetch(`${candidatesApiBase()}/resume-tracking/candidate/${candidateId}/events`);
       if (!r.ok) throw new Error('http ' + r.status);
       const data = await r.json();
       const events = (data && data.events) || [];
@@ -5086,7 +5186,7 @@ if (clientBtn && candidateId) {
     }
   };
 
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resume-tracking/candidate/${candidateId}`)
+  fetch(`${candidatesApiBase()}/resume-tracking/candidate/${candidateId}`)
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
       const count = (data && data.view_count) || 0;
@@ -5298,7 +5398,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
 }
 
 (function wireHireReminders(){
-  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API = candidatesApiBase();
   const cid = new URLSearchParams(location.search).get('id');
   if (!cid) return;
 

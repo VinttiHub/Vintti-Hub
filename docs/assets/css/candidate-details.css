@@ -6579,3 +6579,53 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   background: none; border: 0; padding: 0; cursor: pointer;
   font-size: .8rem; color: #6c38ff; text-decoration: underline;
 }
+
+/* Banner de sincronización con HubSpot en la solapa Hire (sync inverso).
+   Va fuera de .grid: adentro caía como una celda más entre los campos de plata. */
+.hs-sync {
+  border: 1px solid #dbe0ee;
+  border-left: 3px solid #ff7a59;      /* naranja HubSpot: identifica de qué es */
+  background: #fbfcff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 0 0 18px;
+}
+.hs-sync-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hs-sync-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hs-sync-title { font-size: 14px; font-weight: 600; color: #22283d; }
+.hs-sync-sub   { font-size: 12.5px; color: #6b7391; line-height: 1.35; }
+.hs-sync-btn {
+  flex: 0 0 auto;
+  border: 0;
+  background: #ff7a59;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .12s ease, opacity .12s ease;
+}
+.hs-sync-btn:hover:not(:disabled) { background: #f0603c; }
+.hs-sync-btn:disabled { opacity: .55; cursor: default; }
+.hs-sync-msg {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e8ecf7;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.hs-sync-msg.is-ok   { color: #1f7a48; }
+.hs-sync-msg.is-warn { color: #8a6d1f; }
+.hs-sync-msg.is-err  { color: #b3261e; }
+
+@media (max-width: 640px) {
+  .hs-sync-main { align-items: stretch; }
+  .hs-sync-btn  { width: 100%; }
+}

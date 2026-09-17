@@ -1065,7 +1065,7 @@ async function getCurrentUserId({ force = false } = {}) {
 
   // 2) Fast path: /users?email=
   try {
-    const fast = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users?email=${encodeURIComponent(email)}`);
+    const fast = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`);
     console.debug('[uid] /users?email status:', fast.status);
     if (fast.ok) {
       const arr = await fast.json(); // [] o [ { user_id, email_vintti, ... } ]
@@ -1083,7 +1083,7 @@ async function getCurrentUserId({ force = false } = {}) {
 
   // 3) Fallback: /users (full) y match por email
   try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
+    const res = await fetch(API_BASE + '/users');
     console.debug('[uid] /users status:', res.status);
     if (!res.ok) return null;
     const users = await res.json();
@@ -1413,7 +1413,7 @@ replacementCandidateInput?.addEventListener('input', debounce(async (e) => {
   const q = e.target.value.trim();
   if (q.length < 2) return; // avoid spam
   try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(q)}`);
+    const res = await fetch(`${API_BASE}/candidates?search=${encodeURIComponent(q)}`);
     const items = await res.json();
     replacementCandidatesList.innerHTML = '';
     items.forEach(({ candidate_id, name }) => {
@@ -1506,7 +1506,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
   }
   const onOppPage = !!document.getElementById('opportunityTableBody');
   if (onOppPage) {
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light')
+  fetch(API_BASE + '/opportunities/light')
     .then(response => response.json())
     .then(async data => {
 
@@ -1516,7 +1516,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
       await Promise.all(data.map(async opp => {
         if (opp.opp_stage === 'Sourcing') {
           try {
-            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opp.opportunity_id}/latest_sourcing_date`);
+            const res = await fetch(`${API_BASE}/opportunities/${opp.opportunity_id}/latest_sourcing_date`);
             const result = await res.json();
             if (result.latest_sourcing_date) {
               opp.latest_sourcing_date = result.latest_sourcing_date;
@@ -1640,7 +1640,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
                 referenceDate = new Date(opp.nda_signature_or_start_date);
               } else {
                 // 2) Fallback: pedirla al backend
-                const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
+                const res = await fetch(`${API_BASE}/opportunities/${oppId}/latest_sourcing_date`);
                 const result = await res.json();
                 if (result.latest_sourcing_date) {
                   referenceDate = new Date(result.latest_sourcing_date);
@@ -1985,7 +1985,7 @@ if (downloadCsvBtn) {
           const opportunityId = String(stageSelect?.dataset?.id || '');
           if (!opportunityId) return null;
           try {
-            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${encodeURIComponent(opportunityId)}`);
+            const res = await fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const detail = await res.json();
             return [opportunityId, detail];
@@ -3198,7 +3198,7 @@ document.addEventListener('change', async e => {
 
   try {
     // 1) Persistir en backend
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opp_sales_lead: newLead })
@@ -3238,7 +3238,7 @@ document.addEventListener('blur', async (e) => {
   if (newComment === original) return;
 
   try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [field]: newComment })
@@ -3613,7 +3613,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
   submitBtn?.setAttribute('disabled', 'disabled');
 
   try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
+    const res = await fetch(API_BASE + '/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -3809,7 +3809,7 @@ if (createOpportunityForm && createButton) {
     };
 
     try {
-      const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities', {
+      const response = await fetch(API_BASE + '/opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -3841,7 +3841,7 @@ if (createOpportunityForm && createButton) {
 }
 
 
-fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
+fetch(API_BASE + '/accounts')
   .then(response => response.json())
   .then(accounts => {
     const datalist = document.getElementById('accountList');
@@ -3855,13 +3855,13 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
   .catch(err => {
     console.error('Error loading accounts:', err);
   });
-fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+fetch(API_BASE + '/users')
   .then(response => response.json())
   .then(users => {
     const salesDropdown = document.getElementById('sales_lead');
     if (!salesDropdown) return;
 
-fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+fetch(API_BASE + '/users')
   .then(response => response.json())
   .then(users => {
     const salesDropdown = document.getElementById('sales_lead');
@@ -4053,7 +4053,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
   // visible después de elegir "Sourcing": overlay mientras tanto.
   showOppBusy('Loading opportunity…', 'Checking the current start date.');
 
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`)
+  fetch(`${API_BASE}/opportunities/${opportunityId}`)
     .then(res => {
       if (!res.ok) throw new Error(`GET /opportunities ${res.status}`);
       return res.json();
@@ -4075,7 +4075,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           showOppBusy('Moving to Sourcing…', 'Saving the start date and the new stage.');
 
           try {
-            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+            const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/fields`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ nda_signature_or_start_date: date })
@@ -4110,7 +4110,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           showOppBusy('Moving to Sourcing…', 'Saving the new sourcing round.');
 
           try {
-            const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/sourcing', {
+            const res = await fetch(API_BASE + '/sourcing', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -4202,7 +4202,7 @@ async function queryCandidates(term){
   if (cwAbort) cwAbort.abort();
   cwAbort = new AbortController();
 
-  const url = `https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(q)}`;
+  const url = `${API_BASE}/candidates?search=${encodeURIComponent(q)}`;
   const res = await fetch(url, { signal: cwAbort.signal });
   const data = await res.json();
   CW_CACHE.set(q, data || []);
@@ -4273,6 +4273,9 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
   const hireBox = document.getElementById('closeWinHireBox');
   const dateLabel = document.querySelector('label[for="closeWinDate"]');
   const dateInput = document.getElementById('closeWinDate');
+  const mktLabel = document.getElementById('closeWinMktLabel');
+  const mktBox = document.getElementById('closeWinMktBox');
+  const mktInputs = mktBox ? Array.from(mktBox.querySelectorAll('input[name="closeWinMkt"]')) : [];
   const hireInput = document.getElementById('closeWinHireInput');
   popup.style.display = 'flex';
 
@@ -4309,6 +4312,10 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
   if (hireBox) hireBox.style.display = showHire ? '' : 'none';
   if (dateLabel) dateLabel.style.display = isSignedMode ? 'none' : '';
   if (dateInput) dateInput.style.display = isSignedMode ? 'none' : '';
+  // MKT Collab sólo en Close Win: es lo que HubSpot pide al cerrar el deal.
+  if (mktLabel) mktLabel.style.display = isSignedMode ? 'none' : '';
+  if (mktBox) mktBox.style.display = isSignedMode ? 'none' : '';
+  mktInputs.forEach((i) => { i.checked = false; });
 
   if (showHire) {
     // inicializa autocomplete solo cuando se necesita seleccionar candidato
@@ -4338,6 +4345,12 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
         alert('Please select the hired candidate.');
         return;
       }
+      // Obligatorio igual que en HubSpot. Si no hubo colaboración, la opción es
+      // "No Collab": dejarlo vacío haría que el deal quede sin un campo requerido.
+      if (!mktInputs.some((i) => i.checked)) {
+        alert('Please select at least one MKT Collab option (use "No Collab" if there was none).');
+        return;
+      }
     }
 
     // Este flujo son 3-4 requests encadenados: es el más lento de todos.
@@ -4365,7 +4378,7 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
         });
 
         // 2) Asegurar hire_opportunity
-        const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+        const res2 = await fetch(`${API_BASE}/candidates/${candidateId}/hire`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ opportunity_id: Number(opportunityId) })
@@ -4390,7 +4403,7 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
       // patchOpportunityStage y los dos necesitan el candidato ya cargado.
       if (missingHire) {
         await patchOppFields(opportunityId, { candidato_contratado: cwSelectedId });
-        const hireRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${cwSelectedId}/hire`, {
+        const hireRes = await fetch(`${API_BASE}/candidates/${cwSelectedId}/hire`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ opportunity_id: Number(opportunityId) })
@@ -4398,9 +4411,12 @@ async function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signe
         if (!hireRes.ok) throw new Error(await hireRes.text());
       }
 
-      // Close Win: guardar fecha de cierre y cambiar stage
+      // Close Win: guardar fecha de cierre + MKT Collab, después cambiar stage.
+      // Van ANTES del cambio de stage porque el push a HubSpot se dispara dentro
+      // de patchOpportunityStage y lee estas dos columnas de la base.
       await patchOppFields(opportunityId, {
-        opp_close_date: date
+        opp_close_date: date,
+        mkt_collab: mktInputs.filter((i) => i.checked).map((i) => i.value).join(';')
       });
       await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
       logOpportunityTrack('saveCloseWin');
@@ -4443,7 +4459,7 @@ async function getHiredCandidateIdFromOpportunity(opportunityId) {
 }
 
 function loadCandidatesForCloseWin() {
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates')
+  fetch(API_BASE + '/candidates')
     .then(response => response.json())
     .then(candidates => {
       const datalist = document.getElementById('closeWinCandidates');
@@ -4473,7 +4489,7 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
   let errorMessage = null;
 
   try {
-    const response = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+    const response = await fetch(`${API_BASE}/opportunities/${opportunityId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opp_stage: newStage })
@@ -4576,7 +4592,7 @@ function closeCloseLostPopup() {
 }
 async function patchOppFields(oppId, payload) {
   console.log("📤 PATCH /opportunities/%s/fields", oppId, payload);
-  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+  const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)

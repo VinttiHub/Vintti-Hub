@@ -66,6 +66,30 @@ class HubSpotClient:
         payload = self._request("GET", f"/crm/v3/properties/{object_type}")
         return payload.get("results", [])
 
+    def update_deal(self, deal_id, properties):
+        """PATCH de propiedades de un deal. EL UNICO WRITE del repo hacia HubSpot.
+
+        Todo lo demas que habla con HubSpot lee (GET o POST /search). Este metodo
+        escribe, asi que:
+
+        - Necesita el scope `crm.objects.deals.write` en la app privada. Con el
+          token de solo lectura HubSpot devuelve 403 y `_request` levanta
+          HubSpotError; no falla en silencio.
+        - `_request` ya trae auth, timeout de 30s y el reintento de 429/502/503/504.
+          Ojo que ese reintento aplica tambien aca: el PATCH tiene que ser
+          idempotente (lo es, manda valores absolutos, no incrementos).
+        - Un dict vacio no se manda: seria un PATCH sin efecto que igual cuenta
+          contra el rate limit y ensucia el historial del deal.
+        """
+        if not deal_id:
+            raise HubSpotError("update_deal necesita un deal_id")
+        props = {k: v for k, v in (properties or {}).items() if v is not None}
+        if not props:
+            return {}
+        return self._request(
+            "PATCH", f"/crm/v3/objects/deals/{deal_id}", json={"properties": props}
+        )
+
     def get_deal_pipelines(self):
         """Catalogo de pipelines de deals con sus stages (id + label + displayOrder).
 

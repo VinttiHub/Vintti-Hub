@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260911-hs-hire3" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260917-apibase" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -841,6 +841,26 @@
 
     <!-- ===================== HIRE ===================== -->
     <div id="hire" class="tab-content" role="tabpanel" aria-labelledby="hire">
+
+      <!-- Banner de sincronización con HubSpot (sync inverso, hub -> HubSpot).
+           Va FUERA de .grid a propósito: adentro caía como una celda más entre los
+           campos de plata y quedaba ilegible.
+
+           Aparece cuando la vacante vino de HubSpot (tiene deal atado), sin mirar el
+           stage: al llegar acá recién desde el popup de Signed el push automático ya
+           salió, pero salió ANTES de que se cargaran estos campos, así que lo que se
+           escriba abajo no viaja hasta que alguien lo reenvíe o corra el cron. -->
+      <div id="hubspot-push" class="hs-sync" hidden>
+        <div class="hs-sync-main">
+          <div class="hs-sync-text">
+            <strong class="hs-sync-title">Sincronizar con HubSpot</strong>
+            <span class="hs-sync-sub">Los datos que cargues acá no se copian solos al deal.</span>
+          </div>
+          <button type="button" id="hubspot-push-btn" class="hs-sync-btn">Enviar a HubSpot</button>
+        </div>
+        <div id="hubspot-push-msg" class="hs-sync-msg" hidden></div>
+      </div>
+
       <div class="grid">
         <!-- Model pill (text updated by JS) -->
         <div id="opp-model-pill" class="pill">Model: —</div>
@@ -1303,7 +1323,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260911-hs-hire3"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260917-apibase"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

@@ -286,6 +286,20 @@ Tres cosas que no son obvias:
   a pegar un transcript de 29 KB en vez de un link; entero reventaría el JSON de
   `/sync/opportunities/last` y el mail.
 
+#### El sello `hubspot_pushed_at` se crea aparte, a propósito
+
+`_ensure_hubspot_opportunity_columns()` se **cortocircuita** si las columnas que ya conocía
+están presentes (`_hubspot_opportunity_schema_is_ready`), para no tomar un ACCESS EXCLUSIVE
+sobre `opportunity` antes de un loop de minutos. Consecuencia que costó una hora el 2026-09-16:
+una columna **nueva** agregada dentro de esa función **no se crea nunca** en un entorno donde el
+chequeo ya da True — o sea, en producción. El push escribía bien en HubSpot y después reventaba
+con `UndefinedColumn` al sellar, y como el disparo automático nunca levanta, el error se veía
+sólo en el campo `hubspot_push` de la respuesta.
+
+Por eso `hubspot_pushed_at` la crea `_ensure_push_columns()`, con su propio flag de proceso y su
+propia consulta al catálogo. Cualquier columna nueva que haga falta para el push va ahí, no en
+la otra.
+
 ### Retrocesos en HubSpot: se detectan, no se actúan
 
 `hs_v2_date_entered_<stage>` guarda la **última** entrada a esa etapa y **no se borra al
@@ -376,6 +390,113 @@ Env opcionales: `HUBSPOT_OPP_PIPELINE_IDS`, `HUBSPOT_OPP_STAGE_IDS`, `HUBSPOT_OP
 `HUBSPOT_OPP_SETUP_FEE_PROPERTY`, `HUBSPOT_OPP_FINAL_FEE_PROPERTY`,
 `HUBSPOT_OPP_SYNC_BOOTSTRAP` (default: 24 h atrás — un bootstrap ancho crearía una opp por cada
 deal histórico), `HUBSPOT_OPP_SYNC_OVERLAP_MINUTES` (10), `HUBSPOT_OPP_SYNC_SEND_EMAILS` (true).
+
+### La marca Vintti AI la decide el pipeline, no un checkbox
+
+`account.vintti_ai` sale ahora del **pipeline del deal**: si viene de *Vintti AI Pipeline*
+(`898243926`), el sync prende la marca. Antes dependía de una propiedad `vintti_ai` que en
+HubSpot vive en el **CONTACTO** y que casi nadie tilda — 3 cuentas de 344 —, así que las opps
+de Mia aparecían sin la insignia en Opportunities. El pipeline es el mismo dato del que ya
+sale `opp_sales_lead = mia@vintti.com`, o sea que era información que el sync ya tenía.
+
+Tres cosas para tener en cuenta:
+
+- **No es sólo la insignia de la tabla**: esa columna decide **qué logo sale en el CV que ve el
+  cliente** (`resume-readonly.js`, vía `candidates_routes.py:1206-1250`). Cambiarla es visible
+  para afuera.
+- **Sólo prende, nunca apaga.** Si un deal se mueve fuera del pipeline de AI, apagar la marca
+  cambiaría la marca de CVs ya enviados: eso lo decide una persona.
+- Se aplica en las dos ramas de `_process_hubspot_deal` (opp nueva y opp existente), porque las
+  9 opps del pipeline de AI son anteriores al cambio y nunca pasan por la rama de creación de
+  cuenta. Ojo que en la rama de opp existente va **después** de `changed = False`, o el reset se
+  come la marca.
+
+El fallback del frontend (`workspace.js: matchRecord`, "si no sé si es AI, mirá si el sales lead
+es mia@vintti.com") sigue siendo **código muerto**: la columna es `NOT NULL DEFAULT FALSE` y la
+query hace `COALESCE(a.vintti_ai, FALSE)`, así que nunca llega un `null` y el fallback no corre
+jamás. Se dejó así a propósito: ahora la marca la pone el sync, que es una sola fuente de verdad.
+
+### La URL de App Runner hardcodeada rompe TODA prueba local
+
+`docs/assets/js/main.js` define `API_BASE` con detección de localhost (línea ~875),
+pero hasta el 2026-09-17 tenía **23 fetch con la URL de App Runner escrita a mano**,
+incluidos los dos que más importan: `patchOpportunityStage()` y `patchOppFields()`.
+Lo mismo en `candidate-details.js` con `API_CANDIDATES`.
+
+El síntoma es cruel: la página corre en `localhost`, el backend local está levantado
+y **el request se va a producción igual**. Todo "funciona" —el stage cambia, el campo
+se guarda— pero lo atendió el código viejo de App Runner. Costó una tarde entera de
+debugging del sync inverso: el botón "Enviar a HubSpot" andaba (usa
+`candidatesApiBase()`) y el cambio de stage no (iba a prod), y parecía un problema de
+proceso local sin reiniciar.
+
+Ya están todos pasados a `${API_BASE}` / `candidatesApiBase()`. **Si agregás un fetch
+nuevo, usá la constante.** La única excepción a propósito es `SEND_EMAIL_ENDPOINT`:
+manda mails reales y no conviene que una prueba local los dispare por otra ruta.
+
+## Sync INVERSO: el hub escribe en HubSpot (Signed y Close Win)
+
+Todo lo de arriba va HubSpot → hub. Las **dos últimas etapas van al revés**: la recruiter mueve
+la opp a Signed en el hub, carga el hire en el hub, la pasa a Close Win, y el hub le empuja a
+HubSpot el stage y los montos.
+
+Por qué se dio vuelta: de los **33 deals en Closed Win, `set_up_fee`, `final_fee` y
+`candidates_final_salary` están cargados en 0** (medido 2026-09-16). Nadie los completa de ese
+lado porque la plata vive en el hub. Los dos de texto sí los carga una persona en HubSpot
+(`role_hired_deal` 26/33, `mkt_collab` 25/33) — de ahí que la política de pisado sea asimétrica:
+
+| Campo | Hub → HubSpot |
+|---|---|
+| `candidates_final_salary`, `final_fee`, `set_up_fee` | **el hub pisa siempre** |
+| `role_hired_deal` | sólo si HubSpot lo tiene vacío |
+| `mkt_collab` | **nunca se manda** — el hub no tiene ese dato |
+
+**`role_hired_deal` es el PUESTO, no la persona.** Los 26 valores cargados dicen "Accounts
+Payable", "Fund Accountant", "Operations Manager": ni uno es un nombre propio. Sale de
+`opp_position_name`, no de `candidates.name` (HubSpot no tiene identidad de candidato).
+
+`GET /hubspot/push/preview` muestra deal por deal qué se escribiría, **corre con el token de
+sólo lectura** y es lo que hay que mirar antes de prender nada. `GET /hubspot/push/scope` dice
+si el token puede escribir. `POST /hubspot/push/opportunity/<id>` (con `dry_run`) empuja una.
+
+Cinco cosas que no son obvias:
+
+- **Necesita el scope `crm.objects.deals.write`**, que se agrega a mano desde la UI de HubSpot
+  (app privada **36896335**, portal **23778741**) con una cuenta Super Admin. Sin él, HubSpot
+  devuelve 403 y no se escribe nada. `HubSpotClient.update_deal()` es **el único write del repo**
+  hacia HubSpot; todo lo demás lee.
+- **Apagado por defecto** (`HUBSPOT_PUSH_ENABLED`). Mover un deal a Closed Win puede disparar
+  workflows y notificaciones que ve todo ventas: no es algo que deba encenderse al deployar.
+- **El disparo va FUERA del `with conn:`** de `update_opportunity_stage`, igual que el mail de
+  cliente inactivo, y **nunca levanta**. Adentro, una llamada HTTP de 30s con reintentos dejaría
+  la transacción abierta y un error de HubSpot haría rollback de un stage que la persona ya
+  movió. Y tiene que leer los montos **después** del commit, porque el Credit Loop pisa
+  `ho.fee`/`ho.revenue` (`credit_loop.py:867-902`).
+- **No retrocede ni resucita.** `decide_push_stage()` es el espejo de `decide_stage_transition()`:
+  si HubSpot ya está igual o más adelante no toca el stage (los montos sí viajan igual), y si el
+  deal está en Closed Lost o DQL **no lo toca en absoluto** — moverlo desde ahí lo reabriría.
+- **Sólo alcanza a las opps con `hubspot_deal_id`.** Hoy son **7**: el hub tiene 358 opps en
+  Close Win pero sólo 6 atadas a un deal (más 1 en Signed). Las históricas nunca se ataron, así
+  que en la práctica esto sirve **hacia adelante**.
+
+Los números salen de `utils/hubspot_push_values.py`, que **replica la precedencia de
+`_mrr_staffing.py:79-95`** (última fila de `salary_updates` → la primera → `hire_opportunity.*`)
+y el branch por modelo de `candidate-details.js:524-526` (Staffing → `fee`; Recruiting →
+`revenue`, el fee one-shot). Verificado: las 7 opps reconcilian exacto con el MRR. Si se toca
+una, hay que tocar la otra.
+
+**El stage "Signed" de HubSpot no estaba mapeado.** Existe en los dos pipelines (ids
+`1437034145` y `1436968304`) y hasta el 2026-09-16 no estaba en `STAGE_ALIASES`, así que un deal
+parado ahí caía en `unmapped_stage` y el sync entrante lo salteaba entero. No molestaba porque
+no lo usaba nadie. Ahora está mapeado; `"signed"` va **después** de `"nda_signed"` en
+`STAGE_RESOLUTION_ORDER` porque en la pasada por tokens `{signed} ⊆ {nda, signed}` y el alias
+suelto se comería "NDA Signed". Tampoco tiene `hs_v2_date_entered_*` (404 verificado), igual que
+las dos etapas "NDA Sent".
+
+El loop entre las dos direcciones está acotado: cuando el hub empuja Closed Win, el sync
+entrante lo lee como `closed_won` y `STAGE_KEY_TO_HUB_STAGE["closed_won"] = None`, así que **no
+mueve el stage del hub**. Sí vuelve a copiar los 5 espejos con los valores que acabamos de
+mandar — circular, pero inofensivo: ningún dataset lee esas columnas.
 
 ## Apriora: las 6 preguntas obligatorias de screening
 

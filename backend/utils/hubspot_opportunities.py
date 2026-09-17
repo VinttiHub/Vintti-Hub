@@ -141,12 +141,21 @@ STAGE_ALIASES = {
     "deep_dive": ["Deep Dive", "Deepdive"],
     "nda_sent": ["NDA Sent", "NDA enviado", "Envio NDA", "NDA Enviada"],
     "nda_signed": ["NDA Signed", "NDA firmado", "NDA Firmada", "Firma NDA"],
+    # "Signed" a secas es un stage PROPIO de HubSpot (ids 1437034145 y 1436968304),
+    # distinto de "NDA Signed". Hasta el 2026-09-16 no estaba mapeado, asi que un
+    # deal parado ahi caia en `unmapped_stage` y el sync lo salteaba entero. No
+    # molestaba porque no lo usaba nadie; el sync inverso lo va a empezar a usar.
+    "signed": ["Signed", "Firmado", "Firmada"],
     "closed_won": ["Closed Won", "Cerrado ganado", "Ganado", "Won", "Close Win"],
 }
 
 # Orden de resolucion: los mas especificos primero, para que "NDA Signed" no se
 # lo coma el alias "NDA Sent" via matching por tokens.
-STAGE_RESOLUTION_ORDER = ("nda_signed", "nda_sent", "deep_dive", "intro_call", "closed_won")
+# `signed` va DESPUES de `nda_signed` a proposito: en la pasada por tokens
+# {signed} es subconjunto de {nda, signed}, asi que el alias suelto se comeria
+# "NDA Signed". La pasada exacta corre primero y marca el stage como `claimed`,
+# pero el orden es el segundo cinturon de seguridad.
+STAGE_RESOLUTION_ORDER = ("nda_signed", "nda_sent", "deep_dive", "intro_call", "signed", "closed_won")
 
 OPPORTUNITY_FIELD_ALIASES = {
     "role_to_hire": [
@@ -188,6 +197,20 @@ OPPORTUNITY_FIELD_ALIASES = {
     # intro call) y al pasar a NDA Sent (el del deep dive). Son texto libre.
     "intro_call_recording": ["intro_call_recording", "Intro Call Recording"],
     "deep_dive_recording": ["deep_dive_recording", "Deep Dive Recording"],
+    # Los que HubSpot pide al pasar a Signed, ademas de los 4 de plata/rol. Todos
+    # salen del hub (solapa Hire + ficha del candidato) y estan 0/33 cargados en
+    # HubSpot: los escribe el sync INVERSO, no se leen nunca hacia el hub.
+    "price_type": ["price_type", "Price Type"],
+    "computer": ["computer", "Computer"],
+    "candidate_start_date": ["candidates_start_date", "Candidate's Start Date"],
+    "candidate_end_date": ["candidates_end_date", "Candidate's End Date"],
+    "candidate_address": ["candidates_address", "Candidate's Address"],
+    "candidate_dni": ["dni", "Candidate's DNI"],
+    "candidate_location": ["candidates_location", "Candidate's Location"],
+    # La fecha de cierre del deal. HubSpot la estampa sola al entrar a una etapa
+    # cerrada (con la fecha de HOY), asi que el push tiene que pisarla con la
+    # `opp_close_date` del hub, que es cuando se cerro de verdad.
+    "close_date": ["closedate", "Close Date", "Fecha de cierre"],
 }
 
 # Campos de negocio que HubSpot carga en NDA Sent -> columna del hub.
@@ -234,13 +257,16 @@ STAGE_KEY_TO_HUB_STAGE = {
     "deep_dive": "Deep Dive",
     "nda_sent": "NDA Sent",
     "nda_signed": "Sourcing",
+    # HubSpot "Signed" -> hub "Signed". Normalmente viaja al reves (lo empuja el
+    # hub), pero si alguien lo mueve a mano en HubSpot el sync lo trae.
+    "signed": "Signed",
     # Closed Won NO mueve el stage: en el hub 'Close Win' dispara creditos,
     # marca el hire activo y entra a revenue. Solo trae los fees.
     "closed_won": None,
 }
 
 # Stages de HubSpot a partir de los cuales la opportunity debe existir en el hub.
-STAGE_KEYS_THAT_CREATE = ("deep_dive", "nda_sent", "nda_signed", "closed_won")
+STAGE_KEYS_THAT_CREATE = ("deep_dive", "nda_sent", "nda_signed", "signed", "closed_won")
 
 # Los unicos stage keys cuya fecha de entrada tiene columna en `opportunity`.
 STAGE_KEYS_WITH_HUB_DATE = ("deep_dive", "nda_sent", "nda_signed")
@@ -578,6 +604,7 @@ HUBSPOT_STAGE_RANK = {
     "deep_dive": 10,
     "nda_sent": 20,
     "nda_signed": 30,
+    "signed": 35,
     "closed_won": 40,
 }
 

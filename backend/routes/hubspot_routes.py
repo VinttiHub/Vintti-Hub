@@ -23,6 +23,8 @@ from utils.hubspot import (
     strip_tracking_params,
 )
 from utils import hubspot_opportunities as hs_opps
+from utils import hubspot_push as hs_push
+from utils import hubspot_push_values as hs_push_values
 from utils.hubspot_waiting_alert import alerta_en_pausa, send_waiting_deals_alert
 from dashboards.datasets._now import today_ar
 
@@ -347,6 +349,10 @@ def _ensure_hubspot_opportunity_columns(cursor):
     # hace parecer que la migracion se desaplico.
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS first_meeting_recording TEXT")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deepdive_recording TEXT")
+    # Sello del sync INVERSO (hub -> HubSpot). Esto solo cubre un entorno nuevo:
+    # en prod esta funcion se cortocircuita, asi que de crearla se encarga
+    # _ensure_push_columns(), que tiene su propio chequeo.
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_pushed_at TIMESTAMPTZ")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_opportunity_hubspot_deal_id
@@ -2639,6 +2645,37 @@ def _load_opportunity_by_id(cursor, opportunity_id, schema_ready=True):
     return cursor.fetchone()
 
 
+def _marcar_cuenta_vintti_ai(cursor, account_id, pipeline_key, dry_run):
+    """La cuenta es Vintti AI si el deal vino del pipeline de Vintti AI.
+
+    Antes esto dependia de un checkbox (`vintti_ai`) que en HubSpot vive en el
+    CONTACTO y que casi nadie tilda: 3 cuentas de 344. El pipeline, en cambio, es
+    un dato duro — es el mismo del que ya sale `opp_sales_lead = mia@vintti.com`.
+
+    Ojo con lo que toca: esta columna no es solo la insignia de la tabla de
+    Opportunities, tambien decide **que logo sale en el CV que se le manda al
+    cliente** (`resume-readonly`).
+
+    Solo PRENDE, nunca apaga. Si un deal se mueve fuera del pipeline de AI, apagar
+    la marca cambiaria la marca de CVs ya enviados; eso lo decide una persona.
+    """
+    if pipeline_key != "vintti_ai" or not account_id:
+        return None
+    cursor.execute(
+        "SELECT COALESCE(vintti_ai, FALSE) AS vintti_ai FROM account WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cursor.fetchone()
+    if not row or row["vintti_ai"]:
+        return None
+    if not dry_run:
+        cursor.execute(
+            "UPDATE account SET vintti_ai = TRUE WHERE account_id = %s AND NOT COALESCE(vintti_ai, FALSE)",
+            (account_id,),
+        )
+    return {"account_id": account_id, "motivo": "el deal viene del pipeline Vintti AI"}
+
+
 def _apply_business_fields(cursor, opportunity_id, business, opp_row, dry_run):
     """Completa budget/salario/experiencia/fees con lo que trae HubSpot.
 
@@ -2867,6 +2904,10 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         item["account_id"] = account_id
         item["account_action"] = account_action
 
+        marcada = _marcar_cuenta_vintti_ai(cursor, account_id, entry["key"], dry_run)
+        if marcada:
+            item["vintti_ai_marcada"] = marcada
+
         adopted, ambiguous = _adopt_existing_opportunity(
             cursor, account_id, role, ctx["allow_ambiguous"], schema_ready=schema_ready
         )
@@ -2997,6 +3038,15 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
     item["hub_stage_before"] = opp.get("opp_stage")
 
     changed = False
+
+    # Tambien para las opps que ya existian: las 9 del pipeline de Vintti AI son
+    # anteriores a este cambio y nunca pasan por la rama de creacion de cuenta.
+    # Va DESPUES de `changed = False`, o el reset se comeria la marca.
+    marcada = _marcar_cuenta_vintti_ai(cursor, opp.get("account_id"), entry["key"], dry_run)
+    if marcada:
+        item["vintti_ai_marcada"] = marcada
+        changed = True
+
     target_stage = hs_opps.STAGE_KEY_TO_HUB_STAGE.get(stage_key)
     new_stage, reason = hs_opps.decide_stage_transition(opp.get("opp_stage"), target_stage)
     item["reason"] = reason
@@ -3321,6 +3371,28 @@ def sync_hubspot_opportunities():
                 logging.exception("HubSpot opportunity sync fallo en el deal %s", deal_id)
                 errors.append(_error_record(exc, deal_id=deal_id))
 
+        # Sync INVERSO: despues de traer lo de HubSpot, empujar lo que cambio en el
+        # hub. Va aca y no en un cron aparte para que las dos direcciones corran
+        # siempre juntas y en el mismo orden: primero se lee, despues se escribe.
+        # OJO con el alcance: `limit` y `deal_ids` acotan el loop de ARRIBA (la
+        # direccion entrante), no esto. Una corrida acotada es, por definicion, una
+        # prueba, y una prueba no puede mover a Closed Win los deals de media
+        # cartera. Paso el 2026-09-16 con un `limit: 1` que empujo 8 opps.
+        push_report = None
+        corrida_acotada = bool(deal_ids) or bool(limit)
+        if not _push_enabled():
+            push_report = {"apagado": "HUBSPOT_PUSH_ENABLED no esta prendido"}
+        elif corrida_acotada and not body.get("push"):
+            push_report = {
+                "omitido": "corrida acotada (limit/deal_ids): mandá \"push\": true si "
+                           "de verdad querés empujar TODAS las opps de Signed/Close Win",
+            }
+        else:
+            if not dry_run:
+                _ensure_push_columns(cursor)
+                conn.commit()
+            push_report = _push_pass(client, conn, cursor, dry_run)
+
         counts = {"created": 0, "adopted": 0, "updated": 0, "skipped": 0}
         for item in items:
             action = item.get("action") or item.get("would_action") or "skipped"
@@ -3349,6 +3421,7 @@ def sync_hubspot_opportunities():
             "warnings": pipeline_map["warnings"],
             "migracion_aplicada": schema_ready,
             "retrocesos": retrocesos,
+            "push": push_report,
             "deals_found": len(deals),
             "limit_truncated": limit_truncated,
             "send_emails": send_emails,
@@ -4052,4 +4125,402 @@ def preview_hubspot_opportunities():
         return jsonify({"success": False, "error": str(exc)}), 502
     except Exception as exc:  # noqa: BLE001
         logging.exception("HubSpot opportunity preview failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# ===========================================================================
+# Sync INVERSO: el hub escribe en HubSpot al final del funnel.
+#
+# La direccion de siempre (HubSpot -> hub) esta arriba. Esto es al reves, y solo
+# para las dos ultimas etapas: la recruiter mueve la opp a Signed en el hub, carga
+# el hire en el hub, la pasa a Close Win, y el hub empuja el stage y los montos.
+#
+# Por que: de los 33 deals que estan en Closed Win en HubSpot, Set Up Fee, Final
+# Fee y Final Salary estan cargados en 0 (medido 2026-09-16). Nadie los completa
+# de ese lado porque la plata vive en el hub.
+# ===========================================================================
+
+
+_PUSH_SCHEMA_READY = False
+
+
+def _ensure_push_columns(cursor):
+    """Crea `hubspot_pushed_at`. Tiene que ser APARTE de _ensure_hubspot_opportunity_columns().
+
+    Aquella funcion se saltea todos sus ALTER si las columnas que ya conocia estan
+    presentes (`_hubspot_opportunity_schema_is_ready`), cosa de no tomar un ACCESS
+    EXCLUSIVE sobre `opportunity` antes de un loop largo. En produccion ese chequeo
+    da True, asi que una columna NUEVA agregada ahi adentro no se crea nunca —
+    exactamente lo que paso con esta el 2026-09-16: el push escribia bien en
+    HubSpot y despues reventaba con UndefinedColumn al sellar.
+
+    Por eso va con su propio flag: se evalua una vez por proceso y no depende del
+    estado del schema del sync entrante.
+    """
+    global _PUSH_SCHEMA_READY
+    if _PUSH_SCHEMA_READY:
+        return
+    cursor.execute(
+        """
+        SELECT column_name FROM information_schema.columns
+         WHERE table_name = 'opportunity'
+           AND column_name IN ('hubspot_pushed_at', 'hubspot_push_hash', 'mkt_collab')
+        """
+    )
+    presentes = {r["column_name"] if isinstance(r, dict) else r[0] for r in cursor.fetchall()}
+    if "hubspot_pushed_at" not in presentes:
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_pushed_at TIMESTAMPTZ")
+    if "hubspot_push_hash" not in presentes:
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_push_hash TEXT")
+    if "mkt_collab" not in presentes:
+        # La carga la recruiter en el popup de Close Win del hub. OJO que NO es lo
+        # mismo que `hubspot_mkt_collab`: aquella es la columna ESPEJO de lo que
+        # HubSpot tenga (direccion entrante); esta es el dato del hub, que es el
+        # que viaja hacia HubSpot.
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS mkt_collab TEXT")
+    _PUSH_SCHEMA_READY = True
+
+
+def _push_enabled():
+    """Apagado por defecto. Se prende recien despues de mirar el preview.
+
+    Mover un deal a Closed Win en HubSpot puede disparar workflows y notificaciones
+    que ve todo el equipo de ventas: no es algo que deba encenderse solo al
+    deployar.
+    """
+    return str(os.environ.get("HUBSPOT_PUSH_ENABLED") or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _push_one(client, cursor, opportunity_id, dry_run, pipeline_map=None, property_map=None):
+    """Arma (y opcionalmente manda) el PATCH de UNA opp. No commitea.
+
+    Devuelve siempre un dict describible, incluso cuando no hay nada que hacer: el
+    reporte tiene que poder decir POR QUE no se escribio, que es la mitad util.
+    """
+    valores = hs_push_values.hire_values_for_opportunity(cursor, opportunity_id)
+    item = {
+        "opportunity_id": opportunity_id,
+        "opp_stage": valores.get("opp_stage"),
+        "opp_model": valores.get("opp_model"),
+        "opp_position_name": valores.get("opp_position_name"),
+        "opp_close_date": str(valores.get("opp_close_date") or "") or None,
+        "candidate_name": valores.get("candidate_name"),
+        "deal_id": valores.get("deal_id"),
+        "valores_del_hub": {k: str(v) for k, v in (valores.get("valores") or {}).items()},
+        "fuentes": valores.get("fuentes") or {},
+    }
+
+    if not valores.get("existe"):
+        item["accion"] = "omitida"
+        item["motivo"] = "la opportunity no existe"
+        return item
+    if not valores.get("deal_id"):
+        # Sin deal atado no hay a quien escribirle. Es el caso mayoritario hoy:
+        # 358 opps en Close Win y solo 6 con deal.
+        item["accion"] = "omitida"
+        item["motivo"] = "la opp no tiene hubspot_deal_id (se cargo a mano o nunca se ato)"
+        return item
+    if not hs_push.hub_stage_to_stage_key(valores.get("opp_stage")):
+        item["accion"] = "omitida"
+        item["motivo"] = "el stage '%s' no se empuja (solo Signed y Close Win)" % valores.get("opp_stage")
+        return item
+
+    pipeline_map = pipeline_map or hs_opps.resolve_pipeline_stage_map(client)
+    property_map = property_map or hs_opps.resolve_opportunity_property_map(client)
+
+    # Se lee el deal ANTES de escribir: hace falta para no pisar el texto que cargo
+    # una persona y para no mandar un PATCH con el valor que el deal ya tiene.
+    deal = client.get_deal_with_associations(
+        valores["deal_id"], extra_properties=hs_push.properties_to_fetch(property_map)
+    )
+    deal_props = (deal or {}).get("properties") or {}
+    item["dealname"] = deal_props.get("dealname")
+
+    # El pipeline/stage que manda es el del deal de verdad, no lo que tenga
+    # guardado la opp: alguien pudo moverlo en HubSpot desde el ultimo sync.
+    valores["pipeline_id"] = str(deal_props.get("pipeline") or "") or valores.get("pipeline_id")
+    valores["dealstage_id"] = str(deal_props.get("dealstage") or "") or valores.get("dealstage_id")
+
+    payload = hs_push.build_push_payload(valores, deal_props, property_map, pipeline_map)
+    item["properties"] = payload["properties"]
+    item["omitidos"] = payload["omitidos"]
+    item["stage"] = payload["stage"]
+
+    huella = hs_push.values_fingerprint(valores)
+    item["huella"] = huella
+
+    if not payload["properties"]:
+        item["accion"] = "sin_cambios"
+        item["motivo"] = "HubSpot ya esta igual que el hub"
+        if not dry_run:
+            # Se sella igual: ya sabemos que este estado del hub esta reflejado, y
+            # asi la proxima pasada del cron ni siquiera lee el deal.
+            _sellar_push(cursor, opportunity_id, huella, escribio=False)
+        return item
+
+    if dry_run:
+        item["accion"] = "se_escribiria"
+        return item
+
+    client.update_deal(valores["deal_id"], payload["properties"])
+    _sellar_push(cursor, opportunity_id, huella, escribio=True)
+    item["accion"] = "escrito"
+    return item
+
+
+def _sellar_push(cursor, opportunity_id, huella, escribio):
+    """Guarda la huella (y la fecha, si hubo escritura de verdad)."""
+    cursor.execute(
+        """
+        UPDATE opportunity
+           SET hubspot_push_hash = %s,
+               hubspot_pushed_at = CASE WHEN %s THEN NOW() ELSE hubspot_pushed_at END
+         WHERE opportunity_id = %s
+           AND NULLIF(hubspot_deal_id, '') IS NOT NULL
+        """,
+        (huella, bool(escribio), opportunity_id),
+    )
+
+
+def push_opportunity_to_hubspot(opportunity_id, dry_run=False):
+    """Punto de entrada unico del push. Abre y cierra su propia conexion.
+
+    La abre aparte a proposito: el disparo automatico corre DESPUES de que
+    update_opportunity_stage commiteo, justo para que una llamada HTTP de hasta 30s
+    no viva adentro de esa transaccion.
+    """
+    conn = None
+    try:
+        client = HubSpotClient()
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        if not dry_run:
+            _ensure_push_columns(cursor)
+            conn.commit()
+        item = _push_one(client, cursor, opportunity_id, dry_run)
+        conn.rollback() if dry_run else conn.commit()
+        cursor.close()
+        return item
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _push_pass(client, conn, cursor, dry_run, limit=200):
+    """Re-empuja las opps de Signed/Close Win cuyo lado del hub cambio.
+
+    Existe porque el push automatico sale SOLO al mover el stage, y todo lo que se
+    edita despues en la solapa Hire (montos, fechas, address, DNI) no volveria a
+    viajar nunca. Ademas esas ediciones entran por dos endpoints distintos —
+    /candidates/<id>/hire y /candidates/<id>— y el segundo ni sabe de que opp se
+    trata, asi que engancharse a la escritura seria fragil. Aca se mira el estado
+    final, venga de donde venga.
+
+    La huella evita el trabajo al pedo: el conjunto de opps cerradas solo crece, y
+    sin esto el cron leeria N deals de HubSpot cada 30 minutos para no cambiar nada
+    el 99% de las veces. Solo se llama a HubSpot cuando el lado del hub cambio.
+    """
+    # En dry run no se crea nada (tiene que ser 100% de solo lectura), asi que la
+    # columna de la huella puede no existir todavia. Sin esto el dry run que se
+    # corre ANTES de aplicar el schema fallaria en cada opp.
+    cursor.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'opportunity' AND column_name = 'hubspot_push_hash'
+        """
+    )
+    hay_huella = bool(cursor.fetchone())
+
+    resultado = {"miradas": 0, "sin_cambios": 0, "empujadas": [], "errores": []}
+    if not hay_huella:
+        resultado["aviso"] = "sin columna hubspot_push_hash: se evalua todo sin saltear"
+    for oid in hs_push_values.opportunities_pushables(cursor, limit=limit):
+        resultado["miradas"] += 1
+        try:
+            valores = hs_push_values.hire_values_for_opportunity(cursor, oid)
+            if not valores.get("deal_id"):
+                continue
+            huella = hs_push.values_fingerprint(valores)
+            if hay_huella:
+                cursor.execute(
+                    "SELECT hubspot_push_hash FROM opportunity WHERE opportunity_id = %s", (oid,)
+                )
+                fila = cursor.fetchone()
+                if fila and fila.get("hubspot_push_hash") == huella:
+                    resultado["sin_cambios"] += 1
+                    continue
+            item = _push_one(client, cursor, oid, dry_run)
+            if item.get("accion") in ("escrito", "se_escribiria"):
+                resultado["empujadas"].append({
+                    "opportunity_id": oid,
+                    "accion": item["accion"],
+                    "campos": sorted((item.get("properties") or {}).keys()),
+                })
+            conn.rollback() if dry_run else conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            _rollback_quietly(conn, "push opp %s" % oid)
+            logging.exception("push del cron fallo en la opp %s", oid)
+            resultado["errores"].append({"opportunity_id": oid, "error": str(exc)})
+    return resultado
+
+
+@bp.route("/hubspot/push/preview", methods=["GET", "OPTIONS"])
+def preview_hubspot_push():
+    """Que le escribiria el hub a HubSpot, sin escribir nada.
+
+    CORRE CON EL TOKEN DE SOLO LECTURA: es la pantalla para mirar ANTES de pedir el
+    scope crm.objects.deals.write. Recorre las opps en Signed/Close Win que tienen
+    deal atado y muestra, campo por campo, que entraria y que se omitiria y por que.
+
+    GET /hubspot/push/preview?limit=20
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    try:
+        limit = int(request.args.get("limit") or 20)
+    except ValueError:
+        return jsonify({"success": False, "error": "limit must be an integer"}), 400
+
+    conn = None
+    try:
+        client = HubSpotClient()
+        pipeline_map = hs_opps.resolve_pipeline_stage_map(client)
+        property_map = hs_opps.resolve_opportunity_property_map(client)
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        ids = hs_push_values.opportunities_pushables(cursor, limit=limit)
+
+        items, errores = [], []
+        for oid in ids:
+            try:
+                items.append(_push_one(client, cursor, oid, True, pipeline_map, property_map))
+            except HubSpotError as exc:
+                errores.append({"opportunity_id": oid, "error": str(exc)})
+        conn.rollback()
+        cursor.close()
+
+        resumen = {}
+        for item in items:
+            resumen[item.get("accion")] = resumen.get(item.get("accion"), 0) + 1
+
+        return jsonify({
+            "success": True,
+            "push_habilitado": _push_enabled(),
+            "token_puede_escribir": None,   # se sabe recien al intentar; ver /hubspot/push/scope
+            "de_donde_sale_cada_campo": {
+                campo: property_map.get(campo) for campo in hs_push.PUSH_FIELDS
+            },
+            "politica": {
+                "pisa_siempre": sorted(hs_push.PUSH_OVERWRITE),
+                "solo_si_esta_vacio": sorted(set(hs_push.PUSH_FIELDS) - hs_push.PUSH_OVERWRITE),
+                "nunca_se_manda": sorted(hs_push.PUSH_NEVER),
+            },
+            "opps_miradas": len(items),
+            "resumen": resumen,
+            "errores": errores,
+            "items": items,
+        })
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot push preview failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+@bp.route("/hubspot/push/scope", methods=["GET", "OPTIONS"])
+def check_hubspot_push_scope():
+    """Si el token puede escribir deals. Read-only: no escribe nada en HubSpot.
+
+    Existe porque el scope se agrega a mano desde la UI de HubSpot y hace falta una
+    forma de confirmar que quedo bien sin mover un deal de verdad para probarlo.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+    try:
+        import requests as _requests
+        token = os.environ.get("HUBSPOT_PRIVATE_APP_TOKEN")
+        if not token:
+            return jsonify({"success": False, "error": "falta HUBSPOT_PRIVATE_APP_TOKEN"}), 500
+
+        # La verdad la da el PATCH, no la lista de scopes: el endpoint de
+        # access-token-info es de apps privadas y una clave de servicio puede no
+        # contestarlo. Se pega a un deal que NO existe, asi que HubSpot resuelve el
+        # permiso antes de buscar el objeto: 403 = sin permiso, 404 = con permiso.
+        # Ninguna de las dos toca un deal real.
+        probe = _requests.patch(
+            "https://api.hubapi.com/crm/v3/objects/deals/1",
+            headers={"Authorization": "Bearer %s" % token, "Content-Type": "application/json"},
+            json={"properties": {"dealname": "permission probe"}}, timeout=20,
+        )
+        puede = probe.status_code == 404
+        if probe.status_code not in (403, 404):
+            logging.warning("probe de escritura devolvio %s: %s", probe.status_code, probe.text[:200])
+
+        # Los scopes son informativos y pueden no estar disponibles.
+        info = {}
+        try:
+            resp = _requests.post(
+                "https://api.hubapi.com/oauth/v2/private-apps/get/access-token-info",
+                json={"tokenKey": token}, timeout=20,
+            )
+            info = resp.json() if resp.ok else {}
+        except Exception:  # noqa: BLE001
+            info = {}
+
+        return jsonify({
+            "success": True,
+            "portal": info.get("hubId"),
+            "app_id": info.get("appId"),
+            "puede_escribir_deals": puede,
+            "probe_status": probe.status_code,
+            "scopes": sorted(info.get("scopes") or []) or None,
+            "push_habilitado": _push_enabled(),
+            "que_falta": None if puede else (
+                "La credencial no puede escribir deals: falta crm.objects.deals.write"
+            ),
+        })
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot push scope check failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@bp.route("/hubspot/push/opportunity/<int:opportunity_id>", methods=["POST", "OPTIONS"])
+def push_hubspot_opportunity(opportunity_id):
+    """Empuja UNA opp a HubSpot. {"dry_run": true} para simular.
+
+    POST /hubspot/push/opportunity/123  {"dry_run": true}
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    body = request.get_json(silent=True) or {}
+    dry_run = bool(body.get("dry_run"))
+    if not dry_run and not _push_enabled():
+        return jsonify({
+            "success": False,
+            "error": "el push esta apagado: falta HUBSPOT_PUSH_ENABLED=true",
+        }), 409
+    try:
+        item = push_opportunity_to_hubspot(opportunity_id, dry_run=dry_run)
+        return jsonify({"success": True, "dry_run": dry_run, "resultado": item})
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("HubSpot push fallo para la opp %s", opportunity_id)
         return jsonify({"success": False, "error": str(exc)}), 500
