@@ -2205,7 +2205,21 @@ function renderHubspotSyncReport(r) {
     if (i.cuenta_nueva) {
       return `<div class="hs-link-note">la cuenta${i.cuenta ? ` <b>${escapeHtml(i.cuenta)}</b>` : ''} todavía no existe en el hub: no hay opps para vincular</div>`;
     }
-    if (!i.candidatas || !i.candidatas.length) return '';
+    // Sin candidatas el deal NO necesita decision: el sync lo va a crear solo la
+    // proxima vez que lo mire. Pero puede no mirarlo nunca —ya se cayo de la
+    // ventana incremental, por eso esta en la cola— asi que igual tiene que haber
+    // un boton. Sin el, el deal queda frenado y sin forma de resolverlo desde la
+    // pagina, que es justo el olvido silencioso que la cola existe para evitar.
+    if (!i.candidatas || !i.candidatas.length) {
+      return `
+        <details class="hs-link" open>
+          <summary>Ya no hay opportunities para vincular</summary>
+          <div class="hs-link-row">
+            <button type="button" class="hs-new-btn">Es nueva, creala</button>
+          </div>
+          <p class="hs-link-status" role="status">Ninguna opp de esa cuenta quedó sin deal atado.</p>
+        </details>`;
+    }
     const opciones = i.candidatas.map(c =>
       `<option value="${c.opportunity_id}"${c.cerrada ? ' data-cerrada="1"' : ''}>#${c.opportunity_id} · ${escapeHtml(c.opp_position_name || 'sin puesto')} · ${escapeHtml(c.opp_stage || 'sin stage')}${c.opp_model ? ` · ${escapeHtml(c.opp_model)}` : ''}${c.opp_type ? ` · ${escapeHtml(c.opp_type)}` : ''}${etiquetaDeepDive(c)}</option>`
     ).join('');
@@ -2268,14 +2282,16 @@ function wireHubspotLinkButtons(panel) {
     const btnNueva = box.querySelector('.hs-new-btn');
     const select = box.querySelector('.hs-link-select');
     const status = box.querySelector('.hs-link-status');
-    if (!dealId || !btn || !select) return;
+    // El select y Vincular faltan cuando ya no quedan candidatas; el boton
+    // "es nueva" existe siempre y se cablea igual.
+    if (!dealId) return;
 
-    select.addEventListener('change', () => {
+    if (select && btn) select.addEventListener('change', () => {
       btn.disabled = !select.value;
       if (select.value) status.textContent = '';
     });
 
-    btn.addEventListener('click', async () => {
+    if (btn && select) btn.addEventListener('click', async () => {
       const oppId = select.value;
       if (!oppId) return;
       const opcion = select.options[select.selectedIndex];
@@ -2320,8 +2336,8 @@ function wireHubspotLinkButtons(panel) {
     if (btnNueva) btnNueva.addEventListener('click', async () => {
       if (!confirm('¿Ninguna de las opportunities de esa cuenta es esta búsqueda?\n\nSe va a crear una nueva en el próximo sync.')) return;
       btnNueva.disabled = true;
-      btn.disabled = true;
-      select.disabled = true;
+      if (btn) btn.disabled = true;
+      if (select) select.disabled = true;
       status.textContent = 'Marcando…';
       try {
         const res = await fetch(`${API_BASE}/hubspot/deals/${encodeURIComponent(dealId)}/mark-new`, {

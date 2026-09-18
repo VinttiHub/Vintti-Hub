@@ -225,6 +225,16 @@ Cómo se entera una persona, porque el cron corre en GitHub Actions y no lo mira
 - **Al abrir `docs/opportunities.html`**, `mostrarDealsFrenados()` pega a
   `GET /hubspot/deals/waiting` (lee la tabla, no toca HubSpot) y pinta el panel con los
   desplegables si hay algo. No corre ningún sync.
+- **La columna `candidates` dice QUÉ deals están frenados, no qué opps mostrar.** El
+  endpoint recalcula las candidatas en vivo con `_link_candidates()` y descarta el JSON
+  guardado, porque esa foto sólo se refresca mientras el deal siga entrando en la ventana
+  de 24 h: un deal que nadie toca en HubSpot se cae de la ventana y la foto queda clavada.
+  Así el panel llegó a ofrecer #763 como "Interviewing" cuando en el hub ya estaba en
+  Closed Lost hacía dos días, y a Heavys le faltaba la única candidata que servía (#656
+  Senior Accountant, misma fecha de Deep Dive que el deal). `deal_deep_dive_date` está en
+  la tabla justamente para poder marcar "misma fecha" sin volver a pegarle a HubSpot.
+  Si el recálculo vuelve vacío el panel igual dibuja **"Es nueva, creala"**: sin botón, ese
+  deal quedaría frenado para siempre.
 - **Un mail por deal frenado, una sola vez.** Sólo por los que tienen `notified_at IS NULL`,
   reclamados con un `UPDATE ... RETURNING` para que dos corridas solapadas no lo dupliquen. Sin
   frenos nuevos no sale ningún mail: avisar por los que siguen esperando serían 48 mails

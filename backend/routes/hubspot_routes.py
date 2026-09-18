@@ -403,17 +403,28 @@ def _ensure_hubspot_deals_waiting_table(cursor):
         )
         """
     )
+    # La fecha de Deep Dive del DEAL. Se guarda para que el panel pueda marcar
+    # "misma fecha" sin volver a pegarle a HubSpot: el endpoint de la cola es de
+    # lectura y lo consulta la pagina al abrirse. El flag de arriba es un booleano
+    # de proceso (arranca en False en cada boot), asi que una columna agregada aca
+    # SI se crea despues de deployar — al reves de lo que pasa en
+    # _ensure_hubspot_opportunity_columns, donde el cortocircuito lo decide una
+    # consulta al catalogo.
+    cursor.execute(
+        "ALTER TABLE hubspot_deals_waiting "
+        "ADD COLUMN IF NOT EXISTS deal_deep_dive_date DATE"
+    )
     _HUBSPOT_DEALS_WAITING_READY = True
 
 
-def _remember_waiting_deal(cursor, item, candidatas):
+def _remember_waiting_deal(cursor, item, candidatas, deal_deep_dive_date=None):
     """Guarda/refresca el deal frenado. Nunca pisa first_seen_at ni notified_at."""
     cursor.execute(
         """
         INSERT INTO hubspot_deals_waiting
                (deal_id, dealname, role_to_hire, account_id, account_name,
-                opp_model, candidates, first_seen_at, last_seen_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, NOW(), NOW())
+                opp_model, candidates, deal_deep_dive_date, first_seen_at, last_seen_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), NOW())
         ON CONFLICT (deal_id) DO UPDATE
            SET dealname = EXCLUDED.dealname,
                role_to_hire = EXCLUDED.role_to_hire,
@@ -421,11 +432,12 @@ def _remember_waiting_deal(cursor, item, candidatas):
                account_name = EXCLUDED.account_name,
                opp_model = EXCLUDED.opp_model,
                candidates = EXCLUDED.candidates,
+               deal_deep_dive_date = EXCLUDED.deal_deep_dive_date,
                last_seen_at = NOW()
         """,
         (str(item.get("deal_id")), item.get("dealname"), item.get("role_to_hire"),
          item.get("account_id"), item.get("account_name"), item.get("opp_model"),
-         json.dumps(candidatas, default=str)),
+         json.dumps(candidatas, default=str), deal_deep_dive_date),
     )
 
 
@@ -2550,10 +2562,31 @@ def _adopt_existing_opportunity(cursor, account_id, position, allow_ambiguous, s
     return rows[0], None
 
 
-def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
+# Una opp "cerrada" es una que el sync ya NO puede mover de stage: Closed Lost y
+# Stop estan blindados (decide_stage_transition devuelve hub_stage_is_terminal) y
+# Close Win tiene el rank mas alto, asi que nunca avanza. Las tres necesitan la
+# misma guarda de fechas: lo que trae HubSpot ahi es lo viejo.
+HUB_CLOSED_STAGES = hs_opps.HUB_TERMINAL_STAGES | {"close win"}
+
+
+def _opp_esta_cerrada(stage):
+    return str(stage or "").strip().lower() in HUB_CLOSED_STAGES
+
+
+def _fecha_iso(valor):
+    """date/datetime/str -> 'YYYY-MM-DD'. Sirve para comparar y para el JSON."""
+    if not valor:
+        return None
+    if hasattr(valor, "isoformat"):
+        return valor.isoformat()[:10]
+    return str(valor)[:10]
+
+
+def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8,
+                     deal_deep_dive_date=None):
     """Opps de esa cuenta que una persona podria querer atar a este deal.
 
-    Es la query de adopcion SIN el predicado de nombre y CON 'close win' adentro.
+    Es la query de adopcion SIN el predicado de nombre y SIN filtro de stage.
     Existe porque el nombre del puesto casi nunca coincide entre los dos sistemas
     ('Tutor' vs 'Computer Science Teacher') y ademas la mitad de las opps que ya
     estaban cargadas a mano estan cerradas: la adopcion automatica no las puede
@@ -2561,9 +2594,12 @@ def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
 
     NO adopta: solo sugiere. Quien vincula es una persona, via /link-deal.
 
-    Closed Lost y Stop quedan afuera igual que en la adopcion: atarle un deal a
-    una opp muerta es casi siempre un error de carga, y el sync despues no la
-    puede mover porque son stages blindados.
+    Las cerradas (Close Win / Closed Lost / Stop) entran A PROPOSITO, al reves que
+    en la adopcion automatica. Cuando la gemela cerrada es la UNICA opp de la
+    cuenta, dejarlas afuera devuelve una lista vacia, y el freno de mas abajo lee
+    esa lista vacia como "no hay nada que consultar" y crea en silencio: asi
+    nacieron 9 duplicadas entre el 11 y el 14 de septiembre. Atarla no la revive
+    (decide_stage_transition no le toca el stage), solo frena la duplicada.
     """
     if not account_id:
         return []
@@ -2575,13 +2611,14 @@ def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
           FROM opportunity
          WHERE account_id = %%s
            %s
-           AND LOWER(BTRIM(COALESCE(opp_stage, ''))) NOT IN ('closed lost', 'stop')
          ORDER BY opportunity_id DESC
         """ % sin_deal,
         (account_id,),
     )
+    deal_dd = _fecha_iso(deal_deep_dive_date)
     filas = []
     for row in cursor.fetchall():
+        dd = _fecha_iso(row["deep_dive_date"])
         filas.append({
             "opportunity_id": row["opportunity_id"],
             "opp_position_name": row["opp_position_name"],
@@ -2591,13 +2628,21 @@ def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8):
             # en la misma cuenta (Criterium-Dudka tiene dos "Admin Assistant").
             "opp_type": row["opp_type"],
             "opp_sales_lead": row["opp_sales_lead"],
+            # El panel lo avisa antes de vincular: atarla NO la reabre.
+            "cerrada": _opp_esta_cerrada(row["opp_stage"]),
+            "deep_dive_date": dd,
+            "mismo_deep_dive": bool(dd and deal_dd and dd == deal_dd),
             "parecido": round(
                 hs_opps.position_similarity(position, row["opp_position_name"]), 3
             ),
         })
-    # El parecido solo ORDENA. A igual parecido gana la mas nueva, que es el mismo
-    # criterio de desempate que usa la adopcion (ORDER BY opportunity_id DESC).
-    filas.sort(key=lambda f: (-f["parecido"], -f["opportunity_id"]))
+    # Nada de esto DECIDE: no hay umbral en ningun lado, solo ordenan para que la
+    # correcta quede arriba y no se caiga del limit. La fecha de Deep Dive va
+    # primero porque es la senal que mas pego en la practica: en las 9 duplicadas
+    # coincidia dia por dia incluso donde el texto no se parecia en nada
+    # ("Tax Specialist" vs "Part Time Senior Tax Professional", parecido 0.34).
+    # A igual todo gana la mas nueva, el mismo desempate que usa la adopcion.
+    filas.sort(key=lambda f: (-int(f["mismo_deep_dive"]), -f["parecido"], -f["opportunity_id"]))
     return filas[:limit]
 
 
@@ -2915,7 +2960,8 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             # `candidates` son ids pelados; las link_candidates traen puesto y stage,
             # que es lo que hace falta para elegir cual de las dos es.
             item["link_candidates"] = _link_candidates(
-                cursor, account_id, role, schema_ready=schema_ready
+                cursor, account_id, role, schema_ready=schema_ready,
+                deal_deep_dive_date=stage_dates.get("deep_dive_date"),
             )
             return _skip(deal, "ambiguous_position_match", candidates=ambiguous, **item)
 
@@ -2960,12 +3006,16 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             # Vale en dry run igual que en la corrida real: el reporte tiene que
             # decir lo que va a pasar de verdad.
             candidatas = _link_candidates(
-                cursor, account_id, role, schema_ready=schema_ready
+                cursor, account_id, role, schema_ready=schema_ready,
+                deal_deep_dive_date=stage_dates.get("deep_dive_date"),
             )
             if candidatas and not _deal_marked_as_new(cursor, deal_id):
                 item["link_candidates"] = candidatas
                 if not dry_run:
-                    _remember_waiting_deal(cursor, dict(item, deal_id=deal_id), candidatas)
+                    _remember_waiting_deal(
+                        cursor, dict(item, deal_id=deal_id), candidatas,
+                        deal_deep_dive_date=stage_dates.get("deep_dive_date"),
+                    )
                 return _skip(deal, "waiting_for_decision", **item)
 
             initial_stage = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
@@ -3076,26 +3126,42 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         item["hub_stage_after"] = new_stage
         changed = True
 
-    # Fechas: HubSpot pisa el CURRENT_DATE que estampo el hub, pero nunca borra.
+    # Fechas: en una opp ABIERTA HubSpot pisa el CURRENT_DATE que estampo el hub
+    # (pero nunca borra). En una CERRADA es al reves, solo rellena los NULL: ahi la
+    # fecha de HubSpot es la vieja —el hub ya cerro la busqueda y el deal quedo
+    # parado, Flamingo cerro el 16-jun con el deal en NDA Signed de mayo— y
+    # nda_signature_or_start_date es ancla de ~10 datasets.
+    opp_cerrada = _opp_esta_cerrada(opp.get("opp_stage"))
     dates_written = {
         column: value
         for column, value in stage_dates.items()
         if value is not None and opp.get(column) != value
+        and not (opp_cerrada and opp.get(column) is not None)
     }
     if dates_written:
+        # Se reporta lo que se va a escribir de verdad: si el dry run anunciara un
+        # pisado que no va a ocurrir, el reporte y el mail estarian mintiendo.
         item["dates_written"] = _iso_dates(dates_written)
+        if opp_cerrada:
+            item["fechas_solo_rellenadas"] = True
         changed = True
         if not dry_run:
+            # El ORDEN del COALESCE es lo unico que decide quien gana.
+            asignacion = ("{col} = COALESCE({col}, %s)" if opp_cerrada
+                          else "{col} = COALESCE(%s, {col})")
+            sets = ",\n                       ".join(
+                asignacion.format(col=col)
+                for col in ("deep_dive_date", "nda_sent_date",
+                            "nda_signature_or_start_date")
+            )
             cursor.execute(
                 """
                 UPDATE opportunity
-                   SET deep_dive_date = COALESCE(%s, deep_dive_date),
-                       nda_sent_date  = COALESCE(%s, nda_sent_date),
-                       nda_signature_or_start_date = COALESCE(%s, nda_signature_or_start_date),
+                   SET %s,
                        hubspot_synced_at = NOW()
-                 WHERE opportunity_id = %s
+                 WHERE opportunity_id = %%s
                    AND NULLIF(hubspot_deal_id, '') IS NOT NULL
-                """,
+                """ % sets,
                 (
                     dates_written.get("deep_dive_date"),
                     dates_written.get("nda_sent_date"),
@@ -3610,11 +3676,14 @@ def link_opportunity_to_hubspot_deal(opportunity_id):
                     "error": f"la opportunity #{opportunity_id} ya esta atada al deal {ya}",
                 }), 409
 
-            if str(opp["opp_stage"] or "").strip().lower() in hs_opps.HUB_TERMINAL_STAGES:
-                return jsonify({
-                    "success": False,
-                    "error": f"la opportunity esta en '{opp['opp_stage']}' y el sync no la puede mover",
-                }), 409
+            # Una opp CERRADA se puede atar, y es el caso que mas se usa: el hub
+            # ya cerro la busqueda y HubSpot quedo atrasado (Flamingo se cerro el
+            # 16-jun y el deal sigue parado en NDA Signed de mayo). Atarla no la
+            # reabre — decide_stage_transition devuelve hub_stage_is_terminal y el
+            # sync no le toca el stage — pero es lo unico que frena al cron de
+            # crear una duplicada por dia. Rechazarla con 409 era justo al reves de
+            # lo que hace falta.
+            opp_cerrada = _opp_esta_cerrada(opp["opp_stage"])
 
             cursor.execute(
                 """
@@ -3661,6 +3730,9 @@ def link_opportunity_to_hubspot_deal(opportunity_id):
             "dealname": props.get("dealname"),
             "opp_position_name": opp["opp_position_name"],
             "opp_stage": opp["opp_stage"],
+            # El panel lo usa para decir "queda cerrada" en vez de "volve a Simular
+            # para ver que le va a traer": a esta no le va a traer nada.
+            "opp_cerrada": opp_cerrada,
         })
     except HubSpotError as exc:
         if conn:
@@ -3674,6 +3746,35 @@ def link_opportunity_to_hubspot_deal(opportunity_id):
     finally:
         if conn:
             conn.close()
+
+
+def _refrescar_candidatas(cursor, filas):
+    """Recalcula las candidatas de cada deal frenado contra `opportunity`. Muta `filas`.
+
+    El JSON de hubspot_deals_waiting es una foto del momento del freno, y el sync
+    solo la refresca mientras el deal siga entrando en la ventana incremental de
+    24 h. Un deal que nadie toca en HubSpot se cae de esa ventana y la foto queda
+    clavada: asi el panel llego a ofrecer una opp como "Interviewing" cuando en el
+    hub ya estaba en Closed Lost hacia dos dias, y a Heavys le faltaba la candidata
+    correcta (#656 Senior Accountant) porque el dia del freno las cerradas todavia
+    quedaban afuera de la lista.
+
+    Por eso se recalcula con la misma funcion que usa el sync en vez de refrescar
+    campo por campo: la foto sirve para saber QUE deals estan frenados, no para
+    decidir que opps mostrar. Es solo lectura: la cola no se reescribe desde aca.
+    """
+    for fila in filas:
+        if not fila.get("account_id"):
+            continue
+        fila["candidates"] = _link_candidates(
+            cursor,
+            fila["account_id"],
+            fila.get("role_to_hire") or "",
+            deal_deep_dive_date=fila.get("deal_deep_dive_date"),
+        )
+        # Ya quedo plegada dentro de mismo_deep_dive de cada candidata; suelta no
+        # le sirve a nadie y solo ensucia el JSON que lee la pagina.
+        fila.pop("deal_deep_dive_date", None)
 
 
 @bp.route("/hubspot/deals/waiting", methods=["GET", "OPTIONS"])
@@ -3692,20 +3793,29 @@ def hubspot_deals_waiting():
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("SELECT to_regclass('public.hubspot_deals_waiting') AS t")
             if not (cursor.fetchone() or {}).get("t"):
+                # No se crea desde aca: si el sync nunca corrio, no hay cola.
                 return jsonify({"success": True, "count": 0, "deals": []})
+            # La tabla puede existir SIN deal_deep_dive_date: se creo en un deploy
+            # anterior y el ALTER vive en el ensure, que solo corre desde el sync.
+            # Sin esta linea el panel reventaria con UndefinedColumn hasta la
+            # primera corrida del cron — el mismo tropiezo que hubspot_pushed_at.
+            _ensure_hubspot_deals_waiting_table(cursor)
+            conn.commit()
             cursor.execute(
                 """
                 SELECT deal_id, dealname, role_to_hire, account_id, account_name,
-                       opp_model, candidates, first_seen_at, last_seen_at
+                       opp_model, candidates, deal_deep_dive_date,
+                       first_seen_at, last_seen_at
                   FROM hubspot_deals_waiting
                  ORDER BY first_seen_at
                 """
             )
-            filas = cursor.fetchall()
+            filas = [dict(f) for f in cursor.fetchall()]
+            _refrescar_candidatas(cursor, filas)
         return jsonify({
             "success": True,
             "count": len(filas),
-            "deals": [dict(f) for f in filas],
+            "deals": filas,
         })
     except Exception as exc:  # noqa: BLE001
         logging.exception("No se pudo leer la cola de deals frenados")
