@@ -6614,6 +6614,22 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 }
 .hs-sync-btn:hover:not(:disabled) { background: #f0603c; }
 .hs-sync-btn:disabled { opacity: .55; cursor: default; }
+/* Desvincular es la salida de emergencia, no una acción de todos los días: va al
+   lado de Enviar pero sin competirle visualmente. */
+.hs-sync-actions { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
+.hs-sync-btn-ghost {
+  background: transparent;
+  color: #6b7391;
+  border: 1px solid #dbe0ee;
+  font-weight: 500;
+}
+.hs-sync-btn-ghost:hover:not(:disabled) { background: #f3f5fb; color: #b3261e; }
+.hs-sync-deal {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #6b7391;
+  font-variant-numeric: tabular-nums;
+}
 .hs-sync-msg {
   margin-top: 10px;
   padding-top: 10px;
@@ -6626,6 +6642,60 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .hs-sync-msg.is-err  { color: #b3261e; }
 
 @media (max-width: 640px) {
-  .hs-sync-main { align-items: stretch; }
-  .hs-sync-btn  { width: 100%; }
+  .hs-sync-main    { align-items: stretch; }
+  .hs-sync-actions { flex-direction: column; align-items: stretch; }
+  .hs-sync-btn     { width: 100%; }
+}
+
+/* Buscador de deals para vincular una vacante que se cargó a mano.
+   Vive adentro de .hs-sync, así que hereda el marco naranja. */
+.hs-link {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e8ecf7;
+}
+.hs-link-search { display: flex; gap: 8px; align-items: center; }
+.hs-link-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid #dbe0ee;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #22283d;
+  background: #fff;
+}
+.hs-link-input:focus { outline: 2px solid #ffd3c7; border-color: #ff7a59; }
+.hs-link-hint  { margin: 8px 0 0; font-size: 12px; color: #8a6d1f; }
+.hs-link-empty { margin: 10px 0 0; font-size: 12.5px; color: #6b7391; }
+.hs-link-list  { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.hs-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e3e7f3;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+/* Misma fecha de Deep Dive: la señal que más pegó en la práctica. Se marca, no
+   se preselecciona — elige una persona. */
+.hs-link-row.is-match { border-color: #9fd3b4; background: #f4fbf7; }
+.hs-link-row.is-taken { opacity: .6; }
+.hs-link-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hs-link-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #22283d;
+  overflow-wrap: anywhere;   /* el nombre del deal es la red de contención: se lee entero */
+}
+.hs-link-meta  { font-size: 12px; color: #6b7391; line-height: 1.35; }
+.hs-link-taken { font-size: 12px; color: #8a6d1f; flex: 0 0 auto; }
+.hs-link-pick  { padding: 7px 14px; }
+
+@media (max-width: 640px) {
+  .hs-link-search { flex-direction: column; align-items: stretch; }
+  .hs-link-row    { flex-direction: column; align-items: stretch; }
+  .hs-link-pick   { width: 100%; }
 }

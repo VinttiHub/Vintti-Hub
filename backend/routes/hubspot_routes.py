@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -3588,6 +3589,236 @@ def last_hubspot_opportunity_sync():
             conn.close()
 
 
+# --- buscar el deal de una opp que se cargo a mano ---------------------------
+# El panel de deals frenados de Opportunities arranca del DEAL y solo aparece
+# mientras el sync lo frena. Para una opp vieja que ya tiene el hire cargado el
+# recorrido es el contrario —tengo la vacante, me falta el deal— y hasta ahora no
+# existia: de 355 opps en Close Win con hire, 14 tienen deal atado.
+#
+# Se busca por NOMBRE y no por cuenta porque account.hubspot_company_id esta
+# cargado en 16 de 345 cuentas, y en NINGUNA de las que hay que arreglar.
+
+# Palabras que no distinguen una cuenta de otra. Corta a proposito: "Media" o
+# "Group" SI distinguen y se dejan, aunque traigan varios resultados.
+_TOKENS_GENERICOS = {"llc", "inc", "corp", "ltd", "sa", "srl", "the", "and"}
+
+
+def _tokens_de_busqueda(texto, tope=4):
+    """Tokens utiles de un nombre de cuenta, en el orden en que aparecen."""
+    crudos = re.findall(r"[A-Za-z0-9]+", str(texto or ""))
+    utiles = [t for t in crudos if len(t) >= 3 and t.lower() not in _TOKENS_GENERICOS]
+    return list(dict.fromkeys(utiles))[:tope]
+
+
+def _buscar_deals_por_nombre(client, texto, propiedades, tope=60):
+    """Deals cuyo dealname se parece a `texto`. Devuelve (deals, como_se_encontro).
+
+    Dos pasadas, y las dos hacen falta (medido contra la API el 2026-09-18):
+
+    1. El texto entero como un solo CONTAINS_TOKEN. HubSpot lo trata como "todos
+       estos tokens", asi que 'PinPoint Analytics' encuentra el deal exacto, pero
+       'KTB Services' contra 'KTBSERVICES LLC' devuelve CERO y 'One Shore Media'
+       contra 'One Core Media' tambien.
+    2. Token por token con comodin de prefijo, y se juntan TODAS las pasadas.
+       Cortar en el primer token que trae algo parece mas barato y esta mal: el
+       token que matchea primero suele ser el generico. 'KTB Services' probaba
+       'Services*' (tres deals que no son) y nunca llegaba a 'KTB*', que es el
+       unico que encuentra 'KTBSERVICES LLC'. El ruido que agrega la pasada
+       generica lo acomoda el orden por parecido de nombre.
+
+    NO hay umbral de parecido: lo que vuelve se ordena y lo elige una persona.
+    """
+    texto = str(texto or "").strip()
+    if not texto:
+        return [], None
+
+    def buscar(valor):
+        return client.search_deals(
+            [{"propertyName": "dealname", "operator": "CONTAINS_TOKEN", "value": valor}],
+            extra_properties=propiedades,
+            max_results=tope,
+        )
+
+    encontrados = buscar(texto)
+    if encontrados:
+        return encontrados, texto
+
+    por_id, con_que = {}, []
+    for token in _tokens_de_busqueda(texto):
+        valor = token + "*"
+        hallados = buscar(valor)
+        if not hallados:
+            continue
+        con_que.append(valor)
+        for deal in hallados:
+            por_id.setdefault(str(deal.get("id")), deal)
+        if len(por_id) >= tope:
+            break
+    return list(por_id.values()), (" / ".join(con_que) or None)
+
+
+@bp.route("/hubspot/opportunities/<int:opportunity_id>/deal-candidates",
+          methods=["GET", "OPTIONS"])
+def hubspot_deal_candidates(opportunity_id):
+    """Deals de HubSpot que podrian ser esta vacante. Read-only: no escribe nada.
+
+    `?q=` reemplaza el nombre de la cuenta como texto de busqueda. Hace falta que
+    sea editable: el deal de One Shore Media se llama 'One Core Media' en HubSpot,
+    y sin poder cambiar el texto esos casos no se pueden vincular desde la UI.
+
+    Quien vincula es una persona, con POST .../link-deal. Esto solo sugiere, igual
+    que _link_candidates pero en el sentido contrario.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT o.opportunity_id, o.account_id, o.opp_stage, o.opp_model,
+                       o.opp_position_name, o.deep_dive_date,
+                       NULLIF(o.hubspot_deal_id, '') AS hubspot_deal_id,
+                       COALESCE(a.client_name, '') AS client_name
+                  FROM opportunity o
+                  LEFT JOIN account a ON a.account_id = o.account_id
+                 WHERE o.opportunity_id = %s
+                """,
+                (opportunity_id,),
+            )
+            opp = cursor.fetchone()
+            if not opp:
+                return jsonify({
+                    "success": False,
+                    "error": f"no existe la opportunity #{opportunity_id}",
+                }), 404
+
+            consulta = (request.args.get("q") or "").strip() or opp["client_name"]
+            if not consulta:
+                return jsonify({
+                    "success": True, "opportunity_id": opportunity_id, "q": "",
+                    "encontrado_con": None, "deals": [],
+                    "motivo": "la cuenta no tiene nombre; escribi con que buscar",
+                })
+
+            client = HubSpotClient()
+            pipeline_map = hs_opps.resolve_pipeline_stage_map(client)
+            property_map = hs_opps.resolve_opportunity_property_map(client)
+            role_prop = property_map.get("role_to_hire")
+
+            propiedades = ["dealname", "dealstage", "pipeline", "createdate"]
+            if role_prop:
+                propiedades.append(role_prop)
+            propiedades.extend(pipeline_map.get("date_properties") or [])
+
+            crudos, encontrado_con = _buscar_deals_por_nombre(
+                client, consulta, propiedades
+            )
+
+            # Un deal ya atado a otra opp lo rechazaria /link-deal con 409: mejor no
+            # ofrecerlo. Una sola query con todos los ids en vez de una por fila.
+            ids = [str(d.get("id")) for d in crudos if d.get("id")]
+            atados = {}
+            if ids:
+                cursor.execute(
+                    """
+                    SELECT NULLIF(hubspot_deal_id, '') AS deal_id, opportunity_id
+                      FROM opportunity
+                     WHERE NULLIF(hubspot_deal_id, '') = ANY(%s)
+                    """,
+                    (ids,),
+                )
+                atados = {f["deal_id"]: f["opportunity_id"] for f in cursor.fetchall()}
+
+        opp_dd = _fecha_iso(opp["deep_dive_date"])
+        pipelines_conocidos = set(
+            (pipeline_map.get("pipeline_id_by_key") or {}).values()
+        )
+
+        filas = []
+        for deal in crudos:
+            deal_id = str(deal.get("id") or "")
+            props = deal.get("properties") or {}
+            pipeline_id = str(props.get("pipeline") or "").strip()
+            # Un deal de un pipeline que no sincronizamos quedaria atado y mudo, y
+            # /link-deal lo rechaza con 400. No se ofrece.
+            if pipelines_conocidos and pipeline_id not in pipelines_conocidos:
+                continue
+            entry = hs_opps.pipeline_entry(pipeline_map, pipeline_id) or {}
+            dealstage_id = str(props.get("dealstage") or "").strip()
+            fechas = hs_opps.stage_dates_from_deal(
+                pipeline_map, pipeline_id, props, _parse_hubspot_date
+            )
+            deal_dd = _fecha_iso(fechas.get("deep_dive_date"))
+            dealname = str(props.get("dealname") or "").strip()
+            role = str(props.get(role_prop) or "").strip() if role_prop else ""
+            filas.append({
+                "deal_id": deal_id,
+                "dealname": dealname,
+                "role_to_hire": role or None,
+                "pipeline": entry.get("label"),
+                "stage": (entry.get("stage_labels") or {}).get(dealstage_id),
+                "stage_key": hs_opps.deal_stage_key(pipeline_map, pipeline_id, dealstage_id),
+                "deep_dive_date": deal_dd,
+                "nda_signature_or_start_date": _fecha_iso(
+                    fechas.get("nda_signature_or_start_date")
+                ),
+                "mismo_deep_dive": bool(deal_dd and opp_dd and deal_dd == opp_dd),
+                # Dos parecidos distintos y los dos ordenan: el del NOMBRE separa
+                # 'One Core Media' de 'Frayter Media' cuando la busqueda fue por el
+                # token generico, y el del PUESTO desempata dos deals del mismo
+                # cliente. position_similarity sirve para los dos: es tokens +
+                # SequenceMatcher, no sabe que esta comparando.
+                "parecido_nombre": round(
+                    hs_opps.position_similarity(consulta, dealname), 3
+                ),
+                "parecido_puesto": round(
+                    hs_opps.position_similarity(opp["opp_position_name"], role), 3
+                ),
+                # Solo molesta si esta atado a OTRA opp: /link-deal lo rechaza con
+                # 409. Atado a esta misma no es un problema, es la respuesta.
+                "ya_atado_a": (
+                    atados.get(deal_id)
+                    if atados.get(deal_id) != opportunity_id else None
+                ),
+                "es_el_actual": atados.get(deal_id) == opportunity_id,
+            })
+
+        # Mismo criterio que _link_candidates: la fecha de Deep Dive primero, que es
+        # la senal que mas pego en la practica (en las 9 duplicadas de septiembre
+        # coincidia dia por dia incluso donde el texto no se parecia en nada).
+        # Nada de esto DECIDE: no hay umbral, solo ordenan.
+        filas.sort(key=lambda f: (
+            bool(f["ya_atado_a"]),
+            -int(f["mismo_deep_dive"]),
+            -f["parecido_nombre"],
+            -f["parecido_puesto"],
+        ))
+        return jsonify({
+            "success": True,
+            "opportunity_id": opportunity_id,
+            "opp_position_name": opp["opp_position_name"],
+            "opp_deep_dive_date": opp_dd,
+            "client_name": opp["client_name"],
+            "ya_vinculada_a": opp["hubspot_deal_id"],
+            "q": consulta,
+            "encontrado_con": encontrado_con,
+            "deals": filas[:8],
+            "total_encontrados": len(filas),
+        })
+    except HubSpotError as exc:
+        logging.exception("No se pudieron buscar deals para la opp %s", opportunity_id)
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("No se pudieron buscar deals para la opp %s", opportunity_id)
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @bp.route("/hubspot/opportunities/<int:opportunity_id>/link-deal", methods=["POST", "OPTIONS"])
 def link_opportunity_to_hubspot_deal(opportunity_id):
     """Ata a mano una opp que ya existia en el hub con su deal de HubSpot.
@@ -3901,7 +4132,16 @@ def unmark_hubspot_deal_as_new(deal_id):
 
 @bp.route("/hubspot/opportunities/<int:opportunity_id>/unlink-deal", methods=["POST", "OPTIONS"])
 def unlink_opportunity_from_hubspot_deal(opportunity_id):
-    """Deshace una vinculacion equivocada. Sin esto solo se arregla por SQL."""
+    """Deshace una vinculacion equivocada. Sin esto solo se arregla por SQL.
+
+    Borra tambien el sello del push (hubspot_push_hash / hubspot_pushed_at), y esa
+    parte NO es cosmetica. values_fingerprint() se calcula SOLO con los valores del
+    hub —stage y montos— y no incluye el deal, asi que despues de atar la opp a
+    OTRO deal la huella vieja sigue coincidiendo: el push contestaria
+    "sin_cambios" y no escribiria nunca en el deal nuevo, mientras el hub muestra
+    todo en orden. Es el tipo de falla muda que no se descubre hasta que alguien
+    mira HubSpot de casualidad.
+    """
     if request.method == "OPTIONS":
         return ("", 204)
 
@@ -3914,13 +4154,19 @@ def unlink_opportunity_from_hubspot_deal(opportunity_id):
         conn = get_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             _ensure_hubspot_opportunity_columns(cursor)
+            # El sello del push vive en columnas que crea _ensure_push_columns(),
+            # aparte a proposito (ver CLAUDE.md): sin esto el UPDATE de abajo
+            # revienta con UndefinedColumn en un entorno donde nunca se pusheo.
+            _ensure_push_columns(cursor)
             conn.commit()
             cursor.execute(
                 """
                 UPDATE opportunity
                    SET hubspot_deal_id = NULL,
                        hubspot_pipeline_id = NULL,
-                       hubspot_dealstage_id = NULL
+                       hubspot_dealstage_id = NULL,
+                       hubspot_push_hash = NULL,
+                       hubspot_pushed_at = NULL
                  WHERE opportunity_id = %s
                 RETURNING opportunity_id
                 """,
@@ -4291,6 +4537,9 @@ def _ensure_push_columns(cursor):
     _PUSH_SCHEMA_READY = True
 
 
+PUSH_ENABLED_ENV = "HUBSPOT_PUSH_ENABLED"
+
+
 def _push_enabled():
     """Apagado por defecto. Se prende recien despues de mirar el preview.
 
@@ -4298,9 +4547,50 @@ def _push_enabled():
     que ve todo el equipo de ventas: no es algo que deba encenderse solo al
     deployar.
     """
-    return str(os.environ.get("HUBSPOT_PUSH_ENABLED") or "").strip().lower() in (
+    return str(os.environ.get(PUSH_ENABLED_ENV) or "").strip().lower() in (
         "1", "true", "yes", "on",
     )
+
+
+def _normalizar_nombre_env(nombre):
+    return re.sub(r"[^a-z0-9]", "", str(nombre or "").lower())
+
+
+def _env_parecida_a_push_enabled():
+    """Una env seteada con el nombre casi bien. None si no hay ninguna.
+
+    Existe por una tarde perdida el 2026-09-18: en App Runner la variable estaba
+    como HUBSPOT_PUSH_ENABLE (sin D), asi que _push_enabled() leia None, el boton
+    "Enviar a HubSpot" contestaba "desactivado en este entorno" y la consola de AWS
+    mostraba la variable puesta en true. El sintoma no dice en ningun lado que el
+    nombre este mal.
+
+    Compara sin mayusculas ni guiones bajos y tolera hasta 2 caracteres de
+    diferencia de largo, que cubre el typo tipico (una letra de menos, un plural,
+    un guion de mas). Solo mira variables que empiezan con HUBSPOT_ y solo devuelve
+    el valor de esa: el environment entero tiene secretos y no se vuelca nunca.
+    """
+    esperado = _normalizar_nombre_env(PUSH_ENABLED_ENV)
+    for nombre, valor in os.environ.items():
+        if nombre == PUSH_ENABLED_ENV or not nombre.upper().startswith("HUBSPOT_"):
+            continue
+        candidato = _normalizar_nombre_env(nombre)
+        if candidato == esperado:
+            continue
+        # Prefijo de uno del otro y casi del mismo largo: "hubspotpushenable" vs
+        # "hubspotpushenabled" entra; "hubspotsyncsecret" no.
+        comparte_prefijo = candidato.startswith(esperado) or esperado.startswith(candidato)
+        if comparte_prefijo and abs(len(candidato) - len(esperado)) <= 2:
+            return {
+                "nombre": nombre,
+                "valor": valor,
+                "esperado": PUSH_ENABLED_ENV,
+                "detalle": (
+                    "hay una variable con un nombre parecido seteada; el codigo lee "
+                    "%s y esta no cuenta" % PUSH_ENABLED_ENV
+                ),
+            }
+    return None
 
 
 def _push_one(client, cursor, opportunity_id, dry_run, pipeline_map=None, property_map=None):
@@ -4598,6 +4888,9 @@ def check_hubspot_push_scope():
             "probe_status": probe.status_code,
             "scopes": sorted(info.get("scopes") or []) or None,
             "push_habilitado": _push_enabled(),
+            # Si el push esta apagado pero hay una env con el nombre casi bien, eso
+            # es LA respuesta a "pero si la tengo puesta". Ver _env_parecida_a_push_enabled.
+            "env_sospechosa": None if _push_enabled() else _env_parecida_a_push_enabled(),
             "que_falta": None if puede else (
                 "La credencial no puede escribir deals: falta crm.objects.deals.write"
             ),

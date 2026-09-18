@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260918-guarantee" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260918-hslink" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -851,14 +851,53 @@
            salió, pero salió ANTES de que se cargaran estos campos, así que lo que se
            escriba abajo no viaja hasta que alguien lo reenvíe o corra el cron. -->
       <div id="hubspot-push" class="hs-sync" hidden>
-        <div class="hs-sync-main">
-          <div class="hs-sync-text">
-            <strong class="hs-sync-title">Sincronizar con HubSpot</strong>
-            <span class="hs-sync-sub">Los datos que cargues acá no se copian solos al deal.</span>
+        <!-- Estado 1: la vacante ya tiene deal atado. -->
+        <div id="hubspot-push-linked" hidden>
+          <div class="hs-sync-main">
+            <div class="hs-sync-text">
+              <strong class="hs-sync-title">Sincronizar con HubSpot</strong>
+              <span class="hs-sync-sub">Los datos que cargues acá no se copian solos al deal.</span>
+            </div>
+            <div class="hs-sync-actions">
+              <button type="button" id="hubspot-push-btn" class="hs-sync-btn">Enviar a HubSpot</button>
+              <!-- Deshacer una vinculación equivocada. Sin este botón el único
+                   arreglo es por consola, y vincular lo puede hacer cualquiera
+                   que cargue un hire. -->
+              <button type="button" id="hubspot-unlink-btn" class="hs-sync-btn hs-sync-btn-ghost">Desvincular</button>
+            </div>
           </div>
-          <button type="button" id="hubspot-push-btn" class="hs-sync-btn">Enviar a HubSpot</button>
+          <p class="hs-sync-deal" id="hubspot-push-deal" hidden></p>
+          <div id="hubspot-push-msg" class="hs-sync-msg" hidden></div>
         </div>
-        <div id="hubspot-push-msg" class="hs-sync-msg" hidden></div>
+
+        <!-- Estado 2: no tiene deal, así que no hay nada que enviar todavía.
+             Antes acá no se mostraba NADA y el botón simplemente no existía, que
+             es exactamente lo que no se entiende desde afuera. De 355 opps en
+             Close Win con hire cargado, sólo 14 tienen deal: el camino para
+             atarlo tiene que estar donde se nota que falta. -->
+        <div id="hubspot-push-unlinked" hidden>
+          <div class="hs-sync-main">
+            <div class="hs-sync-text">
+              <strong class="hs-sync-title">Esta vacante no está vinculada a HubSpot</strong>
+              <span class="hs-sync-sub">Sin deal atado no se puede enviar nada. Buscá el deal y vinculalo una sola vez.</span>
+            </div>
+            <button type="button" id="hubspot-link-open" class="hs-sync-btn">Buscar el deal</button>
+          </div>
+
+          <div id="hubspot-link-panel" class="hs-link" hidden>
+            <div class="hs-link-search">
+              <!-- Editable a propósito: el deal de One Shore Media se llama
+                   "One Core Media" en HubSpot. Sin poder cambiar el texto, esos
+                   casos no se pueden vincular desde ningún lado. -->
+              <input type="text" id="hubspot-link-q" class="hs-link-input"
+                     placeholder="Nombre del cliente en HubSpot" autocomplete="off" />
+              <button type="button" id="hubspot-link-search" class="hs-sync-btn">Buscar</button>
+            </div>
+            <p class="hs-link-hint" id="hubspot-link-hint" hidden></p>
+            <div id="hubspot-link-list" class="hs-link-list"></div>
+            <div id="hubspot-link-msg" class="hs-sync-msg" hidden></div>
+          </div>
+        </div>
       </div>
 
       <div class="grid">
@@ -1336,7 +1375,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260918-guarantee"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260918-hslink"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

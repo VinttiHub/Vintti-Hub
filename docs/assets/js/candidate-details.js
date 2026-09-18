@@ -529,15 +529,206 @@ function nombresLegibles(props){
   return Object.keys(props || {}).map(k => HS_CAMPO_LEGIBLE[k] || k);
 }
 
-/* El banner aparece si la vacante VINO DE HUBSPOT (tiene deal atado), sin mirar el
+/* El banner tiene DOS estados y se muestra siempre que haya vacante, sin mirar el
    stage. Antes miraba opp_stage y no se veía al llegar recién desde el popup de
-   Signed. Si el stage no es de los que viajan, el backend lo explica al apretar. */
+   Signed. Si el stage no es de los que viajan, el backend lo explica al apretar.
+
+   Con deal atado → el botón de enviar. Sin deal → el buscador para atarlo. Hasta
+   el 2026-09-18 el estado "sin deal" no existía: el banner entero se escondía, y
+   desde afuera parecía que el botón sólo aparecía en las opps que había creado el
+   sync. La regla verdadera siempre fue "tiene hubspot_deal_id", que también se
+   cumple en una opp cargada a mano que el sync adoptó después. */
 function mostrarBotonPushHubspot(oppData){
   const box = document.getElementById('hubspot-push');
   if (!box) return;
-  box.hidden = !oppData?.hubspot_deal_id;
+  const oppId = Number(oppData?.opportunity_id) || null;
+  // Sin vacante no hay nada que decir: ni enviar ni vincular.
+  box.hidden = !oppId;
+  const vinculada = !!oppData?.hubspot_deal_id;
+  const linked   = document.getElementById('hubspot-push-linked');
+  const unlinked = document.getElementById('hubspot-push-unlinked');
+  if (linked)   linked.hidden   = !vinculada;
+  if (unlinked) unlinked.hidden = vinculada;
+
+  // A qué deal está atada. Se dice en pantalla porque es lo único que permite
+  // notar que está atada al deal equivocado antes de apretar Enviar.
+  const deal = document.getElementById('hubspot-push-deal');
+  if (deal) {
+    deal.textContent = vinculada ? `Deal ${oppData.hubspot_deal_id}` : '';
+    deal.hidden = !vinculada;
+  }
+
   const msg = document.getElementById('hubspot-push-msg');
   if (msg) { msg.hidden = true; msg.textContent = ''; }
+  // El panel de búsqueda arranca cerrado cada vez que se repinta la solapa: si
+  // quedara abierto con los resultados de otro candidato, el botón "Vincular"
+  // estaría ofreciendo atar el deal a una vacante que ya no es la de la pantalla.
+  cerrarPanelVinculacion();
+}
+
+/* ——— Vincular la vacante con su deal de HubSpot ————————————————————————
+   El panel de deals frenados de Opportunities arranca del DEAL y sólo aparece
+   mientras el sync lo frena. Acá el recorrido es el contrario: tengo la vacante
+   y me falta el deal. Sugiere; vincula una persona con un click. */
+function cerrarPanelVinculacion(){
+  const panel = document.getElementById('hubspot-link-panel');
+  if (panel) panel.hidden = true;
+  const lista = document.getElementById('hubspot-link-list');
+  if (lista) lista.innerHTML = '';
+  pintarMsgLink('', null);
+  const hint = document.getElementById('hubspot-link-hint');
+  if (hint) { hint.hidden = true; hint.textContent = ''; }
+}
+
+function pintarMsgLink(texto, tipo){
+  const msg = document.getElementById('hubspot-link-msg');
+  if (!msg) return;
+  msg.className = 'hs-sync-msg' + (tipo ? ' is-' + tipo : '');
+  msg.textContent = texto;
+  msg.hidden = !texto;
+}
+
+function escHsLink(valor){
+  return String(valor ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function filaDealCandidato(deal, oppDeepDive){
+  const atado = deal.ya_atado_a;
+  // La fecha de Deep Dive es la señal que más pegó en la práctica: en las 9
+  // duplicadas de septiembre coincidía día por día incluso donde el texto no se
+  // parecía en nada. Se muestra, pero no decide: decide quien mira.
+  const fecha = deal.deep_dive_date
+    ? `Deep Dive ${escHsLink(deal.deep_dive_date)}${deal.mismo_deep_dive ? ' · misma fecha' : ''}`
+    : 'sin fecha de Deep Dive';
+  const accion = atado
+    ? `<span class="hs-link-taken">ya atado a la vacante #${escHsLink(atado)}</span>`
+    : `<button type="button" class="hs-sync-btn hs-link-pick"
+               data-deal-id="${escHsLink(deal.deal_id)}">Vincular</button>`;
+  return `
+    <div class="hs-link-row${deal.mismo_deep_dive ? ' is-match' : ''}${atado ? ' is-taken' : ''}">
+      <div class="hs-link-row-main">
+        <strong class="hs-link-name">${escHsLink(deal.dealname || 'Deal sin nombre')}</strong>
+        <span class="hs-link-meta">
+          ${escHsLink(deal.role_to_hire || 'sin puesto cargado')} ·
+          ${escHsLink(deal.stage || 'sin stage')} · ${fecha}
+        </span>
+      </div>
+      ${accion}
+    </div>`;
+}
+
+async function buscarDealsParaVincular(apiBase, texto){
+  const oppId = window.__currentOppId;
+  const lista = document.getElementById('hubspot-link-list');
+  const input = document.getElementById('hubspot-link-q');
+  const hint  = document.getElementById('hubspot-link-hint');
+  if (!oppId) { pintarMsgLink('Esta contratación no está asociada a ninguna vacante.', 'err'); return; }
+  if (!lista) return;
+
+  pintarMsgLink('', null);
+  lista.innerHTML = '<p class="hs-link-empty">Buscando en HubSpot…</p>';
+  try {
+    const url = new URL(`${apiBase}/hubspot/opportunities/${encodeURIComponent(oppId)}/deal-candidates`);
+    if (texto) url.searchParams.set('q', texto);
+    const res = await fetch(url.toString());
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      lista.innerHTML = '';
+      pintarMsgLink(data?.error || `No se pudo buscar (error ${res.status}).`, 'err');
+      return;
+    }
+    // El input se llena con lo que el backend terminó usando (por defecto el
+    // nombre de la cuenta), para que quede claro qué se buscó y se pueda editar.
+    if (input && !input.value) input.value = data.q || '';
+    if (hint) {
+      hint.textContent = data.encontrado_con && data.encontrado_con !== data.q
+        ? `No hubo match exacto: se buscó por "${data.encontrado_con}".`
+        : '';
+      hint.hidden = !hint.textContent;
+    }
+    if (!data.deals || !data.deals.length) {
+      lista.innerHTML = `<p class="hs-link-empty">No apareció ningún deal para
+        "${escHsLink(data.q)}". Probá con el nombre que tiene en HubSpot.</p>`;
+      return;
+    }
+    lista.innerHTML = data.deals
+      .map(d => filaDealCandidato(d, data.opp_deep_dive_date)).join('');
+  } catch (err) {
+    console.error('Buscar deals falló:', err);
+    lista.innerHTML = '';
+    pintarMsgLink('No se pudo conectar con el servidor.', 'err');
+  }
+}
+
+async function desvincularDeal(apiBase, candidateId){
+  const oppId = window.__currentOppId;
+  const btn = document.getElementById('hubspot-unlink-btn');
+  if (!oppId) return;
+  // Confirmación de verdad: desvincular deja a la vacante fuera del sync hasta que
+  // alguien la vuelva a atar, y el cron puede crear una duplicada mientras tanto.
+  if (!confirm('¿Desvincular esta vacante del deal de HubSpot?\n\n' +
+               'Deja de enviarle datos. Si el deal sigue abierto en HubSpot, el sync ' +
+               'puede volver a crear una vacante duplicada.')) return;
+  const textoOriginal = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Desvinculando…'; }
+  try {
+    const res = await fetch(
+      `${apiBase}/hubspot/opportunities/${encodeURIComponent(oppId)}/unlink-deal`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      pintarMsgPush(data?.error || `No se pudo desvincular (error ${res.status}).`, 'err');
+      return;
+    }
+    const oppData = await fetch(
+      `${apiBase}/candidates/${candidateId}/hire_opportunity`, { cache: 'no-store' }
+    ).then(r => r.json()).catch(() => null);
+    mostrarBotonPushHubspot(oppData);
+    // El aviso vive DENTRO del panel de búsqueda, y mostrarBotonPushHubspot lo
+    // deja cerrado. Se abre acá a propósito: si desvinculó fue porque estaba mal,
+    // así que lo que sigue es buscar el deal correcto.
+    const panel = document.getElementById('hubspot-link-panel');
+    if (panel) panel.hidden = false;
+    pintarMsgLink('Desvinculada. Buscá el deal correcto y volvé a vincularla.', 'warn');
+  } catch (err) {
+    console.error('Desvincular deal falló:', err);
+    pintarMsgPush('No se pudo conectar con el servidor.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+  }
+}
+
+async function vincularDeal(apiBase, dealId, candidateId){
+  const oppId = window.__currentOppId;
+  if (!oppId || !dealId) return;
+  pintarMsgLink('Vinculando…', null);
+  try {
+    const res = await fetch(
+      `${apiBase}/hubspot/opportunities/${encodeURIComponent(oppId)}/link-deal`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deal_id: String(dealId) }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      pintarMsgLink(data?.error || `No se pudo vincular (error ${res.status}).`, 'err');
+      return;
+    }
+    // Repintar desde el servidor y no a mano: así el estado de la pantalla sale
+    // de la misma fuente que lo decide, y aparece el botón de enviar sin recargar.
+    const oppData = await fetch(
+      `${apiBase}/candidates/${candidateId}/hire_opportunity`, { cache: 'no-store' }
+    ).then(r => r.json()).catch(() => null);
+    mostrarBotonPushHubspot(oppData);
+    pintarMsgPush(
+      data.opp_cerrada
+        ? 'Vinculada. La vacante está cerrada, así que el sync no le va a mover el stage.'
+        : 'Vinculada. Ya podés enviar los datos a HubSpot.',
+      'ok');
+  } catch (err) {
+    console.error('Vincular deal falló:', err);
+    pintarMsgLink('No se pudo conectar con el servidor.', 'err');
+  }
 }
 
 function pintarMsgPush(texto, tipo){
@@ -4119,6 +4310,45 @@ if (hireRevenue){
   const hsPushBtn = document.getElementById('hubspot-push-btn');
   if (hsPushBtn) {
     hsPushBtn.addEventListener('click', () => reenviarAHubspot(candidatesApiBase()));
+  }
+  const hsUnlinkBtn = document.getElementById('hubspot-unlink-btn');
+  if (hsUnlinkBtn) {
+    hsUnlinkBtn.addEventListener('click', () =>
+      desvincularDeal(candidatesApiBase(), candidateId));
+  }
+  // Vinculación con el deal. El panel arranca cerrado y la primera búsqueda sale
+  // sin `q`: el backend usa el nombre de la cuenta y devuelve con qué buscó.
+  const hsLinkOpen = document.getElementById('hubspot-link-open');
+  if (hsLinkOpen) {
+    hsLinkOpen.addEventListener('click', () => {
+      const panel = document.getElementById('hubspot-link-panel');
+      if (!panel) return;
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) buscarDealsParaVincular(candidatesApiBase(), '');
+    });
+  }
+  const hsLinkSearch = document.getElementById('hubspot-link-search');
+  const hsLinkQ = document.getElementById('hubspot-link-q');
+  if (hsLinkSearch) {
+    hsLinkSearch.addEventListener('click', () =>
+      buscarDealsParaVincular(candidatesApiBase(), (hsLinkQ?.value || '').trim()));
+  }
+  if (hsLinkQ) {
+    hsLinkQ.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();   // adentro de la solapa Hire, Enter manda el form
+      buscarDealsParaVincular(candidatesApiBase(), (hsLinkQ.value || '').trim());
+    });
+  }
+  // Delegado: las filas se repintan en cada búsqueda, así que no se puede cablear
+  // botón por botón.
+  const hsLinkList = document.getElementById('hubspot-link-list');
+  if (hsLinkList) {
+    hsLinkList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.hs-link-pick');
+      if (!btn) return;
+      vincularDeal(candidatesApiBase(), btn.dataset.dealId, candidateId);
+    });
   }
   const hsReopen = document.querySelector('#hubspot-hire-reopen button');
   if (hsReopen) {

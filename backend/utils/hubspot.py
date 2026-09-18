@@ -121,7 +121,14 @@ class HubSpotClient:
             })
         return self.search_deals(filters, extra_properties=extra_properties)
 
-    def search_deals(self, filters, extra_properties=None):
+    def search_deals(self, filters, extra_properties=None, max_results=None):
+        """Busca deals. `max_results` corta la paginacion.
+
+        Sin `max_results` esto pagina hasta agotar el resultado, que es lo que
+        necesita el sync. Un buscador por nombre no: un token generico como
+        "Media" trae decenas de deals y no tiene sentido traerlos todos para
+        despues mostrar 8.
+        """
         properties = [
             "dealname",
             "dealstage",
@@ -148,6 +155,8 @@ class HubSpotClient:
                 body["after"] = after
             payload = self._request("POST", "/crm/v3/objects/deals/search", json=body)
             results.extend(payload.get("results", []))
+            if max_results and len(results) >= max_results:
+                return results[:max_results]
             after = payload.get("paging", {}).get("next", {}).get("after")
             if not after:
                 break

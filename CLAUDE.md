@@ -475,8 +475,13 @@ Cinco cosas que no son obvias:
   (app privada **36896335**, portal **23778741**) con una cuenta Super Admin. Sin él, HubSpot
   devuelve 403 y no se escribe nada. `HubSpotClient.update_deal()` es **el único write del repo**
   hacia HubSpot; todo lo demás lee.
-- **Apagado por defecto** (`HUBSPOT_PUSH_ENABLED`). Mover un deal a Closed Win puede disparar
-  workflows y notificaciones que ve todo ventas: no es algo que deba encenderse al deployar.
+- **Apagado por defecto** (`HUBSPOT_PUSH_ENABLED`, con **D** al final). Mover un deal a Closed
+  Win puede disparar workflows y notificaciones que ve todo ventas: no es algo que deba
+  encenderse al deployar. El 2026-09-18 la env en App Runner estaba como `HUBSPOT_PUSH_ENABLE`
+  y costó una tarde: el botón contestaba "desactivado en este entorno" mientras la consola de
+  AWS mostraba la variable en `true`. Por eso `GET /hubspot/push/scope` ahora devuelve
+  **`env_sospechosa`**: si el push está apagado y hay una env con el nombre casi igual, la
+  nombra. Es lo primero que hay que mirar ante un "pero si la tengo puesta".
 - **El disparo va FUERA del `with conn:`** de `update_opportunity_stage`, igual que el mail de
   cliente inactivo, y **nunca levanta**. Adentro, una llamada HTTP de 30s con reintentos dejaría
   la transacción abierta y un error de HubSpot haría rollback de un stage que la persona ya
@@ -485,9 +490,49 @@ Cinco cosas que no son obvias:
 - **No retrocede ni resucita.** `decide_push_stage()` es el espejo de `decide_stage_transition()`:
   si HubSpot ya está igual o más adelante no toca el stage (los montos sí viajan igual), y si el
   deal está en Closed Lost o DQL **no lo toca en absoluto** — moverlo desde ahí lo reabriría.
-- **Sólo alcanza a las opps con `hubspot_deal_id`.** Hoy son **7**: el hub tiene 358 opps en
-  Close Win pero sólo 6 atadas a un deal (más 1 en Signed). Las históricas nunca se ataron, así
-  que en la práctica esto sirve **hacia adelante**.
+- **Sólo alcanza a las opps con `hubspot_deal_id`.** Al 2026-09-18 son **15**: de 355 opps en
+  Close Win con hire cargado, 14 tienen deal (más 1 en Signed). Las históricas nunca se ataron,
+  así que sin vincularlas esto sirve sólo **hacia adelante** — de ahí el buscador de la solapa
+  Hire, abajo.
+
+### Vincular desde la vacante: el camino inverso al panel de deals frenados
+
+El panel de `docs/opportunities.html` arranca del **deal** y sólo aparece mientras el sync lo
+frena. Para una opp vieja que ya tiene el hire cargado el recorrido es el contrario —tengo la
+vacante, me falta el deal— y hasta el 2026-09-18 no existía: el banner de la solapa Hire se
+escondía entero cuando no había deal, así que desde afuera parecía que el botón **Enviar a
+HubSpot** sólo salía en las opps que había creado el sync. La regla siempre fue *tiene
+`hubspot_deal_id`*, que también se cumple en una opp cargada a mano que el sync **adoptó**.
+
+Ahora el banner tiene dos estados y el de "sin deal" ofrece buscar:
+`GET /hubspot/opportunities/<id>/deal-candidates?q=` (read-only) →
+`POST .../link-deal`, que ya existía.
+
+Tres cosas que no son obvias:
+
+- **Se busca por NOMBRE, no por cuenta.** `account.hubspot_company_id` está cargado en 16 de
+  345 cuentas y en **ninguna** de las que hay que arreglar, así que la asociación por company
+  no sirve para este caso.
+- **Dos pasadas contra `CONTAINS_TOKEN`, y las dos hacen falta** (medido contra la API):
+  el texto entero encuentra `PinPoint Analytics`, pero devuelve **cero** para
+  `KTB Services` → `KTBSERVICES LLC` y para `One Shore Media` → `One Core Media`. La segunda
+  pasada va token por token con comodín (`KTB*`) y **junta todas**: cortar en el primer token
+  que trae algo probaba `Services*` y nunca llegaba a `KTB*`.
+- **El input es editable a propósito.** Cuando el deal se llama distinto que la cuenta
+  (*One Core* vs *One Shore*) es la única forma de llegar a él. La red de contención es que
+  `link-deal` **no valida** que el deal sea de la cuenta de la opp: por eso cada fila muestra
+  el nombre del deal en grande, y nunca hay nada preseleccionado.
+
+A diferencia del panel de Opportunities —gateado a `pgonzales` + `mariano` por
+`OPP_HUBSPOT_WAITING_ALLOWED`— este camino **no tiene lista de acceso**: lo usa cualquiera que
+cargue un hire, que es el punto de sacar el cuello de botella. Por eso el estado "vinculada"
+muestra el deal id y tiene **Desvincular** al lado de Enviar.
+
+**`unlink-deal` borra también `hubspot_push_hash` / `hubspot_pushed_at`, y eso no es
+cosmética.** `values_fingerprint()` se calcula SOLO con stage + montos del hub y **no incluye
+el deal**: sin limpiar el sello, una opp que se desata y se vuelve a atar a OTRO deal conserva
+la huella vieja, el push contesta `sin_cambios` y **no escribe nunca en el deal nuevo**
+mientras el hub muestra todo en orden.
 
 Los números salen de `utils/hubspot_push_values.py`, que **replica la precedencia de
 `_mrr_staffing.py:79-95`** (última fila de `salary_updates` → la primera → `hire_opportunity.*`)
