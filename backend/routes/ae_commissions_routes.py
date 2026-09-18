@@ -80,6 +80,9 @@ def get_report():
         "mes_ini": mes_ini.isoformat(),
         "mes_fin": mes_fin.isoformat(),
         "churn_m3_override_applied": payload.get("churn_m3_override_applied"),
+        # Si es False, la migracion del arrangement todavia no se corrio y TODOS los
+        # reemplazos de Recruiting van a salir como "Sin arrangement".
+        "guarantee_column_present": payload.get("guarantee_column_present"),
     }))
 
 

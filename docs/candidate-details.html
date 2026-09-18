@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260917-apibase-fix2" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260918-guarantee" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -905,6 +905,19 @@
           <input type="number" id="hire-revenue" />
         </div>
 
+        <!-- Replacement arrangement (recruiting only; visibility handled by JS).
+             La garantia del puesto: si el candidato se cae dentro de estos dias, el
+             reemplazo se busca sin cargo y no comisiona al AE. Lo lee el reporte de
+             Comisiones AE, pestana Recruiting. -->
+        <div class="field" id="hire-guarantee-field" style="display:none;">
+          <label for="hire-guarantee">Replacement arrangement</label>
+          <select id="hire-guarantee">
+            <option value="">—</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </div>
+
         <div class="field">
           <label for="hire-price-type">Price Type</label>
           <select id="hire-price-type">
@@ -1323,7 +1336,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260917-apibase-fix2"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260918-guarantee"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

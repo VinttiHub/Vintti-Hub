@@ -44,6 +44,100 @@ _LINKEDIN_SCHEME_RE = re.compile(r'^https?://', flags=re.I)
 _WHITESPACE_RE = re.compile(r'\s+')
 _LINKEDIN_DOMAIN_RE = re.compile(r'linkedin\.com.*', flags=re.I)
 _BLACKLIST_COLUMN_CACHE = None
+
+# --------------------------------------------------------------------------- #
+# hire_opportunity.replacement_guarantee_days
+#
+# El arrangement de garantia de un hire de Recruiting (60 o 90 dias). La crea la
+# migracion 20260918_add_hire_replacement_guarantee.sql, que se corre a mano;
+# estos helpers hacen que el Hub funcione igual antes de correrla.
+#
+# Van SEPARADOS y con su propio flag de proceso a proposito: una columna nueva
+# metida adentro de un ensure que ya cortocircuita no se crea nunca en un entorno
+# donde el chequeo ya da True (o sea, en produccion). Es exactamente lo que paso
+# con `hubspot_pushed_at` el 2026-09-16 — ver CLAUDE.md.
+#
+# El ALTER se llama SOLO desde el PATCH. Un ADD COLUMN toma ACCESS EXCLUSIVE sobre
+# `hire_opportunity`, y hacerlo en cada lectura deadlockea (mismo razonamiento que
+# el comentario de db.py:32). La GET usa la sonda, que solo consulta el catalogo.
+# --------------------------------------------------------------------------- #
+_HIRE_GUARANTEE_COLUMN_READY = False
+_HIRE_GUARANTEE_COLUMN_PRESENT = False
+
+
+def _ensure_hire_guarantee_column(cur) -> None:
+    """Crea la columna si falta. Solo desde el PATCH de /candidates/<id>/hire."""
+    global _HIRE_GUARANTEE_COLUMN_READY, _HIRE_GUARANTEE_COLUMN_PRESENT
+    if _HIRE_GUARANTEE_COLUMN_READY:
+        return
+    cur.execute(
+        "ALTER TABLE hire_opportunity "
+        "ADD COLUMN IF NOT EXISTS replacement_guarantee_days SMALLINT"
+    )
+    _HIRE_GUARANTEE_COLUMN_READY = True
+    _HIRE_GUARANTEE_COLUMN_PRESENT = True
+
+
+def _hire_has_guarantee_column(cur) -> bool:
+    """Sonda de catalogo. No escribe nada.
+
+    Solo se cachea el SI. Un NO cacheado se volveria permanente para ese worker:
+    con 12 procesos, el que sondeo antes de que existiera la columna seguiria
+    devolviendo None en la GET aunque otro ya la hubiera creado, y el <select> de
+    la solapa Hire apareceria vacio con el dato guardado en la base. Mientras
+    falta, la sonda es una consulta barata al catalogo por request; una vez que
+    esta, no se vuelve a consultar nunca.
+    """
+    global _HIRE_GUARANTEE_COLUMN_PRESENT
+    if _HIRE_GUARANTEE_COLUMN_PRESENT:
+        return True
+    cur.execute(
+        """
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'hire_opportunity'
+           AND column_name  = 'replacement_guarantee_days'
+         LIMIT 1
+        """
+    )
+    presente = cur.fetchone() is not None
+    if presente:
+        _HIRE_GUARANTEE_COLUMN_PRESENT = True
+    return presente
+
+
+def _forget_hire_guarantee_column() -> None:
+    """Suelta los flags. Se llama despues de un rollback del PATCH.
+
+    El ALTER corre DENTRO de la transaccion del PATCH, asi que un rollback
+    posterior tambien se lleva la columna. Si los flags quedaran en True, este
+    worker no volveria a intentar crearla nunca y todos los guardados siguientes
+    moririan con UndefinedColumn hasta reiniciar el proceso.
+    """
+    global _HIRE_GUARANTEE_COLUMN_READY, _HIRE_GUARANTEE_COLUMN_PRESENT
+    _HIRE_GUARANTEE_COLUMN_READY = False
+    _HIRE_GUARANTEE_COLUMN_PRESENT = False
+
+
+def _clean_guarantee_days(value):
+    """'' / None -> None; '60' -> 60. Un SMALLINT no traga el string vacio.
+
+    El <select> de la solapa Hire manda '' cuando lo dejan en blanco (mismo caso
+    que el resto de los inputs de docs/, ver CLAUDE.md), asi que hay que
+    traducirlo a NULL y no dejarlo llegar al UPDATE.
+    """
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if raw == '' or raw.lower() in ('null', 'none'):
+        return None
+    try:
+        return int(float(raw))
+    except (TypeError, ValueError):
+        raise ValueError('replacement_guarantee_days must be a number or empty')
+
+
 _REJECTED_BATCH_STATUSES = {
     'client rejected after interviewing',
 }
@@ -1696,8 +1790,15 @@ def handle_candidate_hire_data(candidate_id):
             account_id    = opp.get('account_id')
 
             # 2) read hire_opportunity
-            cur.execute("""
+            # La columna del arrangement puede no existir todavia (la migracion se
+            # corre a mano): se consulta el catalogo y, si falta, se devuelve None
+            # en vez de romper la solapa Hire entera.
+            guarantee_col = ("replacement_guarantee_days"
+                             if _hire_has_guarantee_column(cur)
+                             else "NULL::smallint AS replacement_guarantee_days")
+            cur.execute(f"""
                 SELECT
+                    {guarantee_col},
                     references_notes,
                     reference_1_name,
                     reference_1_company,
@@ -1789,7 +1890,8 @@ def handle_candidate_hire_data(candidate_id):
                     'buyout_dolar': None,
                     'buyout_daterange': None,
                     'status': 'unhired',
-                    'carga_inactive': None
+                    'carga_inactive': None,
+                    'replacement_guarantee_days': None
                 })
 
             return jsonify({
@@ -1827,7 +1929,10 @@ def handle_candidate_hire_data(candidate_id):
                 'buyout_daterange': row['buyout_daterange'],
                 'status': row['effective_status'],
                 'carga_active': row['carga_active'],
-                'carga_inactive': row['carga_inactive']
+                'carga_inactive': row['carga_inactive'],
+                # 60 / 90 / None. Solo se carga en Recruiting; el front lo esconde
+                # en Staffing, pero la API lo devuelve igual para los dos.
+                'replacement_guarantee_days': row['replacement_guarantee_days']
             })
 
         # ---------- PATCH ----------
@@ -1851,6 +1956,11 @@ def handle_candidate_hire_data(candidate_id):
 
         if not opportunity_id:
             return jsonify({'error': 'opportunity_id is required in PATCH body'}), 400
+
+        # El ALTER solo cuando el payload trae el campo: asi el resto de los
+        # guardados de la solapa Hire no pagan un ADD COLUMN de mas.
+        if 'replacement_guarantee_days' in data:
+            _ensure_hire_guarantee_column(cur)
 
         # 1) fetch account/model for THIS opportunity
         cur.execute("""
@@ -1998,7 +2108,8 @@ def handle_candidate_hire_data(candidate_id):
             'buyout_daterange': 'buyout_daterange',
             'inactive_reason': 'inactive_reason',
             'inactive_comments': 'inactive_comments',
-            'inactive_vinttierror': 'inactive_vinttierror'
+            'inactive_vinttierror': 'inactive_vinttierror',
+            'replacement_guarantee_days': 'replacement_guarantee_days'
         }
         ignored_fields = sorted(
             key for key in data.keys()
@@ -2015,6 +2126,14 @@ def handle_candidate_hire_data(candidate_id):
                 if k in ("start_date", "end_date"):
                     try:
                         v = _clean_date(v)
+                    except ValueError as ve:
+                        return jsonify({"error": str(ve)}), 400
+
+                # el <select> manda '' cuando lo dejan en blanco, y un SMALLINT
+                # no traga el string vacio
+                if k == "replacement_guarantee_days":
+                    try:
+                        v = _clean_guarantee_days(v)
                     except ValueError as ve:
                         return jsonify({"error": str(ve)}), 400
 
@@ -2199,6 +2318,8 @@ def handle_candidate_hire_data(candidate_id):
 
     except Exception as e:
         conn.rollback()
+        # El rollback se lleva tambien el ADD COLUMN si esta corrida lo hizo.
+        _forget_hire_guarantee_column()
         import traceback
         print("❌ Error in /candidates/<id>/hire:")
         print(traceback.format_exc())

@@ -137,6 +137,10 @@
       ["close_date", "Fecha de Cierre", "left"],
       ["recruiting_fee", "Recruiting Fee", "right"],
       ["is_replacement", "Replacement", "center"],
+      // Las tres del arrangement: solo dicen algo en una fila de Replacement.
+      ["guarantee_label", "Arrangement", "center"],
+      ["days_label", "Días trabajados", "center"],
+      ["replacement_label", "Reemplazo", "center"],
       ["ae", "AE", "left"]
     ],
     m3: [
@@ -172,10 +176,19 @@
     return (raw === null || raw === undefined || raw === "") ? "—" : String(raw);
   }
 
-  /* Una fila incompleta es un fee en cero: data que falta, no comisión cero. */
+  /* Una fila incompleta es un fee en cero: data que falta, no comisión cero.
+
+     Los reemplazos de Recruiting son la excepción y hay que mantenerla igual que
+     `incomplete_rows()` en backend/ae_commissions/report.py:
+       · "gratis"  → cierra en cero a propósito, no falta nada;
+       · "missing" → hasta que no se cargue el arrangement no se sabe si ese cero
+                     está mal, y ya tiene su propio aviso (más accionable). */
   function isIncomplete(block, row) {
     if (block === "staffing") return !row.hire_count || !Number(row.fee);
-    if (block === "recruiting") return !row.hire_count || !Number(row.recruiting_fee);
+    if (block === "recruiting") {
+      if (row.replacement_status === "free" || row.replacement_status === "missing") return false;
+      return !row.hire_count || !Number(row.recruiting_fee);
+    }
     return false;
   }
 
@@ -200,6 +213,12 @@
         // a dónde lleva antes de hacer click.
         if (c[0] === "opp_position_name" && oppId) {
           text = '<a class="aec-link" href="' + oppUrl(oppId) + '">' + text + "</a>";
+        }
+        // El veredicto va como pill: es la columna que se lee de un vistazo.
+        if (c[0] === "replacement_label" && row.replacement_status &&
+            row.replacement_status !== "none") {
+          text = '<span class="aec-tag aec-tag--' + esc(row.replacement_status) + '">' +
+                 text + "</span>";
         }
         if (flag && i === 0) text += '<span class="aec-flag">sin fee</span>';
         return '<td class="aec-td--' + c[2] + '">' + text + "</td>";
@@ -268,6 +287,9 @@
       ["blue", "Setup fees", money(sum(st, "setup_fee"))],
       ["cyan", "Cierres Recruiting", rc.length],
       ["cyan", "Recruiting fees", money(sum(rc, "recruiting_fee"))],
+      ["lime", "Reemplazos gratis", rc.filter(function (r) {
+        return r.replacement_status === "free";
+      }).length],
       ["mag", "Bajas M3", m3.length]
     ];
     document.getElementById("aecKpis").innerHTML = cards.map(function (c) {
@@ -379,11 +401,23 @@
 
         var faltantes = (data.staffing || []).filter(function (r) { return isIncomplete("staffing", r); })
           .concat((data.recruiting || []).filter(function (r) { return isIncomplete("recruiting", r); }));
-        document.getElementById("aecNotice").innerHTML = faltantes.length
-          ? '<p class="aec-notice"><strong>' + faltantes.length + "</strong> oportunidad(es) " +
+        var avisos = "";
+        if (faltantes.length) {
+          avisos += '<p class="aec-notice"><strong>' + faltantes.length + "</strong> oportunidad(es) " +
             "cerradas sin fee cargado. Hay que completarlas antes de liquidar, porque suman " +
-            "cero a la comisión.</p>"
-          : "";
+            "cero a la comisión.</p>";
+        }
+        // Sin el arrangement no se puede decir si el reemplazo es gratis o pago, así
+        // que el aviso manda al lugar donde se carga y no a buscar un fee.
+        var sinArrangement = (data.recruiting || []).filter(function (r) {
+          return r.replacement_status === "missing";
+        });
+        if (sinArrangement.length) {
+          avisos += '<p class="aec-notice"><strong>' + sinArrangement.length + "</strong> reemplazo(s) " +
+            "de Recruiting sin arrangement cargado. Se carga en la solapa Hire del candidato " +
+            "que se cayó; hasta entonces no se sabe si el reemplazo comisiona.</p>";
+        }
+        document.getElementById("aecNotice").innerHTML = avisos;
       })
       .catch(function (err) {
         setError(err.message || "No se pudo cargar el reporte.");

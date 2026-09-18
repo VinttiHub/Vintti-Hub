@@ -58,6 +58,8 @@ COLS_STAFFING = [
     ("equipment", "Equipment", "center"),
     ("ae", "AE", "left"),
 ]
+# Las tres columnas del arrangement van pegadas a "Replacement" porque solo
+# significan algo en esa fila: en un cierre nuevo salen vacias.
 COLS_RECRUITING = [
     ("client_name", "Nombre de Cliente", "left"),
     ("opp_position_name", "Nombre de Oportunidad", "left"),
@@ -65,6 +67,9 @@ COLS_RECRUITING = [
     ("close_date", "Fecha de Cierre", "left"),
     ("recruiting_fee", "Recruiting Fee", "right"),
     ("is_replacement", "Replacement", "center"),
+    ("guarantee_label", "Arrangement", "center"),
+    ("days_label", "Días trabajados", "center"),
+    ("replacement_label", "Reemplazo", "center"),
     ("ae", "AE", "left"),
 ]
 COLS_M3 = [
@@ -172,11 +177,30 @@ def incomplete_rows(staffing, recruiting) -> list[dict]:
     caminos y los dos importan igual — la opp cerro sin hire cargado todavia, o
     el hire existe pero nadie completo el monto. El mail los lista aparte para
     que se corrijan antes de liquidar, en vez de que pasen como cero.
+
+    EXCEPCION, los reemplazos de Recruiting. Uno GRATIS cierra legitimamente en
+    cero — justamente porque no se cobra —; antes salia con el cartel rojo "sin
+    fee" mandando a buscar un monto que no existe. Y uno SIN ARRANGEMENT tampoco
+    entra: hasta que no se cargue la garantia no se sabe si ese cero esta mal, y
+    ese caso ya tiene su propio aviso (mas accionable, porque dice que falta el
+    arrangement y no el fee). Si despues resulta ser un reemplazo pago con fee en
+    cero, la corrida siguiente lo marca aca.
     """
     faltantes = [r for r in staffing if not r.get("hire_count") or not r.get("fee")]
     faltantes += [r for r in recruiting
-                  if not r.get("hire_count") or not r.get("recruiting_fee")]
+                  if r.get("replacement_status") not in ("free", "missing")
+                  and (not r.get("hire_count") or not r.get("recruiting_fee"))]
     return faltantes
+
+
+def incomplete_guarantees(recruiting) -> list[dict]:
+    """Reemplazos de Recruiting que todavia no se pueden decidir.
+
+    Les falta el arrangement del candidato que se cayo, o no se pudo ubicar ese
+    hire. Van en un aviso propio y NO en el de "sin fee": lo que hay que cargar es
+    la garantia, no un monto.
+    """
+    return [r for r in recruiting if r.get("replacement_status") == "missing"]
 
 
 def _cta(period_month: date) -> str:
@@ -278,8 +302,29 @@ def render(period_month: date, payload: dict) -> tuple[str, str]:
             f'{detalle}{" ..." if len(faltantes) > 8 else ""}</p>'
         )
 
+    sin_arrangement = incomplete_guarantees(recruiting)
+    if sin_arrangement:
+        detalle = ", ".join(
+            f"{_esc(r.get('client_name'))} · {_esc(r.get('opp_position_name'))}"
+            for r in sin_arrangement[:8]
+        )
+        body += (
+            f'<p style="margin:12px 0 0;padding:12px 14px;border-radius:10px;'
+            f'background:#fff;border:1px solid {C_MAGENTA};color:{C_INK};font-size:13px;">'
+            f'<strong>{len(sin_arrangement)}</strong> reemplazo(s) de Recruiting sin '
+            "arrangement cargado. Sin ese dato no se puede decir si el reemplazo es "
+            "gratis o pago: hay que completarlo en la solapa Hire del candidato que se "
+            f'cayo. {detalle}{" ..." if len(sin_arrangement) > 8 else ""}</p>'
+        )
+
     body += (
         f'<p style="margin:22px 0 0;font-size:12px;color:{C_MUTED};">'
+        "Reemplazos de Recruiting: el arrangement (60 o 90 dias) es el del candidato "
+        "que se cayo. Si duro esa cantidad de dias o menos, la busqueda se rehace sin "
+        "cargo y el reemplazo NO comisiona; si duro mas, se cobra y si comisiona. El "
+        "borde va incluido (dia 60 con arrangement de 60 = gratis). La comision del "
+        "cierre original no se descuenta en ningun caso.</p>"
+        f'<p style="margin:8px 0 0;font-size:12px;color:{C_MUTED};">'
         "Alcance: opps con etapa Close Win y fecha de cierre dentro del mes, de los AEs "
         "del scope Sales, excluyendo cuentas internas. M3 = baja real (no buyout) "
         "ocurrida en el mes dentro de los primeros 3 meses del candidato, asi cada "

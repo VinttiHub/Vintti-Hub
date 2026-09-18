@@ -2943,6 +2943,7 @@ const hireSalary = document.getElementById('hire-salary');
 const hireFee = document.getElementById('hire-fee');
 const hireRevenue = document.getElementById('hire-revenue');
 const hirePriceType = document.getElementById('hire-price-type');
+const hireGuarantee = document.getElementById('hire-guarantee');
 const hireSetupFee = document.getElementById('hire-setup-fee');
 const referencesDiv = document.getElementById('hire-references');
 const hireReferenceFields = [
@@ -3890,6 +3891,9 @@ if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => upda
 if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
 if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 if (hirePriceType) hirePriceType.addEventListener('change', () => updateHireField('price_type', hirePriceType.value));
+// Arrangement de garantia (60/90). Campo plano como price_type: NO pasa por
+// createSalaryUpdateFromInputs, que es solo para salary/fee/revenue.
+if (hireGuarantee) hireGuarantee.addEventListener('change', () => updateHireField('replacement_guarantee_days', hireGuarantee.value));
 if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
 if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseFloat(hireSetupFee.value); if (!isNaN(v)) updateHireField('setup_fee', v); });
 if (referencesDiv) referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
@@ -3971,6 +3975,10 @@ if (hireRevenue){
 
     if (feeField) feeField.style.display = isRecruiting ? 'none' : 'block';
     if (setupField) setupField.style.display = isRecruiting ? 'none' : 'block';
+
+    // El arrangement de garantia es al reves que Set up Fee: solo Recruiting.
+    const guaranteeField = document.getElementById('hire-guarantee-field');
+    if (guaranteeField) guaranteeField.style.display = isRecruiting ? '' : 'none';
     if (revenueInput) {
       revenueInput.disabled = !isRecruiting;
       revenueInput.classList.toggle('disabled-hover', !isRecruiting);
@@ -4039,6 +4047,10 @@ if (hireRevenue){
         try { mostrarBotonPushHubspot(hsOppData); }
         catch (err) { console.warn('No se pudo pintar el botón de push', err); }
         const priceType = document.getElementById('hire-price-type'); if (priceType) priceType.value = data.price_type || '';
+        // ?? y no ||: un 0 no es un arrangement valido, pero tampoco hay que
+        // convertir null en '' por dos caminos distintos.
+        const guaranteeSel = document.getElementById('hire-guarantee');
+        if (guaranteeSel) guaranteeSel.value = data.replacement_guarantee_days ?? '';
         const comp = document.getElementById('hire-computer');      if (comp) comp.value = data.computer || '';
         const perks = document.getElementById('hire-extraperks');   if (perks) perks.innerHTML = data.extraperks || '';
         const ws = document.getElementById('hire-working-schedule');if (ws) ws.value = data.working_schedule || '';

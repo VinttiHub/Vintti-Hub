@@ -25,16 +25,79 @@ log = logging.getLogger(__name__)
 RECIPIENTS = ["pgonzales@vintti.com", "bahia@vintti.com"]
 
 
+# --------------------------------------------------------------------------- #
+# Reemplazos de Recruiting: gratis o pagos
+#
+# Si el candidato anterior se cayo DENTRO de su arrangement de garantia, la
+# busqueda se rehace sin cargo y esa opp no comisiona. Si se cayo despues, el
+# reemplazo se cobra y si comisiona. La comision del cierre ORIGINAL no se toca
+# en ningun caso (decision de la owner, 2026-09-18): esto no es un clawback.
+#
+# El borde va INCLUIDO: caerse el dia 60 con un arrangement de 60 es gratis.
+# Ojo que no es la misma aritmetica que `churn_m3`, que usa `<` estricto y meses
+# calendario; aca son dias y el criterio es distinto a proposito.
+#
+# Se calcula en Python y no en SQL, igual que `amount`, para que la pagina, el
+# mail y el CSV no puedan diferir.
+# --------------------------------------------------------------------------- #
+REPLACEMENT_LABELS = {
+    "free": "Gratis · no comisiona",
+    "paid": "Pago · comisiona",
+    "missing": "Sin arrangement",
+    "none": "",
+}
+
+
+def _replacement_status(row: dict) -> str:
+    """'free' | 'paid' | 'missing' | 'none' para una fila de Recruiting."""
+    if row.get("is_replacement") != "Si":
+        return "none"
+
+    dias = row.get("days_worked")
+    garantia = row.get("guarantee_days")
+    if garantia is None or dias is None:
+        # Falta el arrangement, o no se pudo ubicar el hire anterior (la opp de
+        # reemplazo quedo sin `replacement_of`, o el candidato no tiene hire en
+        # esa cuenta). En los dos casos decide una persona.
+        return "missing"
+    try:
+        dias = int(dias)
+        garantia = int(garantia)
+    except (TypeError, ValueError):
+        return "missing"
+    if dias < 0:
+        # end_d anterior a start_d: data sucia. No se adivina.
+        return "missing"
+    return "free" if dias <= garantia else "paid"
+
+
+def _decorate_replacements(recruiting: list[dict]) -> None:
+    """Agrega status + las tres etiquetas que pintan la tabla y el mail."""
+    for row in recruiting:
+        status = _replacement_status(row)
+        row["replacement_status"] = status
+        row["replacement_label"] = REPLACEMENT_LABELS[status]
+        if status == "none":
+            row["guarantee_label"] = ""
+            row["days_label"] = ""
+            continue
+        garantia = row.get("guarantee_days")
+        row["guarantee_label"] = f"{int(garantia)} días" if garantia else "Sin cargar"
+        dias = row.get("days_worked")
+        row["days_label"] = str(int(dias)) if dias is not None else ""
+
+
 def collect(conn, mes_ini: date, mes_fin: date) -> dict:
     """Los tres bloques del mes. Solo lee: no escribe ni manda nada."""
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         extra_ok = queries.staffing_extra_exists(cur)
+        guarantee_ok = queries.guarantee_column_exists(cur)
 
         sql, params = queries.staffing(mes_ini, mes_fin)
         cur.execute(sql, params)
         staffing = [dict(r) for r in cur.fetchall()]
 
-        sql, params = queries.recruiting(mes_ini, mes_fin)
+        sql, params = queries.recruiting(mes_ini, mes_fin, has_guarantee=guarantee_ok)
         cur.execute(sql, params)
         recruiting = [dict(r) for r in cur.fetchall()]
 
@@ -49,11 +112,14 @@ def collect(conn, mes_ini: date, mes_fin: date) -> dict:
                          if row.get("opp_model") == "Recruiting"
                          else row.get("fee"))
 
+    _decorate_replacements(recruiting)
+
     return {
         "staffing": staffing,
         "recruiting": recruiting,
         "m3": m3,
         "churn_m3_override_applied": extra_ok,
+        "guarantee_column_present": guarantee_ok,
     }
 
 

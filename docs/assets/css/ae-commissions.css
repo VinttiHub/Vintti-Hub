@@ -307,6 +307,22 @@
   vertical-align: middle;
 }
 
+/* ---------- Veredicto del reemplazo (pestaña Recruiting) ----------
+   Sólo primarios de marca (ver CLAUDE.md). Sobre lima la tinta va oscura: el lima
+   es demasiado claro para leerse como fondo de texto blanco. */
+.aec-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.aec-tag--free    { background: var(--aec-lime); color: var(--aec-lime-ink); }
+.aec-tag--paid    { background: var(--aec-blue); color: #fff; }
+.aec-tag--missing { background: var(--aec-mag);  color: #fff; }
+
 .aec-foot {
   margin: 14px 0 0;
   font-size: 12px;
