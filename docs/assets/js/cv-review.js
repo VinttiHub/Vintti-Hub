@@ -25,6 +25,16 @@
     'agostina@vintti.com',
   ]);
 
+  // Quién decide las habilitaciones de client process. Set APARTE de OVERSIGHT a propósito
+  // y por el mismo motivo que en el backend: Lara aprueba o bloquea habilitaciones, pero no
+  // es supervisión del CV review — no ve toda la cola por defecto ni recibe los mails de
+  // review. Espeja CLEARANCE_DECIDER_EMAILS de backend/routes/cv_review_routes.py, que es
+  // el gate real (_require_oversight → 403).
+  const CLEARANCE_DECIDERS = new Set([
+    ...OVERSIGHT,
+    'lara@vintti.com',
+  ]);
+
   const ALLOWED = new Set([
     ...OVERSIGHT,
     'agustin@vintti.com',
@@ -301,9 +311,9 @@
 
   /* ------------------------------------------- habilitaciones de client process
    *
-   * Un candidato que ya está en CLIENT_PROCESS_LIMIT o más procesos con cliente no entra
-   * al batch: el backend lo deja afuera y abre un pedido acá. La supervisión aprueba (la
-   * recruiter re-manda y pasa) o bloquea (queda afuera hasta que ella misma lo revierta).
+   * Un candidato que ya está en MÁS de CLIENT_PROCESS_LIMIT procesos con cliente no entra
+   * al batch: el backend lo deja afuera y abre un pedido acá. Quien decide (CLEARANCE_DECIDERS)
+   * aprueba (la recruiter re-manda y pasa) o bloquea (queda afuera hasta que lo revierta).
    *
    * El límite y el stage espejan CLIENT_PROCESS_LIMIT / CLIENT_PROCESS_STAGE de
    * backend/routes/cv_review_routes.py. Si tocás uno, tocá el otro o el número del gate y
@@ -321,7 +331,7 @@
   };
 
   function loadClearances() {
-    if (!OVERSIGHT.has(me)) return Promise.resolve();
+    if (!CLEARANCE_DECIDERS.has(me)) return Promise.resolve();
     // "all" y no "pending": la sección también es el historial, y el deep-link de un mail
     // puede apuntar a una que ya se decidió (dos personas mirando el mismo mail).
     return fetch(`${API}/cv_client_process_clearances?status=all`, { headers: headers() })
@@ -402,7 +412,7 @@
   }
 
   function renderClearances() {
-    if (!OVERSIGHT.has(me)) return;
+    if (!CLEARANCE_DECIDERS.has(me)) return;
     const head = $('cvrClearToggle');
     const panel = $('cvrClearPanel');
     const list = $('cvrClearList');
@@ -1764,8 +1774,8 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
   }
 
   /* ---------------------------------------------------------- historial del candidato
-   * Dónde más estuvo este candidato. Existe por una regla de negocio: un candidato que ya
-   * llegó a "In Client Process" más de CLIENT_PROCESS_LIMIT veces no se manda de nuevo.
+   * Dónde más estuvo este candidato. Existe por una regla de negocio: un candidato que está
+   * en "In Client Process" en más de CLIENT_PROCESS_LIMIT vacantes no se manda de nuevo.
    *
    * OJO con qué se cuenta: `opportunity_candidates.stage_pipeline` es el estado ACTUAL en
    * el pipeline, no un historial. No hay tabla de historial de stages, así que esto cuenta

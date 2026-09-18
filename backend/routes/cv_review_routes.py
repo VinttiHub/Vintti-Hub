@@ -53,6 +53,14 @@ OVERSIGHT_EMAILS = ("pgonzales@vintti.com", "agostina@vintti.com")
 # Quien puede decidir además de los sales leads con rol. Corta a propósito.
 REVIEW_OVERRIDE_EMAILS = set(OVERSIGHT_EMAILS)
 
+# Quién decide una habilitación de client process. Es una lista APARTE de OVERSIGHT_EMAILS
+# a propósito: Lara decide habilitaciones, pero no es supervisión del CV review. Sumarla a
+# OVERSIGHT_EMAILS le abriría además TODOS los reviews de la cola y TODOS los mails de
+# review, que llevan scores de la AI de candidatos que no son suyos.
+#
+# Tupla y no set: el orden decide el orden de los destinatarios del mail del gate.
+CLEARANCE_DECIDER_EMAILS = OVERSIGHT_EMAILS + ("lara@vintti.com",)
+
 # --- gate de "client process" ------------------------------------------------
 # Un candidato metido en muchos procesos con cliente a la vez es un problema de negocio, no
 # de documento: si lo toman en dos lados se cae una colocación. Antes esto era sólo la card
@@ -219,19 +227,22 @@ def _require_reviewer():
 
 
 def _require_oversight():
-    """Decidir una habilitación de client process: sólo el par de supervisión.
+    """Decidir una habilitación de client process: sólo CLEARANCE_DECIDER_EMAILS.
 
     A diferencia de _require_reviewer(), acá NO entran los sales leads con rol: el gate
     existe para que un candidato no se reparta entre varias vacantes, y quien lo pide es
     justamente el lado que quiere mandarlo. Si el sales lead de la vacante pudiera
     autohabilitarse, el control no controlaría nada.
 
+    Va contra CLEARANCE_DECIDER_EMAILS y no contra REVIEW_OVERRIDE_EMAILS: decidir una
+    habilitación y ver toda la cola de reviews son dos permisos distintos.
+
     Falla CERRADO, igual que _require_reviewer.
     """
     denied = _require_active_user()
     if denied:
         return denied
-    if _user_email() in REVIEW_OVERRIDE_EMAILS:
+    if _user_email() in CLEARANCE_DECIDER_EMAILS:
         return None
     return jsonify({"error": "forbidden", "code": "not_oversight"}), 403
 
@@ -398,9 +409,11 @@ SKIP_REASONS = {
     # Los dos del gate de client process. El texto nombra a quién hay que ir a buscar: un
     # "blocked" a secas deja a la recruiter sin saber qué hacer después.
     "client_process_pending": (
-        "Already in 3+ client processes — Agostina has to clear this one first"),
+        f"Already in more than {CLIENT_PROCESS_LIMIT} client processes — Agostina or Lara "
+        f"has to clear this one first"),
     "client_process_blocked": (
-        "Blocked by Agostina — already in 3+ client processes"),
+        f"Blocked by the supervision — already in more than {CLIENT_PROCESS_LIMIT} "
+        f"client processes"),
     # Reenvío de un batch donde sólo cambió un CV. Ver _resend_guard.
     "already_approved": "Already approved — this CV has not changed since",
     "unchanged": "This CV has not changed since the sales lead asked for corrections",
@@ -463,7 +476,11 @@ def _client_process_gate(conn, cur, candidate_id, opportunity_id, actor):
     preguntar. Un OK global convertiría el gate en un trámite de una sola vez.
     """
     n = _client_process_count(cur, candidate_id)
-    if n < CLIENT_PROCESS_LIMIT:
+    # Estrictamente MAYOR que el límite: estar en 3 procesos es estar en el límite, no
+    # pasado. Es el mismo corte que ya usaba el chip del drawer ("3 of 3 used", ámbar, "one
+    # more goes over 3") — hasta el 2026-09-18 el backend frenaba en 3 y la card decía que
+    # todavía se podía, que era la misma regla contada de dos maneras distintas.
+    if n <= CLIENT_PROCESS_LIMIT:
         return None, None
 
     cur.execute(
@@ -1213,7 +1230,7 @@ def list_opportunity_clearances(opportunity_id):
     Cualquier usuario activo, no sólo la supervisión: el punto es justamente que la
     recruiter (y quien mire la vacante) vea POR QUÉ ese candidato no se envió, en vez de
     que el perfil desaparezca del batch sin explicación. Es de lectura y acotado a una
-    vacante; decidir sigue siendo sólo de OVERSIGHT_EMAILS.
+    vacante; decidir sigue siendo sólo de CLEARANCE_DECIDER_EMAILS.
     """
     denied = _require_actor()
     if denied:
@@ -2815,7 +2832,7 @@ def _notify_clearance_requested(clearance_ids):
     cards = "".join(_clearance_card(r, others.get(r["candidate_id"])) for r in rows)
     n_c = len(rows)
     many = n_c != 1
-    lead = ("Before {} to sales for review, {} your OK: {} already in {} or more client "
+    lead = ("Before {} to sales for review, {} your OK: {} already in more than {} client "
             "processes at once.").format(
         "these CVs go" if many else "this CV goes",
         "they need" if many else "it needs",
@@ -2835,7 +2852,7 @@ def _notify_clearance_requested(clearance_ids):
     """
     subject = "Client process check – {} candidate{} need{} your OK".format(
         n_c, "s" if many else "", "" if many else "s")
-    return _send_email(subject, html, _clearance_recipients(OVERSIGHT_EMAILS))
+    return _send_email(subject, html, _clearance_recipients(CLEARANCE_DECIDER_EMAILS))
 
 
 def _notify_clearance_decided(clearance_id):
@@ -2853,7 +2870,8 @@ def _notify_clearance_decided(clearance_id):
 
     approved = row["status"] == "approved"
     # La recruiter primero; la supervisión siempre, para que quede la copia de la decisión.
-    recipients = _clearance_recipients([row.get("requested_by")] + list(OVERSIGHT_EMAILS))
+    recipients = _clearance_recipients(
+        [row.get("requested_by")] + list(CLEARANCE_DECIDER_EMAILS))
     if not recipients:
         return False
 
