@@ -42,6 +42,19 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 17: el encargo que se termina se acepta escrito de las dos formas. Antes "End of project"
+# contaba y "Project ended" no, y sólo para "contract": una asimetría imposible de explicarle
+# a una recruiter, que es quien tiene que escribir la frase. Ahora cubre proyecto / contrato
+# / engagement / assignment por igual. No mueve ningún score guardado (las 10 apariciones del
+# corpus ya venían con rótulo "Reason for leaving:"); es blindaje hacia adelante.
+# 16: un puesto que se explica solo por el TÍTULO deja de contar como job hopping sin
+# justificar, más allá de la pasantía que ya estaba. Entran el encargo con nombre propio
+# —"Senior Accountant (Clean-up Project)", "Financial Analyst (5 month project)", "Tax
+# Manager (Project for Tax Session)"—, la tesis ("MSc Thesis"), el contrato con duración
+# ("9 month contract") y la tutoría. Cuatro reviews recuperan los 10 puntos y NINGUNO los
+# pierde. Lo delicado no son las palabras nuevas sino la guarda: ver el comentario arriba
+# de _REASON_SELF_EVIDENT, donde está escrito por qué "project" vale entre paréntesis y no
+# suelto, y por qué "consultant" no entra.
 # 15: el chequeo de job hopping pasa a leer la descripción ENTERA del rol, y el regex del
 # motivo acepta "Reason to leave" además de "Reason for leaving". Eran dos cegueras que se
 # apilaban y castigaban −10 a CVs que sí explican cada salida (Alfonso Martinez Ruiz y
@@ -146,7 +159,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 15
+ANALYSIS_VERSION = 17
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -1584,12 +1597,20 @@ def _month_label(m: int) -> str:
 # La primera alternativa acepta "for" y "to" a propósito: la frase que más se usa hoy es
 # "Reason to leave:" (13 roles) y la versión vieja, que sólo tenía "reason for leaving",
 # la daba por inexistente y castigaba −10.
+#
+# El encargo que se termina cubre proyecto / contrato / engagement / assignment y no sólo
+# "contract", porque la asimetría era rara de explicarle a una recruiter: "End of project"
+# contaba y "Project ended" no. Sobre los 997 roles del corpus la frase aparece 10 veces y
+# las 10 están dentro de un "Reason for leaving:", ninguna suelta describiendo el trabajo
+# — o sea que no hay superficie de falso positivo, que es el riesgo real acá: un motivo
+# inventado SACA un castigo sin que se note.
 _REASON_STATED = re.compile(r"""
     reason\s+(for|to)\s+(leav\w*|departure|exit)
   | reason\s+(he|she|they)\s+left
   | left\s+(the\s+)?(company|role|position)\s+(to|because|when|after|due)
   | (end|conclusion)\s+of\s+(a\s+|the\s+)?(short[- ]term\s+)?(contract|engagement|project)
-  | contract\s+(ended|was\s+not\s+renewed|expired)
+  | (projects?|contracts?|engagements?|assignments?)\s+(was\s+|were\s+)?
+    (ended|expired|concluded|finished|completed|terminated|termination|not\s+renewed)
   | (role|position|team)\s+was\s+eliminated
   | company\s+(closed|shut\s+down|went\s+under)
   | motivo\s+de\s+salida
@@ -1600,12 +1621,32 @@ _REASON_STATED = re.compile(r"""
 # TÍTULO y en la EMPRESA — "Freelance" y "Self-employed" viven en el campo empresa, y ése es
 # justo el caso que más importa: el que factura por cliente tiene un puesto corto por cliente
 # y no dejó nada.
+#
+# "PROJECT" NO ES UNA PALABRA SUELTA ACÁ, Y ÉSA ES TODA LA GRACIA. Vale cuando aclara el
+# encargo —entre paréntesis, "Senior Accountant (Clean-up Project)", o con la duración
+# adelante, "(5 month project)"— y NO cuando es el cargo. En los mismos tramos cortos del
+# corpus hay cinco puestos permanentes que la llevan en el título: Project Manager, Senior
+# Project Manager (x2), Project Lead y Project Assistant. Un `\bproject\b` pelado los
+# limpiaría a los cinco y borraría job hopping real del reporte. Probé también la variante
+# "cualquier project salvo si le sigue un cargo": da los MISMOS tres casos y encima hay que
+# mantener la lista de cargos. Misma lógica que las guardas de _TOOL_GENERIC_CORE.
+#
+# "consultant" quedó AFUERA a pedido de la owner: en Deloitte / EY / KPMG es cargo de planta,
+# no un encargo corto.
+#
+# Ojo con el orden: `project[- ]based` va ANTES que las alternativas nuevas para que
+# "Project Based Contract" cite "Project Based" y no el paréntesis de al lado.
 _REASON_SELF_EVIDENT = re.compile(r"""
     (?<![a-z])(intern|internship|trainee|apprentice|pasant[ea]|practicante|becari[oa])(?![a-z])
   | (?<![a-z])(temporary|temporal|interim|fixed[- ]term|seasonal|maternity)(?![a-z])
   | (?<![a-z])(freelance|self[- ]employed|independiente|aut[oó]nomo)(?![a-z])
   | project[- ]based
   | temporary\s+(position|project|contract)
+  | \([^)]*\b(projects?|proyectos?|contract|contrato|thesis|tesis)\b[^)]*\)
+  | (?<![a-z])\d+[- ]month\s+(projects?|contract)(?![a-z])
+  | (?<![a-z])(thesis|tesis)(?![a-z])
+  | contract\s+(role|position)
+  | (?<![a-z])tutor(a|es|as)?(?![a-z])
 """, re.I | re.X)
 
 

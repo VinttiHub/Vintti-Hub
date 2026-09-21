@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
-"""Recalcula el castigo de job hopping de los CV reviews ya guardados (v12-v14 → v15).
+"""Recalcula el castigo de job hopping de los CV reviews ya guardados.
 
-La v15 arregla dos cegueras que se apilaban en el chequeo de job hopping: el motivo
-de salida escrito FUERA de las viñetas se tiraba antes de buscarlo, y el regex no
-aceptaba "Reason to leave" (sólo "Reason for leaving"). Los dos están en
-`utils/cv_review_ai.py`; ver la entrada 15 del changelog del encabezado.
+Se corre después de cada cambio a `job_hopping()` o a sus regex de motivo, en
+`utils/cv_review_ai.py`: un arreglo ahí sólo alcanza a lo que se puntúe de ahora en más,
+y los reviews que ya están en pantalla siguen mostrando el castigo viejo. Lleva todo a
+`ANALYSIS_VERSION`, que es la que lee en vivo — no hay número de versión hardcodeado acá.
+
+Corridas hasta hoy:
+  · v15 (2026-09-21) — el motivo escrito FUERA de las viñetas se tiraba antes de buscarlo,
+    y el regex no aceptaba "Reason to leave". 4 reviews recuperaron 10 puntos.
+  · v16 (2026-09-21) — un puesto que se explica solo por el título (el encargo entre
+    paréntesis, la tesis, el contrato con duración, la tutoría) deja de contar como job
+    hopping sin justificar. Otros 4.
+  · v17 (2026-09-21) — "Project ended" se acepta igual que "End of project", y para
+    proyecto / contrato / engagement / assignment por igual. 0 scores movidos: los 179
+    reviews sólo se re-sellaron, porque las 10 apariciones del corpus ya venían con
+    rótulo. Es la corrida típica de un cambio que sólo blinda hacia adelante.
 
 **No llama a OpenAI.** Lo que cambia es determinístico y sus insumos ya están en la
 base: `job_hopping()` sale del `resume_snapshot`, y el score sale de la checklist que
@@ -29,15 +40,15 @@ corrida en seco — que iba a tocar 32 reviews en vez de 4:
     cuenta da otra cosa, el review se reporta como DIVERGE y NO se escribe. Es la red
     que evita que este script se convierta en un re-score encubierto.
 
-Esperado al 2026-09-21: 4 reviews cambian de score (268 Delfina Coppini 90→100,
-271 Paola Reis 78→88, 292 Alfonso Martinez Ruiz 80→90, 293 Roberto Vazquez Vaillard
-60→70), el 94 sale reportado como AL ALZA sin escribirse, y los otros 173 sólo pasan
-a v15. Ninguno baja: el arreglo no afloja el criterio, deja de estar ciego.
+La v16 fue la última que movió números: 4 reviews subieron 10 puntos (113 Santiago
+Regueira 65→75, 207 Daniel Esteban Tapiero 80→90, 234 Fatima Villalta 90→100,
+277 Luisa Rodriguez 90→100) y el resto sólo pasó de versión. Ninguno bajó — los
+arreglos de este chequeo no aflojan el criterio, le sacan la venda.
 
 Uso:
     cd backend
-    python scripts/backfill_job_hopping_v15.py            # dry-run: sólo el reporte
-    python scripts/backfill_job_hopping_v15.py --apply    # escribe
+    python scripts/backfill_job_hopping.py            # dry-run: sólo el reporte
+    python scripts/backfill_job_hopping.py --apply    # escribe
 
 Es idempotente: correrlo dos veces no cambia nada la segunda vez.
 """

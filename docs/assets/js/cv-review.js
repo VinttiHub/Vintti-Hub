@@ -1477,7 +1477,9 @@
         <i>${jhMonths(st.months)}</i>
         ${st.reason_kind
           ? `<em class="is-ok"${hlRegister('ev', st.reason_quote)}>${
-              st.reason_kind === 'rehired' ? 'Hired back later — ' : ''}“${esc(st.reason_quote)}”</em>`
+              st.reason_kind === 'rehired' ? 'Hired back later — '
+                : st.reason_kind === 'self_evident' ? 'The title says it — '
+                : ''}“${esc(st.reason_quote)}”</em>`
           : '<em class="is-missing">the CV never says why it ended</em>'}
       </li>`;
     // El encabezado va SIEMPRE, en los cinco estados: el bloque se saltaba porque no tenía
