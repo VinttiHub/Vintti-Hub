@@ -29,6 +29,9 @@ from . import (
     op_one_shot_kill_detail,
     op_one_shot_kill_history,
     mrr_history,
+    am_mrr_history,
+    am_gmrr_contractors_detail,
+    am_m3_pending_detail,
     active_headcount_history,
     active_headcount_detail,
     active_headcount_30d_total,
@@ -264,6 +267,9 @@ from . import (
 
 _REGISTRY: dict[str, dict[str, Any]] = {
     mrr_history.DATASET["key"]: mrr_history.DATASET,
+    am_mrr_history.DATASET["key"]: am_mrr_history.DATASET,
+    am_gmrr_contractors_detail.DATASET["key"]: am_gmrr_contractors_detail.DATASET,
+    am_m3_pending_detail.DATASET["key"]: am_m3_pending_detail.DATASET,
     active_headcount_history.DATASET["key"]: active_headcount_history.DATASET,
     active_headcount_detail.DATASET["key"]: active_headcount_detail.DATASET,
     active_headcount_30d_total.DATASET["key"]: active_headcount_30d_total.DATASET,

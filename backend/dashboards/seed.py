@@ -287,6 +287,9 @@ RESET_CHART_KEYS = {
         "am_table_headcount_growth_30d_detail",
         "am_donut_risk_score",
         "am_table_risk_score_detail",
+        "am_line_mrr_am",
+        "am_table_gmrr_am_detail",
+        "am_table_m3_pending_detail",
         "am_bar_risk_score_points",
         "am_bar_risk_score_distribution",
         "am_line_nrr",
@@ -1490,6 +1493,73 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 95, "w": 6, "h": 5},
         "sort_order": 440,
+    },
+    {
+        # GMRR/MRR del AM: el mismo motor que los tiles del tab
+        # Management Dashboard, pero descontando las vacantes que todavia estan dentro
+        # de los 3 meses posteriores al Close Win de un AE. Un solo chart sirve a los
+        # dos tiles (GMRR y MRR) via `data-override-metric`, igual que `gr_line_mrr`.
+        "chart_key": "am_line_mrr_am",
+        "tab_key": "account-management",
+        "title": "GMRR / MRR del AM (sin M3 del AE)",
+        "type": "line",
+        "dataset_key": "am_mrr_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["mrr_total"],
+                "formatter": "currency",
+                "tooltipExtras": ["candidatos_activos", "clientes_activos", "m3_excluded_total"],
+            },
+        },
+        "position": {"x": 0, "y": 100, "w": 12, "h": 5},
+        "sort_order": 450,
+    },
+    {
+        # Un solo detalle para los dos drawers (GMRR y MRR): cambian los `data-cols`.
+        "chart_key": "am_table_gmrr_am_detail",
+        "tab_key": "account-management",
+        "title": "GMRR del AM - Desglose por contractor",
+        "type": "table",
+        "dataset_key": "am_gmrr_contractors_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "candidate_name",
+                    "client_name",
+                    "account_manager",
+                    "start_date",
+                    "salary",
+                    "fee",
+                    "gmrr",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 105, "w": 12, "h": 6},
+        "sort_order": 460,
+    },
+    {
+        # El complemento del anterior: los que todavia estan en el M3 del AE.
+        "chart_key": "am_table_m3_pending_detail",
+        "tab_key": "account-management",
+        "title": "Esperando el M3 del AE - Detalle",
+        "type": "table",
+        "dataset_key": "am_m3_pending_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "candidate_name",
+                    "client_name",
+                    "ae",
+                    "close_date",
+                    "entra_el",
+                    "fee",
+                    "gmrr",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 111, "w": 12, "h": 6},
+        "sort_order": 470,
     },
 
     # Sales

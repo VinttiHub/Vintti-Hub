@@ -3753,11 +3753,35 @@
     });
   }
 
+  // Qué está mirando realmente un detalle `data-month-aware`. Tiene que espejar la
+  // precedencia de refetchMonthAwareElements(): corte > hasta > fin del mes elegido.
+  // Antes el chip escribía SIEMPRE el mes, así que al elegir un Corte (o un rango
+  // Desde/Hasta) la suma del detalle cambiaba pero el cartel seguía diciendo el mes
+  // — el usuario leía "Sep 2026" mirando un snapshot a 30d terminando en el corte.
+  function drawerScopeText(month) {
+    if (isCorteMode()) return `al ${fmtDateLong(state.corte)}`;
+    if (state.mes) return formatMonthHuman(state.mes);
+    if (state.desde || state.hasta) {
+      const desde = state.desde ? fmtDateLong(state.desde) : '…';
+      const hasta = state.hasta ? fmtDateLong(state.hasta) : 'hoy';
+      // Mismo año en las dos puntas: el año va una sola vez, al final.
+      const mismoAnio = state.desde && state.hasta
+        && String(state.desde).slice(0, 4) === String(state.hasta).slice(0, 4);
+      return mismoAnio
+        ? `${desde.replace(/ \d{4}$/, '')} – ${hasta}`
+        : `${desde} – ${hasta}`;
+    }
+    return month ? formatMonthHuman(month) : '';
+  }
+
   function syncMonthChips(month) {
-    const txt = month ? formatMonthHuman(month) : '';
+    const txt = drawerScopeText(month || monthState.selected);
+    // El fallback ("Últimos 30d") sólo vale mientras NO haya ningún filtro de fecha
+    // puesto; con corte/mes/rango el chip tiene que decir lo que se está aplicando.
+    const sinFiltro = !isCorteMode() && !state.mes && !state.desde && !state.hasta;
     document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
       const fallback = el.dataset.chipFallback;
-      el.textContent = (fallback && !monthState.picked) ? fallback : txt;
+      el.textContent = (fallback && !monthState.picked && sinFiltro) ? fallback : txt;
     });
   }
 
@@ -4303,6 +4327,9 @@
       el.textContent = txt;
       el.classList.toggle('is-filtered', filtered);
     });
+    // Los chips de los drawers cuelgan del mismo estado: si no se resincronizan acá,
+    // al elegir un Corte el detalle se refetchea pero el cartel queda con el mes viejo.
+    syncMonthChips(monthState.selected);
     updateWindowedCards();
   }
 

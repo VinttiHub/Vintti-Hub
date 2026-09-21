@@ -107,7 +107,7 @@
        ============================================================ -->
   <nav class="tabs" role="tablist">
     <label class="tabs__btn" for="tab-growth-new">Management Dashboard <span class="ct">16</span></label>
-    <label class="tabs__btn" for="tab-am">Account Management <span class="ct">44</span></label>
+    <label class="tabs__btn" for="tab-am">Account Management <span class="ct">46</span></label>
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">32</span></label>
     <label class="tabs__btn" for="tab-marketing">Marketing <span class="ct">3</span></label>
@@ -1393,6 +1393,91 @@
         </div>
       </div>
 
+      <!-- ============== Section: GMRR & MRR del AM ==============
+           Mismo motor que los tiles GMRR/MRR del tab Management Dashboard
+           (`gr_line_mrr`), pero descontando lo que todavia esta dentro de los 3 meses
+           posteriores al Close Win de un AE. Un solo chart (`am_line_mrr_am`) sirve a
+           los dos tiles y a los dos charts via data-override-metric, igual que el
+           original — 1 fetch por metrica, no 4.
+           OJO: sin `data-window-label`, porque el dataset no usa window_bounds — sigue
+           la misma precedencia que los tiles originales (Mes/Desde-Hasta > corte). -->
+      <div class="section s-12">
+        <div>
+          <h2>GMRR &amp; MRR · AM</h2>
+          <p>El mismo GMRR y MRR de Staffing, contando sólo lo que ya es del AM: una vacante vendida por un Account Executive entra recién a los 3 meses del Close Win.</p>
+        </div>
+      </div>
+
+      <div class="skpi-tile skpi-g-2 s-6">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">GMRR · AM</span>
+          <span class="skpi-tile__tag">Revenue</span>
+        </div>
+        <div class="skpi-tile__value" data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</div>
+        <div class="skpi-tile__delta">
+          <span data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
+          <span style="color:#8a93a3;font-weight:600" title="Lo que vendio un AE y todavia no cumplio los 3 meses desde el Close Win. Entra al AM cuando los cumple.">· <span data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="m3_excluded_total" data-reduce="last" data-corte-field="m3_corte" data-fmt="currency-k">—</span> en M3 del AE</span>
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="am-gmrr" aria-label="Ver detalle GMRR · AM">Ver detalle</button>
+      </div>
+
+      <div class="skpi-tile skpi-g-3 s-6">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">MRR · AM</span>
+          <span class="skpi-tile__tag">Fee</span>
+        </div>
+        <div class="skpi-tile__value" data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</div>
+        <div class="skpi-tile__delta">
+          <span data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
+          <span style="color:#8a93a3;font-weight:600" title="Lo que vendio un AE y todavia no cumplio los 3 meses desde el Close Win. Entra al AM cuando los cumple.">· <span data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="m3_excluded_total" data-reduce="last" data-corte-field="m3_corte" data-fmt="currency-k">—</span> en M3 del AE</span>
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="am-mrr-fee" aria-label="Ver detalle MRR · AM">Ver detalle</button>
+      </div>
+
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">GMRR del AM · mes a mes</h3>
+            <p class="card__sub">Salary + fee, sin los primeros 3 meses del AE</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="line" data-axis="xy"
+               data-x="mes" data-y="mrr_total" data-color="lime" data-labels="GMRR del AM" data-fmt-y="currency-k"
+               data-tooltip-extras="candidatos_activos|Contractors|int,clientes_activos|Clientes|int,m3_excluded_total|En M3 del AE|currency-k"
+               viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="20" y1="40" x2="540" y2="40"/>
+              <line x1="20" y1="100" x2="540" y2="100"/>
+              <line x1="20" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">MRR del AM · mes a mes</h3>
+            <p class="card__sub">Sólo el fee de Vintti, sin los primeros 3 meses del AE</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="line" data-axis="xy"
+               data-x="mes" data-y="mrr_total" data-color="violet" data-labels="MRR del AM" data-fmt-y="currency-k"
+               data-tooltip-extras="candidatos_activos|Contractors|int,clientes_activos|Clientes|int,m3_excluded_total|En M3 del AE|currency-k"
+               viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="20" y1="40" x2="540" y2="40"/>
+              <line x1="20" y1="100" x2="540" y2="100"/>
+              <line x1="20" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
       <!-- ============== Section: Churn ============== -->
       <div class="section s-12">
         <div>
@@ -1886,6 +1971,7 @@
           </table>
         </div>
       </div>
+
 
       <!-- ============== Section: Revenue per account (moved from Growth) -->
       <div class="section s-12">
@@ -9436,6 +9522,182 @@
           </div>
         </div>
 
+        <!-- Panel · GMRR · AM (Account Management) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-gmrr">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · recurring revenue</span>
+            <h3 class="kpi-drawer__title">GMRR · AM</h3>
+            <p class="kpi-drawer__sub">Salary + fee de los contractors cuya cuenta gestiona el AM. Excluye lo que todavía está dentro de los 3 meses posteriores al Close Win de un Account Executive.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">GMRR del AM · <span class="js-period-suffix" data-mom="último mes" data-corte="al corte">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Esperando el M3 del AE</h4>
+              <!-- Las dos stats son el toggle del expander: un click y se ve QUIENES son.
+                   `bindExpanders()` escucha cualquier [data-expand-toggle] y togglea el
+                   `.expander` mas cercano, asi que no hace falta tocar el JS. -->
+              <div class="expander">
+                <div class="kpi-drawer__stats">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes están esperando el M3">
+                    <span class="kpi-drawer__stat__label">Todavía del AE</span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="m3_excluded_total" data-reduce="last" data-corte-field="m3_corte" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">entra al AM a los 3 meses del Close Win</span>
+                  </div>
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes están esperando el M3">
+                    <span class="kpi-drawer__stat__label">Contractors en M3</span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="text" data-field="m3_excluded_count" data-reduce="last" data-corte-field="m3_corte_count" data-fmt="int">—</span>
+                    <span class="kpi-drawer__stat__sub">no cuentan todavía</span>
+                  </div>
+                </div>
+                <button type="button" class="expander__toggle" data-expand-toggle>
+                  Ver quiénes están esperando <span class="arrow">▾</span>
+                </button>
+                <div class="expander__panel">
+                  <p class="muted" style="margin:8px 0;font-size:12px;">
+                    Lo que todavía cuenta para el AE · <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+                  </p>
+                  <div class="dtable-wrap"
+                       data-chart="am_table_m3_pending_detail" data-bind="dtable"
+                       data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,ae|AE que vendió|raw,close_date|Close Win|raw,entra_el|Entra el|raw,salary|Salary|currency,fee|Fee|currency,gmrr|GMRR|currency"
+                       data-empty-text="Nadie esperando el M3 del AE en el período seleccionado."
+                       data-month-aware></div>
+                  <div class="churn-fee-total">
+                    <span class="churn-fee-total__label">Total esperando</span>
+                    <span class="churn-fee-total__value" data-chart="am_table_m3_pending_detail" data-bind="text" data-field="gmrr" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_mrr_am" data-override-metric="Revenue" data-bind="line"
+                     data-x="mes" data-y="mrr_total" data-color="lime"
+                     data-labels="GMRR del AM" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Contractors del AM
+                <span class="count" data-chart="am_table_gmrr_am_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+              </h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada contractor Staffing activo al corte cuya vacante ya cumplió los 3 meses desde el Close Win (o no la vendió un AE). La suma de la columna equivale al total del período.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="am_table_gmrr_am_detail" data-bind="dtable"
+                   data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,account_manager|AM|raw,close_date|Close Win|raw,salary|Salary|currency,fee|Fee|currency,gmrr|GMRR|currency"
+                   data-empty-text="Sin contractors del AM activos en el período seleccionado."
+                   data-month-aware></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total GMRR del AM</span>
+                <span class="churn-fee-total__value" data-chart="am_table_gmrr_am_detail" data-bind="text" data-field="gmrr" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">El reloj de los 3 meses corre por vacante y se ancla en la fecha de Close Win de la opportunity. Las vacantes que no vendió un AE entran de una.</p>
+          </div>
+        </div>
+
+        <!-- Panel · MRR · AM (Account Management) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-mrr-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · recurring revenue</span>
+            <h3 class="kpi-drawer__title">MRR · AM</h3>
+            <p class="kpi-drawer__sub">Sólo el fee de Vintti de los contractors cuya cuenta gestiona el AM, sin los que siguen dentro del M3 del Account Executive.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">MRR del AM · <span class="js-period-suffix" data-mom="último mes" data-corte="al corte">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Esperando el M3 del AE</h4>
+              <!-- Las dos stats son el toggle del expander: un click y se ve QUIENES son.
+                   `bindExpanders()` escucha cualquier [data-expand-toggle] y togglea el
+                   `.expander` mas cercano, asi que no hace falta tocar el JS. -->
+              <div class="expander">
+                <div class="kpi-drawer__stats">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes están esperando el M3">
+                    <span class="kpi-drawer__stat__label">Todavía del AE</span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="m3_excluded_total" data-reduce="last" data-corte-field="m3_corte" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">entra al AM a los 3 meses del Close Win</span>
+                  </div>
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes están esperando el M3">
+                    <span class="kpi-drawer__stat__label">Contractors en M3</span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="text" data-field="m3_excluded_count" data-reduce="last" data-corte-field="m3_corte_count" data-fmt="int">—</span>
+                    <span class="kpi-drawer__stat__sub">no cuentan todavía</span>
+                  </div>
+                </div>
+                <button type="button" class="expander__toggle" data-expand-toggle>
+                  Ver quiénes están esperando <span class="arrow">▾</span>
+                </button>
+                <div class="expander__panel">
+                  <p class="muted" style="margin:8px 0;font-size:12px;">
+                    Lo que todavía cuenta para el AE · <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+                  </p>
+                  <div class="dtable-wrap"
+                       data-chart="am_table_m3_pending_detail" data-bind="dtable"
+                       data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,ae|AE que vendió|raw,close_date|Close Win|raw,entra_el|Entra el|raw,fee|Fee mensual|currency"
+                       data-empty-text="Nadie esperando el M3 del AE en el período seleccionado."
+                       data-month-aware></div>
+                  <div class="churn-fee-total">
+                    <span class="churn-fee-total__label">Total esperando</span>
+                    <span class="churn-fee-total__value" data-chart="am_table_m3_pending_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_mrr_am" data-override-metric="Fee" data-bind="line"
+                     data-x="mes" data-y="mrr_total" data-color="violet"
+                     data-labels="MRR del AM" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Contractors del AM
+                <span class="count" data-chart="am_table_gmrr_am_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+              </h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada contractor Staffing activo al corte cuya vacante ya cumplió los 3 meses desde el Close Win (o no la vendió un AE). La suma de la columna equivale al total del período.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="am_table_gmrr_am_detail" data-bind="dtable"
+                   data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,account_manager|AM|raw,close_date|Close Win|raw,fee|Fee mensual|currency"
+                   data-empty-text="Sin contractors del AM activos en el período seleccionado."
+                   data-month-aware></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total MRR del AM</span>
+                <span class="churn-fee-total__value" data-chart="am_table_gmrr_am_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Mismo criterio que la card de GMRR: cambia la columna (fee en vez de salary + fee), no la población.</p>
+          </div>
+        </div>
+
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-churn-reasons-detail">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Operations · caídas de candidatos</span>
@@ -9792,7 +10054,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=154" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=155" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>
