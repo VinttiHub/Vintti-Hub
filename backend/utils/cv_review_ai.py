@@ -42,6 +42,19 @@ MODEL = "gpt-4o"
 # v3: exige requisitos CONCRETOS y citados de la JD en jd_requirements_missed (v1 devolvía
 # "specific tools mentioned in the JD", que no le sirven a nadie) y afloja la severidad
 # de las fechas, que capeaba el score por falsos positivos de precisión.
+# 15: el chequeo de job hopping pasa a leer la descripción ENTERA del rol, y el regex del
+# motivo acepta "Reason to leave" además de "Reason for leaving". Eran dos cegueras que se
+# apilaban y castigaban −10 a CVs que sí explican cada salida (Alfonso Martinez Ruiz y
+# Roberto Vazquez Vaillard, reviews 292 y 293, los dos con el motivo escrito en los 2 tramos
+# cortos). La primera es la grave: la recruiter escribe el motivo como una línea suelta
+# DESPUÉS de la lista de viñetas —"</ul><br>Reason to leave: ..."— que es lo que sale del
+# editor de candidate-details al salir de la viñeta, y _bullets() devuelve SÓLO lo que está
+# dentro de los <li>. El motivo no es que no se detectara: es que no llegaba al detector.
+# Medido sobre los 997 roles con descripción del corpus: 64 tienen frase de motivo, 7 están
+# fuera de los <li> y 13 dicen "Reason to leave". De los 53 reviews con castigo vigente
+# cambian 4 y ninguno empeora — el arreglo no afloja el criterio, le saca la venda.
+# _bullets() NO se toca: lo usan el prompt del juez, el chequeo de herramientas y el de eco
+# de JD, y ensancharlo movería scores de requisitos en CVs que hoy están bien.
 # 14: el chequeo de herramientas deja de leer el nombre al pie de la letra. La JD pedía
 # "QuickBooks Online" y el CV de Hammurabi Landaverde decía, en un bullet de un rol,
 # "Managed accounting operations using QuickBooks, including bank reconciliations, AP/AR,
@@ -133,7 +146,7 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 14
+ANALYSIS_VERSION = 15
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -656,6 +669,19 @@ def _bullets(raw: Any) -> List[str]:
         return [b for b in (_strip_html(i) for i in items) if b]
     plain = _strip_html(text)
     return [plain] if plain else []
+
+
+def _description_text(raw: Any) -> str:
+    """La descripción ENTERA, no sólo lo que está dentro de los <li>.
+
+    _bullets() tira todo lo que quede fuera de la lista, y para el prompt está bien: ahí el
+    contenido real son las viñetas. Para el motivo de salida es ciego, porque la recruiter
+    lo escribe como una línea suelta DESPUÉS de la lista —"</ul><br>Reason to leave: ..."—,
+    que es lo que sale del editor de candidate-details al salir de la viñeta. Sobre los 997
+    roles con descripción del corpus, 7 tenían el motivo escrito exactamente así y el
+    chequeo de job hopping no lo veía: castigaba −10 por una línea que estaba en el CV.
+    """
+    return _strip_html(raw)
 
 
 def _as_list(value: Any) -> List[Dict[str, Any]]:
@@ -1495,8 +1521,12 @@ def _stints(snapshot: Dict[str, Any], now: int) -> List[Dict[str, Any]]:
             # original para CITAR. _norm_for_match sólo baja a minúscula y colapsa espacios,
             # así que los índices de las dos coinciden y se puede matchear en una y cortar en
             # la otra. Sin esto la cita salía en pantalla como "relocated temporarily to spain".
+            #
+            # Va _description_text() y NO _bullets(): el motivo de salida casi siempre está
+            # fuera de la lista de viñetas. Ver el comentario de _description_text().
             "raw": re.sub(r"\s+", " ", " ".join(
-                [title, str(entry.get("company") or "")] + _bullets(entry.get("description")))).strip(),
+                [title, str(entry.get("company") or ""),
+                 _description_text(entry.get("description"))])).strip(),
         })
 
     # Mismo orden que el CV del cliente: por fecha de FIN descendente, con lo actual primero.
@@ -1548,10 +1578,14 @@ def _month_label(m: int) -> str:
 # puede leer en el CV no le sirve al reviewer para decidir si la acepta.
 #
 # Listas cortas y crecidas con datos de producción, no adivinando — mismo criterio que
-# _REQ_ASSUMED y _TOOL_UNREMARKABLE. Sobre los 55 CVs reales de cv_reviews éstas aciertan
-# los 7 casos que tienen motivo, sin un solo falso positivo.
+# _REQ_ASSUMED y _TOOL_UNREMARKABLE. Sobre los 997 roles con descripción de cv_reviews hay
+# 64 con motivo escrito y éstas los aciertan, sin un solo falso positivo.
+#
+# La primera alternativa acepta "for" y "to" a propósito: la frase que más se usa hoy es
+# "Reason to leave:" (13 roles) y la versión vieja, que sólo tenía "reason for leaving",
+# la daba por inexistente y castigaba −10.
 _REASON_STATED = re.compile(r"""
-    reason\s+for\s+(leaving|departure)
+    reason\s+(for|to)\s+(leav\w*|departure|exit)
   | reason\s+(he|she|they)\s+left
   | left\s+(the\s+)?(company|role|position)\s+(to|because|when|after|due)
   | (end|conclusion)\s+of\s+(a\s+|the\s+)?(short[- ]term\s+)?(contract|engagement|project)
@@ -1586,7 +1620,11 @@ def _stint_reason(stint: Dict[str, Any], later_keys: set):
         return "rehired", f'{stint["company"]} hired them again later'
     m = _REASON_STATED.search(stint["raw"])
     if m:
-        return "stated", _sentence_around(stint["raw"], m.start())
+        # Un RÓTULO ("Reason to leave:") es el comienzo de la cita: lo que viene antes es
+        # el bullet anterior, no el motivo. Ver _sentence_around().
+        return "stated", _sentence_around(
+            stint["raw"], m.start(),
+            from_pos=bool(_REASON_LABEL_END.match(stint["raw"], m.end())))
     joined = " ".join(stint["titles"] + [stint["company"]])
     m = _REASON_SELF_EVIDENT.search(joined)
     if m:
@@ -1594,9 +1632,21 @@ def _stint_reason(stint: Dict[str, Any], later_keys: set):
     return "", ""
 
 
-def _sentence_around(text: str, pos: int) -> str:
-    """La oración donde cae el match, recortada. La cita ES lo que el reviewer audita."""
-    start = max(text.rfind(". ", 0, pos) + 2, 0)
+# Lo que sigue a un rótulo: "Reason to leave" + ":" . Distingue el rótulo, donde la cita
+# empieza, de una frase suelta ("the reason he left was..."), donde la oración entera es el
+# contexto que el reviewer necesita.
+_REASON_LABEL_END = re.compile(r"\s*:")
+
+
+def _sentence_around(text: str, pos: int, from_pos: bool = False) -> str:
+    """La oración donde cae el match, recortada. La cita ES lo que el reviewer audita.
+
+    `from_pos` arranca en el match en vez de en el principio de la oración, y es para los
+    rótulos. El retroceso busca el ". " anterior, y un bullet que no termina en punto no
+    frena nada: la cita de Orbia salía en pantalla como "Tools: Excel Reason to leave:
+    Accepted an opportunity...", porque "Tools: Excel" es el bullet de al lado.
+    """
+    start = pos if from_pos else max(text.rfind(". ", 0, pos) + 2, 0)
     end = text.find(". ", pos)
     end = len(text) if end == -1 else end
     return text[start:end].strip()[:220]

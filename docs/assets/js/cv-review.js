@@ -1525,7 +1525,8 @@
           anywhere in this CV. A short stint is not the problem — an unexplained one is, and
           the client will ask.</p>
         <ul class="cvr-hop-list">${un.map(jhRow).join('')}</ul>
-        <p class="cvr-hop-fix">Add it to that role's bullets — <code>Reason for leaving: …</code>
+        <p class="cvr-hop-fix">Add it anywhere in that role's description — a bullet or a line
+          under the list, <code>Reason for leaving: …</code> or <code>Reason to leave: …</code>
           — and score again. If you don't know why, ask the candidate before this goes out:
           this is the one gap on the page you cannot close by rewriting.</p>
       </div>`;
