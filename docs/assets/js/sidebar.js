@@ -120,7 +120,7 @@
     const dashOk = new Set([
       'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com',
       'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com', 'camila@vintti.com',
-      'justo@vintti.com','ana@vintti.com'
+      'justo@vintti.com','ana@vintti.com','pilar@vintti.com'
     ]).has(email);
     setDisplay('dashboardLink', dashOk);
     setDisplay('customDashboardLink', dashOk);
