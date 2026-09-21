@@ -479,9 +479,14 @@ function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false 
   `;
 }
 
-function renderOrgBranch(parentId, childrenByLeaderId, depth=1, pathIds=new Set()){
-  if (depth > 10) return "";
-  const children = safeOrgChildren(parentId, childrenByLeaderId, pathIds);
+// Fila de hermanos: la usa renderOrgBranch para los reportes de alguien y
+// renderOrgChartLayout para los jefes que comparten un mismo cartel de
+// departamento. Es una sola implementación a propósito: las reglas de
+// has-branches y de la barra que une hermanos viven acá y en profile.css, y
+// duplicar el markup las dejaría desincronizadas.
+// forceLeader: los jefes de departamento van siempre en azul, tengan o no gente
+// a cargo (si no, uno sin reportes se dibujaría como hoja).
+function renderOrgNodeRow(children, childrenByLeaderId, depth, pathIds, { forceLeader=false } = {}){
   if (!children.length) return "";
   const nodes = children.map((child)=>{
     const cid = Number(child?.user_id);
@@ -504,12 +509,41 @@ function renderOrgBranch(parentId, childrenByLeaderId, depth=1, pathIds=new Set(
       ${nodes.map(({ child, cid, nextPath, hasChildren })=> `
           <div class="org-node">
             <span class="org-connector" aria-hidden="true"></span>
-            ${renderOrgPersonCard(child, { isLeader: hasChildren, isLeaf: !hasChildren })}
+            ${renderOrgPersonCard(child, { isLeader: forceLeader || hasChildren, isLeaf: !forceLeader && !hasChildren })}
             ${renderOrgBranch(cid, childrenByLeaderId, depth + 1, nextPath)}
           </div>
         `).join("")}
     </div>
   `;
+}
+
+function renderOrgBranch(parentId, childrenByLeaderId, depth=1, pathIds=new Set()){
+  if (depth > 10) return "";
+  const children = safeOrgChildren(parentId, childrenByLeaderId, pathIds);
+  return renderOrgNodeRow(children, childrenByLeaderId, depth, pathIds);
+}
+
+// El cartel morado sale del `team` del jefe de la columna, así que dos jefes con
+// el mismo team comparten cartel (Founder's Office = Jaz + Lar). Sin `team` el
+// cartel cae al nombre de la persona, y ahí fusionar mostraría el nombre de uno
+// solo: esos quedan cada uno en su propia columna.
+function orgDeptGroupKey(lead){
+  const team = String(lead?.team || "").trim().toLowerCase();
+  return team || `#uid:${Number(lead?.user_id) || 0}`;
+}
+
+// Agrupa respetando el orden en que vienen: safeOrgChildren ya los devuelve
+// ordenados por team y después por user_name, así que las columnas salen
+// alfabéticas solas.
+function groupOrgDepartments(departmentLeads){
+  const groups = new Map();
+  departmentLeads.forEach((lead)=>{
+    const key = orgDeptGroupKey(lead);
+    const list = groups.get(key) || [];
+    list.push(lead);
+    groups.set(key, list);
+  });
+  return [...groups.values()];
 }
 
 function renderOrgChartLayout(root, childrenByLeaderId){
@@ -539,17 +573,28 @@ function renderOrgChartLayout(root, childrenByLeaderId){
       <div class="org-root-wrap">${renderOrgPersonCard(root, { isRoot: true, isLeader: true })}</div>
       <div class="org-root-stem" aria-hidden="true"></div>
       <div class="org-dept-grid">
-        ${departmentLeads.map((lead)=>{
-          const leadId = Number(lead?.user_id);
-          const path = new Set(rootPath);
-          if (Number.isFinite(leadId) && leadId > 0) path.add(leadId);
-          const deptLabel = escapeHtml(String(lead?.team || lead?.user_name || "Team").toUpperCase());
+        ${groupOrgDepartments(departmentLeads).map((leads)=>{
+          const head = leads[0];
+          const deptLabel = escapeHtml(String(head?.team || head?.user_name || "Team").toUpperCase());
+          let body;
+          if (leads.length === 1){
+            const leadId = Number(head?.user_id);
+            const path = new Set(rootPath);
+            if (Number.isFinite(leadId) && leadId > 0) path.add(leadId);
+            body = `
+              ${renderOrgPersonCard(head, { isLeader: true, isLeaf: false })}
+              ${renderOrgBranch(leadId, childrenByLeaderId, 1, path)}
+            `;
+          } else {
+            // Varios jefes bajo un mismo cartel: se dibujan como la fila de
+            // hermanos de cualquier otro nivel, cada uno con su propio subárbol.
+            body = renderOrgNodeRow(leads, childrenByLeaderId, 1, rootPath, { forceLeader: true });
+          }
           return `
             <section class="org-dept">
               <div class="org-dept-pill">${deptLabel}</div>
               <span class="org-dept-stem" aria-hidden="true"></span>
-              ${renderOrgPersonCard(lead, { isLeader: true, isLeaf: false })}
-              ${renderOrgBranch(leadId, childrenByLeaderId, 1, path)}
+              ${body}
             </section>
           `;
         }).join("")}
@@ -557,6 +602,59 @@ function renderOrgChartLayout(root, childrenByLeaderId){
     </div>
   `;
   hydrateOrgAvatars(host);
+  syncOrgSiblingLines(host);
+  watchOrgSiblingLines(host);
+}
+
+// La barra que une a los hermanos se dibuja por RENGLÓN VISUAL, no por fila del
+// DOM: una fila que envuelve tiene dos renglones y una sola barra cruzaría el
+// hueco entre ellos, atando tarjetas que no van juntas. Cuál es el primero y el
+// último de cada renglón sólo se sabe después del layout, así que se marca acá
+// y no en el HTML. Una tarjeta sola en su renglón no lleva barra: no hay a quién
+// unirla, y sin esto quedaría un tramo suelto sobre ella.
+function syncOrgSiblingLines(host){
+  if (!host) return;
+  host.querySelectorAll(".org-children").forEach((row)=>{
+    const nodes = Array.from(row.children).filter((el)=> el.classList.contains("org-node"));
+    nodes.forEach((node)=> node.classList.remove("has-sibling-bar", "is-line-start", "is-line-end"));
+    // Con el panel oculto todo mide 0 y los renglones no se pueden distinguir.
+    // No se marca nada: el ResizeObserver vuelve a llamar al abrir la pestaña.
+    if (!nodes.length || !row.offsetWidth) return;
+
+    let line = [];
+    const flush = ()=>{
+      if (line.length > 1){
+        line.forEach((node)=> node.classList.add("has-sibling-bar"));
+        line[0].classList.add("is-line-start");
+        line[line.length - 1].classList.add("is-line-end");
+      }
+      line = [];
+    };
+    let top = null;
+    nodes.forEach((node)=>{
+      if (top !== null && Math.abs(node.offsetTop - top) > 1) flush();
+      top = node.offsetTop;
+      line.push(node);
+    });
+    flush();
+  });
+}
+
+let ORG_LINE_OBSERVER = null;
+let ORG_LINE_FRAME = 0;
+
+// Re-marca cuando el host cambia de ancho: al abrir la pestaña (pasa de 0 a su
+// tamaño) y en cada resize, que es cuando cambia dónde envuelve cada fila.
+function watchOrgSiblingLines(host){
+  if (!host || typeof ResizeObserver === "undefined") return;
+  if (ORG_LINE_OBSERVER) ORG_LINE_OBSERVER.disconnect();
+  ORG_LINE_OBSERVER = new ResizeObserver(()=>{
+    // Las clases no afectan el layout (la barra es un ::before absoluto), pero
+    // el rAF evita reentrar en el mismo frame que dispara el observer.
+    cancelAnimationFrame(ORG_LINE_FRAME);
+    ORG_LINE_FRAME = requestAnimationFrame(()=> syncOrgSiblingLines(host));
+  });
+  ORG_LINE_OBSERVER.observe(host);
 }
 
 function hydrateOrgAvatars(root){
@@ -719,6 +817,7 @@ const LEADER_ACCESS_EMAILS = new Set([
   "agostina@vintti.com",
   "bahia@vintti.com",
   "justo@vintti.com",
+  "ana@vintti.com",
   "lucia@vintti.com",
   "camila@vintti.com",
   "mia@vintti.com",

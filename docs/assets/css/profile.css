@@ -996,13 +996,18 @@ input:focus, select:focus, textarea:focus{
   gap: 8px;
 }
 
-/* Barra que une a los hermanos, sólo en filas de una sola línea: cada nodo
-   aporta su tramo y el primero y el último se recortan a su propio centro.
-   Se ancla al nodo (no a un ancho de tarjeta fijo) para seguir alineada
-   aunque un hermano del borde traiga subárbol y sea más ancho que una
-   tarjeta. En filas que envuelven no se dibuja, porque cruzaría el hueco
-   entre líneas. */
-.org-children.has-branches > .org-node::before{
+/* Barra que une a los hermanos: cada nodo aporta su tramo y el primero y el
+   último de cada renglón se recortan a su propio centro. Se ancla al nodo (no a
+   un ancho de tarjeta fijo) para seguir alineada aunque un hermano del borde
+   traiga subárbol y sea más ancho que una tarjeta.
+   Va en TODAS las filas, no sólo en las que traen subárbol: sin ella, dos
+   equipos hermanos (los BDRs de Anita y los de Justo) quedan pegados en una
+   misma banda y no se sabe de quién cuelga cada tarjeta.
+   El renglón lo decide syncOrgSiblingLines() en profile.js después del layout,
+   porque una fila que envuelve tiene dos renglones y una barra corrida los
+   cruzaría. Sin esas clases no se dibuja nada: es el estado correcto mientras
+   el panel está oculto y todavía no hay medidas. */
+.org-children > .org-node.has-sibling-bar::before{
   content: "";
   position: absolute;
   top: 0;
@@ -1012,8 +1017,8 @@ input:focus, select:focus, textarea:focus{
   background: rgba(59,130,246,.36);
 }
 
-.org-children.has-branches > .org-node:first-child::before{ left: 50%; }
-.org-children.has-branches > .org-node:last-child::before{ right: 50%; }
+.org-children > .org-node.is-line-start::before{ left: 50%; }
+.org-children > .org-node.is-line-end::before{ right: 50%; }
 
 .org-connector{
   width: 2px;
