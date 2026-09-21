@@ -4894,17 +4894,35 @@ function emailForSalesLead(opp) {
   if (name.includes('agustin')) return 'agustin@vintti.com';
   if (name.includes('mariano')) return 'mariano@vintti.com';
   if (name.includes('mia'))     return 'mia@vintti.com';
+  if (name.includes('pilar'))   return 'pilar@vintti.com';
   return '';
 }
 
 // Iniciales pedidas: Bahía → BL, Lara → LR, Agustín → AR
+// Iniciales de quien no este en la lista de arriba. Antes caia en '--' y por eso Pilar
+// aparecia como "--" en la columna Sales Lead al pasar a ser AM: la lista tenia cinco
+// nombres escritos a mano y ella no estaba. Con esto, alguien nuevo muestra algo
+// razonable sin que haya que tocar codigo.
+function initialsFallback(key = '') {
+  const raw = String(key || '').trim().toLowerCase();
+  if (!raw) return '--';
+  const local = raw.includes('@') ? raw.split('@')[0] : raw;
+  const partes = local.split(/[^a-z\u00e0-\u00ff]+/i).filter(Boolean);
+  if (!partes.length) return '--';
+  const letras = partes.length >= 2
+    ? partes[0][0] + partes[1][0]
+    : partes[0].slice(0, 2);
+  return letras.toUpperCase();
+}
+
 function initialsForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
   if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
   if (key.includes('mariano')    || key.includes('marian@'))    return 'MS';
   if (key.includes('mia')) return 'MC';
   if (key.includes('agustin')) return 'AM';
-  return '--';
+  if (key.includes('pilar')) return 'PL';
+  return initialsFallback(key);
 }
 
 // Clase de color de la burbuja

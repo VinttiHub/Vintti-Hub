@@ -11,10 +11,10 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 TARGET = 20
 
 
@@ -73,7 +73,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           LEAST(100, ROUND(100.0 * cnt / NULLIF(%(target)s, 0)))::int   AS bar_pct
         FROM agg;
     """
-    return sql, {"ae_leads": AE_LEADS, "am_leads": AM_LEADS, "target": TARGET,
+    return sql, {"ae_leads": AE_LEADS, "am_leads": am_leads(), "target": TARGET,
                  "cur_ini": cur_ini, "cur_fin": cur_fin, "prev_ini": prev_ini, "prev_fin": prev_fin}
 
 

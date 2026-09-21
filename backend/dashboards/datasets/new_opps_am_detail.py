@@ -1,7 +1,7 @@
 """New opportunities by AM — per-row breakdown by window.
 
 Sibling of new_opps_am_windows. Same filter (opps with opp_type='New' owned
-by an AM email in DASHBOARD_AM_EMAILS, default `lara@vintti.com`) but
+by `_am_scope.am_history()`) but
 instead of 4 aggregate counts, returns one row per opp inside the selected
 window.
 
@@ -15,9 +15,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
-
-
-_DEFAULT_AM_EMAILS = ("lara@vintti.com",)
+from ._am_scope import am_history
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -38,9 +36,9 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def _am_emails() -> list[str]:
-    raw = os.environ.get("DASHBOARD_AM_EMAILS", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(_DEFAULT_AM_EMAILS)
+    # Los AM de hoy + los que lo fueron: estas opps se filtran por `opp_sales_lead`,
+    # que es historico y no se reasigna. Ver `_am_scope`.
+    return list(am_history())
 
 
 def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:

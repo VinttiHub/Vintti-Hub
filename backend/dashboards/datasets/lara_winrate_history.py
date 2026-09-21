@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+# El scope del AM ya no es una persona: sale de `users.role` (+ los ex-AM, para
+# que la serie historica no se corte cuando cambia el organigrama). Ver _am_scope.
+from ._am_scope import am_history
 
 
-LARA_EMAIL = "lara@vintti.com"
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -52,8 +54,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND (
-              TRIM(LOWER(o.opp_sales_lead)) = %(lara)s
-              OR TRIM(LOWER(o.opp_hr_lead)) = %(lara)s
+              TRIM(LOWER(o.opp_sales_lead)) IN %(am)s
+              OR TRIM(LOWER(o.opp_hr_lead)) IN %(am)s
             )
             AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date <= %(hasta)s::date)
@@ -79,7 +81,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY DATE_TRUNC('month', close_d);
     """
 
-    return sql, {"lara": LARA_EMAIL, "desde": desde, "hasta": hasta, "stage": stage}
+    return sql, {"am": am_history(), "desde": desde, "hasta": hasta, "stage": stage}
 
 
 DATASET = {

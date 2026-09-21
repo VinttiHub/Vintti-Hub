@@ -4,6 +4,9 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+# El componente "upsells" del drawer filtraba por lara@vintti.com a mano. Ahora
+# sigue al rol: los AM de hoy + los que lo fueron. Ver `_am_scope`.
+from ._am_scope import am_history
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -126,7 +129,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END::numeric AS monto
           FROM ventana v
           JOIN hires_full h
-            ON h.opp_sales_lead = 'lara@vintti.com'
+            ON h.opp_sales_lead IN %(am_hist)s
            AND h.opp_close_d IS NOT NULL
            AND h.opp_close_d >  v.win_ini
            AND h.opp_close_d <= v.win_fin
@@ -180,7 +183,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,"metric": metric, "corte": corte}
+        "win_ini": win_ini, "win_fin": win_fin, "metric": metric, "corte": corte,
+        "am_hist": am_history()}
 
 
 DATASET = {

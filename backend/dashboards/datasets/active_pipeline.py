@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from ._now import today_ar
+from ._am_scope import am_history
+
+
+_AE_LEADS = ("bahia@vintti.com", "mariano@vintti.com")
+
+
+def _sales_leads() -> tuple[str, ...]:
+    """AE + quien tenga (o haya tenido) el rol AM. Antes eran 3 emails escritos
+    dentro del SQL, con lara@vintti.com entre ellos."""
+    return tuple(dict.fromkeys(_AE_LEADS + am_history()))
 
 
 # Stages excluded from "pipeline" — must match the legacy filter in
@@ -72,11 +82,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.cr_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
-            AND LOWER(COALESCE(TRIM(o.opp_sales_lead), '')) IN (
-              'bahia@vintti.com',
-              'mariano@vintti.com',
-              'lara@vintti.com'
-            )
+            AND LOWER(COALESCE(TRIM(o.opp_sales_lead), '')) IN %(sales_leads)s
         ),
         win_rates AS (
           SELECT
@@ -123,7 +129,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN win_rates w;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"corte": corte, "sales_leads": _sales_leads()}
 
 
 DATASET = {

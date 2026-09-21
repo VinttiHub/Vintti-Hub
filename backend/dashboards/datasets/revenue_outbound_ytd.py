@@ -18,10 +18,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from ._now import today_ar
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -209,7 +209,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM staffing s, staffing_cnt sc, recruiting r;
     """
 
-    return sql, {"corte": corte, "ae_leads": AE_LEADS, "am_leads": AM_LEADS}
+    return sql, {"corte": corte, "ae_leads": AE_LEADS, "am_leads": am_leads()}
 
 
 DATASET = {

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+# El scope del AM ya no es una persona: sale de `users.role` (+ los ex-AM, para
+# que la serie historica no se corte cuando cambia el organigrama). Ver _am_scope.
+from ._am_scope import am_history
 
 
-LARA_EMAIL = "lara@vintti.com"
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -62,7 +64,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN mes_objetivo mo
           WHERE o.opportunity_id IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
-            AND LOWER(TRIM(o.opp_sales_lead)) = %(lara)s
+            AND LOWER(TRIM(o.opp_sales_lead)) IN %(am)s
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND DATE_TRUNC('month', NULLIF(o.opp_close_date::text, '')::date)::date = mo.mes_pick
@@ -85,7 +87,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY close_d DESC, opportunity_id;
     """
 
-    return sql, {"lara": LARA_EMAIL, "mes": mes, "desde": desde, "hasta": hasta, "stage": stage}
+    return sql, {"am": am_history(), "mes": mes, "desde": desde, "hasta": hasta, "stage": stage}
 
 
 DATASET = {

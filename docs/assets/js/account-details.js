@@ -192,6 +192,30 @@ function deriveContractTypeFromCandidates(hires = []) {
   return null;
 }
 
+// Quien es el Account Manager sale de `users.role` (el mismo campo que edita el
+// organigrama), no de un email escrito aca: el 2026-09-21 Lara paso a Chief of Staff y
+// Pilar a AM, y con el email hardcodeado ese cambio no llegaba a ningun lado — el
+// sistema le seguia reasignando TODA cuenta ganada a Lara.
+// Se cachea por carga de pagina: es una lista de una fila.
+// Si el endpoint falla devuelve null, y entonces NO se toca el account_manager: es
+// preferible dejar el que estaba a borrarlo o pisarlo con un valor inventado.
+let _accountManagerPromise = null;
+function fetchAccountManagerEmail(apiBase) {
+  if (!_accountManagerPromise) {
+    _accountManagerPromise = fetch(`${apiBase}/users/account-managers`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : []))
+      .then(rows => {
+        if (!Array.isArray(rows) || !rows.length) return null;
+        return (rows[0].email_vintti || '').toString().trim().toLowerCase() || null;
+      })
+      .catch(err => {
+        console.warn('\u26a0\ufe0f Could not fetch account manager:', err);
+        return null;
+      });
+  }
+  return _accountManagerPromise;
+}
+
 async function fetchSuggestedSalesLead(accountId) {
   if (!accountId) return null;
   try {
@@ -249,9 +273,9 @@ async function refreshAccountDerivedFields() {
   if (derivedStatus) {
     const normalizedStatus = derivedStatus.toLowerCase();
     if (normalizedStatus === 'active client') {
-      const laraEmail = 'lara@vintti.com';
-      if (normalizedManager !== laraEmail) {
-        patch.account_manager = laraEmail;
+      const amEmail = await fetchAccountManagerEmail(API_BASE_URL);
+      if (amEmail && normalizedManager !== amEmail) {
+        patch.account_manager = amEmail;
       }
     } else if (normalizedStatus === 'lead in process') {
       const suggested = await fetchSuggestedSalesLead(base.account_id);

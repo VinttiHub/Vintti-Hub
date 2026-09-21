@@ -44,6 +44,7 @@ from utils.storage_utils import (
 )
 from utils.html_utils import clean_html_for_webflow as _clean_html_for_webflow
 from utils.html_utils import clean_job_description_html
+from utils.am_roster import normalize_account_manager
 
 bp = Blueprint('accounts', __name__)
 
@@ -1686,6 +1687,11 @@ def update_account_fields(account_id):
                 values.append(normalize_lead_source(data[field]))
             elif field == 'outsource':
                 values.append(normalize_outsource(data[field]))
+            elif field == 'account_manager':
+                # Freno contra un front cacheado que todavia manda al AM viejo.
+                # Ver utils/am_roster.normalize_account_manager: el 2026-09-21 esto
+                # deshizo 80 de las 123 cuentas migradas en cuestion de horas.
+                values.append(normalize_account_manager(data[field]))
             else:
                 values.append(data[field])
 

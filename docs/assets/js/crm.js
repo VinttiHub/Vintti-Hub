@@ -1611,6 +1611,22 @@ if (typeof window.resolveAvatar !== 'function') {
   };
 }
 
+// Iniciales de quien no este en la lista de arriba. Antes caia en '--' y por eso Pilar
+// aparecia como "--" en la columna Sales Lead al pasar a ser AM: la lista tenia cinco
+// nombres escritos a mano y ella no estaba. Con esto, alguien nuevo muestra algo
+// razonable sin que haya que tocar codigo.
+function initialsFallback(key = '') {
+  const raw = String(key || '').trim().toLowerCase();
+  if (!raw) return '--';
+  const local = raw.includes('@') ? raw.split('@')[0] : raw;
+  const partes = local.split(/[^a-z\u00e0-\u00ff]+/i).filter(Boolean);
+  if (!partes.length) return '--';
+  const letras = partes.length >= 2
+    ? partes[0][0] + partes[1][0]
+    : partes[0].slice(0, 2);
+  return letras.toUpperCase();
+}
+
 function initialsForSalesLead(key='') {
   const s = key.toLowerCase();
   if (s.includes('bahia'))   return 'BL';
@@ -1618,7 +1634,8 @@ function initialsForSalesLead(key='') {
   if (s.includes('agustin')) return 'AM';
   if (s.includes('mariano')) return 'MS';   // ✅ ADD
   if (s.includes('mia')) return 'MC';
-  return '--';
+  if (s.includes('pilar')) return 'PL';
+  return initialsFallback(s);
 }
 
 function badgeClassForSalesLead(key='') {
@@ -1638,6 +1655,7 @@ function emailFromNameGuess(name='') {
   if (s.includes('agustin')) return 'agustin@vintti.com';
   if (s.includes('mariano')) return 'mariano@vintti.com'; // ✅ ADD
   if (s.includes('mia')) return 'mia@vintti.com';
+  if (s.includes('pilar')) return 'pilar@vintti.com';
   return '';
 }
 
@@ -1779,6 +1797,30 @@ async function fetchAccountDerivedBulk(ids = []) {
 
   await runWithConcurrency(tasks, 4);
   return out;
+}
+
+// Quien es el Account Manager sale de `users.role` (el mismo campo que edita el
+// organigrama), no de un email escrito aca: el 2026-09-21 Lara paso a Chief of Staff y
+// Pilar a AM, y con el email hardcodeado ese cambio no llegaba a ningun lado — el
+// sistema le seguia reasignando TODA cuenta ganada a Lara.
+// Se cachea por carga de pagina: es una lista de una fila.
+// Si el endpoint falla devuelve null, y entonces NO se toca el account_manager: es
+// preferible dejar el que estaba a borrarlo o pisarlo con un valor inventado.
+let _accountManagerPromise = null;
+function fetchAccountManagerEmail(apiBase) {
+  if (!_accountManagerPromise) {
+    _accountManagerPromise = fetch(`${apiBase}/users/account-managers`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : []))
+      .then(rows => {
+        if (!Array.isArray(rows) || !rows.length) return null;
+        return (rows[0].email_vintti || '').toString().trim().toLowerCase() || null;
+      })
+      .catch(err => {
+        console.warn('\u26a0\ufe0f Could not fetch account manager:', err);
+        return null;
+      });
+  }
+  return _accountManagerPromise;
 }
 
 async function fetchSuggestedSalesLeadForAccount(accountId) {
@@ -2006,7 +2048,7 @@ async function refreshCrmDerivedFields(accountIds = null, { source = 'manual' } 
         let desiredManager = null;
         const normalizedStatus = (derivedStatus || '').toLowerCase().trim();
         if (normalizedStatus === 'active client') {
-          desiredManager = 'lara@vintti.com';
+          desiredManager = await fetchAccountManagerEmail(API_BASE);
         } else if (normalizedStatus === 'lead in process') {
           desiredManager = await fetchSuggestedSalesLeadForAccount(accountId);
         }

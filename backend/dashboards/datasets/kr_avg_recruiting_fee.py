@@ -11,10 +11,10 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 OPP_MODEL = "Recruiting"
 FEE_EXPR = "COALESCE(ho.revenue, 0)"
 
@@ -69,7 +69,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(DISTINCT account_id)::int                     AS client_count
         FROM scoped;
     """
-    return sql, {"model": OPP_MODEL, "ae_leads": AE_LEADS, "am_leads": AM_LEADS,
+    return sql, {"model": OPP_MODEL, "ae_leads": AE_LEADS, "am_leads": am_leads(),
                  "win_ini": win_ini, "win_fin": win_fin}
 
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
+# El componente "upsells" del drawer filtraba por lara@vintti.com a mano. Ahora
+# sigue al rol: los AM de hoy + los que lo fueron. Ver `_am_scope`.
+from ._am_scope import am_history
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -127,7 +130,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END::numeric AS monto
           FROM mes_fin mf
           JOIN hires_full h
-            ON h.opp_sales_lead = 'lara@vintti.com'
+            ON h.opp_sales_lead IN %(am_hist)s
            AND h.opp_close_d IS NOT NULL
            AND h.opp_close_d >= mf.mes
            AND h.opp_close_d <= mf.fin_mes
@@ -180,7 +183,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY componente, client_name, candidate_name, opportunity_id;
     """
 
-    return sql, {"metric": metric, "mes": mes}
+    return sql, {"metric": metric, "mes": mes, "am_hist": am_history()}
 
 
 DATASET = {

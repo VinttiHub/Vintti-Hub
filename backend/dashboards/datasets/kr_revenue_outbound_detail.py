@@ -5,10 +5,10 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 
 
 def _parse_date(value):
@@ -67,7 +67,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY w.client_name, w.model, w.opp_position_name, w.close_d
         ORDER BY revenue DESC, w.client_name;
     """
-    params = {"ae_leads": AE_LEADS, "am_leads": AM_LEADS, "win_ini": win_ini, "win_fin": win_fin}
+    params = {"ae_leads": AE_LEADS, "am_leads": am_leads(), "win_ini": win_ini, "win_fin": win_fin}
     if model_clause:
         params["model"] = model
     return sql, params

@@ -208,6 +208,57 @@ def list_recruiters():
     return _list_users_by_role('recruiter')
 
 
+# Roles de `users.role` que significan "Account Manager". Es el MISMO campo que edita
+# el organigrama, a proposito: el 2026-09-21 Lara paso a Chief of Staff y Pilar a AM, y
+# hasta entonces 'lara@vintti.com' estaba escrito a mano en el JS que reasigna la cuenta
+# al ganarla, o sea que el cambio de organigrama no llegaba a ningun lado.
+ACCOUNT_MANAGER_ROLES = ('AM', 'ACCOUNT MANAGER')
+
+
+@bp.route('/users/account-managers')
+def list_account_managers():
+    """Los Account Managers activos, segun `users.role`.
+
+    Lo usan `crm.js` y `account-details.js` para saber a quien asignarle una cuenta
+    cuando pasa a Active Client. Devuelve una lista (puede haber mas de un AM); el
+    front toma el primero por orden alfabetico de nombre, que es estable.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    u.user_id,
+                    u.user_name,
+                    LOWER(TRIM(u.email_vintti)) AS email_vintti,
+                    u.role,
+                    u.avatar_url
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE UPPER(TRIM(COALESCE(u.role, ''))) IN %s
+                  AND COALESCE(aua.is_active, TRUE)
+                  AND NULLIF(TRIM(u.email_vintti), '') IS NOT NULL
+                  AND LOWER(TRIM(u.email_vintti)) <> ALL(%s)
+                ORDER BY LOWER(u.user_name), LOWER(u.email_vintti)
+                """,
+                (ACCOUNT_MANAGER_ROLES, list(HIDDEN_USER_EMAILS)),
+            )
+            rows = cur.fetchall()
+        return jsonify(rows)
+    except Exception as exc:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 @bp.route('/users/sales-leads')
 def list_sales_leads():
     """

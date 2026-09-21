@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from ._now import today_ar
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 
 
 def _parse_date(value):
@@ -53,7 +53,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*)::int         AS deal_count
         FROM base;
     """
-    return sql, {"ae_leads": AE_LEADS, "am_leads": AM_LEADS, "win_ini": win_ini, "corte": corte}
+    return sql, {"ae_leads": AE_LEADS, "am_leads": am_leads(), "win_ini": win_ini, "corte": corte}
 
 
 DATASET = {

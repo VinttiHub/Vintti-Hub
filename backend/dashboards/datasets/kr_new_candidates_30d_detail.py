@@ -5,10 +5,10 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._am_scope import am_leads  # AM de hoy, segun users.role
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
-AM_LEADS = ("lara@vintti.com",)
 
 
 def _parse_date(value):
@@ -50,7 +50,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 OR LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(am_leads)s )
         ORDER BY start_date DESC, a.client_name;
     """
-    return sql, {"ae_leads": AE_LEADS, "am_leads": AM_LEADS, "win_ini": win_ini, "win_fin": win_fin}
+    return sql, {"ae_leads": AE_LEADS, "am_leads": am_leads(), "win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

@@ -1,9 +1,8 @@
 """New opportunities by AM — count of new opps per window (Last week / WTD / Last month / MTD).
 
-"AM" is interpreted as Lara today (the only Account Manager filtering opps via
-`opp_sales_lead` / `opp_hr_lead` in the existing `lara_winrate_*` datasets).
-The list is read from `DASHBOARD_AM_EMAILS` env var (comma-separated) and
-falls back to `['lara@vintti.com']`.
+"AM" sale de `_am_scope.am_history()`: los que hoy tienen rol AM en `users` mas los
+que lo fueron. Se filtra por `opp_sales_lead`, que es historico y no se reasigna, asi
+que limitarlo al AM de hoy vaciaria la card cada vez que cambia el organigrama.
 
 The opportunity table has no real `created_at` column; the codebase uses
 `COALESCE(nda_signature_or_start_date, opp_close_date)` as the "opened on"
@@ -17,9 +16,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
-
-
-_DEFAULT_AM_EMAILS = ("lara@vintti.com",)
+from ._am_scope import am_history
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -40,9 +37,9 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def _am_emails() -> list[str]:
-    raw = os.environ.get("DASHBOARD_AM_EMAILS", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(_DEFAULT_AM_EMAILS)
+    # Los AM de hoy + los que lo fueron: estas opps se filtran por `opp_sales_lead`,
+    # que es historico y no se reasigna. Ver `_am_scope`.
+    return list(am_history())
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:

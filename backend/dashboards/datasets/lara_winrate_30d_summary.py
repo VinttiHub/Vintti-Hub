@@ -4,9 +4,11 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+# El scope del AM ya no es una persona: sale de `users.role` (+ los ex-AM, para
+# que la serie historica no se corte cuando cambia el organigrama). Ver _am_scope.
+from ._am_scope import am_history
 
 
-LARA_EMAIL = "lara@vintti.com"
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -67,8 +69,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND (
-              TRIM(LOWER(o.opp_sales_lead)) = %(lara)s
-              OR TRIM(LOWER(o.opp_hr_lead)) = %(lara)s
+              TRIM(LOWER(o.opp_sales_lead)) IN %(am)s
+              OR TRIM(LOWER(o.opp_hr_lead)) IN %(am)s
             )
             AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin
             AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text, '')::date >= %(desde)s::date)
@@ -96,7 +98,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
     return sql, {
         "win_ini": win_ini, "win_fin": win_fin,
-        "lara": LARA_EMAIL,
+        "am": am_history(),
         "corte": corte,
         "desde": desde,
         "hasta": hasta,

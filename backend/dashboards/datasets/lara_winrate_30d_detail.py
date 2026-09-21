@@ -4,9 +4,11 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+# El scope del AM ya no es una persona: sale de `users.role` (+ los ex-AM, para
+# que la serie historica no se corte cuando cambia el organigrama). Ver _am_scope.
+from ._am_scope import am_history
 
 
-LARA_EMAIL = "lara@vintti.com"
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -67,7 +69,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           CROSS JOIN ventana v
           WHERE o.opportunity_id IS NOT NULL
-            AND LOWER(TRIM(o.opp_sales_lead)) = %(lara)s
+            AND LOWER(TRIM(o.opp_sales_lead)) IN %(am)s
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
@@ -100,7 +102,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
     return sql, {
         "win_ini": win_ini, "win_fin": win_fin,
-        "lara": LARA_EMAIL,
+        "am": am_history(),
         "corte": corte,
         "desde": desde,
         "hasta": hasta,

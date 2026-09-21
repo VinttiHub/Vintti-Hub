@@ -11,7 +11,15 @@ from ._periods import window_bounds
 from ._recruiters import RECRUITERS_CTE
 
 
-SALES_LEADS = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
+_AE_LEADS = ("bahia@vintti.com", "mariano@vintti.com")
+
+
+def sales_leads() -> tuple[str, ...]:
+    """Los AE + quien tenga (o haya tenido) el rol AM. Antes era una tupla con
+    lara@vintti.com escrita a mano; al pasar ella a Chief of Staff y Pilar a AM
+    (2026-09-21) la card se habria quedado sin las opps del AM nuevo."""
+    from ._am_scope import am_history
+    return tuple(dict.fromkeys(_AE_LEADS + am_history()))
 
 
 def _resolve_modelo(filters: dict) -> str | None:
@@ -92,7 +100,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = COALESCE(r.email, a.email)
         ORDER BY placements DESC, recruiter;
     """
-    return sql, {"w_lo": lo, "w_hi": hi, "sales_leads": SALES_LEADS,
+    return sql, {"w_lo": lo, "w_hi": hi, "sales_leads": sales_leads(),
                  "modelo": modelo, "canal": canal}
 
 
