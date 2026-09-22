@@ -1351,6 +1351,11 @@ body.is-loading .kpi-card::after {
 .dlist__val { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
 .dlist__val--pos  { background: rgba(108, 56, 255, 0.12); color: #6c38ff; }
 .dlist__val--zero { background: #f0f1f5; color: #8a93a3; }
+/* Origen de la vacante en el drawer Churn M3: AE = violeta, AM = celeste, ambos = magenta.
+   El texto va en un tono oscurecido del mismo color para que se lea sobre el tinte. */
+.dlist__val[data-val="AE"]      { background: color-mix(in srgb, #6c38ff 14%, #fff); color: #6c38ff; }
+.dlist__val[data-val="AM"]      { background: color-mix(in srgb, #4ba9ff 20%, #fff); color: color-mix(in srgb, #4ba9ff 60%, #000); }
+.dlist__val[data-val="AE + AM"] { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: color-mix(in srgb, #ff1fdb 75%, #000); }
 
 /* ---------- LOW-SAMPLE FLAG (aviso "muestra baja" cuando el denominador es chico) ---------- */
 .lowsample-flag {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from ._sales_scope import origen_clause
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -61,6 +62,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             LEFT JOIN account a ON a.account_id = h.account_id
             WHERE o.opp_model = 'Staffing'
               AND COALESCE(a.vintti_internal, FALSE) = FALSE
+              /*ORIGEN*/
           ) x
           WHERE start_d IS NOT NULL
         ),
@@ -162,7 +164,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY mes;
     """
 
-    return sql, {"meses": meses, "desde": desde, "hasta": hasta}
+    # Filtro General / AE / AM de la card Churn M3 (override `origen`). Filtra a
+    # nivel hire, antes del roll-up a candidato: un candidato con hires AE y AM en
+    # la misma ventana cuenta en los dos, así que AE + AM puede pasar a General por 1.
+    origen_sql, origen_params = origen_clause(filters)
+    sql = sql.replace("/*ORIGEN*/", origen_sql)
+
+    return sql, {"meses": meses, "desde": desde, "hasta": hasta, **origen_params}
 
 
 DATASET = {

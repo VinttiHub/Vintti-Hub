@@ -1936,7 +1936,8 @@
         const pos = isFinite(n) && n > 0;
         const shown = valFmt ? valFmt(raw) : raw;
         const txt = (raw == null || raw === '') ? '—' : `${shown}${valSuffix ? ' ' + valSuffix : ''}`;
-        val = `<span class="dlist__val ${pos ? 'dlist__val--pos' : 'dlist__val--zero'}">${esc(txt)}</span>`;
+        // data-val deja colorear badges de texto por valor desde CSS (ej. AE / AM).
+        val = `<span class="dlist__val ${pos ? 'dlist__val--pos' : 'dlist__val--zero'}" data-val="${esc(raw == null ? '' : raw)}">${esc(txt)}</span>`;
       }
       const right = (val || date) ? `<div class="dlist__right">${val}${date}</div>` : '';
       return `<div class="dlist__row"><div><span class="dlist__name">${name}</span>${sub}</div>${right}</div>`;
@@ -3753,6 +3754,52 @@
     });
   }
 
+  // Toggle General / AE / AM (card "Churn M3" del tab Management). Setea
+  // data-override-origen en los bindings del grupo y en los paneles del drawer que
+  // declara data-origen-panels, y refetchea. AE = sales lead de la vacante es M+B;
+  // AM = todo lo demás (definido en backend/dashboards/datasets/_sales_scope.py).
+  function bindOrigenToggles() {
+    document.querySelectorAll('[data-origen-toggle]').forEach(group => {
+      const card = group.closest('.skpi-group') || group.closest('.card');
+      const panelKeys = (group.dataset.origenPanels || '').split(/\s+/).filter(Boolean);
+      group.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-origen-set]');
+        if (!btn || btn.classList.contains('is-active')) return;
+        const origen = btn.dataset.origenSet;
+
+        group.querySelectorAll('[data-origen-set]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        const els = [...(card || document).querySelectorAll('[data-chart][data-override-origen]')];
+        panelKeys.forEach(key => {
+          document
+            .querySelectorAll(`[data-kpi-detail-panel="${key}"] [data-chart][data-override-origen]`)
+            .forEach(el => els.push(el));
+        });
+        els.forEach(el => el.setAttribute('data-override-origen', origen));
+
+        const groups = new Map();
+        els.forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            // Cachear: el drawer re-renderiza desde cache cuando se abre.
+            lastFetchedRows.set(compKeyFor(chartKey, overrides), r.rows || []);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (err) { console.error('origen toggle', chartKey, err); }
+        }
+      });
+    });
+  }
+
   // Qué está mirando realmente un detalle `data-month-aware`. Tiene que espejar la
   // precedencia de refetchMonthAwareElements(): corte > hasta > fin del mes elegido.
   // Antes el chip escribía SIEMPRE el mes, así que al elegir un Corte (o un rango
@@ -4761,6 +4808,7 @@
     bindGlobalPeriodToggles();
     bindLeadTypeToggles();
     bindBookToggles();
+    bindOrigenToggles();
     bindDtableFilters();
     bindGlossary();
     bindStickyHead();

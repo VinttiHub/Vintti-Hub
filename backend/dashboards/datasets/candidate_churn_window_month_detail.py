@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from ._sales_scope import origen_case, origen_clause, sales_leads
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -55,6 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               COALESCE(c.name, '')        AS candidate_name,
               h.account_id,
               COALESCE(a.client_name, '') AS account_name,
+              """ + origen_case() + """ AS origen,
               CASE
                 WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
                 ELSE NULLIF(h.start_date::text, '')::date
@@ -75,6 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             LEFT JOIN account    a ON a.account_id   = h.account_id
             WHERE o.opp_model = 'Staffing'
               AND COALESCE(a.vintti_internal, FALSE) = FALSE
+              /*ORIGEN*/
           ) x
           WHERE start_d IS NOT NULL
         ),
@@ -98,6 +101,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             v.m_fin,
             h.candidate_name,
             h.account_name,
+            h.origen,
             h.start_d,
             h.end_d,
             CASE
@@ -120,6 +124,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           TO_CHAR(d.m_fin,   'YYYY-MM-DD')                AS m_fin,
           d.candidate_name,
           d.account_name,
+          d.origen,
           TO_CHAR(d.start_d, 'YYYY-MM-DD')                AS start_d,
           TO_CHAR(d.end_d,   'YYYY-MM-DD')                AS end_d,
           d.baja_tipo
@@ -130,7 +135,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           d.candidate_name;
     """
 
-    return sql, {"meses": meses, "mes": mes, "desde": desde, "hasta": hasta}
+    # Filtro General / AE / AM de la card Churn M3 (override `origen`). Filtra a
+    # nivel hire, antes del roll-up a candidato: un candidato con hires AE y AM en
+    # la misma ventana cuenta en los dos, así que AE + AM puede pasar a General por 1.
+    origen_sql, origen_params = origen_clause(filters)
+    sql = sql.replace("/*ORIGEN*/", origen_sql)
+
+    return sql, {
+        "meses": meses, "mes": mes, "desde": desde, "hasta": hasta,
+        # origen_case() usa la misma lista aunque el filtro sea General.
+        "origen_ae_leads": tuple(sales_leads()),
+        **origen_params,
+    }
 
 
 DATASET = {
@@ -141,6 +157,7 @@ DATASET = {
         {"key": "m_fin", "label": "Fin ventana", "type": "date"},
         {"key": "candidate_name", "label": "Candidato", "type": "string"},
         {"key": "account_name", "label": "Cliente", "type": "string"},
+        {"key": "origen", "label": "Origen (AE/AM)", "type": "string"},
         {"key": "start_d", "label": "Start", "type": "date"},
         {"key": "end_d", "label": "End", "type": "date"},
         {"key": "baja_tipo", "label": "Tipo de baja", "type": "string"},
