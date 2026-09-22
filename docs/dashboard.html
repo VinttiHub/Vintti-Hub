@@ -107,7 +107,7 @@
        ============================================================ -->
   <nav class="tabs" role="tablist">
     <label class="tabs__btn" for="tab-growth-new">Management Dashboard <span class="ct">16</span></label>
-    <label class="tabs__btn" for="tab-am">Account Management <span class="ct">46</span></label>
+    <label class="tabs__btn" for="tab-am">Account Management <span class="ct">48</span></label>
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">32</span></label>
     <label class="tabs__btn" for="tab-marketing">Marketing <span class="ct">3</span></label>
@@ -1332,10 +1332,8 @@
           <div>
             <div class="hero-kpi__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              MRR <span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="mrr_inicial" data-reduce="first" data-fmt="currency-k">—</span> ·
-              +<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="upsells_lara" data-reduce="first" data-fmt="currency-k">—</span> upsells ·
-              −<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="downgrades_recorte" data-reduce="first" data-fmt="currency-k">—</span> downgrades ·
-              −<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="churn_no_recorte" data-reduce="first" data-fmt="currency-k">—</span> churn
+              sobre <span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="mrr_inicial" data-reduce="first" data-fmt="currency-k">—</span>
+              al <span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="base_fecha" data-reduce="first" data-fmt="raw">—</span>
             </div>
           </div>
         </div>
@@ -1399,8 +1397,10 @@
            posteriores al Close Win de un AE. Un solo chart (`am_line_mrr_am`) sirve a
            los dos tiles y a los dos charts via data-override-metric, igual que el
            original — 1 fetch por metrica, no 4.
-           OJO: sin `data-window-label`, porque el dataset no usa window_bounds — sigue
-           la misma precedencia que los tiles originales (Mes/Desde-Hasta > corte). -->
+           OJO: GMRR/MRR van sin `data-window-label`, porque ese dataset no usa
+           window_bounds — siguen la precedencia Mes/Desde-Hasta > corte. El tile del
+           NRR si lo lleva, porque el suyo si la usa.
+           Layout: los 3 tiles arriba y sus 3 charts abajo, cada metrica en su columna. -->
       <div class="section s-12">
         <div>
           <h2>GMRR &amp; MRR · AM</h2>
@@ -1408,7 +1408,7 @@
         </div>
       </div>
 
-      <div class="skpi-tile skpi-g-2 s-6">
+      <div class="skpi-tile skpi-g-2 s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">GMRR · AM</span>
           <span class="skpi-tile__tag">Revenue</span>
@@ -1421,7 +1421,7 @@
         <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="am-gmrr" aria-label="Ver detalle GMRR · AM">Ver detalle</button>
       </div>
 
-      <div class="skpi-tile skpi-g-3 s-6">
+      <div class="skpi-tile skpi-g-3 s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">MRR · AM</span>
           <span class="skpi-tile__tag">Fee</span>
@@ -1434,7 +1434,26 @@
         <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="am-mrr-fee" aria-label="Ver detalle MRR · AM">Ver detalle</button>
       </div>
 
-      <div class="card s-6">
+      <!-- NRR del AM: cierra la seccion GMRR & MRR . AM, sobre el mismo motor
+           (`_am_mrr_staffing`, sin los 3 meses post Close Win del AE).
+           El tile SI lleva `data-window-label` (el dataset usa window_bounds); el chart
+           mensual NO, igual que los otros de esta seccion.
+           `entradas_m3` va aparte a proposito: lo que entra al libro del AM porque
+           vencio el M3 del AE es un traspaso, no expansion, y queda FUERA del NRR. -->
+      <div class="skpi-tile skpi-g-4 s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">NRR · AM · <span data-window-label>30d</span></span>
+          <span class="skpi-tile__tag">Retención</span>
+        </div>
+        <div class="skpi-tile__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__delta">
+          sobre <span data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="mrr_inicial" data-reduce="first" data-fmt="currency-k">—</span>
+          al <span data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="base_fecha" data-reduce="first" data-fmt="raw">—</span>
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="am-nrr-am" aria-label="Ver detalle NRR · AM">Ver detalle</button>
+      </div>
+
+      <div class="card s-4">
         <div class="card__head">
           <div>
             <h3 class="card__title">GMRR del AM · mes a mes</h3>
@@ -1456,7 +1475,7 @@
         </div>
       </div>
 
-      <div class="card s-6">
+      <div class="card s-4">
         <div class="card__head">
           <div>
             <h3 class="card__title">MRR del AM · mes a mes</h3>
@@ -1475,6 +1494,39 @@
               <line x1="20" y1="160" x2="540" y2="160"/>
             </g>
           </svg>
+        </div>
+      </div>
+
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NRR del AM · mes a mes</h3>
+            <p class="card__sub">Mensual, sin los primeros 3 meses del AE</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="am_line_nrr_am" data-bind="area" data-axis="xy"
+               data-x="mes" data-y="nrr_pct" data-color="cyan"
+               data-labels="NRR del AM" data-fmt-y="percent"
+               data-tooltip-extras="mrr_inicial|Base|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k,entradas_m3|Entró del AE|currency-k"
+               viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="20" y1="40" x2="540" y2="40"/>
+              <line x1="20" y1="100" x2="540" y2="100"/>
+              <line x1="20" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="am_table_nrr_am_month_detail" data-bind="month-detail"
+                 data-list-month="mes" data-list-name="candidate_name" data-list-sub="componente" data-list-date="end_d" data-list-start="start_d" data-list-end="end_d" data-list-state="componente"
+                 data-empty-text="Sin movimientos de NRR del AM este mes"></div>
+          </div>
         </div>
       </div>
 
@@ -1675,7 +1727,7 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">NRR · monthly</h3>
-            <p class="card__sub">>100% es expansión neta. 30d window incluye upsells y churn.</p>
+            <p class="card__sub">NRR <b>mensual</b>, no anualizado: más de 100% significa que los clientes que ya tenías pagan más que al empezar el mes. Incluye upsells, cambios de precio y churn.</p>
           </div>
           <span class="callout">
             <span style="color:#fff;font-weight:600" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</span>
@@ -1686,7 +1738,7 @@
           <svg data-chart="am_line_nrr" data-bind="area" data-axis="xy"
                data-x="mes" data-y="nrr_pct" data-color="lime"
                data-labels="NRR %" data-fmt-y="percent"
-               data-tooltip-extras="mrr_inicial|MRR inicial|currency-k,upsells_lara|Upsells|currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k"
+               data-tooltip-extras="mrr_inicial|MRR inicial|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -9458,23 +9510,102 @@
           </div>
         </div>
 
+        <!-- NRR global. La card muestra solo el % y la base; todo el desglose vive aca.
+             Las filas salen del MISMO `nrr_rows` que arma la card, asi que la suma por
+             componente da el numero del tile por construccion. -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-nrr">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · retención</span>
             <h3 class="kpi-drawer__title">NRR · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Net Revenue Retention: upsells menos churn en el período (<span data-window-label>30d</span>).</p>
+            <p class="kpi-drawer__sub">De lo que facturabas al empezar el período, cuánto quedó al final: vacantes nuevas en clientes que ya tenías y salary updates, menos los que se fueron. Es NRR <b>mensual</b>, no anualizado.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">NRR · <span data-window-label>30d</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">sobre la base al <span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="base_fecha" data-reduce="first" data-fmt="raw">—</span>, de <span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="mrr_inicial" data-reduce="first" data-fmt="currency-k">—</span> — es el MRR de esa fecha, no el de hoy</span>
+            </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">NRR · <span data-window-label>30d</span> <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <div class="dlist" data-chart="am_table_nrr_30d_detail" data-bind="list"
-                   data-list-name="candidate_name" data-list-sub="componente" data-list-date="end_d" data-limit="120"></div>
+              <h4 class="kpi-drawer__section-title">Qué sumó y qué restó</h4>
+              <p class="kpi-drawer__note" style="margin:0 0 12px">Tocá cualquiera para ver quiénes son.</p>
+              <div class="kpi-drawer__stats" style="grid-template-columns:1fr">
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Upsells <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="upsells">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="upsells" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">vacantes nuevas en cuentas que ya eran clientes · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="upsells"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,close_date|Close Win|raw,start_d|Start|raw,monto|MRR|currency"
+                         data-empty-text="Sin vacantes nuevas en cuentas existentes en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Salary updates ↑ <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="expansion_precio">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="expansion_precio" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">a alguien que ya estaba, sin sumar gente nueva · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="expansion_precio"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,monto_ini|Antes|currency,monto_fin|Ahora|currency,monto|Subió|currency"
+                         data-empty-text="Nadie tuvo una suba de salary o fee en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Salary updates ↓ <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="contraccion">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="contraccion" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">a alguien que ya estaba, sin que se vaya nadie · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="contraccion"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,monto_ini|Antes|currency,monto_fin|Ahora|currency,monto|Bajó|currency"
+                         data-empty-text="Nadie tuvo una baja de salary o fee en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Downgrades <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="downgrades_recorte">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="downgrades_recorte" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">se fueron por recorte del cliente · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="downgrades_recorte"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,inactive_reason|Motivo|raw,monto|MRR que se fue|currency"
+                         data-empty-text="Nadie se fue por recorte del cliente en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Churn <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="churn_no_recorte">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="churn_no_recorte" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">se fueron por cualquier otro motivo · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="churn_no_recorte"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,inactive_reason|Motivo|raw,monto|MRR que se fue|currency"
+                         data-empty-text="Nadie se fue en este período."></div>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </div>
 
-        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-clients-multi">
+<div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-clients-multi">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · retención</span>
             <h3 class="kpi-drawer__title">Clients > 1 candidate · <span data-window-label>30d</span></h3>
@@ -9523,6 +9654,121 @@
         </div>
 
         <!-- Panel · GMRR · AM (Account Management) -->
+        <!-- NRR del AM. Las filas salen del MISMO `nrr_rows` que arma la card
+             (`_nrr_decomp.decomp_cte`), asi que la suma por componente da el numero
+             del tile por construccion, no por coincidencia. -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-nrr-am">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · retención</span>
+            <h3 class="kpi-drawer__title">NRR · AM · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">De lo que ya era del AM al empezar el período, cuánto quedó al final: upsells y subidas de precio menos bajadas, churn y recortes. Es NRR <b>mensual</b>, no anualizado.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">NRR del AM · <span data-window-label>30d</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">sobre la base al <span data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="base_fecha" data-reduce="first" data-fmt="raw">—</span>, de <span data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="mrr_inicial" data-reduce="first" data-fmt="currency-k">—</span> — es el GMRR del AM de esa fecha, no el de hoy</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Qué sumó y qué restó</h4>
+              <p class="kpi-drawer__note" style="margin:0 0 12px">Tocá cualquiera para ver quiénes son.</p>
+              <div class="kpi-drawer__stats" style="grid-template-columns:1fr">
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Upsells <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="upsells">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="upsells" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">vacantes nuevas en cuentas que ya eran clientes · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="upsells"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,close_date|Close Win|raw,start_d|Start|raw,monto|MRR|currency"
+                         data-empty-text="Sin vacantes nuevas en cuentas existentes en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Salary updates ↑ <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="expansion_precio">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="expansion_precio" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">a alguien que ya estaba, sin sumar gente nueva · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="expansion_precio"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,monto_ini|Antes|currency,monto_fin|Ahora|currency,monto|Subió|currency"
+                         data-empty-text="Nadie tuvo una suba de salary o fee en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Salary updates ↓ <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="contraccion">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="contraccion" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">a alguien que ya estaba, sin que se vaya nadie · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="contraccion"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,monto_ini|Antes|currency,monto_fin|Ahora|currency,monto|Bajó|currency"
+                         data-empty-text="Nadie tuvo una baja de salary o fee en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Downgrades <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="downgrades_recorte">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="downgrades_recorte" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">se fueron por recorte del cliente · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="downgrades_recorte"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,inactive_reason|Motivo|raw,monto|MRR que se fue|currency"
+                         data-empty-text="Nadie se fue por recorte del cliente en este período."></div>
+                  </div>
+                </div>
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Churn <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="churn_no_recorte">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="churn_no_recorte" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">se fueron por cualquier otro motivo · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="churn_no_recorte"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,inactive_reason|Motivo|raw,monto|MRR que se fue|currency"
+                         data-empty-text="Nadie se fue en este período."></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Entró del AE · fuera del NRR</h4>
+              <div class="kpi-drawer__stats" style="grid-template-columns:1fr">
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Traspasado del AE <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="entradas_m3">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="entradas_m3" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">cumplió los 3 meses del Close Win en este período · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="entradas_m3"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,close_date|Close Win|raw,entra_el|Entró el|raw,monto|MRR|currency"
+                         data-empty-text="Ninguna vacante cumplió los 3 meses del Close Win en este período."></div>
+                  </div>
+                </div>
+              </div>
+              <p class="kpi-drawer__note">Suma al GMRR del AM pero <b>no</b> entra al NRR: es un traspaso del Account Executive, no algo que haya hecho el AM. Si contara como expansión, el NRR subiría sin que hubiera pasado nada con las cuentas.</p>
+            </section>
+          </div>
+        </div>
+
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-gmrr">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · recurring revenue</span>

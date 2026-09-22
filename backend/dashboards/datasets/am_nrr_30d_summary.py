@@ -1,9 +1,18 @@
+"""NRR del AM: el mismo NRR, contando solo lo que ya es del Account Manager.
+
+Misma descomposicion que `nrr_30d_summary` (`_nrr_decomp`), pero sobre el motor del tab
+Account Management (`_am_mrr_staffing`), que excluye las vacantes todavia dentro de los
+3 meses posteriores al Close Win de un AE.
+
+Lo que entra al libro del AM porque vencio ese M3 NO cuenta como expansion: sale aparte
+en `entradas_m3`, fuera del cociente. Es un traspaso del AE, no algo que hizo el AM.
+"""
 from __future__ import annotations
 
 from ._periods import window_bounds
-from ._mrr_staffing import HIRES_FULL_CTE, unit_snapshot
+from ._am_mrr_staffing import HIRES_CTE, ae_leads, am_unit_snapshot
 from ._nrr_decomp import (
-    MEASURES,
+    MEASURES_AM,
     base_label_sql,
     decomp_cte,
     summary_columns,
@@ -29,40 +38,42 @@ def _norm_metric(value) -> str:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     metric = _norm_metric(filters.get("metric"))
+    am = str(filters.get("am") or "").strip().lower()
     win_ini, win_fin = window_bounds(filters)
 
-    # R5: el NRR corre sobre el MOTOR CANONICO de MRR (el mismo de Management /
-    # `mrr_history`): MRR efectivo por (candidato, cuenta) con dedup de opp primaria +
-    # `salary_updates`, para que "MRR inicial" reconcilie EXACTO con el GMRR de
-    # Management. Los tres snapshots y la descomposicion en componentes viven en
-    # `_nrr_decomp.decomp_cte()`, compartidos con el drawer: la suma del detalle da
-    # este mismo numero por construccion.
     sql = f"""
-        WITH {HIRES_FULL_CTE},
-        {unit_snapshot('unit_ini', D_INI)},
-        {unit_snapshot('unit_fin', D_FIN)},
-        {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
-        {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
+        WITH {HIRES_CTE},
+        {am_unit_snapshot('unit_ini', D_INI)},
+        {am_unit_snapshot('unit_fin', D_FIN)},
+        {am_unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN, col='close_d'))},
+        {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires',
+                    D_INI, D_FIN, owned=True)}
         SELECT
           TO_CHAR({D_INI}, 'YYYY-MM-DD') AS win_ini,
           {base_label_sql(D_INI)}        AS base_fecha,
           TO_CHAR({D_FIN}, 'YYYY-MM-DD') AS win_fin,
-          {summary_columns()}
+          {summary_columns(owned=True)}
         FROM nrr_rows;
     """
 
-    return sql, {"win_ini": win_ini, "win_fin": win_fin, "metric": metric}
+    return sql, {
+        "win_ini": win_ini,
+        "win_fin": win_fin,
+        "metric": metric,
+        "am": am,
+        "ae_leads": ae_leads(),
+    }
 
 
 DATASET = {
-    "key": "nrr_30d_summary",
-    "label": "NRR (Staffing) — Ventana 30 días",
+    "key": "am_nrr_30d_summary",
+    "label": "NRR del AM — Ventana 30 días",
     "dimensions": [
         {"key": "win_ini", "label": "Inicio", "type": "date"},
         {"key": "win_fin", "label": "Fin", "type": "date"},
         {"key": "base_fecha", "label": "Base al", "type": "string"},
     ],
-    "measures": MEASURES,
+    "measures": MEASURES_AM,
     "default_filters": {},
     "query": query,
 }

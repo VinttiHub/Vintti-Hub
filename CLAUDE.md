@@ -106,6 +106,87 @@ pedido de la owner.
 Requiere la migración `backend/sql/20260902_dashboard_audit.sql` corrida a mano y la env
 `DASHBOARD_AUDIT_TOKEN` (ya seteada en App Runner y como secret del repo).
 
+## NRR: una sola definición para las 8 cards
+
+El NRR del tab Account Management existe en dos versiones —**global** (todo Staffing) y
+**del AM** (sobre `_am_mrr_staffing`, sin los 3 meses posteriores al Close Win de un AE)—
+y cada una tiene card de 30d, serie mensual y sus dos drawers. Los ocho leen la misma
+descomposición:
+
+```
+NRR = (mrr_inicial + upsells + expansion_precio
+       − contraccion − downgrades_recorte − churn_no_recorte) / mrr_inicial
+```
+
+**Está escrita una sola vez, en `backend/dashboards/datasets/_nrr_decomp.py`**
+(`decomp_cte()` → el CTE `nrr_rows`, una fila por unidad). Los summary lo agregan con
+`SUM(...) FILTER`, los detalles lo listan tal cual: por eso la suma del drawer da el
+número de la card **por construcción**. Antes la card y el drawer implementaban la
+métrica por separado y se separaron — el detalle no dedupeaba ni leía `salary_updates`,
+clasificaba el recorte con otro vocabulario y filtraba los upsells por sales lead
+mientras la card filtraba por cohorte de cuentas. Si tocás la fórmula, tocás ese archivo
+y listo; no la repliques en un dataset.
+
+Cinco cosas que no son obvias:
+
+- **El upsell NO exige que el hire esté vivo al cierre de la ventana**: se cuenta por
+  `opp_close_date` dentro de la ventana, aunque el contractor arranque el mes que viene.
+  Es decisión de la owner (2026-09-22). Consecuencia asumida: la identidad
+  `MRR(fin) = mrr_inicial + componentes` **no cierra** contra `mrr_history`, así que esa
+  reconciliación no sirve como test. Lo que sí tiene que cerrar es card == drawer, y
+  `mrr_inicial` del mes M == GMRR de Management del mes M−1.
+- **Por eso los upsells se valúan con un snapshot sin filtro de actividad**: el
+  `where_extra` de `unit_snapshot()` / `am_unit_snapshot()`. Con la cláusula de actividad
+  un upsell que todavía no arrancó se valuaría en cero.
+- **Expansión y contracción excluyen lo ya contado como upsell** (`NOT EXISTS` contra
+  `nrr_ups`): una opp puede tener `opp_close_date` dentro de la ventana con el hire
+  activo desde antes —close date cargado tarde, o pisado por el sync de HubSpot— y se
+  contaría dos veces.
+- **En la UI, `expansion_precio` y `contraccion` se llaman "salary updates"** (pedido de
+  la owner, 2026-09-22: "expansión/contracción" no se entendía, y en el hub esa acción es
+  literalmente editar Salary/Fee en la solapa Hire → una fila en `salary_updates`). Las
+  **cards muestran el NETO** en un solo chip, vía el campo calculado `salary_updates`
+  (= `expansion_precio − contraccion`, con `data-fmt="delta-currency-k"` que ya pone el
+  signo); el desglose ↑/↓ queda para el drawer. Los nombres de columna no cambiaron.
+  Ojo que **no** es lo mismo que `downgrades_recorte`: eso es gente que **se fue**, esto
+  es la misma gente cobrando distinto.
+- **El detalle trae `monto_ini` / `monto_fin`** (cuánto valía y cuánto vale) además del
+  `monto`, para que los salary updates se lean "de $1.700 a $800" y no sólo la
+  diferencia. Van NULL en los componentes donde no aplica. También trae `close_date` y
+  `entra_el`: sin esas fechas, upsells y `entradas_m3` parecen fuera de período, porque
+  los dos se rigen por el Close Win y no por el start del contractor.
+- **Cada tarjeta del drawer despliega su propio desglose**: es un `.expander` cuyo panel
+  lleva la misma `dtable` del detalle filtrada con `data-where-field="componente"` +
+  `data-where-value="<componente>"`. No hace falta JS nuevo (`bindExpanders()` engancha
+  cualquier `[data-expand-toggle]` y `renderBinding()` ya aplica ese filtro), ni un fetch
+  por tarjeta: `hydrate` agrupa por chart y reparte las mismas filas a los seis paneles.
+- **Las dos cards de NRR muestran sólo el % y la base** ("sobre $267.8K al 23-ago");
+  todo el desglose vive en sus drawers (`am-nrr` y `am-nrr-am`), con las mismas tarjetas
+  en los dos. La owner pidió sacarles texto el 2026-09-22: con los seis componentes a la
+  vista la card se leía como un párrafo.
+- **La sección "GMRR & MRR · AM" es una grilla de 3×2**: los tiles de GMRR, MRR y NRR
+  arriba (`s-4` cada uno) y sus tres charts abajo, cada métrica en su columna. Antes el
+  NRR iba en una fila propia junto a su chart y quedaba un hueco debajo del tile, porque
+  un `skpi-tile` es mucho más bajo que una `card` con chart.
+- **`downgrades_recorte` vs `churn_no_recorte` NO cambia el número** (los dos se restan
+  igual). Existe sólo para ver cuáles vienen de un recorte del cliente, y se decide con
+  `RECORTE_RE` = `layoff|downsizing|recorte`, el superset de los dos vocabularios que
+  convivían.
+- **La base es el cierre del día ANTERIOR al inicio de la ventana** (`D_INI` es
+  `win_ini − 1`), igual que `prev_end` en la serie mensual. Así, al elegir un mes, la
+  card de 30d da exactamente el mismo número que el punto de ese mes en el chart.
+- **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Sin ella se
+  lee como si fuera el GMRR de hoy y no cuadra con el tile de al lado: con corte
+  22-sep, GMRR · AM da $237,4K y la base del NRR $208,1K, que es el GMRR · AM del
+  23-ago. Es el mismo indicador en dos fechas — el `+14% vs 30d` del propio tile es ese
+  salto — pero sin la fecha a la vista parece un error de cálculo (reportado por la
+  owner el 2026-09-22).
+
+En el NRR del AM hay un séptimo componente, **`entradas_m3`**: lo que entró al libro
+porque venció el M3 del AE. Va **fuera del cociente** a propósito — es un traspaso, no
+algo que hizo el AM. No es marginal: en septiembre de 2026 eran $28.8K contra una base
+de $228K, así que contarlo como expansión subiría el NRR del AM de 94% a ~107%.
+
 ## Sync HubSpot → Opportunities
 
 `POST /hubspot/sync/opportunities` (en `backend/routes/hubspot_routes.py`) refleja en el hub

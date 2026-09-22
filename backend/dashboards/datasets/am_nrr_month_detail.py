@@ -1,11 +1,12 @@
+"""Drawer mensual del NRR del AM. Sale del MISMO `nrr_rows` que la serie."""
 from __future__ import annotations
 
 from datetime import date
 
-from ._mrr_staffing import HIRES_FULL_CTE, unit_snapshot_monthly
+from ._am_mrr_staffing import HIRES_CTE, ae_leads, am_unit_snapshot_monthly
 from ._nrr_decomp import decomp_cte
+from .am_nrr_history import UPS_POBLACION
 from .nrr_30d_detail import DETAIL_SELECT, DIMENSIONS, MEASURES, unit_info_cte
-from .nrr_history import UPS_POBLACION
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -36,19 +37,17 @@ def _norm_metric(value) -> str:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     metric = _norm_metric(filters.get("metric"))
+    am = str(filters.get("am") or "").strip().lower()
     mes = (
-        _parse_date(filters.get("fecha_nrr"))
+        _parse_date(filters.get("fecha_nrr_am"))
+        or _parse_date(filters.get("fecha_nrr"))
         or _parse_date(filters.get("mes_click"))
         or _parse_date(filters.get("mes"))
     )
 
-    # `meses` es UN solo mes (el que se clickeo), pero se arma igual que en
-    # `nrr_history` para poder reusar los mismos snapshots mensuales: la base es el
-    # FIN DEL MES ANTERIOR (`prev_end`). El detalle anclaba al `fin_mes`, que es lo que
-    # hacia que no cerrara contra la card.
     sql = f"""
-        WITH {HIRES_FULL_CTE},
-        {unit_info_cte()},
+        WITH {HIRES_CTE},
+        {unit_info_cte('hires', close_col='close_d')},
         meses AS (
           SELECT
             m.mes,
@@ -61,23 +60,23 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS mes
           ) m
         ),
-        {unit_snapshot_monthly('unit_ini', 'prev_end')},
-        {unit_snapshot_monthly('unit_fin', 'fin_mes')},
-        {unit_snapshot_monthly('unit_ups', 'fin_mes', UPS_POBLACION)},
+        {am_unit_snapshot_monthly('unit_ini', 'prev_end')},
+        {am_unit_snapshot_monthly('unit_fin', 'fin_mes')},
+        {am_unit_snapshot_monthly('unit_ups', 'fin_mes', UPS_POBLACION)},
         {decomp_cte(
-            'unit_ini', 'unit_fin', 'unit_ups', 'hires_full',
+            'unit_ini', 'unit_fin', 'unit_ups', 'hires',
             'mm.prev_end', 'mm.fin_mes',
-            key='mes', reason_join=' JOIN meses mm ON mm.mes = i.mes',
+            owned=True, key='mes', reason_join=' JOIN meses mm ON mm.mes = i.mes',
         )}
         {DETAIL_SELECT.format(mes='r.mes')}
     """
 
-    return sql, {"metric": metric, "mes": mes}
+    return sql, {"metric": metric, "mes": mes, "am": am, "ae_leads": ae_leads()}
 
 
 DATASET = {
-    "key": "nrr_month_detail",
-    "label": "NRR — Detalle del mes",
+    "key": "am_nrr_month_detail",
+    "label": "NRR del AM — Detalle del mes",
     "dimensions": DIMENSIONS,
     "measures": MEASURES,
     "default_filters": {},

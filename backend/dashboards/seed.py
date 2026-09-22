@@ -296,6 +296,10 @@ RESET_CHART_KEYS = {
         "am_table_nrr_month_detail",
         "am_kpi_nrr_30d",
         "am_table_nrr_30d_detail",
+        "am_line_nrr_am",
+        "am_table_nrr_am_month_detail",
+        "am_kpi_nrr_am_30d",
+        "am_table_nrr_am_30d_detail",
         # Growth & Revenue · NEW (Staffing | Recruiting subtabs)
         "gr_kpi_revenue_ytd",
         "gr_kpi_staffing_window",
@@ -1417,7 +1421,9 @@ MAIN_CHARTS = [
                 "drillKey": "fecha_nrr",
                 "tooltipExtras": [
                     "mrr_inicial",
-                    "upsells_lara",
+                    "upsells",
+                    "expansion_precio",
+                    "contraccion",
                     "downgrades_recorte",
                     "churn_no_recorte",
                 ],
@@ -1460,7 +1466,9 @@ MAIN_CHARTS = [
             "mapping": {
                 "values": [
                     {"key": "mrr_inicial", "label": "MRR", "formatter": "currency"},
-                    {"key": "upsells_lara", "label": "Upsells", "formatter": "currency"},
+                    {"key": "upsells", "label": "Upsells", "formatter": "currency"},
+                    {"key": "expansion_precio", "label": "Subió el precio", "formatter": "currency"},
+                    {"key": "contraccion", "label": "Bajó el precio", "formatter": "currency"},
                     {"key": "downgrades_recorte", "label": "Downgrades", "formatter": "currency"},
                     {"key": "churn_no_recorte", "label": "Churn", "formatter": "currency"},
                     {"key": "nrr_pct", "label": "NRR %", "formatter": "percent"},
@@ -1493,6 +1501,107 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 95, "w": 6, "h": 5},
         "sort_order": 440,
+    },
+    {
+        # NRR del AM: el mismo NRR pero contando solo lo que ya es del Account Manager
+        # (`_am_mrr_staffing`, sin los 3 meses posteriores al Close Win de un AE). Lo que
+        # entra al libro del AM por vencimiento de ese M3 sale en `entradas_m3`, FUERA
+        # del cociente: es un traspaso del AE, no expansion del AM.
+        "chart_key": "am_kpi_nrr_am_30d",
+        "tab_key": "account-management",
+        "title": "NRR del AM en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "am_nrr_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "mrr_inicial", "label": "MRR", "formatter": "currency"},
+                    {"key": "upsells", "label": "Upsells", "formatter": "currency"},
+                    {"key": "expansion_precio", "label": "Subió el precio", "formatter": "currency"},
+                    {"key": "contraccion", "label": "Bajó el precio", "formatter": "currency"},
+                    {"key": "downgrades_recorte", "label": "Downgrades", "formatter": "currency"},
+                    {"key": "churn_no_recorte", "label": "Churn", "formatter": "currency"},
+                    {"key": "entradas_m3", "label": "Entró del AE", "formatter": "currency"},
+                    {"key": "nrr_pct", "label": "NRR %", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 110, "w": 6, "h": 5},
+        "sort_order": 480,
+    },
+    {
+        "chart_key": "am_line_nrr_am",
+        "tab_key": "account-management",
+        "title": "NRR del AM",
+        "type": "line",
+        "dataset_key": "am_nrr_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["nrr_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_nrr_am",
+                "tooltipExtras": [
+                    "mrr_inicial",
+                    "upsells",
+                    "expansion_precio",
+                    "contraccion",
+                    "downgrades_recorte",
+                    "churn_no_recorte",
+                    "entradas_m3",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 110, "w": 6, "h": 5},
+        "sort_order": 490,
+    },
+    {
+        "chart_key": "am_table_nrr_am_30d_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - NRR del AM 30d",
+        "type": "table",
+        "dataset_key": "am_nrr_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "componente",
+                    "client_name",
+                    "candidate_name",
+                    "opportunity_id",
+                    "start_d",
+                    "end_d",
+                    "inactive_reason",
+                    "monto",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 115, "w": 6, "h": 5},
+        "sort_order": 500,
+    },
+    {
+        "chart_key": "am_table_nrr_am_month_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - NRR del AM",
+        "type": "table",
+        "dataset_key": "am_nrr_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "componente",
+                    "client_name",
+                    "candidate_name",
+                    "opportunity_id",
+                    "start_d",
+                    "end_d",
+                    "inactive_reason",
+                    "monto",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 115, "w": 6, "h": 5},
+        "sort_order": 510,
     },
     {
         # GMRR/MRR del AM: el mismo motor que los tiles del tab

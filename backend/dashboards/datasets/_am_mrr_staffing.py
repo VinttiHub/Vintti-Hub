@@ -91,7 +91,8 @@ _HIRES_CTE = """
               ELSE ho.end_date::date
             END AS end_d,
             COALESCE(ho.salary, 0)::numeric AS salary,
-            COALESCE(ho.fee, 0)::numeric    AS fee
+            COALESCE(ho.fee, 0)::numeric    AS fee,
+            TRIM(COALESCE(ho.inactive_reason::text, '')) AS inactive_reason
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           LEFT JOIN account a ON a.account_id = ho.account_id
@@ -325,3 +326,152 @@ SNAPSHOT_CTE = (
                    e.account_manager, e.am_owned
         )"""
 )
+
+
+# Export publico del CTE base, para los datasets que arman su propio pipeline sobre
+# `hires` (hoy: el NRR del AM, que necesita DOS snapshots a fechas distintas).
+HIRES_CTE = _HIRES_CTE
+
+
+def am_unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> str:
+    """CTE de MRR efectivo por (candidato, cuenta) a `dexpr`, con la marca `am_owned`.
+
+    El gemelo de `_mrr_staffing.unit_snapshot()` para el scope del AM: mismo dedup de
+    opp primaria y misma precedencia de `salary_updates`, mas `am_owned` evaluado
+    contra `dexpr` (el reloj de 3 meses corre por vacante, ver `_AM_OWNED`).
+
+    Requiere que `hires` ya exista en el WITH (via `HIRES_CTE`). A diferencia de
+    `ANCHOR_CTE`, que fija dos anclas 'cur'/'prev' en un solo CTE, esto se puede pedir
+    N veces con nombres distintos: el NRR necesita el inicio y el fin de la ventana.
+
+    `where_extra` reemplaza el filtro de poblacion (por defecto: activos a `dexpr`).
+    Lo usa el upsell del NRR, que se cuenta por `opp_close_date` y puede no estar
+    activo a ninguna fecha.
+    """
+    poblacion = where_extra or (
+        f"h.start_d IS NOT NULL AND h.start_d <= {dexpr}"
+        f" AND (h.end_d IS NULL OR h.end_d >= {dexpr})"
+    )
+    owned = _AM_OWNED.format(cutoff=dexpr)
+    return f"""
+        {name}_opps AS (
+          SELECT DISTINCT ON (h.opportunity_id, h.candidate_id)
+            h.opportunity_id, h.candidate_id, h.account_id, h.account_manager,
+            h.start_d, h.close_d, h.salary AS hs, h.fee AS hf,
+            {owned} AS am_owned
+          FROM hires h
+          WHERE {poblacion}
+          ORDER BY h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
+        ),
+        {name}_marked AS (
+          SELECT *,
+            ROW_NUMBER() OVER (
+              PARTITION BY candidate_id, account_id
+              ORDER BY start_d DESC NULLS LAST, opportunity_id DESC
+            ) AS rn
+          FROM {name}_opps
+        ),
+        {name}_eff AS (
+          SELECT m.candidate_id, m.account_id, m.opportunity_id, m.account_manager,
+            m.am_owned, m.rn, m.close_d,
+            CASE WHEN m.rn = 1
+              THEN COALESCE(sr.salary::numeric, se.salary::numeric, m.hs)
+              ELSE m.hs END AS salary,
+            CASE WHEN m.rn = 1
+              THEN COALESCE(sr.fee::numeric, se.fee::numeric, m.hf)
+              ELSE m.hf END AS fee
+          FROM {name}_marked m
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee FROM salary_updates s
+            WHERE s.candidate_id = m.candidate_id
+              AND s.date IS NOT NULL AND s.date::date <= {dexpr}
+            ORDER BY s.date::date DESC, s.update_id DESC LIMIT 1
+          ) sr ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee FROM salary_updates s
+            WHERE s.candidate_id = m.candidate_id AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id DESC LIMIT 1
+          ) se ON TRUE
+        ),
+        {name} AS (
+          SELECT candidate_id, account_id,
+            MAX(opportunity_id) FILTER (WHERE rn = 1) AS opportunity_id,
+            MAX(account_manager)                      AS account_manager,
+            MAX(close_d)                              AS close_d,
+            -- La unidad es del AM si alguna de sus opps ya cumplio el M3. El GMRR/MRR
+            -- del AM agrupa POR am_owned (una unidad puede aportar a las dos mitades),
+            -- pero el NRR necesita una sola respuesta por unidad o la misma unidad
+            -- caeria en dos componentes.
+            BOOL_OR(am_owned)                         AS am_owned,
+            SUM(salary)::numeric                      AS salary,
+            SUM(fee)::numeric                         AS fee
+          FROM {name}_eff
+          GROUP BY candidate_id, account_id
+        )
+    """
+
+
+def am_unit_snapshot_monthly(name: str, dcol: str, where_extra: str | None = None) -> str:
+    """`am_unit_snapshot()` para una serie: un snapshot por cada fila de `meses`.
+
+    Requiere `hires` y `meses` en el WITH. `dcol` es la columna de `meses` que hace de
+    fecha del snapshot, y tambien la fecha contra la que se mide el reloj del M3.
+    """
+    poblacion = where_extra or (
+        f"h.start_d IS NOT NULL AND h.start_d <= m.{dcol}"
+        f" AND (h.end_d IS NULL OR h.end_d >= m.{dcol})"
+    )
+    owned = _AM_OWNED.format(cutoff=f"m.{dcol}")
+    return f"""
+        {name}_opps AS (
+          SELECT DISTINCT ON (m.mes, h.opportunity_id, h.candidate_id)
+            m.mes, m.{dcol} AS d,
+            h.opportunity_id, h.candidate_id, h.account_id, h.account_manager,
+            h.start_d, h.close_d, h.salary AS hs, h.fee AS hf,
+            {owned} AS am_owned
+          FROM meses m
+          JOIN hires h ON {poblacion}
+          ORDER BY m.mes, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
+        ),
+        {name}_marked AS (
+          SELECT *,
+            ROW_NUMBER() OVER (
+              PARTITION BY mes, candidate_id, account_id
+              ORDER BY start_d DESC NULLS LAST, opportunity_id DESC
+            ) AS rn
+          FROM {name}_opps
+        ),
+        {name}_eff AS (
+          SELECT sm.mes, sm.candidate_id, sm.account_id, sm.opportunity_id,
+            sm.account_manager, sm.am_owned, sm.rn, sm.close_d,
+            CASE WHEN sm.rn = 1
+              THEN COALESCE(sr.salary::numeric, se.salary::numeric, sm.hs)
+              ELSE sm.hs END AS salary,
+            CASE WHEN sm.rn = 1
+              THEN COALESCE(sr.fee::numeric, se.fee::numeric, sm.hf)
+              ELSE sm.hf END AS fee
+          FROM {name}_marked sm
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee FROM salary_updates s
+            WHERE s.candidate_id = sm.candidate_id
+              AND s.date IS NOT NULL AND s.date::date <= sm.d
+            ORDER BY s.date::date DESC, s.update_id DESC LIMIT 1
+          ) sr ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee FROM salary_updates s
+            WHERE s.candidate_id = sm.candidate_id AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id DESC LIMIT 1
+          ) se ON TRUE
+        ),
+        {name} AS (
+          SELECT mes, candidate_id, account_id,
+            MAX(opportunity_id) FILTER (WHERE rn = 1) AS opportunity_id,
+            MAX(account_manager)                      AS account_manager,
+            MAX(close_d)                              AS close_d,
+            BOOL_OR(am_owned)                         AS am_owned,
+            SUM(salary)::numeric                      AS salary,
+            SUM(fee)::numeric                         AS fee
+          FROM {name}_eff
+          GROUP BY mes, candidate_id, account_id
+        )
+    """

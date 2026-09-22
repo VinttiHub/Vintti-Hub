@@ -1,209 +1,111 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from ._now import today_ar
-
 from ._periods import window_bounds
-# El componente "upsells" del drawer filtraba por lara@vintti.com a mano. Ahora
-# sigue al rol: los AM de hoy + los que lo fueron. Ver `_am_scope`.
-from ._am_scope import am_history
+from ._mrr_staffing import HIRES_FULL_CTE, unit_snapshot
+from ._nrr_decomp import decomp_cte, upsell_population
 
+# La base es el snapshot al CIERRE DEL DIA ANTERIOR al inicio de la ventana, igual que
+# `prev_end` en la serie mensual: asi, al elegir un mes, esta card da exactamente el
+# mismo numero que el punto de ese mes en el chart. Anclarla al primer dia de la ventana
+# dejaba una diferencia de un dia entre las dos lecturas.
+D_INI = "(%(win_ini)s::date - 1)"
+D_FIN = "%(win_fin)s::date"
 
-def _parse_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    raw = str(value).strip()
-    if not raw:
-        return None
-    parts = raw.split("-")
-    try:
-        if len(parts) == 3:
-            return date(int(parts[0]), int(parts[1]), int(parts[2]))
-        if len(parts) == 2:
-            return date(int(parts[0]), int(parts[1]), 1)
-    except (ValueError, TypeError):
-        return None
-    return None
+def unit_info_cte(src: str = "hires_full", close_col: str = "opp_close_d") -> str:
+    """Datos de la unidad para pintar la fila: los de su hire mas reciente.
+
+    `close_col` es como se llama la fecha de Close Win en el CTE base (`opp_close_d` en
+    `hires_full`, `close_d` en `hires`). Hace falta en el drawer porque hay componentes
+    que se explican por esa fecha y no por el start: el upsell se cuenta por Close Win, y
+    el M3 del AE vence a los 3 meses del Close Win. Mostrando solo el start, las filas
+    parecen fuera de periodo (la owner lo pregunto el 2026-09-22 viendo starts de mayo en
+    la ventana de septiembre).
+    """
+    return f"""
+        unit_info AS (
+          SELECT DISTINCT ON (h.candidate_id, h.account_id)
+            h.candidate_id, h.account_id, h.start_d, h.end_d, h.inactive_reason,
+            h.{close_col} AS close_d,
+            (h.{close_col} + INTERVAL '3 months')::date AS m3_d
+          FROM {src} h
+          ORDER BY h.candidate_id, h.account_id, h.start_d DESC NULLS LAST
+        )"""
+
+# El SELECT del drawer. Sale de `nrr_rows`, el MISMO CTE que agrega la card: por eso
+# la suma de `monto` por componente da exactamente el campo homonimo del resumen.
+DETAIL_SELECT = """
+        SELECT
+          TO_CHAR({mes}, 'YYYY-MM-DD')        AS mes,
+          r.componente,
+          COALESCE(a.client_name, '')         AS client_name,
+          COALESCE(c.name, '')                AS candidate_name,
+          r.opportunity_id,
+          TO_CHAR(u.start_d, 'YYYY-MM-DD')    AS start_d,
+          TO_CHAR(u.end_d,   'YYYY-MM-DD')    AS end_d,
+          TO_CHAR(u.close_d, 'YYYY-MM-DD')    AS close_date,
+          TO_CHAR(u.m3_d,    'YYYY-MM-DD')    AS entra_el,
+          u.inactive_reason,
+          r.monto::float                      AS monto,
+          r.monto_ini::float                  AS monto_ini,
+          r.monto_fin::float                  AS monto_fin
+        FROM nrr_rows r
+        LEFT JOIN candidates c ON c.candidate_id = r.candidate_id
+        LEFT JOIN account    a ON a.account_id   = r.account_id
+        LEFT JOIN unit_info  u ON u.candidate_id = r.candidate_id
+                              AND u.account_id   = r.account_id
+        ORDER BY r.componente, client_name, candidate_name, r.opportunity_id;"""
+
+DIMENSIONS = [
+    {"key": "mes", "label": "Mes", "type": "date"},
+    {"key": "componente", "label": "Componente", "type": "string"},
+    {"key": "client_name", "label": "Cliente", "type": "string"},
+    {"key": "candidate_name", "label": "Candidato", "type": "string"},
+    {"key": "opportunity_id", "label": "Opportunity", "type": "string"},
+    {"key": "start_d", "label": "Start", "type": "date"},
+    {"key": "end_d", "label": "End", "type": "date"},
+    {"key": "close_date", "label": "Close Win", "type": "date"},
+    {"key": "entra_el", "label": "Entra al AM", "type": "date"},
+    {"key": "inactive_reason", "label": "Motivo", "type": "string"},
+]
+
+MEASURES = [
+    {"key": "monto", "label": "Monto", "type": "currency"},
+    {"key": "monto_ini", "label": "Antes", "type": "currency"},
+    {"key": "monto_fin", "label": "Ahora", "type": "currency"},
+]
 
 
 def _norm_metric(value) -> str:
-    if not value:
-        return "All"
-    raw = str(value).strip()
-    if raw in ("All", "Revenue", "Fee"):
-        return raw
-    if raw.lower() == "all":
-        return "All"
-    if raw.lower() == "revenue":
-        return "Revenue"
-    if raw.lower() == "fee":
+    raw = str(value or "").strip().lower()
+    if raw == "fee":
         return "Fee"
+    if raw == "revenue":
+        return "Revenue"
     return "All"
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     metric = _norm_metric(filters.get("metric"))
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or today_ar()
-    )
-
     win_ini, win_fin = window_bounds(filters)
-    sql = """
-        WITH ventana AS (
-          SELECT
-            %(corte)s::date                                AS cutoff,
-            %(win_ini)s::date    AS win_ini,
-            %(win_fin)s::date                                AS win_fin
-        ),
-        hires_full AS (
-          SELECT
-            ho.opportunity_id,
-            ho.candidate_id,
-            ho.account_id,
-            CASE
-              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(ho.start_date::text, '')::date
-            END AS start_d,
-            CASE
-              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-              WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
-              ELSE ho.end_date::date
-            END AS end_d,
-            COALESCE(ho.salary, 0)::numeric AS salary,
-            COALESCE(ho.fee,    0)::numeric AS fee,
-            TRIM(COALESCE(ho.inactive_reason::text, '')) AS inactive_reason,
-            o.opp_sales_lead,
-            o.opp_close_date::date AS opp_close_d,
-            a.client_name,
-            c.name AS candidate_name
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          LEFT JOIN account a    ON a.account_id    = ho.account_id
-          LEFT JOIN candidates c ON c.candidate_id  = ho.candidate_id
-          WHERE o.opp_model = 'Staffing'
-            AND COALESCE(a.vintti_internal, FALSE) = FALSE
-            AND (
-              CASE
-                WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                ELSE NULLIF(ho.start_date::text, '')::date
-              END
-            ) IS NOT NULL
-        ),
-        mrr_inicial_det AS (
-          SELECT
-            v.win_fin                AS mes,
-            'mrr_inicial'::text      AS componente,
-            h.client_name,
-            h.candidate_name,
-            h.opportunity_id,
-            h.start_d,
-            h.end_d,
-            NULL::text               AS inactive_reason,
-            NULL::text               AS opp_sales_lead,
-            CASE
-              WHEN %(metric)s = 'Fee' THEN h.fee
-              ELSE (h.salary + h.fee)
-            END::numeric AS monto
-          FROM ventana v
-          JOIN hires_full h
-            ON h.start_d <= v.win_ini
-           AND (h.end_d IS NULL OR h.end_d >= v.win_ini)
-        ),
-        upsells_lara_det AS (
-          SELECT
-            v.win_fin                AS mes,
-            'upsells_lara'::text     AS componente,
-            h.client_name,
-            h.candidate_name,
-            h.opportunity_id,
-            h.start_d,
-            h.end_d,
-            NULL::text               AS inactive_reason,
-            h.opp_sales_lead,
-            CASE
-              WHEN %(metric)s = 'Fee' THEN h.fee
-              ELSE (h.salary + h.fee)
-            END::numeric AS monto
-          FROM ventana v
-          JOIN hires_full h
-            ON h.opp_sales_lead IN %(am_hist)s
-           AND h.opp_close_d IS NOT NULL
-           AND h.opp_close_d >  v.win_ini
-           AND h.opp_close_d <= v.win_fin
-        ),
-        perdidas_det AS (
-          SELECT
-            v.win_fin                AS mes,
-            CASE
-              WHEN h.inactive_reason ILIKE '%%recorte%%' THEN 'downgrades_recorte'
-              ELSE 'churn_no_recorte'
-            END::text                AS componente,
-            h.client_name,
-            h.candidate_name,
-            h.opportunity_id,
-            h.start_d,
-            h.end_d,
-            h.inactive_reason,
-            h.opp_sales_lead,
-            CASE
-              WHEN %(metric)s = 'Fee' THEN h.fee
-              ELSE (h.salary + h.fee)
-            END::numeric AS monto
-          FROM ventana v
-          JOIN hires_full h
-            ON h.start_d <= v.win_ini
-           AND (h.end_d IS NULL OR h.end_d >= v.win_ini)
-          WHERE h.end_d IS NOT NULL
-            AND h.end_d >  v.win_ini
-            AND h.end_d <= v.win_fin
-        ),
-        all_rows AS (
-          SELECT * FROM mrr_inicial_det
-          UNION ALL
-          SELECT * FROM upsells_lara_det
-          UNION ALL
-          SELECT * FROM perdidas_det
-        )
-        SELECT
-          TO_CHAR(mes, 'YYYY-MM-DD')          AS mes,
-          componente,
-          client_name,
-          candidate_name,
-          opportunity_id,
-          TO_CHAR(start_d, 'YYYY-MM-DD')      AS start_d,
-          TO_CHAR(end_d,   'YYYY-MM-DD')      AS end_d,
-          inactive_reason,
-          opp_sales_lead,
-          monto::float                        AS monto
-        FROM all_rows
-        ORDER BY componente, client_name, candidate_name, opportunity_id;
+
+    sql = f"""
+        WITH {HIRES_FULL_CTE},
+        {unit_info_cte()},
+        {unit_snapshot('unit_ini', D_INI)},
+        {unit_snapshot('unit_fin', D_FIN)},
+        {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
+        {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
+        {DETAIL_SELECT.format(mes=D_FIN)}
     """
 
-    return sql, {
-        "win_ini": win_ini, "win_fin": win_fin, "metric": metric, "corte": corte,
-        "am_hist": am_history()}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin, "metric": metric}
 
 
 DATASET = {
     "key": "nrr_30d_detail",
     "label": "NRR (Staffing) — Detalle ventana 30 días",
-    "dimensions": [
-        {"key": "mes", "label": "Mes", "type": "date"},
-        {"key": "componente", "label": "Componente", "type": "string"},
-        {"key": "client_name", "label": "Cliente", "type": "string"},
-        {"key": "candidate_name", "label": "Candidato", "type": "string"},
-        {"key": "opportunity_id", "label": "Opportunity", "type": "string"},
-        {"key": "start_d", "label": "Start", "type": "date"},
-        {"key": "end_d", "label": "End", "type": "date"},
-        {"key": "inactive_reason", "label": "Razón inactividad", "type": "string"},
-        {"key": "opp_sales_lead", "label": "Sales lead", "type": "string"},
-    ],
-    "measures": [
-        {"key": "monto", "label": "Monto", "type": "currency"},
-    ],
+    "dimensions": DIMENSIONS,
+    "measures": MEASURES,
     "default_filters": {},
     "query": query,
 }

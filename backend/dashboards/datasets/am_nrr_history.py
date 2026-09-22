@@ -1,10 +1,11 @@
+"""NRR del AM, mes a mes. Ver `am_nrr_30d_summary` para la definicion."""
 from __future__ import annotations
 
 from datetime import date
 
-from ._mrr_staffing import HIRES_FULL_CTE, unit_snapshot_monthly
+from ._am_mrr_staffing import HIRES_CTE, ae_leads, am_unit_snapshot_monthly
 from ._nrr_decomp import (
-    MEASURES,
+    MEASURES_AM,
     decomp_cte,
     summary_columns,
     upsell_population,
@@ -37,43 +38,43 @@ def _norm_metric(value) -> str:
     return "All"
 
 
-# Poblacion de los upsells del mes M: vacantes cerradas dentro de (prev_end, fin_mes].
-UPS_POBLACION = upsell_population("m.prev_end", "m.fin_mes")
+# En el motor del AM la fecha de Close Win se llama `close_d`, no `opp_close_d`.
+UPS_POBLACION = upsell_population("m.prev_end", "m.fin_mes", col="close_d")
 
-
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    metric = _norm_metric(filters.get("metric"))
-    desde = _parse_date(filters.get("desde"))
-    hasta = _parse_date(filters.get("hasta"))
-
-    # R5: mismo motor canonico que la card de 30d, mes a mes. Para el mes M la base
-    # (`mrr_inicial`) es el MRR al FIN DEL MES ANTERIOR (`prev_end`), de modo que cuadra
-    # EXACTO con el GMRR de Management del mes M-1 (anclarla al fin del propio mes
-    # inflaba la base). La ventana del mes M es (prev_end, fin_mes].
-    sql = f"""
-        WITH {HIRES_FULL_CTE},
+MESES_CTE = """
         meses AS (
           SELECT
             DATE_TRUNC('month', gs)::date                                AS mes,
             (DATE_TRUNC('month', gs) + INTERVAL '1 month - 1 day')::date AS fin_mes,
             (DATE_TRUNC('month', gs) - INTERVAL '1 day')::date           AS prev_end
           FROM generate_series(
-            (SELECT MIN(start_d) FROM hires_full),
-            (SELECT MAX(COALESCE(end_d, CURRENT_DATE)) FROM hires_full),
+            (SELECT MIN(start_d) FROM hires),
+            (SELECT MAX(COALESCE(end_d, CURRENT_DATE)) FROM hires),
             INTERVAL '1 month'
           ) gs
-        ),
-        {unit_snapshot_monthly('unit_ini', 'prev_end')},
-        {unit_snapshot_monthly('unit_fin', 'fin_mes')},
-        {unit_snapshot_monthly('unit_ups', 'fin_mes', UPS_POBLACION)},
+        )"""
+
+
+def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+    metric = _norm_metric(filters.get("metric"))
+    am = str(filters.get("am") or "").strip().lower()
+    desde = _parse_date(filters.get("desde"))
+    hasta = _parse_date(filters.get("hasta"))
+
+    sql = f"""
+        WITH {HIRES_CTE},
+        {MESES_CTE},
+        {am_unit_snapshot_monthly('unit_ini', 'prev_end')},
+        {am_unit_snapshot_monthly('unit_fin', 'fin_mes')},
+        {am_unit_snapshot_monthly('unit_ups', 'fin_mes', UPS_POBLACION)},
         {decomp_cte(
-            'unit_ini', 'unit_fin', 'unit_ups', 'hires_full',
+            'unit_ini', 'unit_fin', 'unit_ups', 'hires',
             'mm.prev_end', 'mm.fin_mes',
-            key='mes', reason_join=' JOIN meses mm ON mm.mes = i.mes',
+            owned=True, key='mes', reason_join=' JOIN meses mm ON mm.mes = i.mes',
         )},
         agregado AS (
           SELECT
-          {summary_columns(group='mes')}
+          {summary_columns(group='mes', owned=True)}
           FROM nrr_rows
           GROUP BY mes
         )
@@ -86,6 +87,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           a.contraccion,
           a.downgrades_recorte,
           a.churn_no_recorte,
+          a.entradas_m3,
           a.nrr_pct
         FROM agregado a
         WHERE a.mrr_inicial IS NOT NULL AND a.mrr_inicial > 0
@@ -94,16 +96,20 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY a.mes;
     """
 
-    return sql, {"metric": metric, "desde": desde, "hasta": hasta}
+    return sql, {
+        "metric": metric,
+        "am": am,
+        "desde": desde,
+        "hasta": hasta,
+        "ae_leads": ae_leads(),
+    }
 
 
 DATASET = {
-    "key": "nrr_history",
-    "label": "NRR mensual (Staffing)",
-    "dimensions": [
-        {"key": "mes", "label": "Mes", "type": "date"},
-    ],
-    "measures": MEASURES,
+    "key": "am_nrr_history",
+    "label": "NRR del AM (mensual)",
+    "dimensions": [{"key": "mes", "label": "Mes", "type": "date"}],
+    "measures": MEASURES_AM,
     "default_filters": {},
     "query": query,
 }
