@@ -95,7 +95,8 @@
     "pgonzales@vintti.com",
     "bahia@vintti.com",
     "lara@vintti.com",
-    "agustin@vintti.com"
+    "agustin@vintti.com",
+    "mariano@vintti.com"
   ]);
 
   /* ---------- Formato ---------- */

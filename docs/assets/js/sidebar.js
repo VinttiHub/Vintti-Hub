@@ -158,7 +158,8 @@
     // backend/routes/ae_commissions_routes.py, y las dos listas se mantienen en
     // sincronia a mano. Bahia se suma cuando lo pida la owner.
     setDisplay('aeCommissionsLink', new Set([
-      'pgonzales@vintti.com','bahia@vintti.com','lara@vintti.com','agustin@vintti.com'
+      'pgonzales@vintti.com','bahia@vintti.com','lara@vintti.com','agustin@vintti.com',
+      'mariano@vintti.com'
     ]).has(email));
 
     // Summary link

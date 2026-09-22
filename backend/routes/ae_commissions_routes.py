@@ -29,6 +29,7 @@ AE_COMMISSIONS_ALLOWED = {
     "bahia@vintti.com",
     "lara@vintti.com",
     "agustin@vintti.com",
+    "mariano@vintti.com",
 }
 
 
