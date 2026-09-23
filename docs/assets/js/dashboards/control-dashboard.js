@@ -3490,8 +3490,9 @@
   }
 
   /* ---------- refetch all month-detail panels for a given month ---------- */
-  async function refetchMonthDetails(month) {
-    const els = document.querySelectorAll('[data-bind="month-detail"]');
+  // `only`: refetchear sólo esos paneles (lo usa el toggle General / AM).
+  async function refetchMonthDetails(month, only) {
+    const els = only || document.querySelectorAll('[data-bind="month-detail"]');
     await Promise.all([...els].map(async (el) => {
       const chartKey = el.dataset.chart;
       if (!chartKey) return;
@@ -3499,7 +3500,12 @@
         // Pass both `mes` (cohort datasets) and `corte` = end-of-month
         // (point-in-time snapshot datasets like the MRR contractor details).
         // Each dataset reads only the param it understands; the other is ignored.
-        const res = await fetchChart(chartKey, { mes: month, corte: endOfMonth(month) });
+        // Sólo `origen` (toggle General / AM) viaja: sin él el detalle mensual
+        // quedaba en General con el toggle en AM. Los demás data-override-* de
+        // estos paneles (stage_min del tab Sales) nunca se mandaron y mandarlos
+        // cambiaría lo que muestran.
+        const ov = el.dataset.overrideOrigen ? { origen: el.dataset.overrideOrigen } : {};
+        const res = await fetchChart(chartKey, { ...ov, mes: month, corte: endOfMonth(month) });
         renderMonthDetail(el, res.rows || [], { month });
       } catch (e) {
         console.error('month-detail fetch failed', chartKey, e);
@@ -3754,13 +3760,16 @@
     });
   }
 
-  // Toggle General / AE / AM (card "Churn M3" del tab Management). Setea
+  // Toggle General / AE / AM (card "Churn M3" del tab Management y hero "3 / 6m
+  // Churn" del tab Account Management, esta sólo General / AM). Setea
   // data-override-origen en los bindings del grupo y en los paneles del drawer que
   // declara data-origen-panels, y refetchea. AE = sales lead de la vacante es M+B;
   // AM = todo lo demás (definido en backend/dashboards/datasets/_sales_scope.py).
+  // El scope tiene que cerrar en la card: si cae a `document`, el toggle de una
+  // pestaña refiltra las cards de la otra (comparten dataset).
   function bindOrigenToggles() {
     document.querySelectorAll('[data-origen-toggle]').forEach(group => {
-      const card = group.closest('.skpi-group') || group.closest('.card');
+      const card = group.closest('.skpi-group') || group.closest('.card') || group.closest('.hero-kpi');
       const panelKeys = (group.dataset.origenPanels || '').split(/\s+/).filter(Boolean);
       group.addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-origen-set]');
@@ -3781,8 +3790,12 @@
         });
         els.forEach(el => el.setAttribute('data-override-origen', origen));
 
+        // El detalle mensual no pasa por renderBinding (se refetchea con `mes`).
+        const monthEls = els.filter(el => el.dataset.bind === 'month-detail');
+        if (monthEls.length && monthState.selected) refetchMonthDetails(monthState.selected, monthEls);
+
         const groups = new Map();
-        els.forEach(el => {
+        els.filter(el => el.dataset.bind !== 'month-detail').forEach(el => {
           const ov = readOverridesFor(el);
           const ck = compKeyFor(el.dataset.chart, ov);
           if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });

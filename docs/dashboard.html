@@ -1291,13 +1291,21 @@
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">3 / 6m Churn<br/>· <span data-window-label>30d</span></div>
-            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-cohort-churn" aria-label="Ver detalle 3 / 6m Churn">⚐</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <!-- General / AM: mismo filtro que la card Churn M3 de Management, sin AE.
+                   Aplica también al drawer am-cohort-churn (data-origen-panels). -->
+              <div class="period-toggle" data-origen-toggle data-origen-panels="am-cohort-churn" role="tablist" aria-label="Origen">
+                <button type="button" class="is-active" data-origen-set="all" role="tab" aria-selected="true">General</button>
+                <button type="button" data-origen-set="am" role="tab" aria-selected="false" title="Vacantes del Account Manager (todo lo que no vendió un AE)">AM</button>
+              </div>
+              <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-cohort-churn" aria-label="Ver detalle 3 / 6m Churn">⚐</button>
+            </div>
           </div>
           <div>
-            <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
-              de <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en cohort
+              <span data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
+              de <span data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en cohort
             </div>
           </div>
         </div>
@@ -1635,24 +1643,30 @@
           <div>
             <h3 class="card__title">3 / 6m Churn <span data-window-label>30d</span></h3>
             <p class="card__sub">Sobrevivencia de cohortes en su ventana de exposure (filtro Meses 3 / 6).</p>
+            <!-- General / AM: mismo filtro que la card Churn M3 de Management, sin AE.
+                 Independiente del toggle de la hero "3 / 6m Churn". -->
+            <div class="period-toggle" data-origen-toggle role="tablist" aria-label="Origen" style="margin-top:10px">
+              <button type="button" class="is-active" data-origen-set="all" role="tab" aria-selected="true">General</button>
+              <button type="button" data-origen-set="am" role="tab" aria-selected="false" title="Vacantes del Account Manager (todo lo que no vendió un AE)">AM</button>
+            </div>
           </div>
           <div class="metric-row" style="gap:32px">
             <div>
-              <span class="num" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+              <span class="num" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
               <span class="lab">Sobrevivieron</span>
             </div>
             <div>
-              <span class="num" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+              <span class="num" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
               <span class="lab">Bajas</span>
             </div>
             <div>
-              <span class="num green" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent" data-class-on-sign>—</span>
+              <span class="num green" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent" data-class-on-sign>—</span>
               <span class="lab">Churn cohorte</span>
             </div>
           </div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="am_line_candidate_churn_window" data-bind="line" data-axis="xy"
+          <svg data-chart="am_line_candidate_churn_window" data-override-origen="all" data-bind="line" data-axis="xy"
                data-x="mes" data-y="churn_real_pct" data-color="violet"
                data-labels="3 / 6m Churn %" data-fmt-y="percent"
                data-tooltip-extras="starts|Starts|int,bajas_real|Bajas reales|int,bajas_buyout|Buyouts|int,activos_al_cierre|Activos al cierre|int,churn_pct|Churn total %|percent"
@@ -1670,7 +1684,7 @@
             Ver detalle mensual <span class="arrow">▾</span>
           </button>
           <div class="expander__panel">
-            <div data-chart="am_table_candidate_churn_window_detail" data-bind="month-detail"
+            <div data-chart="am_table_candidate_churn_window_detail" data-override-origen="all" data-bind="month-detail"
                  data-list-month="m_fin" data-list-name="candidate_name" data-list-sub="account_name"
                  data-list-date="end_d" data-list-start="start_d" data-list-end="end_d"
                  data-list-state="baja_tipo"
@@ -9488,18 +9502,64 @@
           </div>
         </div>
 
+        <!-- Mismo armado que el drawer churn-m3 de Management (hero, composición,
+             tendencia, cohorte con AE/AM y fecha de baja). Todo lleva
+             data-override-origen: lo mueve el toggle General / AM de la hero. -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-cohort-churn">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · churn</span>
             <h3 class="kpi-drawer__title">3 / 6m Churn · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Bajas de candidatos en la cohorte de 3 / 6 meses.</p>
+            <p class="kpi-drawer__sub">Contractors que arrancaron en la ventana de 3 / 6 meses (filtro Meses) hasta el corte: cuántos ya se fueron. Indicador de retención temprana.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Bajas</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn rate</span>
+            </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">3 / 6m Churn <span class="count" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <div class="dlist" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="list"
-                   data-list-name="candidate_name" data-list-sub="account_name" data-list-date="baja_tipo" data-limit="80"></div>
+              <h4 class="kpi-drawer__section-title">Composición del churn</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Candidatos</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">arrancaron en la ventana</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">que siguen activos</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_candidate_churn_window" data-override-origen="all" data-bind="line"
+                     data-x="mes" data-y="bajas_real" data-color="rose"
+                     data-labels="Bajas" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <!-- Total desde el summary y no contando filas, igual que en churn-m3:
+                   el auditor compararía ese conteo contra el hero (Bajas). -->
+              <h4 class="kpi-drawer__section-title">Cohorte <span class="count" data-chart="am_kpi_candidate_churn_window" data-override-origen="all" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_candidate_churn_window_cohort_detail" data-override-origen="all" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="account_name" data-list-value="origen" data-list-date="estado" data-limit="200"></div>
             </section>
           </div>
         </div>
@@ -10310,7 +10370,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=157" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=160" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>
