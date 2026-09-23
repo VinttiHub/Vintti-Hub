@@ -192,6 +192,7 @@ OPPORTUNITY_FIELD_ALIASES = {
         "Years of Experience",
     ],
     "expected_fee": ["expected_fee", "Expected Fee"],
+    "expected_revenue": ["expected_revenue", "Expected Revenue"],
     "expected_setup_fee": ["expected_set_up_fee", "Expected Set Up Fee"],
     # Los links de grabacion. HubSpot los pide al pasar a Deep Dive (el de la
     # intro call) y al pasar a NDA Sent (el del deep dive). Son texto libre.
@@ -215,7 +216,8 @@ OPPORTUNITY_FIELD_ALIASES = {
 
 # Campos de negocio que HubSpot carga en NDA Sent -> columna del hub.
 # Ninguna de estas columnas la lee un dataset del dashboard, salvo expected_fee
-# (Active Pipeline / Pipeline Outbound AE). `fee` es la que el hub muestra como
+# (Active Pipeline / Pipeline Outbound AE) y expected_revenue (Active Pipeline,
+# Pipeline CR - Churn, Open opps by industry, Pipeline Outbound AE). `fee` es la que el hub muestra como
 # "Set Up Fee"; el fee del MRR es otro, sale de hire_opportunity.
 BUSINESS_FIELD_TO_COLUMN = {
     "min_budget": "min_budget",
@@ -224,6 +226,7 @@ BUSINESS_FIELD_TO_COLUMN = {
     "max_salary": "max_salary",
     "years_experience": "years_experience",
     "expected_fee": "expected_fee",
+    "expected_revenue": "expected_revenue",
     "expected_setup_fee": "fee",
 }
 

@@ -2652,7 +2652,7 @@ def _link_candidates(cursor, account_id, position, schema_ready=True, limit=8,
 _OPP_BASE_COLUMNS = """opportunity_id, account_id, opp_stage, opp_position_name, opp_model,
                deep_dive_date, nda_sent_date, nda_signature_or_start_date,
                min_budget, max_budget, min_salary, max_salary, years_experience,
-               fee, expected_fee,
+               fee, expected_fee, expected_revenue,
                first_meeting_recording, deepdive_recording"""
 _OPP_HUBSPOT_COLUMNS = """,
                hubspot_setup_fee, hubspot_final_fee, hubspot_final_salary,
@@ -2832,8 +2832,8 @@ def _apply_business_fields(cursor, opportunity_id, business, opp_row, dry_run):
     owner). Mismo criterio que usa el sync del CRM con las cuentas.
 
     `fee` es la que el hub muestra como "Set Up Fee" y no la lee ningun dataset;
-    el fee del MRR sale de hire_opportunity. La unica con impacto en un card es
-    expected_fee (Active Pipeline).
+    el fee del MRR sale de hire_opportunity. Las unicas con impacto en un card son
+    expected_fee y expected_revenue (Active Pipeline y otras del pipeline).
     """
     faltantes = {
         column: value

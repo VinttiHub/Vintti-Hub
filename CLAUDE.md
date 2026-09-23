@@ -345,6 +345,7 @@ renegocian dentro del hub:
 | Min/Max Candidate Salary | `min_salary` / `max_salary` | ninguno |
 | Candidate's Years of Experience | `years_experience` | ninguno |
 | Expected Fee | `expected_fee` | Active Pipeline / Pipeline Outbound AE |
+| **Expected Revenue** | `expected_revenue` | Active Pipeline / Pipeline CR − Churn / Open opps by industry / Pipeline Outbound AE |
 | **Expected Set Up Fee** | `fee` (el "Set Up Fee" de Opportunity Detail) | ninguno |
 
 `opportunity.fee` NO es el fee del MRR: ese sale de `hire_opportunity.fee`, y ningún
