@@ -441,8 +441,22 @@ que resuelve el branch por modelo, el revenue derivado y el dedupe de `salary_up
 `POST /opportunities/<id>/hubspot-hire-applied` sella que ya se aplicó.
 
 Fechas: `hs_v2_date_entered_<stage>` → `deep_dive_date` / `nda_sent_date` /
-`nda_signature_or_start_date`. HubSpot **pisa** el `CURRENT_DATE` que estampó el hub, pero nunca
-borra (`COALESCE`). Ojo que `nda_signature_or_start_date` es ancla de ~10 datasets.
+`nda_signature_or_start_date`. En una opp abierta **gana la más temprana** (`LEAST`): HubSpot
+rellena o adelanta la fecha del hub, **nunca la atrasa**. En una cerrada sólo rellena los NULL.
+Ojo que `nda_signature_or_start_date` es ancla de ~10 datasets.
+
+Hasta el 2026-09-23 HubSpot pisaba siempre, y eso hacía que las fechas "cambiaran solas".
+`hs_v2_date_entered_*` es cuándo el AE hizo click y guarda la **última** entrada, así que:
+
+- El 11-sep se pusieron al día varios deals de una vez en HubSpot y la NDA Signed de la 782
+  pasó del 26-ago al 11-sep. Del mismo lote, 730, 761, 788, 795 y 800 tienen 11-sep y la fecha
+  real es desconocida: la tiene que confirmar la recruiter.
+- El 17-sep, deshacer un push de prueba volvió 8 deals a NDA Signed, y la 780 quedó "firmada" un
+  día antes del cierre. Las otras 5 Close Win las restaura
+  `backend/scripts/restore_nda_dates_20260917.py`.
+
+Una carga tardía, un retroceso o una prueba en HubSpot siempre producen fechas más nuevas: con
+`LEAST` ya no pueden atrasar nada.
 
 **HubSpot no tiene propiedad de fecha para las dos etapas "NDA Sent"** (ids
 `1429477933` y `1429487919`, agregadas después que el resto): no existe el

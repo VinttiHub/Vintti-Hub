@@ -3231,17 +3231,28 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         item["hub_stage_after"] = new_stage
         changed = True
 
-    # Fechas: en una opp ABIERTA HubSpot pisa el CURRENT_DATE que estampo el hub
-    # (pero nunca borra). En una CERRADA es al reves, solo rellena los NULL: ahi la
-    # fecha de HubSpot es la vieja —el hub ya cerro la busqueda y el deal quedo
-    # parado, Flamingo cerro el 16-jun con el deal en NDA Signed de mayo— y
-    # nda_signature_or_start_date es ancla de ~10 datasets.
+    # Fechas: en una opp ABIERTA gana la MAS TEMPRANA. HubSpot puede rellenar o
+    # adelantar una fecha del hub, nunca atrasarla: `hs_v2_date_entered_*` es cuando
+    # el AE hizo click, no cuando paso. Hasta el 2026-09-23 HubSpot pisaba siempre, y
+    # el 11-sep una puesta al dia en HubSpot llevo la NDA Signed de la 782 del 26-ago
+    # al 11-sep; el 17-sep, deshacer un push de prueba re-entro 8 deals a NDA Signed y
+    # la 780 quedo "firmada" un dia antes del cierre. Una carga tardia, un retroceso o
+    # una prueba siempre dan fechas MAS NUEVAS, asi que con esta regla no rompen nada.
+    # En una CERRADA solo se rellenan los NULL: Flamingo cerro el 16-jun con el deal
+    # en NDA Signed de mayo, y nda_signature_or_start_date es ancla de ~10 datasets.
     opp_cerrada = _opp_esta_cerrada(opp.get("opp_stage"))
+
+    def _hubspot_gana(actual, nueva):
+        if actual is None:
+            return True
+        if opp_cerrada:
+            return False
+        return nueva < actual
+
     dates_written = {
         column: value
         for column, value in stage_dates.items()
-        if value is not None and opp.get(column) != value
-        and not (opp_cerrada and opp.get(column) is not None)
+        if value is not None and _hubspot_gana(opp.get(column), value)
     }
     if dates_written:
         # Se reporta lo que se va a escribir de verdad: si el dry run anunciara un
@@ -3251,9 +3262,10 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             item["fechas_solo_rellenadas"] = True
         changed = True
         if not dry_run:
-            # El ORDEN del COALESCE es lo unico que decide quien gana.
+            # LEAST ignora los NULL: rellena un NULL del hub y un NULL del parametro
+            # (fecha que HubSpot no manda) no borra nada.
             asignacion = ("{col} = COALESCE({col}, %s)" if opp_cerrada
-                          else "{col} = COALESCE(%s, {col})")
+                          else "{col} = LEAST({col}, %s)")
             sets = ",\n                       ".join(
                 asignacion.format(col=col)
                 for col in ("deep_dive_date", "nda_sent_date",
