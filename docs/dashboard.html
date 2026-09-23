@@ -1371,8 +1371,29 @@
         </div>
       </div>
 
+      <!-- Reactivated clients · <span data-window-label>30d</span>
+           Mismo chart que el hint "+N reactivated" de New clients (Management).
+           Si a un cliente se le va un contractor y hay un Replacement vivo, esa baja
+           NO cuenta en Client churn; cuando arranca el reemplazo, cuenta acá
+           (motivo = 'Reemplazo'). Decisión de la owner 2026-09-23. -->
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Reactivated clients<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-reactivated-clients" aria-label="Ver detalle Reactivated clients">⚐</button>
+          </div>
+          <div>
+            <div class="hero-kpi__value" data-chart="sa_kpi_reactivated_clients_30d" data-bind="text" data-field="reactivated_clients_30d" data-reduce="first" data-fmt="int">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Reemplazo" data-bind="text" data-reduce="count" data-fmt="int">—</span> por reemplazo ·
+              <span data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Volvió" data-bind="text" data-reduce="count" data-fmt="int">—</span> volvieron
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Account Management Conversion Rate · <span data-window-label>30d</span> -->
-      <div class="hero-kpi s-6">
+      <div class="hero-kpi s-4">
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">Account Management<br/>Conversion Rate · <span data-window-label>30d</span></div>
@@ -1390,7 +1411,7 @@
       </div>
 
       <!-- Headcount Growth · <span data-window-label>30d</span> -->
-      <div class="hero-kpi s-6">
+      <div class="hero-kpi s-4">
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">Headcount growth<br/>· <span data-window-label>30d</span></div>
@@ -6515,7 +6536,7 @@
                    data-month-aware
                    data-drawer-window-target="reactivated-clients"></div>
             </section>
-            <p class="kpi-drawer__note">New clients cuenta sólo la <strong>primera vez</strong> de una cuenta. Un cliente que se fue y volvió aparece como <strong>Reactivated</strong>: no suma a New clients pero sí a Active clients, y su baja anterior sigue contando como churn en su mes. Por eso: Active clients = Active previo + New + Reactivated − Churn − Buyouts.</p>
+            <p class="kpi-drawer__note">New clients cuenta sólo la <strong>primera vez</strong> de una cuenta. Un cliente que se fue y volvió aparece como <strong>Reactivated</strong>: no suma a New clients pero sí a Active clients, y su baja anterior sigue contando como churn en su mes. <strong>Excepción: reemplazos.</strong> Si se fue un contractor y hubo días sin nadie activo hasta que arrancó su reemplazo, esa baja <strong>no</strong> cuenta como churn, pero la vuelta sí suma a Reactivated. Por eso Active previo + New + Reactivated − Churn − Buyouts no siempre da exacto Active clients: la diferencia son esos reemplazos.</p>
           </div>
         </div>
 
@@ -9483,6 +9504,29 @@
               <div class="dlist" data-chart="am_table_client_churn_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="80"></div>
             </section>
+            <p class="kpi-drawer__note">Si a un cliente se le va un contractor y hay un <strong>reemplazo en curso</strong> (opp Replacement que no está en Closed Lost ni Stop), la cuenta <strong>no cuenta como churn</strong>. Cuando arranca el reemplazo aparece en <strong>Reactivated clients</strong>. Si el reemplazo se cae, la baja vuelve a contar en su fecha original.</p>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-reactivated-clients">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · reactivated</span>
+            <h3 class="kpi-drawer__title">Reactivated clients · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">Clientes que habían quedado sin contractors activos y volvieron a tener uno en el período (<span data-window-label>30d</span>).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por reemplazo · <span data-window-label>30d</span> <span class="count" data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Reemplazo" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Reemplazo" data-bind="list"
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"></div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Volvieron · <span data-window-label>30d</span> <span class="count" data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Volvió" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="sa_table_reactivated_clients_30d_detail" data-where-field="motivo" data-where-value="Volvió" data-bind="list"
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"></div>
+            </section>
+            <p class="kpi-drawer__note"><strong>Por reemplazo</strong>: se fue un contractor, Vintti lo reemplazó y hubo días sin nadie activo entre medio. Esa baja <strong>no cuenta</strong> en Client churn. <strong>Volvieron</strong>: el cliente se había ido (sí contó como churn) y volvió a contratar.</p>
           </div>
         </div>
 

@@ -147,6 +147,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 AND h2.start_d <= h.end_d + 1
                 AND (h2.end_d IS NULL OR h2.end_d >= h.end_d + 1)
             )
+            -- Si se fue un contractor y hay un Replacement vivo para él (no
+            -- Closed Lost/Stop), el cliente no se fue: es un hueco hasta que
+            -- arranca el reemplazo. Ese arranque sí cuenta como Reactivated.
+            -- Decisión de la owner (2026-09-23). Si el Replacement termina
+            -- Closed Lost/Stop, la baja vuelve a contar en su fecha original.
+            AND NOT EXISTS (
+              SELECT 1
+              FROM opportunity ro
+              WHERE ro.account_id = h.account_id
+                AND ro.opp_type = 'Replacement'
+                AND NULLIF(ro.replacement_of::text, '') = h.candidate_id::text
+                AND COALESCE(ro.opp_stage, '') NOT IN ('Closed Lost', 'Stop')
+            )
         ),
         reactivation_events AS (
           -- Cliente que vuelve: pasa de 0 hires activos a >= 1, y no es su

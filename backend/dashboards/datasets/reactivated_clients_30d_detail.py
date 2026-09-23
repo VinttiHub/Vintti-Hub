@@ -78,7 +78,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           a.client_name,
           c.name AS candidate_name,
           TO_CHAR(bp.fecha_baja_previa, 'YYYY-MM-DD') AS fecha_baja_previa,
-          (re.start_d - bp.fecha_baja_previa)::int    AS dias_inactivo
+          (re.start_d - bp.fecha_baja_previa)::int    AS dias_inactivo,
+          -- 'Reemplazo': el que arranca viene de una opp Replacement de un
+          -- contractor de la misma cuenta. Esa baja no cuenta como churn
+          -- (ver client_churn_30d_summary) pero la vuelta sí es Reactivated.
+          CASE WHEN EXISTS (
+            SELECT 1
+            FROM hire_opportunity hr
+            JOIN opportunity ro ON ro.opportunity_id = hr.opportunity_id
+            WHERE hr.account_id = re.account_id
+              AND COALESCE(hr.carga_active::date,
+                           NULLIF(hr.start_date::text, '')::date) = re.start_d
+              AND ro.opp_type = 'Replacement'
+              AND EXISTS (
+                SELECT 1 FROM hire_opportunity hp
+                WHERE hp.account_id = re.account_id
+                  AND hp.candidate_id::text = NULLIF(ro.replacement_of::text, '')
+              )
+          ) THEN 'Reemplazo' ELSE 'Volvió' END          AS motivo
         FROM reactivation_events re
         CROSS JOIN ventana v
         LEFT JOIN baja_previa bp
@@ -100,6 +117,7 @@ DATASET = {
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "candidate_name", "label": "Candidato", "type": "string"},
         {"key": "fecha_baja_previa", "label": "Baja previa", "type": "date"},
+        {"key": "motivo", "label": "Motivo", "type": "string"},
     ],
     "measures": [
         {"key": "dias_inactivo", "label": "Días inactivo", "type": "number"},
