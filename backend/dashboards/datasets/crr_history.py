@@ -62,14 +62,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE (%(desde)s::date IS NULL OR m.mes >= DATE_TRUNC('month', %(desde)s::date))
             AND (%(hasta)s::date IS NULL OR m.mes <= DATE_TRUNC('month', %(hasta)s::date))
         ),
+        -- Base = cierre del mes ANTERIOR (`prev_end` del NRR), no el día 1: con el día 1,
+        -- un cliente cuyo último contractor se iba el último día del mes anterior
+        -- quedaba retenido ese mes y fuera de la base de éste (churn que no se contaba).
         activos_inicio AS (
           SELECT DISTINCT
             m.mes,
             h.account_id
           FROM meses_filtrado m
           JOIN hires h
-            ON h.start_d <= m.mes
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= m.mes
+            ON h.start_d <= (m.mes - 1)
+           AND COALESCE(h.end_d, DATE '9999-12-31') >= (m.mes - 1)
         ),
         activos_fin AS (
           SELECT DISTINCT

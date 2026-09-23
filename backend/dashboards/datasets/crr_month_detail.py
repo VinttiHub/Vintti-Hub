@@ -74,8 +74,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             h.account_id
           FROM ventana_mes v
           JOIN hires h
-            ON h.start_d <= v.mes
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.mes
+            -- Base = cierre del mes anterior, igual que crr_history (ver ahí).
+            ON h.start_d <= (v.mes - 1)
+           AND COALESCE(h.end_d, DATE '9999-12-31') >= (v.mes - 1)
         ),
         activos_fin AS (
           SELECT DISTINCT

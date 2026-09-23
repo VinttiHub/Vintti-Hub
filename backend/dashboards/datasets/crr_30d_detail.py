@@ -37,7 +37,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             %(corte)s::date                                AS corte_d,
             %(win_ini)s::date   AS win_ini,
-            %(win_fin)s::date                                AS win_fin
+            %(win_fin)s::date                                AS win_fin,
+            (%(win_ini)s::date - 1)                          AS base_d
         ),
         hires AS (
           SELECT
@@ -62,13 +63,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               OR NULLIF(ho.start_date::text, '') IS NOT NULL
             )
         ),
+        -- Base = cierre del día ANTERIOR a la ventana, igual que el NRR (`D_INI` en
+        -- nrr_30d_summary.py), misma CTE que crr_30d_summary. Con la base en win_ini, un cliente cuyo último
+        -- contractor se iba el último día del mes anterior quedaba retenido ese mes y
+        -- fuera de la base del siguiente: su churn no se contaba nunca.
         activos_inicio AS (
           SELECT DISTINCT
             v.corte_d, v.win_ini, v.win_fin, h.account_id
           FROM ventana v
           JOIN hires h
-            ON h.start_d <= v.win_ini
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_ini
+            ON h.start_d <= v.base_d
+           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.base_d
         ),
         activos_fin AS (
           SELECT DISTINCT
