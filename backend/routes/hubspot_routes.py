@@ -2691,6 +2691,108 @@ def _load_opportunity_by_id(cursor, opportunity_id, schema_ready=True):
     return cursor.fetchone()
 
 
+# ---------------------------------------------------------------------------
+# Model (Staffing / Recruiting / Project-Based) despues de crear la opp.
+#
+# Hasta el 2026-09-23 el sync copiaba el Model solo al CREAR: si el AE lo corregia
+# en HubSpot despues, el hub no se enteraba nunca. Pero tampoco se puede copiar a
+# ciegas en cada corrida: en Summit Chase (808) y founderfirst (825) HubSpot dice
+# Staffing desde el Deep Dive y la recruiter lo corrigio a Recruiting en el hub;
+# pisarlo desharia esa correccion cada 30 min.
+#
+# Por eso se recuerda el ultimo valor VISTO en HubSpot (`hubspot_model_seen`): solo
+# se copia al hub cuando ESE valor cambia, o sea cuando alguien edito el Model en
+# HubSpot. Si el hub difiere pero HubSpot sigue igual, gana el hub.
+# ---------------------------------------------------------------------------
+
+_MODEL_SEEN_READY = False
+
+
+def _model_seen_column_exists(cursor):
+    cursor.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'opportunity' AND column_name = 'hubspot_model_seen'
+        """
+    )
+    return cursor.fetchone() is not None
+
+
+def _ensure_model_seen_column(cursor):
+    """Crea `hubspot_model_seen`. APARTE de _ensure_hubspot_opportunity_columns()
+    por el mismo motivo que _ensure_push_columns(): aquella se cortocircuita en
+    produccion y una columna nueva agregada ahi no se crearia nunca."""
+    global _MODEL_SEEN_READY
+    if _MODEL_SEEN_READY:
+        return
+    if not _model_seen_column_exists(cursor):
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_model_seen TEXT")
+    _MODEL_SEEN_READY = True
+
+
+def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
+    """Aplica el Model de HubSpot a una opp que ya existe. Devuelve lo que reportar.
+
+    - HubSpot vacio: nada.
+    - Primera vez que se ve (seen NULL: opps anteriores a esto, vinculadas o
+      adoptadas): solo se toma la foto. No se toca opp_model, salvo que este vacio.
+    - HubSpot igual a lo visto: nada, aunque el hub difiera (correccion manual).
+    - HubSpot cambio: se copia al hub si la opp esta abierta. En una cerrada solo
+      se reporta: el modelo decide si el revenue cuenta como Staffing o Recruiting.
+    """
+    if not model:
+        return {}
+    opportunity_id = opp["opportunity_id"]
+    seen = None
+    if column_ready:
+        cursor.execute(
+            "SELECT hubspot_model_seen FROM opportunity WHERE opportunity_id = %s",
+            (opportunity_id,),
+        )
+        row = cursor.fetchone()
+        seen = row["hubspot_model_seen"] if row else None
+
+    hub_model = (opp.get("opp_model") or "").strip()
+    reporte = {}
+    nuevo_model = None
+    if not seen:
+        if not hub_model:
+            nuevo_model = model
+            reporte["modelo_completado"] = model
+    elif seen.strip().lower() != model.strip().lower():
+        if hub_model.lower() == model.strip().lower():
+            pass
+        elif _opp_esta_cerrada(opp.get("opp_stage")):
+            reporte["modelo_distinto_cerrada"] = {"hub": hub_model or None, "hubspot": model}
+        else:
+            nuevo_model = model
+            reporte["modelo_actualizado"] = {"antes": hub_model or None, "despues": model}
+
+    # Fuera de dry run la columna siempre existe (_ensure_model_seen_column corre
+    # antes del loop). En un dry run sin ella todo se lee como "primera vez".
+    if dry_run or not column_ready:
+        return reporte
+
+    if nuevo_model:
+        cursor.execute(
+            """
+            UPDATE opportunity
+               SET opp_model = %s, hubspot_model_seen = %s, hubspot_synced_at = NOW()
+             WHERE opportunity_id = %s AND NULLIF(hubspot_deal_id, '') IS NOT NULL
+            """,
+            (nuevo_model, model, opportunity_id),
+        )
+    elif seen != model:
+        cursor.execute(
+            """
+            UPDATE opportunity SET hubspot_model_seen = %s
+             WHERE opportunity_id = %s AND NULLIF(hubspot_deal_id, '') IS NOT NULL
+            """,
+            (model, opportunity_id),
+        )
+    return reporte
+
+
 def _marcar_cuenta_vintti_ai(cursor, account_id, pipeline_key, dry_run):
     """La cuenta es Vintti AI si el deal vino del pipeline de Vintti AI.
 
@@ -2804,13 +2906,15 @@ def _insert_opportunity_from_deal(cursor, values):
                 INSERT INTO opportunity (
                     opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead,
                     opp_type, opp_stage, deep_dive_date, nda_sent_date, nda_signature_or_start_date,
-                    hubspot_deal_id, hubspot_pipeline_id, hubspot_dealstage_id, hubspot_synced_at
+                    hubspot_deal_id, hubspot_pipeline_id, hubspot_dealstage_id, hubspot_synced_at,
+                    hubspot_model_seen
                 )
                 SELECT COALESCE(MAX(opportunity_id), 0) + 1,
                        %(account_id)s, %(opp_model)s, %(position)s, %(sales_lead)s,
                        'New', %(opp_stage)s,
                        %(deep_dive_date)s, %(nda_sent_date)s, %(nda_signed_date)s,
-                       %(deal_id)s, %(pipeline_id)s, %(dealstage_id)s, NOW()
+                       %(deal_id)s, %(pipeline_id)s, %(dealstage_id)s, NOW(),
+                       %(opp_model)s
                   FROM opportunity
                 RETURNING opportunity_id
                 """,
@@ -3179,6 +3283,16 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         )
         changed = True
 
+    # La foto de "primera vez" no cuenta como cambio: si no, la primera corrida
+    # reportaria como "updated" cada deal que toque.
+    modelo = _apply_model_from_hubspot(
+        cursor, opp, model, dry_run, ctx.get("model_seen_ready", False)
+    )
+    if modelo:
+        item.update(modelo)
+        if "modelo_actualizado" in modelo or "modelo_completado" in modelo:
+            changed = True
+
     # Los 5 campos de Closed Win, todos a columnas ESPEJO de `opportunity`.
     #
     # A proposito NO se escribe hire_opportunity: esos montos viven por
@@ -3361,7 +3475,11 @@ def sync_hubspot_opportunities():
             _ensure_hubspot_sync_state_table(cursor)
             _ensure_hubspot_deal_decisions_table(cursor)
             _ensure_hubspot_deals_waiting_table(cursor)
+            _ensure_model_seen_column(cursor)
             schema_ready = True
+        model_seen_ready = (
+            _model_seen_column_exists(cursor) if dry_run else True
+        )
         conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
 
         run_started_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -3409,6 +3527,7 @@ def sync_hubspot_opportunities():
             "opp_property_map": opp_property_map,
             "dry_run": dry_run,
             "schema_ready": schema_ready,
+            "model_seen_ready": model_seen_ready,
             "allow_ambiguous": allow_ambiguous,
             "send_emails": send_emails,
             "deal_extra_properties": deal_extra_properties,

@@ -482,6 +482,28 @@ Env opcionales: `HUBSPOT_OPP_PIPELINE_IDS`, `HUBSPOT_OPP_STAGE_IDS`, `HUBSPOT_OP
 `HUBSPOT_OPP_SYNC_BOOTSTRAP` (default: 24 h atrás — un bootstrap ancho crearía una opp por cada
 deal histórico), `HUBSPOT_OPP_SYNC_OVERLAP_MINUTES` (10), `HUBSPOT_OPP_SYNC_SEND_EMAILS` (true).
 
+### El Model sigue a HubSpot sólo cuando HubSpot cambia
+
+`opp_model` sale del `model` del deal ("Model (Deal)"). Hasta el 2026-09-23 se copiaba
+**sólo al crear**, así que si el AE lo corregía en HubSpot después el hub no se enteraba.
+Tampoco se puede copiar en cada corrida: en Summit Chase (808) y founderfirst (825)
+HubSpot dice Staffing desde el Deep Dive y la recruiter lo corrigió a Recruiting en el hub.
+Pisarlo desharía esa corrección cada 30 minutos.
+
+Por eso `opportunity.hubspot_model_seen` guarda el **último valor visto en HubSpot**, y
+`_apply_model_from_hubspot()` copia al hub **sólo cuando ese valor cambia**:
+
+- Primera vez que se ve un deal (seen NULL): sólo se toma la foto. No toca `opp_model`,
+  salvo que esté vacío. Por eso el deploy no cambió ningún valor.
+- HubSpot igual a lo visto: gana el hub, aunque difieran.
+- HubSpot cambió y la opp está abierta: `modelo_actualizado` en el reporte.
+- HubSpot cambió y la opp está cerrada: sólo `modelo_distinto_cerrada`, sin tocarla. El modelo
+  decide si el revenue cuenta como Staffing o Recruiting.
+
+La columna la crea `_ensure_model_seen_column()`, **aparte** de
+`_ensure_hubspot_opportunity_columns()`, por el mismo cortocircuito de `hubspot_pushed_at`.
+El hub **no** le manda el Model a HubSpot: el sync inverso sigue siendo sólo stage + montos.
+
 ### La marca Vintti AI la decide el pipeline, no un checkbox
 
 `account.vintti_ai` sale ahora del **pipeline del deal**: si viene de *Vintti AI Pipeline*
