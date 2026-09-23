@@ -508,8 +508,13 @@ Pisarlo desharía esa corrección cada 30 minutos.
 Por eso `opportunity.hubspot_model_seen` guarda el **último valor visto en HubSpot**, y
 `_apply_model_from_hubspot()` copia al hub **sólo cuando ese valor cambia**:
 
-- Primera vez que se ve un deal (seen NULL): sólo se toma la foto. No toca `opp_model`,
-  salvo que esté vacío. Por eso el deploy no cambió ningún valor.
+- Primera vez que se ve un deal (seen NULL = la opp **se acaba de atar**, adoptada por el
+  sync o con Vincular): **gana HubSpot** si la opp está abierta; si está cerrada sólo
+  `modelo_distinto_cerrada`. Una opp creada a mano desde el modal arranca en Staffing por
+  default y ese valor no es una decisión: PGAM #838 (2026-09-23) quedó Staffing con el
+  deal en Recruiting. Hasta ese día la primera vez sólo tomaba la foto, para que el deploy
+  no pisara 808/825; todas las opps atadas ya tienen foto, así que no las toca.
+  `unlink-deal` borra la foto para que un deal nuevo vuelva a contar como "primera vez".
 - HubSpot igual a lo visto: gana el hub, aunque difieran.
 - HubSpot cambió y la opp está abierta: `modelo_actualizado` en el reporte.
 - HubSpot cambió y la opp está cerrada: sólo `modelo_distinto_cerrada`, sin tocarla. El modelo

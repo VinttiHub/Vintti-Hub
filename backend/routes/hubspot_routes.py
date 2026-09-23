@@ -2703,6 +2703,11 @@ def _load_opportunity_by_id(cursor, opportunity_id, schema_ready=True):
 # Por eso se recuerda el ultimo valor VISTO en HubSpot (`hubspot_model_seen`): solo
 # se copia al hub cuando ESE valor cambia, o sea cuando alguien edito el Model en
 # HubSpot. Si el hub difiere pero HubSpot sigue igual, gana el hub.
+#
+# La excepcion es el momento de ATAR el deal (seen NULL): ahi gana HubSpot. Una opp
+# creada a mano desde el modal arranca con Staffing por default, y cuando el sync la
+# adopta ese Staffing no es una decision de nadie (PGAM #838: deal Recruiting). Las
+# opps ya atadas antes de esta regla tienen todas su foto, asi que 808/825 no se tocan.
 # ---------------------------------------------------------------------------
 
 _MODEL_SEEN_READY = False
@@ -2734,8 +2739,11 @@ def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
     """Aplica el Model de HubSpot a una opp que ya existe. Devuelve lo que reportar.
 
     - HubSpot vacio: nada.
-    - Primera vez que se ve (seen NULL: opps anteriores a esto, vinculadas o
-      adoptadas): solo se toma la foto. No se toca opp_model, salvo que este vacio.
+    - Primera vez que se ve (seen NULL): la opp se acaba de atar, adoptada por el
+      sync o vinculada a mano. Gana HubSpot si la opp esta abierta: el Model del
+      hub ahi suele ser el default del modal (Staffing), no una decision. Caso
+      PGAM #838 (2026-09-23): deal Recruiting, opp creada a mano como Staffing.
+      En una cerrada solo se reporta.
     - HubSpot igual a lo visto: nada, aunque el hub difiera (correccion manual).
     - HubSpot cambio: se copia al hub si la opp esta abierta. En una cerrada solo
       se reporta: el modelo decide si el revenue cuenta como Staffing o Recruiting.
@@ -2759,6 +2767,15 @@ def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
         if not hub_model:
             nuevo_model = model
             reporte["modelo_completado"] = model
+        elif hub_model.lower() == model.strip().lower():
+            pass
+        elif _opp_esta_cerrada(opp.get("opp_stage")):
+            reporte["modelo_distinto_cerrada"] = {"hub": hub_model, "hubspot": model}
+        else:
+            nuevo_model = model
+            reporte["modelo_actualizado"] = {
+                "antes": hub_model, "despues": model, "motivo": "recien_vinculada",
+            }
     elif seen.strip().lower() != model.strip().lower():
         if hub_model.lower() == model.strip().lower():
             pass
@@ -4289,6 +4306,9 @@ def unlink_opportunity_from_hubspot_deal(opportunity_id):
             # aparte a proposito (ver CLAUDE.md): sin esto el UPDATE de abajo
             # revienta con UndefinedColumn en un entorno donde nunca se pusheo.
             _ensure_push_columns(cursor)
+            # La foto del Model es del deal viejo: sin limpiarla, al atar otro deal
+            # la opp no cae en "recien vinculada" y no toma el Model del nuevo.
+            _ensure_model_seen_column(cursor)
             conn.commit()
             cursor.execute(
                 """
@@ -4297,7 +4317,8 @@ def unlink_opportunity_from_hubspot_deal(opportunity_id):
                        hubspot_pipeline_id = NULL,
                        hubspot_dealstage_id = NULL,
                        hubspot_push_hash = NULL,
-                       hubspot_pushed_at = NULL
+                       hubspot_pushed_at = NULL,
+                       hubspot_model_seen = NULL
                  WHERE opportunity_id = %s
                 RETURNING opportunity_id
                 """,
