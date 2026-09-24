@@ -674,7 +674,7 @@
 
     <div class="grid skpi-grid">
       <!-- % Reemplazos colocados -->
-      <div class="skpi-tile s-4">
+      <div class="skpi-tile s-3">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Reemplazos colocados</span>
           <span class="skpi-tile__tag">Last 30d</span>
@@ -706,8 +706,41 @@
         <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="replacement-coverage" aria-label="Ver detalle Reemplazos colocados">Ver detalle</button>
       </div>
 
+      <!-- % Reemplazos colocados · Lifetime (mismo dataset, window=lifetime) -->
+      <div class="skpi-tile s-3">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">% Reemplazos colocados</span>
+          <span class="skpi-tile__tag">Lifetime</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text"
+             data-field="placed_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="lowsample-flag" data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="low-sample"
+             data-field="placed_count" data-threshold="5"
+             title="Muestra chica: pocas cerradas en el período (n&lt;5). El % es estadísticamente volátil — tomalo con cautela, no como tendencia.">⚠ Muestra baja (n&lt;5)</div>
+        <div class="skpi-tile__progress">
+          <div class="skpi-tile__progress-bar">
+            <span class="skpi-tile__progress-fill"
+                  data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="progress-fill"
+                  data-field="placed_pct" data-reduce="first" data-target="80"></span>
+          </div>
+          <div class="skpi-tile__progress-meta">
+            <span>
+              <span data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text"
+                    data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+              CW /
+              <span data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text"
+                    data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
+              cerradas
+            </span>
+            <span class="skpi-tile__progress-target">Target: 80%</span>
+          </div>
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="replacement-coverage-lifetime" aria-label="Ver detalle Reemplazos colocados Lifetime">Ver detalle</button>
+      </div>
+
       <!-- % Clientes con +1 candidato · Total -->
-      <div class="skpi-tile s-4">
+      <div class="skpi-tile s-3">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Clientes con +1 candidato</span>
           <span class="skpi-tile__tag">Total</span>
@@ -742,7 +775,7 @@
       </div>
 
       <!-- % Clientes con +1 candidato · Staffing (visible only on Staffing subtab) -->
-      <div class="skpi-tile s-4" data-subtab="staffing">
+      <div class="skpi-tile s-3" data-subtab="staffing">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Clientes con +1 candidato</span>
           <span class="skpi-tile__tag">Staffing</span>
@@ -772,7 +805,7 @@
       </div>
 
       <!-- % Clientes con +1 candidato · Recruiting (visible only on Recruiting subtab) -->
-      <div class="skpi-tile s-4" data-subtab="recruiting">
+      <div class="skpi-tile s-3" data-subtab="recruiting">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Clientes con +1 candidato</span>
           <span class="skpi-tile__tag">Recruiting</span>
@@ -6793,6 +6826,61 @@
                    data-list-name="client_name" data-list-sub="candidate_name" data-list-date="close_date" data-limit="60"></div>
             </section>
             <p class="kpi-drawer__note">Numerador = Replacements cerrados como Close Win en la ventana. Denominador = Replacements cerrados (Close Win + Closed Lost) en la ventana, por `opp_close_date`. La tendencia mensual usa la misma fórmula, agrupando por mes.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Replacement coverage · Lifetime -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="replacement-coverage-lifetime">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">C&amp;C Success · Lifetime</span>
+            <h3 class="kpi-drawer__title">% Reemplazos colocados · Lifetime</h3>
+            <p class="kpi-drawer__sub">De todos los replacements que se cerraron (Close Win o Closed Lost) desde siempre, qué % fue Close Win. Target: 80%.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">% Close Win · Lifetime</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text" data-field="placed_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">Target: 80%</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Numerador / denominador</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Close Win</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text" data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">numerador · replacements ganados</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Cerradas (total)</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-override-window="lifetime" data-bind="text" data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">denominador · Close Win + Closed Lost</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia · % reemplazos mensual</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_replacements_pct" data-bind="line"
+                     data-x="month" data-y="pct_replacements" data-color="lime"
+                     data-labels="% reemplazos" data-fmt-y="percent"
+                     data-tooltip-extras="replacements|Abiertas|int,total_closed|Cerradas|int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · Replacements Close Win <span class="count" data-chart="am_table_replacements_detail" data-override-window="lifetime" data-bind="text" data-reduce="count" data-fmt="int">—</span> · lifetime</h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_replacements_detail" data-override-window="lifetime" data-bind="list"
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="close_date" data-limit="500"></div>
+            </section>
+            <p class="kpi-drawer__note">Misma fórmula que la card de 30d, sin límite de fecha: numerador = Replacements Close Win; denominador = Replacements cerrados (Close Win + Closed Lost), por `opp_close_date`. Es all-time por defecto; si cargás Desde/Hasta o Mes se acota a ese período (y coincide con la card de 30d en ese mes).</p>
           </div>
         </div>
 

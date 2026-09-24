@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._position_chains import lifetime_window
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -23,6 +24,9 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+LIFETIME_WINDOWS = {"lifetime", "all", "all-time", "alltime"}
+
+
 def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
     """`week` = previous full calendar week (Mon-Sun); `7d` = rolling 7 days.
 
@@ -31,6 +35,10 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
     raw count). Without this alignment the two tiles disagree by ±1.
     """
     raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
+    if raw in LIFETIME_WINDOWS:
+        # Card "Lifetime" de C&C Success: all-time, acotada si hay Desde/Hasta o Mes
+        # (misma convención que las otras cards lifetime del dashboard).
+        return lifetime_window(filters, corte)
     if raw in ("7d", "7"):
         return corte - timedelta(days=6), corte
     if raw in ("week", "semana", "last_week", "last-week", "prev_week"):
@@ -99,7 +107,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "replacement_coverage_30d",
-    "label": "% Reemplazos colocados — ventana 30d",
+    "label": "% Reemplazos colocados — ventana 30d / lifetime",
     "dimensions": [
         {"key": "ventana_desde", "label": "Inicio ventana", "type": "date"},
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},

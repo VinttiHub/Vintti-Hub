@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
+from ._now import today_ar
 from ._periods import window_bounds
+from ._position_chains import lifetime_window
+from .replacement_coverage_30d import LIFETIME_WINDOWS
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -44,7 +47,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Alineado al KPI 30d: ventana estándar (Desde/Hasta > Mes > rolling 30d) por
     # opp_close_date. Lista los Replacement 'Close Win' cerrados en la ventana
     # (= el numerador del KPI). Joined a hire_opportunity para el candidato.
-    win_ini, win_fin = window_bounds(filters)
+    # Con window=lifetime (drawer de la card Lifetime) usa la misma ventana que el
+    # KPI, así la lista coincide con su numerador.
+    if str(filters.get("window") or "").strip().lower() in LIFETIME_WINDOWS:
+        win_ini, win_fin = lifetime_window(filters, _parse_date(filters.get("corte")) or today_ar())
+    else:
+        win_ini, win_fin = window_bounds(filters)
 
     sql = """
         WITH replacement_close_wins AS (
