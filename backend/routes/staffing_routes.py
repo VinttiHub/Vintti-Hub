@@ -105,6 +105,10 @@ def _ensure_schema(cur) -> None:
     # `bonus_requests.status` sigue siendo el del workflow de aprobación.
     # `provider` se agregó después de la primera versión de la tabla.
     cur.execute("ALTER TABLE staffing_extra ADD COLUMN IF NOT EXISTS provider TEXT")
+    # Check "Payments" de la tabla: marca fija por par, se destilda a mano.
+    cur.execute(
+        "ALTER TABLE staffing_extra ADD COLUMN IF NOT EXISTS payment BOOLEAN NOT NULL DEFAULT FALSE"
+    )
     cur.execute("ALTER TABLE bonus_requests ADD COLUMN IF NOT EXISTS invoice_status TEXT")
     cur.execute("ALTER TABLE bonus_requests ADD COLUMN IF NOT EXISTS candidate_status TEXT")
     _SCHEMA_READY = True
@@ -411,6 +415,7 @@ PAIRS_SELECT = """
       p.inactive_comments                                    AS inactive_comments,
       p.inactive_vinttierror                                 AS inactive_vinttierror,
       se.platform                                            AS platform,
+      COALESCE(se.payment, FALSE)                            AS payment,
       se.performance                                         AS performance,
       se.notes                                               AS notes,
       se.exit_type                                           AS exit_type_override,
@@ -466,6 +471,7 @@ ORPHANS_SQL = """
       NULL::text            AS inactive_comments,
       NULL::text            AS inactive_vinttierror,
       se.platform           AS platform,
+      COALESCE(se.payment, FALSE) AS payment,
       se.performance        AS performance,
       se.notes              AS notes,
       se.exit_type          AS exit_type_override,
@@ -560,7 +566,7 @@ def staffing_database_csv():
         ("candidate_name", "Candidate"), ("status", "Status"), ("mail", "Mail"),
         ("performance", "Performance"), ("client_name", "Client"), ("country", "Country"),
         ("start_date", "Starting Date"), ("end_date", "End date"), ("churn_date", "Churn date"),
-        ("platform", "Platform"),
+        ("platform", "Platform"), ("payment", "Payments"),
         ("salary", "Salary"), ("equipment", "Equipment"), ("provider", "Provider"),
         ("recruiter", "Recruiter"), ("notes", "Comments"),
     ]
@@ -568,6 +574,7 @@ def staffing_database_csv():
     writer = csv.writer(buf)
     writer.writerow([label for _, label in cols])
     for row in rows:
+        row["payment"] = "Yes" if row.get("payment") else "No"
         writer.writerow([row.get(key) if row.get(key) is not None else "" for key, _ in cols])
 
     stamp = date.today().isoformat()
@@ -620,7 +627,7 @@ def staffing_churn():
 # --------------------------------------------------------------------------- #
 # Edición de los campos que sólo existían en el Sheet
 # --------------------------------------------------------------------------- #
-EDITABLE = {"platform", "performance", "provider", "notes", "exit_type", "churn_m3_override"}
+EDITABLE = {"platform", "performance", "provider", "notes", "exit_type", "churn_m3_override", "payment"}
 
 
 @bp.route("/extra", methods=["PATCH", "OPTIONS"])
@@ -644,6 +651,9 @@ def patch_staffing_extra():
 
     if "churn_m3_override" in fields:
         fields["churn_m3_override"] = _tri_bool(fields["churn_m3_override"])
+    if "payment" in fields:
+        # La columna es NOT NULL: vacío o basura cuenta como destildado.
+        fields["payment"] = bool(_tri_bool(fields["payment"]))
     for key in ("platform", "performance", "provider", "notes", "exit_type"):
         if key in fields:
             fields[key] = _clean(fields[key])
@@ -679,6 +689,62 @@ def patch_staffing_extra():
         conn.commit()
         cur.close()
         return jsonify({"ok": True})
+    except Exception as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@bp.route("/extra/payment", methods=["PATCH", "OPTIONS"])
+def patch_staffing_payment_bulk():
+    """Tilda o destilda "Payments" en muchos pares de una vez (Check all / Uncheck all).
+
+    El front manda sólo las filas visibles, así que respeta el buscador y los filtros.
+    Un solo INSERT ... ON CONFLICT contra `uq_staffing_extra_pair`: los pares que
+    todavía no tienen fila en `staffing_extra` se crean en el mismo statement.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+    email = _current_email()
+    if email not in STAFFING_ALLOWED:
+        return _forbidden()
+
+    data = request.get_json(silent=True) or {}
+    pairs = data.get("pairs")
+    if not isinstance(pairs, list) or not pairs:
+        return jsonify({"error": "pairs is required"}), 400
+    try:
+        cand_ids = [int(p["candidate_id"]) for p in pairs]
+        acct_ids = [int(p["account_id"]) for p in pairs]
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "Every pair needs candidate_id and account_id"}), 400
+    payment = bool(_tri_bool(data.get("payment")))
+
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        _ensure_schema(cur)
+        conn.commit()
+        cur.execute(
+            """
+            INSERT INTO staffing_extra (candidate_id, account_id, payment, updated_by)
+            SELECT DISTINCT t.candidate_id, t.account_id, %(payment)s, %(email)s
+              FROM unnest(%(cands)s::bigint[], %(accts)s::bigint[]) AS t(candidate_id, account_id)
+            ON CONFLICT (candidate_id, account_id) WHERE candidate_id IS NOT NULL
+            DO UPDATE SET payment = EXCLUDED.payment,
+                          updated_by = EXCLUDED.updated_by,
+                          updated_at = NOW()
+            """,
+            {"payment": payment, "email": email, "cands": cand_ids, "accts": acct_ids},
+        )
+        updated = cur.rowcount
+        conn.commit()
+        cur.close()
+        return jsonify({"ok": True, "updated": updated})
     except Exception as exc:
         if conn is not None:
             conn.rollback()

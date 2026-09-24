@@ -187,6 +187,14 @@
     return "—";
   }
 
+  // Check "Payments": se tilda directo en la tabla, sin abrir el drawer. Las filas
+  // que sólo existen en el Sheet no tienen par (candidato, cuenta) y no se editan.
+  function paymentCell(row) {
+    return '<input type="checkbox" class="stf-pay" data-pay' +
+      (row.payment ? " checked" : "") + (row.orphan ? " disabled" : "") +
+      ' aria-label="Payments">';
+  }
+
   // Catálogo fijo de Performance: el desplegable del filtro y el del drawer
   // ofrecen SIEMPRE estas opciones, aunque hoy ninguna fila las use todavía.
   // El orden es el que quiere la owner, no alfabético.
@@ -243,6 +251,9 @@
         value: function (r) { return r.fee; }, cell: moneyCell("stf-money--soft") },
       { key: "client_payment", label: "Client payment", type: "number", total: true,
         value: function (r) { return r.client_payment; }, cell: moneyCell("stf-money--solid") },
+      { key: "payment", label: "Payments", type: "text", options: ["Yes", "No"],
+        value: function (r) { return r.payment ? "Yes" : "No"; },
+        cell: paymentCell },
       { key: "platform", label: "Platform", type: "text",
         options: PLATFORM_VALUES, badge: platformBadge,
         value: function (r) { return r.platform; },
@@ -468,6 +479,13 @@
     host.querySelectorAll("tbody tr").forEach(function (tr) {
       tr.addEventListener("click", function () { opts.onRow(rows[Number(tr.dataset.row)]); });
     });
+    host.querySelectorAll("[data-pay]").forEach(function (cb) {
+      // El click de la fila abre el drawer: el checkbox no tiene que propagarlo.
+      cb.addEventListener("click", function (e) { e.stopPropagation(); });
+      cb.addEventListener("change", function () {
+        togglePayment(rows[Number(cb.closest("tr").dataset.row)], cb);
+      });
+    });
     // El popover se posiciona contra el documento: si la tabla scrollea en
     // horizontal, el encabezado se mueve y quedaría flotando desanclado.
     var scroller = host.querySelector(".stf-scroll");
@@ -610,6 +628,58 @@
   document.addEventListener("click", closePopover);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopover(); });
   window.addEventListener("resize", closePopover);
+
+  /* =====================================================================
+     Payments: 1x1 y masivo
+     ===================================================================== */
+  // Optimista: se actualiza la fila en memoria y sólo se revierte si falla, así
+  // no se recarga la tabla y no se pierden el scroll ni los filtros.
+  function togglePayment(row, cb) {
+    var value = cb.checked;
+    row.payment = value;
+    cb.disabled = true;
+    api("/staffing/extra", {
+      method: "PATCH",
+      body: JSON.stringify({ candidate_id: row.candidate_id, account_id: row.account_id, payment: value })
+    }).then(function () {
+      // Si hay un filtro activo en Payments, la fila puede tener que salir de la vista.
+      if (state.filters.database.payment) renderDatabase();
+    }).catch(function (err) {
+      row.payment = !value;
+      cb.checked = !value;
+      alert("Could not save Payments: " + err.message);
+    }).then(function () {
+      cb.disabled = false;
+    });
+  }
+
+  // Check all / Uncheck all: aplica sólo a las filas visibles, o sea que respeta
+  // el buscador y los filtros de columna.
+  function bulkPayment(value) {
+    var rows = visibleRows("database").filter(function (r) {
+      return !r.orphan && !!r.payment !== value;
+    });
+    if (!rows.length) {
+      alert(value ? "Every visible contractor is already checked." : "No visible contractor is checked.");
+      return;
+    }
+    var msg = value
+      ? "Mark " + rows.length + " visible contractors as paid?"
+      : "Uncheck Payments for " + rows.length + " visible contractors?";
+    if (!confirm(msg)) return;
+    api("/staffing/extra/payment", {
+      method: "PATCH",
+      body: JSON.stringify({
+        payment: value,
+        pairs: rows.map(function (r) { return { candidate_id: r.candidate_id, account_id: r.account_id }; })
+      })
+    }).then(function () {
+      rows.forEach(function (r) { r.payment = value; });
+      renderDatabase();
+    }).catch(function (err) {
+      alert("Could not save Payments: " + err.message);
+    });
+  }
 
   /* =====================================================================
      Las tres pestañas
@@ -814,6 +884,8 @@
       selectField("Platform", "platform", [""].concat(PLATFORM_VALUES), row.platform) +
       selectField("Performance", "performance", [""].concat(PERFORMANCE_VALUES), row.performance) +
       selectField("Provider", "provider", ["", "Quipteams", "Onbordea"], row.provider) +
+      field("Payments", '<label class="stf-pay-field"><input type="checkbox" data-edit-check="payment"' +
+        (row.payment ? " checked" : "") + "> Paid</label>") +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
       '<div class="stf-section-label">From the Hub</div>' +
       readonlyList([
@@ -984,6 +1056,9 @@
     drawer.body.querySelectorAll("[data-edit]").forEach(function (el) {
       out[el.dataset.edit] = el.value.trim();
     });
+    drawer.body.querySelectorAll("[data-edit-check]").forEach(function (el) {
+      out[el.dataset.editCheck] = el.checked;
+    });
     return out;
   }
 
@@ -1052,6 +1127,7 @@
         platform: edits.platform || null,
         performance: edits.performance || null,
         provider: edits.provider || null,
+        payment: !!edits.payment,
         notes: edits.notes || null
       };
       if (kind === "churn") {
@@ -1207,6 +1283,10 @@
         closePopover();
         renderTab(tab);
       });
+    });
+
+    $$("[data-bulk-pay]").forEach(function (btn) {
+      btn.addEventListener("click", function () { bulkPayment(btn.dataset.bulkPay === "on"); });
     });
 
     // El botón de "nuevo bono" vive en los filtros de su pestaña.

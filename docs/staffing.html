@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/staffing.css?v=18" />
+  <link rel="stylesheet" href="./assets/css/staffing.css?v=19" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -47,6 +47,10 @@
                    placeholder="Candidate or client…" autocomplete="off">
           </label>
           <button type="button" class="stf-btn" data-clear="database">Clear filters</button>
+          <button type="button" class="stf-btn" data-bulk-pay="on" title="Applies to the visible rows">
+            <i class="fa-regular fa-square-check"></i> Check all</button>
+          <button type="button" class="stf-btn" data-bulk-pay="off" title="Applies to the visible rows">
+            <i class="fa-regular fa-square"></i> Uncheck all</button>
           <span class="stf-filters__spacer"></span>
           <span class="stf-count" id="stfCountDatabase"></span>
         </div>
@@ -121,7 +125,7 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20260922-mariano-aec" defer></script>
-  <script src="./assets/js/staffing.js?v=19" defer></script>
+  <script src="./assets/js/staffing.js?v=20" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>
