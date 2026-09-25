@@ -18,9 +18,6 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, Json
 
 from db import get_connection
-# Compartidos con el CV Review (chequeo contra LinkedIn): ver utils/coresignal_profile.py.
-from utils.coresignal_profile import (pick as _pick, experiences as _experiences,
-                                      alive as _alive, period as _period)
 
 bp = Blueprint("hirex_sourcing", __name__, url_prefix="/hirex")
 
@@ -32,6 +29,27 @@ def _actor_email():
     return (data.get("actor_email")
             or request.headers.get("X-User-Email")
             or "").strip().lower() or None
+
+
+def _pick(data, *keys):
+    """First non-empty value among `keys`. Coresignal's shape varies by endpoint
+    and by how complete a profile is, so every field is looked up defensively."""
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, (int, float)):
+            return str(value)
+    return None
+
+
+def _experiences(profile):
+    for key in ("experience", "member_experience_collection", "experiences",
+                "member_experience", "work_experience"):
+        value = profile.get(key)
+        if isinstance(value, list) and value:
+            return value
+    return []
 
 
 def _active_experience(profile):
@@ -95,6 +113,21 @@ def map_profile(profile, linkedin_url):
         "email": (_pick(profile, "professional_email", "email", "primary_professional_email") or "").lower() or None,
         "linkedin_url": linkedin_url,
     }
+
+
+def _alive(items):
+    """Coresignal keeps tombstones; anything flagged deleted is history, not fact."""
+    return [i for i in items if isinstance(i, dict) and not i.get("deleted")]
+
+
+def _period(item):
+    start = _pick(item, "date_from") or (str(item["date_from_year"]) if item.get("date_from_year") else None)
+    end = _pick(item, "date_to") or (str(item["date_to_year"]) if item.get("date_to_year") else None)
+    if item.get("is_current") in (1, True, "1") and not end:
+        end = "Present"
+    if start and end:
+        return f"{start} – {end}"
+    return start or end
 
 
 def profile_to_text(profile):

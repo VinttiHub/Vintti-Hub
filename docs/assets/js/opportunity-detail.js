@@ -2415,15 +2415,6 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
     return;
   }
 
-  // LinkedIn viejo: primero se guarda lo pegado (el score corre apenas se crean los
-  // reviews y lee el LinkedIn en ese momento).
-  if (approvalMode() === 'review') {
-    btn.disabled = true;
-    const ok = await approvalLinkedinGate().catch(() => true);
-    btn.disabled = false;
-    if (!ok) return;
-  }
-
   // Antes el botón no se deshabilitaba y sólo usaba alert(): doble click = doble envío.
   btn.disabled = true;
   const label = btn.textContent;
@@ -4518,90 +4509,6 @@ function approvalBrandNote() {
        </span>`;
 }
 
-// --- LinkedIn al día antes de mandar a review (batch) ------------------------------
-// Mismo criterio que el popup de candidate-details: el score compara cada CV contra el
-// LinkedIn del candidato, y la copia de Coresignal puede tener meses. Con más de 90 días
-// (LINKEDIN_STALE_DAYS en backend/utils/cv_review_ai.py) el chequeo no resta y la sales
-// lead ve "not scored". Se pide pegar el de hoy; si no, el segundo click manda igual.
-let approvalLiWarned = false;
-const approvalLiDate = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
-
-async function loadApprovalLinkedin(candidates) {
-  const block = document.getElementById('approval-li-block');
-  const list = document.getElementById('approval-li-list');
-  const msg = document.getElementById('approval-li-msg');
-  if (!block || !list) return;
-  approvalLiWarned = false;
-  block.hidden = true;
-  list.innerHTML = '';
-  if (msg) msg.textContent = '';
-  const ids = (candidates || []).map(c => c.candidate_id).filter(Boolean);
-  if (!ids.length) return;
-  let data;
-  try {
-    const r = await fetch(`${API_BASE}/candidates/linkedin_status?ids=${ids.join(',')}`);
-    if (!r.ok) return;
-    data = await r.json();
-  } catch { return; }   // si falla, se manda como siempre
-  const days = data.stale_days || 90;
-  const rows = [];
-  ids.forEach(id => {
-    const st = (data.candidates || {})[String(id)];
-    if (!st) return;
-    const newest = [st.pasted_at, st.coresignal_as_of].filter(Boolean)
-      .map(d => d.slice(0, 10)).sort().pop();
-    if (newest && (Date.now() - approvalLiDate(newest)) / 864e5 <= days) return;
-    const why = newest
-      ? `LinkedIn from ${approvalLiDate(newest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
-      : 'no LinkedIn yet';
-    rows.push(`<details class="approval-li-item" data-cid="${id}">
-        <summary><b>${escapeHtml(st.name || `#${id}`)}</b><span>${why}</span></summary>
-        <textarea rows="5" placeholder="Not the link — open their LinkedIn, select the whole Experience section, copy it and paste the text here."></textarea>
-      </details>`);
-  });
-  if (!rows.length) return;
-  block.querySelector('.approval-li-lead').textContent =
-    `${rows.length} candidate${rows.length > 1 ? 's have' : ' has'} a LinkedIn over ${days} days old `
-    + `(or none). The AI checks each CV against it — paste the current Experience section so `
-    + `it's checked against today's profile. Optional: you can send without it.`;
-  list.innerHTML = rows.join('');
-  block.hidden = false;
-}
-
-// true = se puede mandar. Guarda lo pegado; si quedan viejos sin pegar, avisa una vez.
-async function approvalLinkedinGate() {
-  const block = document.getElementById('approval-li-block');
-  const msg = document.getElementById('approval-li-msg');
-  if (!block || block.hidden) return true;
-  const items = [...block.querySelectorAll('.approval-li-item')];
-  for (const it of items) {
-    const text = (it.querySelector('textarea')?.value || '').trim();
-    if (!text) continue;
-    const r = await fetch(`${API_BASE}/candidates/${it.dataset.cid}/linkedin_paste`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    }).catch(() => null);
-    if (!r || !r.ok) {
-      const body = r ? await r.json().catch(() => ({})) : {};
-      const name = it.querySelector('summary b')?.textContent || 'a candidate';
-      if (msg) msg.textContent = `Could not save the LinkedIn of ${name}: ${body.error || 'network error'}`;
-      it.open = true;
-      return false;
-    }
-    it.remove();
-  }
-  const left = block.querySelectorAll('.approval-li-item').length;
-  if (!left) { block.hidden = true; return true; }
-  if (!approvalLiWarned) {
-    approvalLiWarned = true;
-    if (msg) msg.textContent = `${left} still without a current LinkedIn. Paste it above — or `
-      + `click Send again to send anyway (their LinkedIn check will show as "not scored").`;
-    return false;
-  }
-  return true;
-}
-
 function approvalMode() {
   const ctx = window.__approvalCtx || {};
   if (ctx.modeOverride) return ctx.modeOverride;
@@ -4866,7 +4773,6 @@ document.getElementById('approval-subject').value = subject;
 const noteEl = document.getElementById('approval-note');
 if (noteEl) noteEl.value = '';
 renderApprovalMode();
-loadApprovalLinkedin(batchCandidates);
 
 document.getElementById('approvalEmailPopup').classList.remove('hidden');
 

@@ -1,5 +1,5 @@
 # coresignal_routes.py
-import os, re, json, logging, urllib.parse, requests
+import os, re, json, urllib.parse, requests
 from flask import Blueprint, jsonify, request
 from db import get_connection
 from typing import Optional
@@ -8,13 +8,8 @@ bp = Blueprint("coresignal", __name__, url_prefix="/coresignal")
 API_BASE = "https://api.coresignal.com/cdapi/v2"
 API_KEY  = os.getenv("CORESIGNAL_API_KEY")
 
-def _api_key():
-    # Se lee al momento de la llamada: el módulo se importa antes de que create_app()
-    # cargue backend/.env, y en local API_KEY quedaba en None.
-    return os.getenv("CORESIGNAL_API_KEY") or API_KEY
-
 def _h():
-    return {"apikey": _api_key(), "accept": "application/json"}
+    return {"apikey": API_KEY, "accept": "application/json"}
 
 def _slug_from_linkedin(url: str) -> Optional[str]:
     if not url: 
@@ -38,45 +33,10 @@ def _collect_employee(slug: str):
         return None, {"status": r.status_code, "text": r.text}
     return r.json(), {"credits": r.headers.get("x-credits-remaining")}
 
-def fetch_and_store_coresignal(candidate_id: int, linkedin_url: str, overwrite: bool = False):
-    """Trae el perfil de Coresignal y lo guarda en candidates.coresignal_scrapper.
-
-    Para llamar desde otro backend (el CV Review, antes de chequear el CV contra LinkedIn).
-    Devuelve (perfil, None) o (None, código): "no_api_key" | "no_linkedin" | "fetch_failed".
-    Nunca levanta: quien llama sigue sin LinkedIn, no se cae.
-    """
-    if not _api_key():
-        return None, "no_api_key"
-    slug = _slug_from_linkedin(linkedin_url or "")
-    if not slug:
-        return None, "no_linkedin"
-    try:
-        data, _meta = _collect_employee(slug)
-    except Exception:
-        logging.exception("coresignal: collect failed for candidate %s", candidate_id)
-        return None, "fetch_failed"
-    if not isinstance(data, dict):
-        return None, "fetch_failed"
-    conn = get_connection(); cur = conn.cursor()
-    try:
-        # Sin `overwrite`, sólo si sigue vacío: la ficha del candidato puede haberlo llenado
-        # mientras tanto. Con `overwrite` (copia vieja, se pidió una nueva) se pisa.
-        cur.execute("""
-            UPDATE candidates SET coresignal_scrapper = %s
-            WHERE candidate_id = %s AND (%s OR COALESCE(coresignal_scrapper, '') = '')
-        """, (json.dumps(data), candidate_id, bool(overwrite)))
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        logging.exception("coresignal: could not store profile for candidate %s", candidate_id)
-    finally:
-        cur.close(); conn.close()
-    return data, None
-
 @bp.route("/candidates/<int:candidate_id>/sync", methods=["POST"])
 def sync_candidate(candidate_id: int):
     """Lee linkedin del candidato, si coresignal_scrapper está vacío → llama Coresignal y guarda el JSON."""
-    if not _api_key():
+    if not API_KEY:
         return jsonify({"error": "CORESIGNAL_API_KEY missing"}), 500
 
     force = request.args.get("force") in ("1", "true", "yes")

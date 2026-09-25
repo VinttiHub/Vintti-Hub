@@ -1534,88 +1534,6 @@
       </div>`;
     })();
 
-    // v18: trabajos del LinkedIn del candidato que el CV no tiene. Mismo formato que job
-    // hopping. Cada omitido resta 5 (tope 15); los de menos de 3 meses y los no laborales
-    // se muestran igual pero no restan. Un análisis v17 no trae _linkedin_check: no se pinta.
-    const li = a._linkedin_check || null;
-    const liWhy = { short: `under ${li && li.min_months || 3} months`,
-                    not_work: 'not a job (volunteering, studies, freelance)',
-                    no_dates: 'LinkedIn gives no dates',
-                    stale: 'LinkedIn data may be outdated — check it by hand' };
-    // "Oct 2025": de cuándo es la copia de Coresignal. No es cuándo la bajamos.
-    const liAsOf = (() => {
-      const m = /^(\d{4})-(\d{2})/.exec((li && li.as_of) || '');
-      if (!m) return '';
-      const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2] - 1];
-      return `${mon} ${m[1]}`;
-    })();
-    const liSrc = liAsOf ? ` <span class="cvr-hop-src">(LinkedIn data from ${liAsOf})</span>` : '';
-    const liRow = (r) => `<li>
-        <b>${esc(r.title || '(no title)')} · ${esc(r.company || '(no company)')}</b>
-        <span>${esc(r.start || '?')} → ${esc(r.end || '?')}</span>
-        ${r.months ? `<i>${jhMonths(r.months)}</i>` : ''}
-        ${r.penalized
-          ? `<em class="is-missing">on LinkedIn, not in the CV &minus;${li.per_role || 5}</em>`
-          : `<em>not in the CV — doesn't count: ${esc(liWhy[r.no_penalty_reason] || '')}</em>`}
-      </li>`;
-    const liHead = (cls, chip) =>
-      scoreHead('fa-id-card', 'LinkedIn check', cls, chip);
-    const liHtml = (() => {
-      if (!li || !li.status || li.status === 'not_run') return '';
-      const flat = (cls, chip, txt) => `<div class="cvr-hop cvr-hop--flat ${cls}" id="cvrLinkedin">
-          ${liHead(cls, chip)}<p class="cvr-hop-line">${txt}</p>
-        </div>`;
-      if (li.status === 'no_linkedin')
-        return flat('is-flat', 'not checked', 'This candidate has no LinkedIn URL, so the CV '
-                            + 'could not be compared against it. Nothing came off the score.');
-      if (li.status === 'fetch_failed')
-        return flat('is-flat', 'not checked', 'The LinkedIn profile could not be fetched, so '
-                            + 'the CV was not compared against it. Nothing came off the score.');
-      if (li.status === 'no_roles')
-        return flat('is-flat', 'not checked', 'The LinkedIn profile lists no jobs to compare '
-                            + 'against. Nothing came off the score.');
-      if (li.status !== 'ran')
-        return flat('is-flat', 'not checked', 'The LinkedIn comparison failed this time. '
-                            + 'Nothing came off the score — re-run to try again.');
-      const missing = li.missing || [];
-      const pen = missing.filter(r => r.penalized);
-      const soft = missing.filter(r => !r.penalized);
-      const checked = (li.roles || []).length;
-      if (!missing.length)
-        return flat('is-ok', 'no penalty', `Every one of the ${checked} jobs on the candidate's `
-                            + `LinkedIn is in this CV.${liSrc}`);
-      if (li.stale && soft.some(r => r.no_penalty_reason === 'stale'))
-        return `<div class="cvr-hop is-warn" id="cvrLinkedin">
-          ${liHead('is-warn', 'not scored')}
-          <p class="cvr-hop-lead"><b>Check these by hand.</b> The LinkedIn data we have is
-            from ${liAsOf || 'a while ago'} — over ${li.stale_days || 90} days old — and the
-            candidate may have changed their profile since. ${soft.length}
-            job${soft.length > 1 ? 's' : ''} in it ${soft.length > 1 ? 'are' : 'is'} not in the
-            CV. <b>Nothing came off the score.</b> To check it for real, paste the current
-            LinkedIn in the candidate's profile (Overview → LinkedIn experience) and re-run.</p>
-          <ul class="cvr-hop-list">${soft.map(liRow).join('')}</ul>
-        </div>`;
-      if (!pen.length)
-        return `<div class="cvr-hop is-ok" id="cvrLinkedin">
-          ${liHead('is-ok', 'no penalty')}
-          <p class="cvr-hop-lead">${soft.length} job${soft.length > 1 ? 's' : ''} on LinkedIn
-            ${soft.length > 1 ? 'are' : 'is'} not in the CV, but none that counts.
-            <b>Nothing came off the score.</b>${liSrc}</p>
-          <ul class="cvr-hop-list">${soft.map(liRow).join('')}</ul>
-        </div>`;
-      return `<div class="cvr-hop is-bad" id="cvrLinkedin">
-        ${liHead('is-bad', `&minus;${li.penalty} pts`)}
-        <p class="cvr-hop-lead"><b>This one did move the score.</b>
-          ${pen.length} job${pen.length > 1 ? 's' : ''} on the candidate's LinkedIn
-          ${pen.length > 1 ? 'are' : 'is'} missing from this CV. The client can open the
-          LinkedIn too, and a job that is there and not here reads as hidden.
-          ${pen.length * (li.per_role || 5) > li.penalty ? `(Capped at ${li.cap || 15}.)` : ''}${liSrc}</p>
-        <ul class="cvr-hop-list">${pen.map(liRow).join('')}${soft.map(liRow).join('')}</ul>
-        <p class="cvr-hop-fix">Add ${pen.length > 1 ? 'them' : 'it'} to the work experience
-          and score again. If it was left out on purpose, say why to the sales lead.</p>
-      </div>`;
-    })();
-
     const reqRow = (r, per) => {
       const f = reqFace(r);
       // "described" pinta verde en el CV; "only listed" ambar. Es la misma distincion que
@@ -1697,15 +1615,6 @@
         sub: { unexplained: 'a stint with no reason given', explained: 'short stints, all explained',
                clean: 'no stint under a year', no_history: 'only one employer',
                unreadable: 'dates could not be read' }[jh.state] || '',
-      });
-      if (li && li.status && li.status !== 'not_run') out.push({
-        cls: li.penalty ? 'is-pen'
-          : (li.status === 'ran' && !(li.stale && (li.missing || []).length) ? 'is-zero' : 'is-warn'),
-        jump: 'cvrLinkedin', n: li.penalty || 0, label: 'LinkedIn check',
-        sub: li.status !== 'ran' ? 'not checked'
-          : li.stale && !li.penalized && (li.missing || []).length ? 'LinkedIn data outdated'
-          : li.penalized ? `${li.penalized} job${li.penalized > 1 ? 's' : ''} missing`
-          : 'nothing missing that counts',
       });
       return out;
     })();
@@ -1848,7 +1757,6 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
       ${reqsHtml}
       ${jhHtml}
       ${toolsHtml}
-      ${liHtml}
       ${!reqs.length && (a.jd_requirements_missed || []).length
         ? `<p class="cvr-note-block"><b>JD requirements the CV never addresses:</b> ${a.jd_requirements_missed.map(esc).join('; ')}</p>`
         : ''}
