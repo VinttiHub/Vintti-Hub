@@ -760,6 +760,63 @@ Contexto que conviene tener a mano: de las **348 positions** que hay en Apriora 
 **2 de 6** preguntas obligatorias. El template las arregla sólo si la recruiter lo elige al crear
 la job, o si se lo pone como default de la company — y eso se hace en Apriora, no acá.
 
+## JD Review: el CV Review, pero para la Job Description
+
+La JD (`opportunity.hr_job_description`) la escribe gpt-4o desde los transcripts de Grain de la
+Intro Call y la Deep Dive (`POST /ai/generate_jd`) y nadie la contrastaba con lo que se habló.
+Circuito: la recruiter aprieta **Send JD to review** en la pestaña Job Description de
+`docs/opportunity-detail.html` (lógica en `jd-review-opp.js`, aparte de opportunity-detail.js) →
+`POST /opportunities/<id>/jd_reviews` congela la JD → un hilo trae los transcripts de los links
+guardados en la opp (`first_meeting_recording` / `deepdive_recording`), los congela en
+`transcript_snapshot` y scorea → mail al sales lead (o al HR lead) + `OVERSIGHT_EMAILS` → el sales
+lead decide en `docs/jd-review.html`.
+
+- Backend: `routes/jd_review_routes.py`, `jd_review_store.py` (tablas `jd_reviews` +
+  `jd_review_checklist`, se autocrean como las de cv_reviews), `utils/jd_review_ai.py`.
+- **Quién revisa se importa de `cv_review_routes`** (`_require_reviewer`, `OVERSIGHT_EMAILS`): una
+  sola lista. En el front, `jd-review.js` y el link del sidebar usan la misma allow-list que CV Review.
+- **No hay "rejected"**: una JD no se descarta, se corrige. Aprobar o pedir cambios, con checklist
+  obligatorio (ítems de `CHECKLIST_ITEMS` o "clean") y comentario obligatorio al pedir cambios.
+- **El juez son dos llamadas separadas a propósito**: primero se extraen los hechos de los
+  transcripts SIN ver la JD (para que no se acomode a lo que la JD ya dice), después se juzga cada
+  hecho contra la JD (covered / partial / contradicted / missing) + lo que la JD dice y nadie dijo
+  (`unsupported`, hard/soft).
+- **El número lo calcula `compute_score()`, no el modelo**: core pesa 2, nice 1; partial = medio;
+  −5 por contradicción y −5 por requisito inventado "hard" (tope 20 cada uno). El relleno "soft" se
+  muestra pero no resta. Subir `ANALYSIS_VERSION` saca los análisis viejos del promedio.
+- **La lista de puntos se guarda y se reusa** (tabla `jd_review_facts`, clave = vacante + huella
+  de los transcripts + `EXTRACT_VERSION`). Re-extraer en cada corrida agrupaba distinto las tareas
+  y el score saltaba ±10 con la misma JD (opp 844: 68 y 80); reusándola, tres corridas dieron 78,
+  78, 78. Las rondas siguientes y **Retry the analysis** reusan la lista (Retry sólo aparece si el
+  análisis falló o no se pudo leer alguna grabación: sin error daría lo mismo); cambia sola si cambian los links/transcripts,
+  y **Rebuild the list of points** (`POST .../analyze {"rebuild": true}`) la rehace a mano.
+  **Rebuild re-scorea TODAS las rondas no canceladas de la vacante** contra la lista nueva
+  (incluso las ya decididas, y con eso el score del primer envío que usa la métrica): si sólo se
+  re-scoreara la actual, la ronda 1 y la 2 quedarían medidas con varas distintas. La lista queda
+  firmada (`rebuilt_by` / `rebuilt_at` en `jd_review_facts`) y el drawer lo muestra en ámbar. Lo
+  pueden usar los sales leads, no sólo la supervisión (decisión de la owner, 2026-09-25). Si tocás
+  el prompt del extractor, subí `EXTRACT_VERSION` o se siguen usando las listas viejas.
+- **El salario nunca se exige con monto** (decisión de la owner, 2026-09-25, v2): en la JD no va
+  cuánto se gana, así que un punto de salario cuenta como *covered* si la JD menciona la paga de
+  cualquier forma ("competitive salary", bonos). Se fuerza en código (`is_salary` + `_SALARY_RE`),
+  no sólo en el prompt, porque el juez igual lo marcaba *partial*.
+- **El estado de cada punto lo deriva el código, no el juez** (v5, 2026-09-25): el EXTRACTOR parte
+  cada punto en partes atómicas ("full-time contractor" = full-time + contractor; una lista = un
+  ítem por parte), el juez sólo marca cada parte `explicit` / `implied` / `no`, y
+  `derive_status()` decide: todas → covered, algunas → partial, ninguna → missing. Con criterio
+  libre (v3) y con el juez partiendo (v4) el mismo caso de la opp 844 salía missing una corrida sí
+  y otra no, aunque la JD dijera "9 to 5" (que implica full-time).
+- **La cuenta del score la arma `compute_score()`** (`points` / `max_points` / `penalty` por punto,
+  `breakdown` / `earned` / `possible` en el resumen) y la página sólo la muestra: no hay una
+  segunda copia de la fórmula en el JS.
+- Sin links de Grain la ronda se crea igual con `ai_error='no_transcripts'` y el mail lo dice. Si
+  el campo del link tiene un transcript pegado (pasó), se usa como texto.
+- El popup del AI Assistant ahora precarga los links guardados, y si la opp no los tenía guarda
+  los que se usaron para generar (sólo si el campo está vacío).
+- Métricas: `GET /jd_reviews/metrics` (sección "Per recruiter" de jd-review.html y pestaña **JD
+  quality** de Recruiter Power, las dos con la tarjeta de `jd-review-cards.js`). Una vacante cuenta
+  una vez, en el período de su primer envío.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):

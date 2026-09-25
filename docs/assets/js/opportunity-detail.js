@@ -2289,6 +2289,15 @@ if (tabName === 'Candidates') {
 
 // Botón abre popup
 aiBtn.addEventListener('click', () => {
+  // Precarga los links de Grain que ya tiene la opp (Overview → First Meeting / Deep Dive
+  // Recording). Sin esto la recruiter los pegaba a mano y el JD Review, que lee esas
+  // columnas, a veces no tenía contra qué comparar. Sólo si el campo del popup está vacío.
+  [['ai-intro-link', 'recording-input'], ['ai-deep-dive-link', 'deepdive-recording-input']]
+    .forEach(([popupId, oppId]) => {
+      const popupEl = document.getElementById(popupId);
+      const saved = (document.getElementById(oppId)?.value || '').trim();
+      if (popupEl && !popupEl.value.trim() && /^https?:\/\//i.test(saved)) popupEl.value = saved;
+    });
   aiPopup.classList.remove('hidden');
 });
 
@@ -2366,6 +2375,18 @@ aiGo.addEventListener('click', async () => {
       // Guardar en la base de datos
       await updateOpportunityField('hr_job_description', jd);
       logOpportunityDetailTrack('opp-details-jd-ai-save');
+
+      // Si la opp no tenía los links guardados, se quedan los que se usaron para generar:
+      // el JD Review lee esas columnas para contrastar la JD con las reuniones. Nunca pisa
+      // un link que ya estaba (el blur guarda '' y no NULL, por eso se mira el valor).
+      [['recording-input', 'first_meeting_recording', introLink],
+       ['deepdive-recording-input', 'deepdive_recording', deepDiveLink]]
+        .forEach(([inputId, field, link]) => {
+          const input = document.getElementById(inputId);
+          if (!link || !input || input.value.trim()) return;
+          input.value = link;
+          updateOpportunityField(field, link);
+        });
       console.log("✅ Job description saved in DB");
 
       alert("✅ Job description generated!");

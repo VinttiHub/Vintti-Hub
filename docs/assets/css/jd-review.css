@@ -1,0 +1,234 @@
+/* JD Review — sólo lo que no existe ya en cv-review.css.
+   Colores de marca (CLAUDE.md): lima = cubierto, celeste = parcial, magenta = dice otra
+   cosa, ámbar = inventado. */
+
+/* --- la JD congelada ------------------------------------------------------ */
+.jdr-doc {
+  flex: 1;
+  min-height: 320px;
+  overflow-y: auto;
+  padding: 22px 26px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--hx-r);
+  background: var(--hx-surface);
+  color: var(--hx-ink);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.jdr-doc h1, .jdr-doc h2, .jdr-doc h3, .jdr-doc h4 { margin: 14px 0 6px; font-size: 14.5px; }
+.jdr-doc p { margin: 0 0 8px; }
+.jdr-doc ul, .jdr-doc ol { margin: 0 0 10px; padding-left: 20px; }
+.jdr-doc li { margin: 2px 0; }
+
+::highlight(jdr-covered)      { background-color: rgba(193, 255, 114, .55); }
+::highlight(jdr-partial)      { background-color: rgba(75, 169, 255, .28); }
+::highlight(jdr-contradicted) { background-color: rgba(255, 31, 219, .28); }
+::highlight(jdr-invented)     { background-color: rgba(255, 196, 61, .45); }
+::highlight(jdr-focus)        { background-color: rgba(0, 59, 255, .35); color: #0a1a66; }
+
+.jdr-legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.jdr-lg {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hx-ink-2);
+}
+.jdr-lg-covered      { background: rgba(193, 255, 114, .55); }
+.jdr-lg-partial      { background: rgba(75, 169, 255, .28); }
+.jdr-lg-contradicted { background: rgba(255, 31, 219, .22); }
+.jdr-lg-invented     { background: rgba(255, 196, 61, .45); }
+
+/* --- panel de análisis ---------------------------------------------------- */
+.jdr-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 12px;
+}
+.jdr-verdict { font-weight: 700; font-size: 14px; }
+.jdr-verdict--ready { color: var(--hx-lime-ink); }
+.jdr-verdict--needs_work { color: var(--hx-amber-ink); }
+.jdr-verdict--not_sendable { color: var(--hx-mag-ink); }
+.jdr-verdict-why { font-size: 12.5px; color: var(--hx-ink-2); margin-top: 2px; }
+.jdr-math { font-size: 11.5px; color: var(--hx-muted); margin-top: 4px; }
+
+.jdr-block {
+  margin: 8px 0;
+  border: 1px solid var(--hx-line);
+  border-left-width: 4px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-surface);
+}
+.jdr-block > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hx-ink);
+}
+.jdr-block > summary b {
+  margin-left: 4px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--hx-slate);
+  font-size: 11px;
+}
+.jdr-block--contradicted { border-left-color: #ff1fdb; }
+.jdr-block--missing      { border-left-color: #003bff; }
+.jdr-block--invented     { border-left-color: #ffc43d; }
+.jdr-block--partial      { border-left-color: #4ba9ff; }
+.jdr-block--covered      { border-left-color: #c1ff72; }
+
+.jdr-cat {
+  margin: 8px 12px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--hx-muted);
+}
+.jdr-facts { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; }
+.jdr-fact {
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: var(--hx-surface-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.jdr-fact.is-locatable { cursor: pointer; }
+.jdr-fact.is-locatable:hover,
+.jdr-fact.is-locatable:focus-visible { outline: 1px solid var(--hx-accent); background: var(--hx-accent-wash); }
+.jdr-fact.is-soft { opacity: .75; }
+.jdr-fact-l1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.jdr-fact-l1 b { font-weight: 600; color: var(--hx-ink); }
+.jdr-imp, .jdr-src {
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.jdr-imp { background: #e5e7ff; color: #312e81; }
+.jdr-imp--nice { background: #eef0f3; color: #6b7480; }
+.jdr-src { background: var(--hx-slate); color: var(--hx-slate-ink); }
+.jdr-quote { margin-top: 3px; color: var(--hx-muted); font-style: italic; }
+.jdr-jdq { margin-top: 3px; color: var(--hx-ink-2); }
+.jdr-jdq span { font-weight: 700; color: var(--hx-mag-ink); }
+.jdr-why { margin-top: 3px; color: var(--hx-ink-2); }
+
+/* --- opportunity-detail: chip de estado y botón -------------------------- */
+/* Mismo ancho y centrado que #job .job-card (opportunity-detail.css), para que la barra
+   quede alineada con el editor que tiene abajo. */
+.jdr-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 1280px;
+  margin: -1rem auto 1rem;
+  padding: 0 .25rem;
+}
+#jdrBar .header-btn:disabled { opacity: .55; cursor: default; }
+/* "Cancel review" es la acción secundaria: contorno. NO lleva .header-btn a propósito:
+   opportunity-detail.css pinta `#job .header-btn` de azul con !important. */
+.jdr-cancel-btn {
+  padding: 9px 16px;
+  border: 1px solid #dfe3ea;
+  border-radius: 999px;
+  background: #fff;
+  color: #4a5566;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jdr-cancel-btn:hover { border-color: #b9c0cb; color: #0e1116; }
+.jdr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eef0f3;
+  color: #4a5566;
+}
+.jdr-chip.is-pending  { background: #ffe9b8; color: #8a5a00; }
+.jdr-chip.is-approved { background: #c1ff72; color: #3a6b00; }
+.jdr-chip.is-changes  { background: #e5e7ff; color: #312e81; }
+.jdr-chip-comment {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid #6c38ff;
+  border-radius: 6px;
+  background: #f4f0ff;
+  font-size: 12.5px;
+  color: #2b1a66;
+}
+.jdr-note {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 420px;
+  padding: 7px 11px;
+  border: 1px solid #dfe3ea;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+/* --- la cuenta del score ------------------------------------------------- */
+.jdr-block--math { border-left-color: #6c38ff; }
+.jdr-math-note { margin: 0 12px 6px; font-size: 11.5px; color: var(--hx-muted); line-height: 1.45; }
+.jdr-math-table { width: calc(100% - 24px); margin: 0 12px 10px; border-collapse: collapse; font-size: 12.5px; }
+.jdr-math-table td { padding: 4px 0; border-bottom: 1px solid var(--hx-line-2); color: var(--hx-ink-2); }
+.jdr-math-table td.n { text-align: right; white-space: nowrap; padding-left: 12px; font-variant-numeric: tabular-nums; }
+.jdr-math-table td.n span { color: var(--hx-faint); }
+.jdr-math-table .jdr-math-missing td, .jdr-math-table .jdr-math-contradicted td { color: var(--hx-muted); }
+.jdr-math-sub td { font-weight: 600; color: var(--hx-ink); }
+.jdr-math-pen td { color: var(--hx-mag-ink) !important; font-weight: 600; }
+.jdr-math-table tfoot td { padding-top: 6px; border-bottom: none; font-weight: 700; font-size: 13.5px; color: var(--hx-ink); }
+
+/* Lo que aporta cada punto. */
+.jdr-pts {
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.jdr-pts.is-full { background: rgba(193, 255, 114, .6); color: var(--hx-lime-ink); }
+.jdr-pts.is-half { background: rgba(75, 169, 255, .2); color: #1d5fa8; }
+.jdr-pts.is-zero { background: var(--hx-slate); color: var(--hx-slate-ink); }
+.jdr-pts.is-free { background: transparent; color: var(--hx-faint); font-weight: 600; }
+.jdr-pts-pen { color: var(--hx-mag-ink); }
+
+.jdr-parts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.jdr-part { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.jdr-part--explicit { background: rgba(193, 255, 114, .6); color: var(--hx-lime-ink); }
+.jdr-part--implied  { background: rgba(75, 169, 255, .2); color: #1d5fa8; }
+.jdr-part--no       { background: var(--hx-slate); color: var(--hx-slate-ink); }
+#jdrOpenOpp, #jdrOpenOpp:hover { text-decoration: none; }
+
+/* Las etiquetas del checklist de JD son más largas que las del CV y .cvr-check trae de la
+   toolbar `height: 38px` + `white-space: nowrap`: se cortaban. Acá bajan de renglón. */
+#jdrChecklist .cvr-check {
+  height: auto;
+  min-height: 38px;
+  padding: 8px 10px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.jdr-rerun-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.jdr-facts-note { margin: 10px 0 0; font-size: 11.5px; color: var(--hx-muted); line-height: 1.45; }
+.jdr-facts-note.is-rebuilt {
+  padding: 8px 10px;
+  border-radius: var(--hx-r-sm);
+  background: var(--hx-amber);
+  color: var(--hx-amber-ink);
+  font-weight: 600;
+}

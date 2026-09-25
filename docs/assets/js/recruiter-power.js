@@ -1997,6 +1997,7 @@ function populateDropdown() {
     updateCardsForLead(hrLeadEmail);
     // No re-fetchea: los datos ya están por recruiter, sólo cambia cuál se pinta.
     renderCvQuality();
+    if (window.JdQuality) window.JdQuality.render();
   };
 
   if (shouldRefreshCards) {
@@ -2490,6 +2491,8 @@ function wireRangePicker() {
     if (metricsState.activeTab === "cvquality") {
       await fetchCvQuality();
     }
+    // Lo mismo para la pestaña de JD quality (recruiter-power-jd.js).
+    if (window.JdQuality) window.JdQuality.onRangeChange(metricsState.activeTab === "jdquality");
 
     const sel = document.getElementById("hrLeadSelect");
     if (sel && sel.value) updateCardsForLead(sel.value);
@@ -2875,6 +2878,7 @@ function setupTabs() {
       // crudos ("english_level") hasta el siguiente render.
       fetchReasonLabels().then(fetchCvQuality);
     }
+    if (target === "jdquality" && window.JdQuality) window.JdQuality.onShow();
   };
 
   tabs.forEach((tab, index) => {

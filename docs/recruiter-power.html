@@ -201,6 +201,9 @@
       <button type="button" class="metrics-tab" data-tab-target="cvquality">
         CV quality
       </button>
+      <button type="button" class="metrics-tab" data-tab-target="jdquality">
+        JD quality
+      </button>
     </div>
     </div><!-- /.metrics-toolbar -->
 
@@ -556,6 +559,21 @@
       </section>
     </section>
 
+    <!-- Calidad de la JD que escribe la recruiter, medida en el gate de JD Review
+         (jd-review.html). La tarjeta la emite assets/js/jd-review-cards.js, la misma que la
+         sección "Per recruiter" de JD Review. Lógica en recruiter-power-jd.js. -->
+    <section class="metrics-tabpanel" data-tab-panel="jdquality" id="jdQualityTab">
+      <div class="cvq-layout" aria-live="polite">
+        <div class="metric-group">
+          <div class="metric-group__head"><span class="metric-group__icon">📝</span><span class="metric-group__label">JD review summary</span><span class="metric-group__rule"></span></div>
+          <div id="jdqCards" class="cvq-cards"></div>
+        </div>
+      </div>
+      <section class="meta-footer">
+        <p id="jdqInfo" class="meta-text"></p>
+      </section>
+    </section>
+
     <section class="metrics-tabpanel" data-tab-panel="history" id="historyTab">
       <section class="history-panel" id="historyPanel" aria-live="polite">
         <header class="history-header">
@@ -660,9 +678,11 @@
   </div>
 
   <script src="./assets/js/avatar-map.js" defer></script>
-  <script src="./assets/js/sidebar.js?v=20260922-mariano-aec" defer></script>
+  <script src="./assets/js/sidebar.js?v=20260925-jd-review" defer></script>
   <script src="./assets/js/cv-review-cards.js?v=20260827-shared"></script>
-  <script src="./assets/js/recruiter-power.js?v=20260827-hirex"></script>
+  <script src="./assets/js/jd-review-cards.js?v=20260925-1"></script>
+  <script src="./assets/js/recruiter-power.js?v=20260925-jd-review"></script>
+  <script src="./assets/js/recruiter-power-jd.js?v=20260925-1"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

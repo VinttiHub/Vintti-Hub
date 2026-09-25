@@ -142,6 +142,10 @@
     ]).has(email);
     setDisplay('cvReviewLink', cvReviewOk);
     if (cvReviewOk) paintCvReviewBadge(email);
+    // JD Review: la misma gente revisa las JDs. El backend importa el gate de CV Review
+    // (routes/jd_review_routes.py), así que esta lista es la misma que la de arriba.
+    setDisplay('jdReviewLink', cvReviewOk);
+    if (cvReviewOk) paintCvReviewBadge(email, JDR_BADGE);
 
     setDisplay('equipmentsLink', new Set([
       'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
@@ -180,9 +184,14 @@
   const CVR_OVERSIGHT = new Set(['pgonzales@vintti.com', 'agostina@vintti.com']);
   const CVR_CACHE_KEY = 'cvr_pending_cache';
   const CVR_CACHE_MS  = 60000;
+  const CVR_BADGE = { linkId: 'cvReviewLink', path: '/cv_reviews/pending_count',
+                      cacheKey: CVR_CACHE_KEY, noun: 'CV' };
+  // La misma burbuja para la cola de JDs (jd-review.html).
+  const JDR_BADGE = { linkId: 'jdReviewLink', path: '/jd_reviews/pending_count',
+                      cacheKey: 'jdr_pending_cache', noun: 'JD' };
 
-  function paintCvReviewBadge(email) {
-    const link = document.getElementById('cvReviewLink');
+  function paintCvReviewBadge(email, cfg = CVR_BADGE) {
+    const link = document.getElementById(cfg.linkId);
     if (!link) return;
 
     const render = (n) => {
@@ -194,13 +203,13 @@
         link.appendChild(b);
       }
       b.textContent = n > 99 ? '99+' : String(n);
-      b.title = `${n} CV${n === 1 ? '' : 's'} waiting for your review`;
+      b.title = `${n} ${cfg.noun}${n === 1 ? '' : 's'} waiting for your review`;
     };
 
     // El sidebar se monta en las 16 páginas del Hub; sin caché esto sería un request por
     // navegación. 60s es de sobra para un contador de una cola que se mueve a mano.
     try {
-      const hit = JSON.parse(sessionStorage.getItem(CVR_CACHE_KEY) || 'null');
+      const hit = JSON.parse(sessionStorage.getItem(cfg.cacheKey) || 'null');
       if (hit && hit.email === email && (Date.now() - hit.at) < CVR_CACHE_MS) {
         render(hit.count);
         return;
@@ -214,7 +223,7 @@
       ? 'http://127.0.0.1:5000'
       : apiBase;
     const mine = CVR_OVERSIGHT.has(email) ? '' : '?mine=1';
-    fetch(`${base}/cv_reviews/pending_count${mine}`, {
+    fetch(`${base}${cfg.path}${mine}`, {
       headers: { 'X-User-Email': email },
     })
       .then(r => (r.ok ? r.json() : null))
@@ -222,7 +231,7 @@
         if (!d) return;
         const n = Number(d.count) || 0;
         try {
-          sessionStorage.setItem(CVR_CACHE_KEY, JSON.stringify({ email, count: n, at: Date.now() }));
+          sessionStorage.setItem(cfg.cacheKey, JSON.stringify({ email, count: n, at: Date.now() }));
         } catch {}
         render(n);
       })

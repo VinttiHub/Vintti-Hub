@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JD Review</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
+  <link rel="stylesheet" href="./assets/css/hirex.css?v=20260806-1" />
+  <!-- Hermana de cv-review.html: reusa su CSS entero (cola, drawer de dos columnas,
+       checklist, anillos) y jd-review.css agrega sólo lo propio. -->
+  <link rel="stylesheet" href="./assets/css/cv-review-cards.css?v=20260827-shared" />
+  <link rel="stylesheet" href="./assets/css/cv-review.css?v=20260921-hopping-title" />
+  <link rel="stylesheet" href="./assets/css/jd-review.css?v=20260925-7" />
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="hirex-app cvr-app" id="jdrDenied" hidden>
+      <div class="hx-state">
+        <div class="hx-empty-mark"><i class="fa-solid fa-lock"></i></div>
+        <h3>Sales leads only</h3>
+        <p>This is where sales leads sign off the job descriptions recruiters write.</p>
+        <a class="hx-btn hx-btn-ghost" href="opportunities.html">
+          <i class="fa-solid fa-arrow-left"></i> Back to opportunities
+        </a>
+      </div>
+    </div>
+
+    <div class="hirex-app cvr-app" id="jdrApp" hidden>
+
+      <header class="hx-topbar">
+        <div class="hx-brand">
+          <span class="hx-logo">JD Review</span>
+          <span class="hx-eyebrow">Sales sign-off</span>
+        </div>
+        <div class="hx-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="jdrSearch" type="search" autocomplete="off"
+                 placeholder="Search by position, client or recruiter" />
+        </div>
+        <div class="hx-topbar-actions">
+          <button class="hx-btn hx-btn-ghost" id="jdrRefresh">
+            <i class="fa-solid fa-rotate"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <section class="hx-view">
+        <div class="hx-toolbar">
+          <div class="hx-filters">
+            <label class="hx-filter">
+              <span>Status</span>
+              <select id="jdrStatus">
+                <option value="pending">Waiting for review</option>
+                <option value="">All</option>
+                <option value="approved">Approved</option>
+                <option value="changes_requested">Needs changes</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
+            <label class="hx-filter">
+              <span>Recruiter</span>
+              <select id="jdrRecruiter"><option value="">All recruiters</option></select>
+            </label>
+            <label class="hx-filter">
+              <span>From</span>
+              <input type="date" id="jdrFrom" />
+            </label>
+            <label class="hx-filter">
+              <span>To</span>
+              <input type="date" id="jdrTo" />
+            </label>
+            <label class="cvr-check">
+              <input type="checkbox" id="jdrMine" />
+              <span id="jdrMineLabel">Only mine</span>
+            </label>
+            <button class="hx-btn hx-btn-ghost" id="jdrApply">Apply</button>
+          </div>
+          <div class="hx-count" id="jdrCount">—</div>
+        </div>
+
+        <!-- ============ Métricas por recruiter ============ -->
+        <div class="cvr-sec-head cvr-sec-head--toggle" id="jdrMetricsToggle"
+             role="button" tabindex="0" aria-expanded="false" aria-controls="jdrMetricsPanel">
+          <i class="fa-solid fa-chevron-right cvr-chev"></i>
+          <h2>Per recruiter</h2>
+          <span class="cvr-window" id="jdrMetricsWindow"></span>
+          <span class="cvr-sec-sum" id="jdrMetricsSum"></span>
+        </div>
+
+        <div id="jdrMetricsPanel" hidden>
+          <details class="cvr-note">
+            <summary><i class="fa-regular fa-circle-question"></i> How these are counted</summary>
+            <div class="cvr-note-body">
+              Each vacancy counts once, in the period its JD was <b>first</b> sent to review.
+              <b>Call coverage</b> is how much of what the client said in the Intro Call and
+              the Deep Dive made it into that first JD: core points weigh double, partial
+              mentions count half, and each point the JD states <b>differently</b> or each
+              requirement <b>nobody asked for</b> takes 5 more off (up to 20 each). The
+              number is computed from the AI's point-by-point check, not picked by the AI.
+              Rates are over JDs you already decided. Checklist items are not exclusive, so
+              they add up to more than 100.
+            </div>
+          </details>
+          <div id="jdrMetrics" class="cvr-metrics"></div>
+          <div class="hx-state cvr-state-sm" id="jdrMetricsEmpty" hidden>
+            <p>No JDs were sent to review in this period.</p>
+          </div>
+        </div>
+
+        <!-- ============ Cola ============ -->
+        <div class="cvr-sec-head"><h2>Queue</h2></div>
+
+        <div class="hx-table-wrap" id="jdrQueueWrap" hidden>
+          <table class="hx-table cvr-table" id="jdrQueueTable">
+            <thead>
+              <tr>
+                <th class="cvr-col-cand">Position</th>
+                <th class="cvr-col-score">Coverage</th>
+                <th class="cvr-col-status">Status</th>
+                <th class="cvr-col-age">Age</th>
+              </tr>
+            </thead>
+            <tbody id="jdrQueueBody"></tbody>
+          </table>
+        </div>
+
+        <div class="hx-state" id="jdrQueueEmpty" hidden>
+          <div class="hx-empty-mark"><i class="fa-solid fa-check"></i></div>
+          <h3>Nothing to review</h3>
+          <p>When a recruiter sends a job description for sign-off, it lands here.</p>
+        </div>
+
+        <div class="hx-state" id="jdrQueueLoading">
+          <div class="hx-spinner"></div>
+          <p>Loading the queue…</p>
+        </div>
+      </section>
+
+      <!-- ============ Drawer ============ -->
+      <div class="hx-scrim" id="jdrScrim" hidden></div>
+      <aside class="hx-drawer cvr-drawer" id="jdrDrawer" role="dialog" aria-modal="true"
+             aria-labelledby="jdrDrawerTitle">
+        <header class="hx-drawer-head">
+          <div class="cvr-drawer-title">
+            <span class="hx-eyebrow">JD review</span>
+            <h2 id="jdrDrawerTitle">Job description</h2>
+            <p class="cvr-drawer-sub" id="jdrDrawerSub"></p>
+          </div>
+          <button class="hx-icon-btn" id="jdrClose" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+
+        <div class="hx-drawer-body cvr-cols">
+          <!-- Izquierda: la JD congelada, con lo que el análisis cita pintado encima. -->
+          <section class="cvr-col cvr-col-cv">
+            <div class="cvr-cv-head">
+              <h3>The JD <span class="cvr-cv-sub">as it was sent</span></h3>
+              <div class="cvr-cv-tools">
+                <label class="cvr-hl-switch">
+                  <input type="checkbox" id="jdrHlSwitch" checked />
+                  <span>Highlight findings</span>
+                </label>
+                <a id="jdrOpenOpp" class="hx-btn hx-btn-soft cvr-open-cv" target="_blank" rel="noopener">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Opportunity
+                </a>
+              </div>
+            </div>
+            <div class="jdr-legend">
+              <span class="jdr-lg jdr-lg-covered">Covered</span>
+              <span class="jdr-lg jdr-lg-partial">Partial</span>
+              <span class="jdr-lg jdr-lg-contradicted">Says something different</span>
+              <span class="jdr-lg jdr-lg-invented">Nobody said it</span>
+            </div>
+            <div id="jdrDoc" class="jdr-doc"></div>
+          </section>
+
+          <section class="cvr-col cvr-col-analysis">
+            <div class="cvr-warn" id="jdrDrift" hidden></div>
+            <div class="cvr-warn cvr-warn--soft" id="jdrSources" hidden></div>
+
+            <details class="hx-section" open>
+              <summary>Call coverage</summary>
+              <div class="cvr-section-body">
+                <div id="jdrAi"></div>
+                <p class="jdr-facts-note" id="jdrFactsNote" hidden></p>
+                <div class="jdr-rerun-row">
+                  <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="jdrReanalyze"
+                          title="Something failed: fetch the recordings again and re-score. Load any missing Grain link on the opportunity (Information tab) first.">
+                    <i class="fa-solid fa-rotate"></i> Retry the analysis
+                  </button>
+                  <button type="button" class="hx-btn hx-btn-ghost cvr-rerun" id="jdrRebuild"
+                          title="Read the calls again and build a new list of points. The score can move because of this alone.">
+                    <i class="fa-solid fa-list-check"></i> Rebuild the list of points
+                  </button>
+                </div>
+              </div>
+            </details>
+
+            <details class="hx-section" id="jdrChecklistSection" open>
+              <summary>Checklist <em class="hx-hint">required</em></summary>
+              <div class="cvr-section-body">
+                <p class="cvr-field-label">Tick anything the JD gets wrong. This feeds the
+                  recruiter's quality metrics.</p>
+                <div id="jdrChecklist" class="cvr-checklist"></div>
+                <label class="cvr-checklist-clean">
+                  <input type="checkbox" id="jdrChecklistClean" />
+                  <span>Nothing to flag — the JD is clean</span>
+                </label>
+              </div>
+            </details>
+
+            <details class="hx-section" id="jdrRoundsSection">
+              <summary>Previous rounds</summary>
+              <div class="cvr-section-body"><div id="jdrRounds" class="cvr-rounds"></div></div>
+            </details>
+
+            <div class="cvr-changes" id="jdrChangesForm" hidden>
+              <label class="hx-field">
+                <span>What needs changing? <em class="hx-hint">required</em></span>
+                <textarea id="jdrChangesComment" rows="4"
+                  placeholder="e.g. The client said 5+ years and US hours (EST) in the deep dive — the JD says 3 years and doesn't mention the schedule."></textarea>
+              </label>
+              <p class="cvr-changes-note">The recruiter fixes the JD and sends it back as the next round.</p>
+            </div>
+
+            <p class="hx-err" id="jdrDrawerError"></p>
+          </section>
+        </div>
+
+        <footer class="hx-drawer-foot" id="jdrDecisionFoot">
+          <span class="cvr-foot-hint" id="jdrFootHint"></span>
+          <div class="hx-foot-right">
+            <button type="button" class="hx-btn cvr-btn-changes" id="jdrChangesToggle">
+              <i class="fa-solid fa-pen"></i> Request changes
+            </button>
+            <button type="button" class="hx-btn hx-btn-primary" id="jdrApprove">
+              <i class="fa-solid fa-check"></i> Approve
+            </button>
+            <button type="button" class="hx-btn hx-btn-ghost" id="jdrChangesCancel" hidden>Cancel</button>
+            <button type="button" class="hx-btn cvr-btn-changes" id="jdrChangesConfirm" hidden>
+              <i class="fa-solid fa-paper-plane"></i> Send the corrections
+            </button>
+          </div>
+        </footer>
+      </aside>
+    </div>
+  </main>
+
+  <script src="./assets/js/sidebar.js?v=20260925-jd-review" defer></script>
+  <script src="./assets/js/cv-review-cards.js?v=20260827-shared" defer></script>
+  <script src="./assets/js/jd-review-cards.js?v=20260925-1" defer></script>
+  <script src="./assets/js/jd-review.js?v=20260925-8" defer></script>
+</body>
+</html>

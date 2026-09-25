@@ -26,6 +26,7 @@
 
   <!-- ===== Styles ===== -->
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260916-qcheck" />
+  <link rel="stylesheet" href="./assets/css/jd-review.css?v=20260925-7" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -339,6 +340,17 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- JD Review: la recruiter manda la JD al sales lead, que la contrasta con lo que se
+           habló en la Intro Call y la Deep Dive. Lógica en jd-review-opp.js. -->
+      <div class="jdr-bar" id="jdrBar">
+        <span class="jdr-chip" id="jdrOppChip">Not reviewed yet</span>
+        <input type="text" id="jdrOppNote" class="jdr-note" maxlength="2000"
+               placeholder="Note for the sales lead (optional)" />
+        <button type="button" id="jdrOppSend" class="header-btn">Send JD to review</button>
+        <button type="button" id="jdrOppCancel" class="jdr-cancel-btn" hidden>Cancel review</button>
+        <p class="jdr-chip-comment" id="jdrOppComment" hidden></p>
       </div>
 
       <div class="job-card">
@@ -1102,7 +1114,8 @@
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260916-qcheck" defer></script>
   <script src="./assets/js/pipeline.js?v=20260916-qcheck" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260911-hs-closedwin" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260925-jd-review" defer></script>
+  <script src="./assets/js/jd-review-opp.js?v=20260925-1" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 
   <!-- ===== Fees visibility helper (kept names & behavior) ===== -->
