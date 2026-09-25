@@ -5934,6 +5934,9 @@ function _replaceDateText(node){
   const histEl   = document.getElementById('cv-review-history');
   const errEl    = document.getElementById('cv-review-error');
   const sendBtn  = document.getElementById('cv-review-submit');
+  const liCard   = document.getElementById('cv-review-li-card');
+  const liWhy    = document.getElementById('cv-review-li-why');
+  const liText   = document.getElementById('cv-review-li-text');
   if (!openBtn || !chip || !popup || !sel || !sendBtn) return;
 
   const me = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
@@ -6218,10 +6221,61 @@ function _replaceDateText(node){
       });
   }
 
+  // --- LinkedIn al día antes de mandar -------------------------------------
+  // El score compara el CV contra el LinkedIn, y lo que tenemos es la copia de Coresignal,
+  // que puede tener meses. Con más de 90 días el chequeo sólo avisa y la sales lead recibe
+  // un "not scored". Pedirlo acá, antes de mandar, es lo que evita la vuelta de "pegalo y
+  // re-corré". No traba: si no lo pega, el segundo click manda igual.
+  const LI_PASTE_URL = `${API}/candidates/${encodeURIComponent(cid)}/linkedin_paste`;
+  let liNeeded = false;      // hay que pedirle el LinkedIn
+  let liWarned = false;      // ya se le avisó una vez: el próximo click manda sin él
+  const liAge = (iso) => (Date.now() - new Date(iso.length === 10 ? iso + 'T12:00:00' : iso)) / 864e5;
+  const liFmt = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso)
+    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+  function checkLinkedin(){
+    liNeeded = false;
+    liWarned = false;
+    if (liCard) liCard.hidden = true;
+    return fetch(LI_PASTE_URL, { headers: headers() })
+      .then(r => r.ok ? r.json() : null)
+      .then(st => {
+        if (!st || !liCard) return;
+        const days = st.stale_days || 90;
+        const newest = [st.pasted_at, st.coresignal_as_of].filter(Boolean)
+          .map(d => d.slice(0, 10)).sort().pop();
+        if (newest && liAge(newest) <= days) return;
+        liNeeded = true;
+        liWhy.textContent = newest
+          ? `The LinkedIn we have is from ${liFmt(newest)} — over ${days} days old, and the `
+            + `profile may have changed. Paste the current Experience section so the CV is `
+            + `checked against today's LinkedIn.`
+          : `We don't have this candidate's LinkedIn yet. Paste the Experience section so the `
+            + `CV can be checked against it.`;
+        liCard.hidden = false;
+      })
+      .catch(() => {});   // si falla, se manda como siempre
+  }
+
+  function saveLinkedin(text){
+    return fetch(LI_PASTE_URL, {
+      method: 'PUT', headers: headers(), body: JSON.stringify({ text }),
+    }).then(async r => {
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(body.error || `HTTP ${r.status}`), { body });
+      // Que el bloque de Overview se entere sin recargar.
+      document.dispatchEvent(new CustomEvent('li-paste:changed', { detail: body }));
+      liNeeded = false;
+      liCard.hidden = true;
+      liText.value = '';
+    });
+  }
+
   // --- popup --------------------------------------------------------------
   function openPopup(preselectOppId){
     if (errEl) errEl.textContent = '';
     popup.classList.remove('hidden');
+    checkLinkedin();
     Promise.all([populateOpportunities(), loadReviews()]).then(() => {
       if (preselectOppId) sel.value = String(preselectOppId);
       paintHistory();
@@ -6242,6 +6296,29 @@ function _replaceDateText(node){
     const oppId = Number(sel.value);
     if (!oppId) return;
     if (errEl) errEl.textContent = '';
+    const pasted = (liText?.value || '').trim();
+    if (liNeeded && pasted) {
+      // Primero se guarda el LinkedIn: el score corre en el backend apenas se crea la
+      // ronda y lee el LinkedIn en ese momento.
+      sendBtn.disabled = true;
+      const label0 = sendBtn.textContent;
+      sendBtn.textContent = 'Saving LinkedIn…';
+      saveLinkedin(pasted)
+        .then(() => { sendBtn.disabled = false; sendBtn.textContent = label0; sendBtn.click(); })
+        .catch(err => {
+          if (errEl) errEl.textContent = err.message || 'Could not save the LinkedIn.';
+          sendBtn.disabled = false;
+          sendBtn.textContent = label0;
+        });
+      return;
+    }
+    if (liNeeded && !liWarned) {
+      liWarned = true;
+      if (errEl) errEl.textContent = 'Paste the current LinkedIn above — or click again to '
+        + 'send without it (the LinkedIn check will show as "not scored").';
+      liText?.focus();
+      return;
+    }
     sendBtn.disabled = true;
     const label = sendBtn.textContent;
     sendBtn.textContent = 'Sending…';
@@ -6362,4 +6439,91 @@ function _replaceDateText(node){
   // Cambiar de pestaña esconde la fila entera; dejar el menú abierto haría que reaparezca
   // desplegado al volver a Resume.
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', close));
+})();
+
+
+// --- LinkedIn de hoy, pegado a mano (para el CV Review) ---------------------------
+// El CV Review compara el CV contra el LinkedIn del candidato, pero lo que tenemos de
+// LinkedIn es la copia de Coresignal, que ellos refrescan cuando quieren (la de la review
+// 196 tenía un año). Pegar la sección Experiencia la reemplaza mientras sea la más nueva.
+// Mismo corte de 90 días que LINKEDIN_STALE_DAYS en backend/utils/cv_review_ai.py.
+(function liPaste() {
+  const card = document.getElementById('li-paste-card');
+  const id = new URLSearchParams(location.search).get('id');
+  if (!card || !id) return;
+  const $ = (x) => document.getElementById(x);
+  const status = $('li-paste-status'), text = $('li-paste-text'), msg = $('li-paste-msg');
+  const save = $('li-paste-save'), clear = $('li-paste-clear'), details = $('li-paste-details');
+  const url = `${candidatesApiBase()}/candidates/${encodeURIComponent(id)}/linkedin_paste`;
+  const fmt = (iso) => {
+    const d = new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
+    return isNaN(d) ? iso : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+  const ageDays = (iso) => (Date.now() - new Date(iso.length === 10 ? iso + 'T12:00:00' : iso)) / 864e5;
+
+  function paint(st) {
+    const days = st.stale_days || 90;
+    status.classList.remove('is-stale', 'is-fresh');
+    const pastedWins = st.pasted_at && (!st.coresignal_as_of || st.pasted_at.slice(0, 10) >= st.coresignal_as_of);
+    if (pastedWins) {
+      const old = ageDays(st.pasted_at) > days;
+      status.textContent = `Pasted on ${fmt(st.pasted_at)} — CV Review uses this.`
+        + (old ? ` Over ${days} days old: paste it again if the profile changed.` : '');
+      status.classList.add(old ? 'is-stale' : 'is-fresh');
+    } else if (st.coresignal_as_of) {
+      const old = ageDays(st.coresignal_as_of) > days;
+      status.textContent = `Using the Coresignal copy of LinkedIn from ${fmt(st.coresignal_as_of)}.`
+        + (old ? ` Over ${days} days old — missing jobs won't be penalized until you paste the current profile.` : '');
+      status.classList.add(old ? 'is-stale' : 'is-fresh');
+      if (old) details.open = true;
+    } else {
+      status.textContent = 'No LinkedIn data yet. Paste the Experience section so CV Review can compare it.';
+      details.open = true;
+    }
+    if (st.pasted_text && !text.value) text.value = st.pasted_text;
+    clear.hidden = !st.pasted_at;
+    const summary = details.querySelector('summary');
+    if (summary) summary.textContent = st.pasted_at ? 'Update the pasted LinkedIn' : 'Paste the current LinkedIn';
+  }
+
+  function request(method, body) {
+    return fetch(url, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+      return data;
+    });
+  }
+
+  function put(value, btn) {
+    btn.disabled = true;
+    msg.className = 'li-paste-msg';
+    msg.textContent = 'Saving…';
+    request('PUT', { text: value })
+      .then((st) => {
+        msg.textContent = value ? 'Saved. Re-run the CV Review to use it.' : 'Removed.';
+        if (!value) text.value = '';
+        paint(st);
+        if (value) details.open = false;   // guardado: se pliega, el estado ya lo dice arriba
+      })
+      .catch((e) => { msg.className = 'li-paste-msg is-error'; msg.textContent = e.message; })
+      .finally(() => { btn.disabled = false; });
+  }
+
+  save.addEventListener('click', () => {
+    const v = text.value.trim();
+    if (!v) { msg.className = 'li-paste-msg is-error'; msg.textContent = 'Paste the Experience section first.'; return; }
+    put(v, save);
+  });
+  clear.addEventListener('click', () => put('', clear));
+
+  // Lo pegado desde el popup de Send to Sales Review también cuenta.
+  document.addEventListener('li-paste:changed', (e) => { text.value = ''; paint(e.detail || {}); });
+
+  request('GET')
+    .then(paint)
+    .catch(() => { status.textContent = 'Could not load the LinkedIn status.'; });
 })();

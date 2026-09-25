@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260918-hslink" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260925-li-layout" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -325,6 +325,31 @@
               </a>
             </label>
             <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
+          </div>
+
+          <!-- LINKEDIN DE HOY, pegado a mano: el CV Review compara el CV contra el LinkedIn,
+               y la copia de Coresignal puede tener meses. Lo llena candidate-details.js. -->
+          <!-- `full`: ocupa las dos columnas. En una sola, la grilla estiraba la tarjeta del
+               LinkedIn de al lado hasta la altura del textarea y quedaba media vacía. -->
+          <div class="field full li-paste" id="li-paste-card">
+            <div class="li-paste-head">
+              <label>LinkedIn experience <span class="u-muted li-paste-for">for CV Review</span></label>
+              <small id="li-paste-status" class="li-paste-status u-muted">Loading…</small>
+            </div>
+            <details id="li-paste-details" class="li-paste-details">
+              <summary>Paste the current LinkedIn</summary>
+              <p class="u-muted li-paste-help">Not the link — the <b>text</b>. Open the profile
+                on LinkedIn, select the whole <b>Experience</b> section with the mouse (from the
+                title to the last job), copy it and paste it here. It replaces the Coresignal
+                copy while it is the newer one.</p>
+              <textarea id="li-paste-text" rows="8"
+                placeholder="Experience&#10;GMAS&#10;Executive Assistant&#10;Nov 2025 - Apr 2026 · 6 mos&#10;…"></textarea>
+              <div class="li-paste-actions">
+                <button type="button" id="li-paste-save" class="li-paste-btn">Save</button>
+                <button type="button" id="li-paste-clear" class="li-paste-btn is-ghost" hidden>Remove pasted</button>
+                <span id="li-paste-msg" class="li-paste-msg"></span>
+              </div>
+            </details>
           </div>
 
           <!-- BLACKLIST (checkbox) -->
@@ -666,6 +691,16 @@
             <label for="cv-review-note">Anything the sales lead should know? (optional)</label>
             <textarea id="cv-review-note" rows="3"
               placeholder="e.g. She's above the range but the QuickBooks depth is exactly what they asked for."></textarea>
+          </div>
+
+          <!-- LinkedIn viejo o inexistente: se pide pegar el de hoy ANTES de mandar, así el
+               chequeo CV vs LinkedIn del score corre contra el perfil actual y la sales lead
+               no recibe un "not scored". Lo maneja wireCvReview() en candidate-details.js. -->
+          <div id="cv-review-li-card" class="cv-review-card cv-review-li" hidden>
+            <label for="cv-review-li-text">Paste the candidate's current LinkedIn</label>
+            <p id="cv-review-li-why" class="cv-review-li-why"></p>
+            <textarea id="cv-review-li-text" rows="6"
+              placeholder="Not the link — open the profile, select the whole Experience section, copy it and paste the text here."></textarea>
           </div>
 
           <div id="cv-review-history" class="cv-review-history"></div>
@@ -1375,7 +1410,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260729-2"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260918-hslink"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260925-li-layout"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

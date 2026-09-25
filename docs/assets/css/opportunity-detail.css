@@ -5827,3 +5827,17 @@ input:checked + .slider::before {
   color: #4a4a63;
   cursor: default;
 }
+
+/* Send for approval (modo review): LinkedIn viejo por candidato, con cuadro para pegar. */
+.approval-li { margin-top: 12px; padding: 12px 14px; border: 1px solid #f5d48a; border-radius: 12px; background: #fffaf0; }
+.approval-li-lead { margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: #7a4a00; }
+.approval-li-list { display: flex; flex-direction: column; gap: 6px; }
+.approval-li-item summary { cursor: pointer; font-size: 13px; }
+.approval-li-item summary b { color: #172036; }
+.approval-li-item summary span { color: #7a4a00; font-size: 12px; margin-left: 6px; }
+.approval-li-item textarea {
+  width: 100%; box-sizing: border-box; margin-top: 6px; font: inherit; font-size: 12.5px;
+  border: 1px solid #e7cf98; border-radius: 8px; padding: 8px; resize: vertical;
+}
+.approval-li-msg { margin: 8px 0 0; font-size: 12.5px; color: #b42318; }
+.approval-li-msg:empty { display: none; }

@@ -816,6 +816,7 @@ def submit_cv_review(candidate_id):
     # timeout=30. Lo que importa para el gate es que la fila exista, y ya está commiteada.
     _spawn_scoring(
         review_id=inserted["review_id"],
+        candidate_id=ctx["candidate_id"],
         has_jd=ctx["has_jd"],
         snapshot=ctx["snapshot"],
         jd_block=ctx["jd_block"],
@@ -1028,6 +1029,7 @@ def _score_batch_and_notify(*, items, batch_id, batch_number, note, extra_to, ex
         try:
             _score_and_notify(
                 review_id=it["review_id"],
+                candidate_id=ctx.get("candidate_id"),
                 has_jd=ctx.get("has_jd", False),
                 snapshot=ctx.get("snapshot") or {},
                 jd_block=ctx.get("jd_block") or "",
@@ -1066,21 +1068,71 @@ def _spawn_batch_scoring(**kwargs):
     ).start()
 
 
+def _linkedin_for_review(candidate_id, candidate_row=None):
+    """El LinkedIn del candidato para el chequeo CV vs LinkedIn: (input, código_si_no_hay).
+
+    Si no hay nada guardado y hay URL, lo trae de Coresignal y lo deja guardado (lo mismo
+    que hace la ficha del candidato al abrirla). Tarda unos segundos, por eso sólo se llama
+    desde el hilo de scoring o desde el re-run, que ya esperan a OpenAI. Nunca levanta.
+    """
+    row = candidate_row
+    if row is None and candidate_id:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute(
+                # to_jsonb: linkedin_scrapper_at se autocrea al primer pegado y puede no
+                # existir todavía; así la lectura no revienta si falta.
+                """SELECT linkedin, linkedin_scrapper, coresignal_scrapper,
+                          to_jsonb(c) ->> 'linkedin_scrapper_at' AS linkedin_scrapper_at
+                   FROM candidates c WHERE candidate_id = %s LIMIT 1""",
+                (candidate_id,),
+            )
+            row = cur.fetchone()
+        except Exception:
+            logging.exception("cv_review: could not read LinkedIn for candidate %s", candidate_id)
+        finally:
+            cur.close()
+            conn.close()
+    row = dict(row or {})
+    li = cv_review_ai.linkedin_input(row)
+    has_url = bool(candidate_id and (row.get("linkedin") or "").strip())
+    # Copia de Coresignal de más de 90 días: se pide una nueva. Si Coresignal tampoco la
+    # actualizó, vuelve igual de vieja y el chequeo avisa sin restar (linkedin_is_stale).
+    if li and not (li.get("source") == "coresignal" and cv_review_ai.linkedin_is_stale(li)
+                   and has_url):
+        return li, None
+    if not li and not has_url:
+        return None, "no_linkedin"
+    from coresignal_routes import fetch_and_store_coresignal
+    profile, err = fetch_and_store_coresignal(candidate_id, row.get("linkedin"),
+                                              overwrite=bool(li))
+    if err:
+        if li:
+            return li, None  # quedarse con la vieja: se avisa, no resta
+        return None, "no_linkedin" if err == "no_linkedin" else "fetch_failed"
+    row["coresignal_scrapper"] = profile
+    return cv_review_ai.linkedin_input(row) or li, None
+
+
 def _score_and_notify(*, review_id, has_jd, snapshot, jd_block, source_text, resume_hash,
-                      notify=True):
+                      candidate_id=None, notify=True):
     """Scorea y avisa. Corre fuera del request: nada de `request` ni de Flask acá.
 
     `notify=False` lo usa el camino de batch, que manda un único mail al final en vez de uno
     por candidato.
     """
     if has_jd:
+        linkedin, li_unavailable = _linkedin_for_review(candidate_id)
         fingerprint = cv_review_ai.input_hash({
             "s": resume_hash, "j": jd_block, "src": cv_review_ai.input_hash(source_text),
+            "li": cv_review_ai.input_hash(linkedin),
             "v": cv_review_ai.ANALYSIS_VERSION,
         })
         score, analysis, ai_error = cv_review_ai.score_cv(
             snapshot=snapshot, jd_block=jd_block, source_text=source_text,
-            fingerprint=fingerprint,
+            fingerprint=fingerprint, linkedin=linkedin,
+            linkedin_unavailable=li_unavailable,
         )
     else:
         # Sin JD el score no significa nada, pero el review ya se creó: el gate es de
@@ -1941,7 +1993,8 @@ def analyze_cv_review(review_id):
             SELECT r.review_id, r.candidate_id, r.opportunity_id, r.resume_snapshot,
                    r.resume_hash, r.ai_analysis, r.ai_analyzed_at, r.ai_score,
                    c.cv_pdf_scrapper, c.affinda_scrapper,
-                   c.linkedin_scrapper, c.coresignal_scrapper,
+                   c.linkedin_scrapper, c.coresignal_scrapper, c.linkedin,
+                   to_jsonb(c) ->> 'linkedin_scrapper_at' AS linkedin_scrapper_at,
                    o.opp_position_name, COALESCE(a.client_name, '') AS client_name
             FROM cv_reviews r
             LEFT JOIN candidates c  ON c.candidate_id   = r.candidate_id
@@ -1977,9 +2030,11 @@ def analyze_cv_review(review_id):
 
     snapshot = row["resume_snapshot"] or {}
     source_text = cv_review_ai.build_source_text(row)
+    linkedin, li_unavailable = _linkedin_for_review(row["candidate_id"], row)
     fingerprint = cv_review_ai.input_hash({
         "s": row["resume_hash"], "j": jd_block,
         "src": cv_review_ai.input_hash(source_text),
+        "li": cv_review_ai.input_hash(linkedin),
         "v": cv_review_ai.ANALYSIS_VERSION,
     })
 
@@ -1993,7 +2048,7 @@ def analyze_cv_review(review_id):
 
     score, analysis, ai_error = cv_review_ai.score_cv(
         snapshot=snapshot, jd_block=jd_block, source_text=source_text,
-        fingerprint=fingerprint,
+        fingerprint=fingerprint, linkedin=linkedin, linkedin_unavailable=li_unavailable,
     )
     if ai_error == "budget":
         return jsonify({"error": "The OpenAI budget for this month is exhausted.",
