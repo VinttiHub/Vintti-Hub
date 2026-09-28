@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=124">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=125">
 </head>
 <body>
 
@@ -2869,6 +2869,78 @@
       </header>
 
       <div class="funnel-row s-12">
+      <!-- ============================================================
+           MQL → SQL · Sales (live HubSpot) — primer paso del funnel.
+           Sales = Origin Outbound O Conversion Channel Outbound (regla de la owner);
+           NO filtra por mql_source (los Outbound tienen 'Outbound MQL').
+           Cohorte: MQLs agendados en la ventana (date_of_meeting_scheduled) → cuántos
+           llegaron a SQL (AE)+. Dataset sales_mql_to_sql_30d.
+           ============================================================ -->
+        <div class="card wrchan-card wr-blue setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">MQL → SQL <span data-window-label>30d</span></h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-mql-sql"
+                  aria-label="Ver detalle MQL a SQL">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_mql_to_sql_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                    data-field="total_sql" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                    data-field="total_mql" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <!-- Desglose: Sales = origin Outbound; Mkt = origin de marketing convertido por Sales (channel Outbound) -->
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label" title="Origin = Outbound">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_mql_to_sql_30d" data-bind="progress-fill"
+                      data-field="ob_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="ob_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ob_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ob_mql" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label" title="Origin de marketing, convertido por Sales (Conversion Channel = Outbound)">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_mql_to_sql_30d" data-bind="progress-fill"
+                      data-field="ch_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="ch_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ch_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ch_mql" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ============================================================
            SQL → Deep Dive · PER CLIENT (AE · ventana) — spec Bahía punto 1.
            "SQL" = cuenta con reunión real (sql_meeting_date), NO creation_date.
@@ -9359,6 +9431,37 @@
         </div>
 
         <!-- Panel · Sales · SQL → Deep Dive · <span data-window-label>30d</span> -->
+        <!-- Panel · Sales · MQL → SQL · <span data-window-label>30d</span> -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-mql-sql">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE's</span>
+            <h3 class="kpi-drawer__title">MQL → SQL · <span data-window-label>30d</span></h3>
+            <p class="kpi-drawer__sub">MQLs de Sales (Origin <strong>o</strong> Conversion Channel = Outbound) que agendaron reunión en la ventana, y cuántos llegaron a SQL.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">MQL → SQL · <span data-window-label>30d</span></span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="total_sql" data-reduce="first" data-fmt="int">—</span> llegaron a SQL de
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="total_mql" data-reduce="first" data-fmt="int">—</span> MQLs
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de MQLs</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_mql_to_sql_30d_detail" data-bind="dtable"
+                   data-cols="mql_date|MQL date|raw,client_name|Cliente|raw,origin|Origin|raw,channel|Channel|raw,status|Estado|raw"
+                   data-empty-text="Sin MQLs de Sales en la ventana."></div>
+            </section>
+          </div>
+        </div>
+
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-deepdive">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>

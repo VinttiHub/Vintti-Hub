@@ -1842,6 +1842,30 @@ MAIN_CHARTS = [
         "sort_order": 86,
     },
     {
+        "chart_key": "sa_kpi_mql_to_sql_30d",
+        "tab_key": "sales",
+        "title": "MQL → SQL (Outbound) - 30d",
+        "type": "kpi",
+        "dataset_key": "sales_mql_to_sql_30d",
+        "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
+        "position": {"x": 0, "y": 27, "w": 12, "h": 4},
+        "sort_order": 87,
+    },
+    {
+        "chart_key": "sa_table_mql_to_sql_30d_detail",
+        "tab_key": "sales",
+        "title": "MQL → SQL - Detalle MQLs 30d",
+        "type": "table",
+        "dataset_key": "sales_mql_to_sql_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["mql_date", "client_name", "origin", "channel", "lead_life", "status"],
+            },
+        },
+        "position": {"x": 0, "y": 31, "w": 12, "h": 5},
+        "sort_order": 87,
+    },
+    {
         "chart_key": "sa_kpi_sql_to_deepdive_30d",
         "tab_key": "sales",
         "title": "SQL → Deep Dive por canal - 30d",

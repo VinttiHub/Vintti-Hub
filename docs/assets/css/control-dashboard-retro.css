@@ -4358,6 +4358,12 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   align-items: stretch;
 }
 .funnel-row > .card { grid-column: span 1; }
+/* De 3 en 3 (pedido de la owner, 2026-09-28, al sumar MQL → SQL: 6 cards = 2 filas
+   parejas). Sólo desde 1000px: abajo de eso 3 columnas bajarían de los 220px del
+   gauge, y el auto-fit de arriba vuelve a decidir cuántas entran. */
+@media (min-width: 1000px) {
+  .funnel-row { grid-template-columns: repeat(3, minmax(220px, 1fr)); }
+}
 /* Fila de una sola card (NDA Signed → Closed Win per opportunity): mismo grid de 4
    columnas que el funnel, así la card conserva el ancho de las de arriba. */
 .funnel-row--single { margin-top: 16px; }
