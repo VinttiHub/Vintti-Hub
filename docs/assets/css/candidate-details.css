@@ -6699,3 +6699,762 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   .hs-link-row    { flex-direction: column; align-items: stretch; }
   .hs-link-pick   { width: 100%; }
 }
+
+/* =======================================================
+   OVERVIEW v2 — campos agrupados por sección
+   -------------------------------------------------------
+   Antes cada dato era una tarjeta suelta y los textos largos
+   tenían 4 estilos distintos. Ahora: una tarjeta por sección
+   (.ov-section), adentro label + valor con un único estilo de
+   input (.ov-input) y un único estilo de nota (.ov-note).
+   Todo va con prefijo #overview .ov-… para no depender de las
+   capas de overrides anteriores (que siguen ahí para Hire).
+   ======================================================= */
+
+#overview .ov-head {
+  margin-bottom: 8px;
+}
+
+#overview .ov-head .field {
+  margin-bottom: 0;
+}
+
+#overview .ov-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 0 43px; /* alineado con el texto de #field-name */
+  font-size: 13px;
+  color: #64748b;
+}
+
+#overview .ov-meta strong {
+  font-weight: 600;
+  color: #334155;
+}
+
+#overview .ov-meta-dot {
+  color: #cbd5e1;
+}
+
+/* Columna principal: pila de secciones sobre el fondo de la página */
+#overview .overview-layout > .ov-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+#overview .ov-section {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+  padding: 22px 24px 24px;
+}
+
+#overview .ov-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+#overview .ov-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+}
+
+#overview .ov-section-head .ov-section-title {
+  margin: 0;
+}
+
+#overview .ov-section-title::before {
+  content: "";
+  width: 4px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--tab-active);
+}
+
+#overview .ov-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+
+#overview .ov-span-2 {
+  grid-column: 1 / -1;
+}
+
+/* ---------- Campo: label + valor ---------- */
+#overview .ov-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  position: relative;
+}
+
+#overview .ov-field.hidden {
+  display: none;
+}
+
+#overview .ov-field > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  height: 18px;
+  line-height: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #64748b;
+}
+
+#overview .ov-ico {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0.75;
+}
+
+#overview .ov-section-title .ov-ico {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+
+/* Un único estilo de input para contenteditable, select, input y textarea */
+#overview .ov-input {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  box-shadow: none;
+  color: #0f172a;
+  line-height: 1.45;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#overview .ov-input:hover {
+  border-color: #cbd5e1;
+}
+
+#overview .ov-input:focus,
+#overview .ov-input:focus-visible {
+  outline: none;
+  background: #fff;
+  border-color: var(--tab-active);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+#overview textarea.ov-input {
+  min-height: 96px;
+  resize: vertical;
+}
+
+#overview select.ov-input {
+  cursor: pointer;
+}
+
+#overview .ov-input-wrap {
+  word-break: break-all;
+}
+
+/* Valor + botón de acción (WhatsApp, abrir LinkedIn) */
+#overview .ov-input-row {
+  display: flex;
+  align-items: flex-start; /* el botón queda a la altura de la 1ª línea aunque el valor ocupe 2 */
+  gap: 8px;
+}
+
+#overview .ov-input-row > .ov-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#overview .ov-input-row .icon-button.whatsapp,
+#overview .ov-icon-btn {
+  flex: 0 0 auto;
+  position: static;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  margin: 0;
+  border-radius: 10px;
+}
+
+#overview .ov-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+#overview .ov-icon-btn:hover {
+  border-color: var(--tab-active);
+  background: #eff6ff;
+}
+
+/* LinkedIn: #linkedin-open-btn trae `display: inline-block !important` de una regla
+   vieja (línea ~1954) que le ganaba al centrado y dejaba el ícono corrido arriba. */
+#overview #linkedin-open-btn.ov-icon-btn {
+  display: inline-flex !important;
+  line-height: 0;
+  font-size: 0;
+}
+
+/* WhatsApp: mismo botón blanco que el de LinkedIn, sólo el logo en verde.
+   Antes era un cuadrado verde con el logo (que ya trae su propio círculo verde)
+   adentro: dos verdes superpuestos. */
+#overview .ov-input-row .icon-button.whatsapp {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+
+#overview .ov-input-row .icon-button.whatsapp:hover {
+  background: #f0fdf4;
+  border-color: rgba(37, 211, 102, 0.6);
+  transform: none;
+}
+
+/* País: buscador + select pegados */
+#overview .country-search-input.ov-input {
+  margin-bottom: 0;
+}
+
+/* Timezone: mismo look que .ov-input y el menú abre hacia abajo */
+#overview .ov-field .timezone-trigger {
+  min-height: 40px;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  font-weight: 400;
+}
+
+#overview .ov-field .timezone-dropdown {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+#overview .ov-field .timezone-options {
+  max-height: 220px;
+}
+
+/* ---------- Profile: chips + blacklist ---------- */
+#overview .ov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+#overview .ov-chip {
+  position: relative;
+  padding: 7px 16px 7px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+#overview .ov-chip:has(input:checked) {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #1d4ed8;
+}
+
+/* Sin #overview a propósito: los estados .is-blacklisted / .not-blacklisted
+   (0,2,0) tienen que seguir ganándole al fondo base. */
+.ov-blacklist {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.ov-blacklist .pretty-check {
+  align-items: center;
+}
+
+/* ---------- Notas (un solo estilo para todos los textos largos) ---------- */
+#overview .ov-note .rich-comment {
+  gap: 6px;
+}
+
+#overview .ov-note .rich-comment-editor,
+#overview .ov-note .rich-input {
+  min-height: 110px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  box-shadow: none;
+  line-height: 1.55;
+}
+
+#overview .ov-note .rich-comment-editor:focus,
+#overview .ov-note .rich-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--tab-active);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Barra del editor: compacta y atenuada hasta que el campo se usa */
+#overview .ov-note .rich-comment-toolbar {
+  gap: 4px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+#overview .ov-note:hover .rich-comment-toolbar,
+#overview .ov-note:focus-within .rich-comment-toolbar {
+  opacity: 1;
+}
+
+#overview .ov-note .rich-comment-toolbar .rich-font-group,
+#overview .ov-note .rich-comment-toolbar .rich-highlight-group {
+  gap: 4px;
+}
+
+#overview .ov-note .rich-comment-toolbar .rich-font-group {
+  padding-right: 6px;
+}
+
+#overview .ov-note .rich-comment-toolbar button {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+#overview .ov-note .rich-comment-toolbar button[data-highlight] {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+}
+
+#overview .ov-note .rich-comment-toolbar button[data-highlight="clear"] {
+  width: auto;
+  height: 22px;
+  padding: 0 8px;
+}
+
+/* Comments suele ser largo: scroll interno en vez de estirar la página */
+#overview .ov-note-comments .rich-comment-editor,
+#overview .ov-note-comments textarea {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* Red Flags: rosa suave */
+#overview .ov-note-flag > label {
+  color: #be123c;
+}
+
+#overview .ov-note-flag .rich-comment-editor,
+#overview .ov-note-flag textarea {
+  background: rgba(244, 63, 94, 0.04);
+  border-color: rgba(244, 63, 94, 0.22);
+  border-left: 3px solid #f43f5e; /* mismo ancho que Process Error, para que queden parejas */
+}
+
+/* Process Error: el rojo más fuerte de la página */
+#overview .ov-note-error > label {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+#overview .ov-note-error .rich-comment-editor,
+#overview .ov-note-error textarea {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.35);
+  border-left: 3px solid #dc2626;
+  color: #7f1d1d;
+}
+
+/* Other process / Vacation: el verde de siempre */
+#overview .ov-field textarea#other-process,
+#overview .ov-field textarea#vacations {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+  border-color: rgba(16, 185, 129, 0.25);
+  border-left: 3px solid rgba(16, 185, 129, 0.4);
+}
+
+#overview .ov-field textarea#other-process:focus,
+#overview .ov-field textarea#vacations:focus {
+  background: #fff;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+/* Candidate success: misma barra compacta */
+#overview .ov-note .rich-toolbar {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+
+#overview .ov-note .rich-toolbar button {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 12px;
+}
+
+/* =======================================================
+   OVERVIEW v2 — columna derecha (Documents / References / Equipment)
+   Mismo lenguaje que la izquierda: .ov-section + título con barrita.
+   ======================================================= */
+#overview .overview-layout > .ov-side {
+  position: static;   /* la columna es muy alta: pegajosa, su final no se alcanzaba */
+  gap: 20px;
+}
+
+#overview .ov-muted {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+/* Link-pastilla de la cabecera (Open form, Details, Success overview) */
+#overview .ov-section-head .pill-link,
+#overview .ov-pill-link {
+  position: static;
+  margin: 0;
+  padding: 5px 12px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+#overview .ov-pill-link::after {
+  display: none;
+}
+
+/* ---------- Documents ---------- */
+#overview .ov-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+#overview .ov-doc + .ov-doc {
+  margin-top: 14px;
+}
+
+#overview .ov-section-title + .ov-doc {
+  padding-top: 0;
+  border-top: 0;
+}
+
+#overview .ov-doc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#overview .ov-doc-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+#overview .ov-doc-actions {
+  display: flex;
+  gap: 6px;
+}
+
+#overview .ov-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+#overview .ov-mini-btn:hover {
+  border-color: var(--tab-active);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#overview .ov-mini-btn .ov-spin-ico {
+  display: inline-block;
+}
+
+#overview .ov-mini-btn.is-spinning {
+  border-color: var(--tab-active);
+  color: #1d4ed8;
+}
+
+#overview .ov-mini-btn.is-spinning .ov-spin-ico {
+  animation: spin 0.6s linear;
+}
+
+#overview .ov-drop {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  box-shadow: none;
+  text-align: center;
+  transform: none;
+}
+
+#overview .ov-drop:hover,
+#overview .ov-drop.dragover {
+  border-color: var(--tab-active);
+  background: #eff6ff;
+  box-shadow: none;
+}
+
+#overview .ov-drop .cv-cta {
+  font-size: 13px;
+  color: #475569;
+}
+
+#overview .ov-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Filas de archivo: el mismo look en CV, Resignation y Tests */
+#overview .ov-doc .cv-list,
+#overview .ov-doc .tests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+#overview .ov-doc .cv-list > .cv-item,
+#overview .ov-doc .tests-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: none;
+}
+
+#overview .ov-doc .cv-list .cv-name,
+#overview .ov-doc .tests-row-info a {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+#overview .ov-doc .cv-list .cv-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+#overview .ov-doc .cv-list .cv-actions a,
+#overview .ov-doc .cv-list .cv-actions button,
+#overview .ov-doc .tests-remove {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Vacío: el render lo pinta como .cv-item sin acciones / .tests-empty */
+#overview .ov-doc .cv-list > .cv-item:not(:has(.cv-actions)) {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+#overview .ov-doc .cv-list > .cv-item:not(:has(.cv-actions)) .cv-name,
+#overview .ov-doc .tests-empty {
+  font-size: 12px;
+  color: #94a3b8;
+  opacity: 1 !important; /* el render le pone opacity .65 inline */
+}
+
+#overview .ov-doc .tests-error {
+  min-height: 0;
+  margin: 0;
+}
+
+#overview .ov-doc .tests-error:empty {
+  display: none;
+}
+
+/* ---------- References ---------- */
+#overview #reference-request-card .reference-status-badge {
+  margin-bottom: 12px;
+}
+
+#overview .reference-overview-list {
+  gap: 10px;
+}
+
+#overview .reference-overview-item {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+#overview .reference-overview-item h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#overview .reference-overview-body,
+#overview .reference-overview-body * {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+#overview .reference-overview-body strong {
+  font-weight: 600;
+  color: #334155;
+}
+
+/* Estado arriba y la acción principal (Analyze with AI, etc.) a todo el ancho
+   de la tarjeta, como estaba antes: pedido de la owner. */
+#overview .reference-overview-actions .reference-status-row {
+  margin: 0;
+}
+
+#overview .ov-allset {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eef0f4;
+}
+
+#overview .ov-allset .ov-chip {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#overview .ov-allset .ov-chip:has(input:checked) {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #065f46;
+}
+
+#overview .ov-allset .pretty-check input {
+  flex: 0 0 auto;
+}
+
+/* ---------- Equipment ---------- */
+#overview #equipments-card .chips-row {
+  font-size: 13px;
+  color: #334155;
+}
+
+#overview #equipments-card .ov-own-computer {
+  margin-top: 14px;
+  padding: 14px 0 0;
+  border-top: 1px solid #eef0f4;
+  background: none;
+  box-shadow: none;
+}
+
+#overview #own-computer-card .toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #334155;
+}
+
+#overview #own-computer-card .toggle-helper {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+@media (max-width: 1024px) {
+  #overview .ov-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #overview .ov-section {
+    padding: 18px 16px 20px;
+  }
+}

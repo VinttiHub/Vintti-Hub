@@ -1,4 +1,5 @@
 import html
+import io
 import json
 import logging
 import re
@@ -118,6 +119,54 @@ def _forget_hire_guarantee_column() -> None:
     global _HIRE_GUARANTEE_COLUMN_READY, _HIRE_GUARANTEE_COLUMN_PRESENT
     _HIRE_GUARANTEE_COLUMN_READY = False
     _HIRE_GUARANTEE_COLUMN_PRESENT = False
+
+
+# --------------------------------------------------------------------------- #
+# candidates.process_error: el campo "Process Error" del Overview de
+# candidate-details. Mismo patron que replacement_guarantee_days: el ALTER sale
+# SOLO desde el PATCH y la GET sondea el catalogo, asi no hace falta correr una
+# migracion a mano y la GET no rompe antes del primer guardado.
+# --------------------------------------------------------------------------- #
+_PROCESS_ERROR_COLUMN_READY = False
+_PROCESS_ERROR_COLUMN_PRESENT = False
+
+
+def _ensure_process_error_column(cur) -> None:
+    """Crea la columna si falta. Solo desde el PATCH de /candidates/<id>."""
+    global _PROCESS_ERROR_COLUMN_READY, _PROCESS_ERROR_COLUMN_PRESENT
+    if _PROCESS_ERROR_COLUMN_READY:
+        return
+    cur.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS process_error TEXT")
+    _PROCESS_ERROR_COLUMN_READY = True
+    _PROCESS_ERROR_COLUMN_PRESENT = True
+
+
+def _candidates_has_process_error_column(cur) -> bool:
+    """Sonda de catalogo. Solo se cachea el SI (ver _hire_has_guarantee_column)."""
+    global _PROCESS_ERROR_COLUMN_PRESENT
+    if _PROCESS_ERROR_COLUMN_PRESENT:
+        return True
+    cur.execute(
+        """
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'candidates'
+           AND column_name  = 'process_error'
+         LIMIT 1
+        """
+    )
+    presente = cur.fetchone() is not None
+    if presente:
+        _PROCESS_ERROR_COLUMN_PRESENT = True
+    return presente
+
+
+def _forget_process_error_column() -> None:
+    """Suelta los flags tras un rollback del PATCH (el ALTER se va con el)."""
+    global _PROCESS_ERROR_COLUMN_READY, _PROCESS_ERROR_COLUMN_PRESENT
+    _PROCESS_ERROR_COLUMN_READY = False
+    _PROCESS_ERROR_COLUMN_PRESENT = False
 
 
 def _clean_guarantee_days(value):
@@ -1077,9 +1126,16 @@ def upload_candidate_cv(candidate_id):
             'webp': 'image/webp'
         }.get(ext, 'application/octet-stream')
 
+        # El archivo se lee UNA vez y S3 y Affinda reciben cada uno su copia:
+        # upload_fileobj (s3transfer) CIERRA el stream al terminar, y el
+        # f.stream.seek(0) de después reventaba con "I/O operation on closed
+        # file". La subida andaba, pero Affinda fallaba siempre en silencio y
+        # affinda_scrapper no se guardaba nunca. Un CV pesa poco: en memoria va bien.
+        file_bytes = f.read()
+
         # Subir a S3
         services.s3_client.upload_fileobj(
-            f,
+            io.BytesIO(file_bytes),
             services.S3_BUCKET,
             s3_key,
             ExtraArgs={'ContentType': content_type}
@@ -1091,12 +1147,9 @@ def upload_candidate_cv(candidate_id):
         affinda_json = None
         if ext == 'pdf' and services.affinda_client:
             try:
-                try:
-                    f.stream.seek(0)
-                    file_for_affinda = f.stream
-                except Exception:
-                    f.seek(0)
-                    file_for_affinda = f
+                file_for_affinda = io.BytesIO(file_bytes)
+                # El SDK toma el nombre del archivo de .name (un BytesIO no lo trae).
+                file_for_affinda.name = f.filename or f"resume_{candidate_id}.pdf"
 
                 doc = services.affinda_client.create_document(
                     file=file_for_affinda,
@@ -1350,6 +1403,12 @@ def get_candidate_by_id(candidate_id):
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        process_error_sql = (
+            "c.process_error"
+            if _candidates_has_process_error_column(cursor)
+            else "NULL::text AS process_error"
+        )
+
         cursor.execute(f"""
             SELECT
                 c.name,
@@ -1364,6 +1423,7 @@ def get_candidate_by_id(candidate_id):
                 c.salary_range,
                 c.red_flags,
                 c.comments,
+                {process_error_sql},
                 c.other_process,
                 c.vacations,
                 c.usa_nationality,
@@ -1562,6 +1622,7 @@ def update_candidate_fields(candidate_id):
         'salary_range',
         'red_flags',
         'comments',
+        'process_error',
         'sign_off',
         'linkedin_scrapper',
         'cv_pdf_scrapper',
@@ -1617,6 +1678,8 @@ def update_candidate_fields(candidate_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        if 'process_error' in data:
+            _ensure_process_error_column(cursor)
         cursor.execute(f"""
             UPDATE candidates
             SET {', '.join(updates)}
@@ -1630,6 +1693,8 @@ def update_candidate_fields(candidate_id):
         return jsonify({'success': True}), 200
 
     except Exception as e:
+        if 'process_error' in (data or {}):
+            _forget_process_error_column()
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/candidates_batches', methods=['POST'])

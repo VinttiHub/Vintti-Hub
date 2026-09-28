@@ -1373,7 +1373,12 @@ qsa('#resume [contenteditable="true"]:not(#videoLinkInput)').forEach(el => {
 });
 
 (() => {
-  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  // Único widget de la caja "Candidate CV" (candidate-details.js ya no tiene copia).
+  // Misma detección de localhost que candidatesApiBase(): con la URL de App Runner
+  // escrita a mano, una prueba local subía el CV a producción (ver CLAUDE.md).
+  const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const candidateId = new URLSearchParams(location.search).get('id');
   const drop = document.getElementById('cv-drop');
   const input = document.getElementById('cv-input');
@@ -1476,8 +1481,11 @@ qsa('#resume [contenteditable="true"]:not(#videoLinkInput)').forEach(el => {
   drop.addEventListener('drop', e=>{ const f=e.dataTransfer?.files?.[0]; if (f) uploadFile(f); });
 
   // Click/browse
-  browseBtn?.addEventListener('click', ()=> input.click());
-  drop.addEventListener('click', (e)=>{ if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return; input.click(); });
+  // openFilePicker (candidate-details.js) abre el selector una sola vez por click:
+  // este widget y el de candidate-details.js escuchan el mismo botón y la misma zona.
+  const pick = (e) => (typeof window.openFilePicker === 'function' ? window.openFilePicker(input, e) : input.click());
+  browseBtn?.addEventListener('click', pick);
+  drop.addEventListener('click', (e)=>{ if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return; pick(e); });
   input.addEventListener('change', ()=>{ const f=input.files?.[0]; if (f) uploadFile(f); });
   refreshBtn?.addEventListener('click', async ()=>{
     const ic = refreshBtn.querySelector('.btn-icon');

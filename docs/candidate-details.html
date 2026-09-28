@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260918-hslink" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260928-ov9" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -201,358 +201,337 @@
     <!-- ===================== OVERVIEW ===================== -->
     <div id="overview" class="tab-content active" role="tabpanel" aria-labelledby="overview">
 
-        <!-- NAME (contenteditable) -->
-        <div class="field">
-          <label>
-            <!-- <img src="/docs/assets/img/user.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;"> -->
-        
-          </label>
-          <div id="field-name" contenteditable="true">—</div>
+        <!-- NAME (contenteditable) + metadatos.
+             Overview v2: los campos van agrupados en secciones (.ov-section) en vez de
+             una tarjeta por dato. Los IDs son los mismos de siempre: candidate-details.js
+             engancha todo por getElementById, no por estructura. -->
+        <div class="ov-head">
+          <div class="field">
+            <div id="field-name" contenteditable="true">—</div>
+          </div>
+          <div class="ov-meta">
+            <span>Created by <strong id="field-created-by">—</strong></span>
+            <span class="ov-meta-dot" aria-hidden="true">·</span>
+            <span id="field-created-at">—</span>
+          </div>
         </div>
 
         <div class="overview-layout">
 
-        <div class="grid">
+        <div class="ov-main">
 
-          <!-- COUNTRY (select + flag chip) -->
-          <div class="field">
-            <label style="display:flex; align-items:center; gap:8px;">
-              <!-- NOTE: This SVG is a placeholder in source; leave as-is to avoid breaking hooks -->
-              <img src="assets/img/earth-location.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+          <!-- ===== CONTACT ===== -->
+          <section class="ov-section">
+            <h3 class="ov-section-title">Contact</h3>
+            <div class="ov-grid">
 
-              <span>Country</span>
-              <span id="country-flag" class="country-flag"></span>
-            </label>
-            <input
-              type="text"
-              id="country-search"
-              class="country-search-input"
-              placeholder="Search country…"
-              aria-label="Search country"
-              autocomplete="off"
-            />
-            <select id="field-country">
-              <option value="">—</option>
-            </select>
-          </div>
-          <div class="field hidden" id="us-state-field">
-            <label for="us-state-input">State (USA)</label>
-            <input type="text" id="us-state-input" list="us-states-list" placeholder="Type to search state…" autocomplete="off" />
-            <datalist id="us-states-list"></datalist>
-          </div>
+              <!-- PHONE (contenteditable + WhatsApp) -->
+              <div class="ov-field" id="phone-field">
+                <label>
+                  <img src="assets/img/telephone.png" alt="" class="ov-ico">
+                  Phone number
+                </label>
+                <div class="ov-input-row">
+                  <div id="field-phone" class="ov-input" contenteditable="true">—</div>
+                  <button id="wa-btn-overview" class="icon-button whatsapp ov-icon-btn" type="button" title="Open WhatsApp">
+                    <img src="assets/img/whatsapp.png" alt="WhatsApp" style="width:20px; height:20px; object-fit:contain;">
+                  </button>
+                </div>
+              </div>
 
-          <div class="field">
-            <label>
-              <img src="assets/img/schedule.png" alt="Timezone" style="width:18px; height:18px; object-fit:contain;">
-              Timezone
-            </label>
-            <div class="timezone-select" id="timezoneSelect">
-              <button type="button" class="timezone-trigger" id="timezoneTrigger" aria-expanded="false">
-                <span id="timezoneTriggerLabel">Select timezones</span>
-                <span class="timezone-caret" aria-hidden="true">▾</span>
-              </button>
-              <div class="timezone-dropdown" id="timezoneDropdown" hidden>
-                <div class="timezone-options">
-                  <label class="timezone-option"><input type="checkbox" value="America/New_York">America/New_York</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Detroit">America/Detroit</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Kentucky/Louisville">America/Kentucky/Louisville</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Kentucky/Monticello">America/Kentucky/Monticello</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Indianapolis">America/Indiana/Indianapolis</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Vincennes">America/Indiana/Vincennes</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Winamac">America/Indiana/Winamac</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Marengo">America/Indiana/Marengo</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Petersburg">America/Indiana/Petersburg</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Vevay">America/Indiana/Vevay</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Chicago">America/Chicago</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Knox">America/Indiana/Knox</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Indiana/Tell_City">America/Indiana/Tell_City</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Menominee">America/Menominee</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/Center">America/North_Dakota/Center</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/New_Salem">America/North_Dakota/New_Salem</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/Beulah">America/North_Dakota/Beulah</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Denver">America/Denver</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Boise">America/Boise</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Phoenix">America/Phoenix</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Los_Angeles">America/Los_Angeles</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Anchorage">America/Anchorage</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Juneau">America/Juneau</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Sitka">America/Sitka</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Metlakatla">America/Metlakatla</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Yakutat">America/Yakutat</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Nome">America/Nome</label>
-                  <label class="timezone-option"><input type="checkbox" value="America/Adak">America/Adak</label>
-                  <label class="timezone-option"><input type="checkbox" value="Pacific/Honolulu">Pacific/Honolulu</label>
+              <!-- EMAIL (contenteditable) -->
+              <div class="ov-field">
+                <label>
+                  <img src="assets/img/mail.png" alt="" class="ov-ico">
+                  Email
+                </label>
+                <div id="field-email" class="ov-input" contenteditable="true">—</div>
+              </div>
+
+              <!-- LINKEDIN (editable link + external open button) -->
+              <div class="ov-field">
+                <label>
+                  <img src="assets/img/linkedin copy.png" alt="" class="ov-ico">
+                  LinkedIn
+                </label>
+                <div class="ov-input-row">
+                  <div id="field-linkedin" class="ov-input ov-input-wrap" contenteditable="true">—</div>
+                  <!-- href is set by JS -->
+                  <a id="linkedin-open-btn" class="linkedin-link ov-icon-btn" title="Open in new tab" target="_blank" rel="noopener noreferrer">
+                    <img src="assets/img/external-link.png" alt="Open" style="width:17px; height:17px; object-fit:contain;">
+                  </a>
+                </div>
+              </div>
+
+              <!-- COUNTRY (search + select + flag chip) -->
+              <div class="ov-field">
+                <label>
+                  <img src="assets/img/earth-location.png" alt="" class="ov-ico">
+                  <span>Country</span>
+                  <span id="country-flag" class="country-flag"></span>
+                </label>
+                <input
+                  type="text"
+                  id="country-search"
+                  class="country-search-input ov-input"
+                  placeholder="Search country…"
+                  aria-label="Search country"
+                  autocomplete="off"
+                />
+                <select id="field-country" class="ov-input">
+                  <option value="">—</option>
+                </select>
+              </div>
+
+              <div class="ov-field hidden" id="us-state-field">
+                <label for="us-state-input">State (USA)</label>
+                <input type="text" id="us-state-input" class="ov-input" list="us-states-list" placeholder="Type to search state…" autocomplete="off" />
+                <datalist id="us-states-list"></datalist>
+              </div>
+
+              <div class="ov-field">
+                <label>
+                  <img src="assets/img/schedule.png" alt="" class="ov-ico">
+                  Timezone
+                </label>
+                <div class="timezone-select" id="timezoneSelect">
+                  <button type="button" class="timezone-trigger" id="timezoneTrigger" aria-expanded="false">
+                    <span id="timezoneTriggerLabel">Select timezones</span>
+                    <span class="timezone-caret" aria-hidden="true">▾</span>
+                  </button>
+                  <div class="timezone-dropdown" id="timezoneDropdown" hidden>
+                    <div class="timezone-options">
+                      <label class="timezone-option"><input type="checkbox" value="America/New_York">America/New_York</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Detroit">America/Detroit</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Kentucky/Louisville">America/Kentucky/Louisville</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Kentucky/Monticello">America/Kentucky/Monticello</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Indianapolis">America/Indiana/Indianapolis</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Vincennes">America/Indiana/Vincennes</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Winamac">America/Indiana/Winamac</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Marengo">America/Indiana/Marengo</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Petersburg">America/Indiana/Petersburg</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Vevay">America/Indiana/Vevay</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Chicago">America/Chicago</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Knox">America/Indiana/Knox</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Indiana/Tell_City">America/Indiana/Tell_City</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Menominee">America/Menominee</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/Center">America/North_Dakota/Center</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/New_Salem">America/North_Dakota/New_Salem</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/North_Dakota/Beulah">America/North_Dakota/Beulah</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Denver">America/Denver</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Boise">America/Boise</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Phoenix">America/Phoenix</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Los_Angeles">America/Los_Angeles</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Anchorage">America/Anchorage</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Juneau">America/Juneau</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Sitka">America/Sitka</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Metlakatla">America/Metlakatla</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Yakutat">America/Yakutat</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Nome">America/Nome</label>
+                      <label class="timezone-option"><input type="checkbox" value="America/Adak">America/Adak</label>
+                      <label class="timezone-option"><input type="checkbox" value="Pacific/Honolulu">Pacific/Honolulu</label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- PHONE (contenteditable) -->
-          <div class="field" id="phone-field">
-            <label style="display:flex; align-items:center; justify-content:space-between;">
-              <span style="display:flex; align-items:center; gap:8px;">
-                <img src="assets/img/telephone.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+          <!-- ===== PROFILE ===== -->
+          <section class="ov-section">
+            <h3 class="ov-section-title">Profile</h3>
+            <div class="ov-grid">
+              <div class="ov-field">
+                <label for="field-english-level">
+                  <img src="assets/img/language.png" alt="" class="ov-ico">
+                  English level
+                </label>
+                <select id="field-english-level" class="ov-input">
+                  <option value="">—</option>
+                  <option value="Poor">Poor</option>
+                  <option value="Regular">Regular</option>
+                  <option value="Good">Good</option>
+                  <option value="Very Good">Very Good</option>
+                  <option value="Excellent">Excellent</option>
+                </select>
+              </div>
 
-                Phone number
-              </span>
-
-              <!-- SIN display:none -->
-              <button id="wa-btn-overview" class="icon-button whatsapp" type="button" title="Open WhatsApp">
-                <img src="assets/img/whatsapp.png" alt="Phone" style="width:28px; height:28px; object-fit:contain;">
-              </button>
-            </label>
-
-            <div id="field-phone" class="editable-pill" contenteditable="true">—</div>
-          </div>
-
-          <!-- EMAIL (contenteditable) -->
-          <div class="field">
-            <label>
-              <img src="assets/img/mail.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
-              Email
-            </label>
-            <div id="field-email" contenteditable="true">—</div>
-          </div>
-
-          <!-- LINKEDIN (editable link + external open button) -->
-          <div class="field">
-            <label style="display:flex; align-items:center; justify-content:space-between;">
-              <img src="assets/img/linkedin copy.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
-              <span>LinkedIn</span>
-              <!-- href is set by JS; keep blank but add rel for security when target=_blank -->
-              <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank" rel="noopener noreferrer">
-                <img src="assets/img/external-link.png" alt="Phone" style="width:18px; height:18px; object-fit:contain;">
-              </a>
-            </label>
-            <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
-          </div>
-
-          <!-- BLACKLIST (checkbox) -->
-          <div class="field blacklist-card" id="blacklist-card">
-            <label class="pretty-check" style="align-items:flex-start;">
-              <input type="checkbox" id="blacklist-toggle" />
-              <span class="box" aria-hidden="true"></span>
-              <span class="txt">
-                <span class="blacklist-card-title">Blacklist (dangerous)</span>
-                <span class="blacklist-card-description u-muted">
-                  Keep risky candidates hidden from searches.
-                </span>
-              </span>
-            </label>
-            <small class="u-muted" id="blacklist-status-text" style="display:none; margin-top:6px;"></small>
-          </div>
-
-          <!-- ENGLISH LEVEL (select) -->
-          <div class="field">
-            <label>
-              <img src="assets/img/language.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-              English Level
-            </label>
-            <select id="field-english-level">
-              <option value="">—</option>
-              <option value="Poor">Poor</option>
-              <option value="Regular">Regular</option>
-              <option value="Good">Good</option>
-              <option value="Very Good">Very Good</option>
-              <option value="Excellent">Excellent</option>
-            </select>
-          </div>
-
-          <!-- MIN SALARY (contenteditable) -->
-          <div class="field">
-            <label>
-              <img src="assets/img/dollar.png" alt="Phone" style="width:17px; height:17px; object-fit:contain;">
-              Min Salary
-            </label>
-            <div id="field-salary-range" contenteditable="true">—</div>
-          </div>
-
-          <!-- CREATED BY / CREATED AT (read-only text) -->
-          <div class="field">
-            <label>
-              <img src="assets/img/edit.png" alt="Phone" style="width:15px; height:15px; object-fit:contain;">
-              Created by
-            </label>
-            <div id="field-created-by">—</div>
-          </div>
-
-          <div class="field">
-            <label>
-              <img src="assets/img/calendar.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
-              Created at
-            </label>
-            <div id="field-created-at">—</div>
-          </div>
-
-
-          <!-- RED FLAGS & COMMENTS (textareas) -->
-          <div class="field-group">
-            <div class="field textarea red-flag">
-              <label for="redFlags">
-                <img src="assets/img/flag.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
-                Red Flags
-              </label>
-              <textarea id="redFlags" placeholder="No red flags"></textarea>
+              <div class="ov-field">
+                <label>
+                  <img src="assets/img/dollar.png" alt="" class="ov-ico">
+                  Min salary
+                </label>
+                <div id="field-salary-range" class="ov-input" contenteditable="true">—</div>
+              </div>
             </div>
 
-            <div class="field textarea comments">
-              <label for="comments">
-                <img src="assets/img/comment.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
-                Comments
-              </label>
-              <textarea id="comments" placeholder="No comments"></textarea>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <div class="field textarea attention-field">
-              <label for="other-process">Other process</label>
-              <textarea id="other-process" placeholder="—"></textarea>
-            </div>
-            <div class="field textarea attention-field">
-              <label for="vacations">Vacation</label>
-              <textarea id="vacations" placeholder="—"></textarea>
-            </div>
-            <div class="field attention-field">
-              <label class="pretty-check">
+            <div class="ov-chips">
+              <label class="pretty-check ov-chip">
                 <input type="checkbox" id="usa-nationality" />
                 <span class="box" aria-hidden="true"></span>
                 <span class="txt">US national</span>
               </label>
-            </div>
-            <div class="field attention-field">
-              <label class="pretty-check">
+              <label class="pretty-check ov-chip">
                 <input type="checkbox" id="quickbooks" />
                 <span class="box" aria-hidden="true"></span>
                 <span class="txt">QuickBooks</span>
               </label>
             </div>
-          </div>
 
-          <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
-          <div class="field textarea">
-            <label style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-              <span style="display:flex; align-items:center; gap:8px;">
-                <img src="assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
-                Candidate success
-              </span>
-              <a id="candidate-success-overview-link" class="pill pill-link" href="candidate-success-overview.html" target="_blank" rel="noopener">🧭 Success overview →</a>
-            </label>
-            <div class="rich-toolbar" id="candidate-succes-toolbar">
-              <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
-              <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
-              <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
-            </div>
-            <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
-          </div>
-
-          
-
-        </div>
-
-
-        <aside class="sidebar">
-          <!-- ===== Documents row: CV + Resignation Letter ===== -->
-          <!-- CV / Resume (drag & drop + list) -->
-          <div class="field doc-card" id="cv-card">
-            <label class="doc-card-label">
-              <span>Candidate CV</span>
-              <button id="cv-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-                <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
-              </button>
-            </label>
-
-            <div class="value two-by-two">
-              <div id="cv-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
-                <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
-                <div class="cv-cta">
-                  Drop a CV here, or
-                  <button id="cv-browse" type="button" class="btn-soft btn-sm">Browse</button>
-                </div>
-                <div class="cv-hint">Only PDF is allowed</div>
-              </div>
-
-              <div id="cv-list" class="cv-list" style="grid-column: 1 / -1;"></div>
-            </div>
-          </div>
-
-          <!-- Resignation Letter (drag & drop + list) -->
-          <div class="field doc-card" id="resig-card">
-            <label class="doc-card-label">
-              <span>Resignation Letter</span>
-              <button id="resig-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-                <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
-              </button>
-            </label>
-
-            <div class="value two-by-two">
-              <div id="resig-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
-                <input id="resig-input" type="file" accept=".pdf" hidden />
-                <div class="cv-cta">
-                  Drop a PDF here, or
-                  <button id="resig-browse" type="button" class="btn-soft btn-sm">Browse</button>
-                </div>
-                <div class="cv-hint">Only PDF is allowed</div>
-              </div>
-
-              <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
-            </div>
-          </div>
-
-          <!-- Tests card -->
-          <div class="field doc-card" id="tests-card">
-            <label class="doc-card-label">
-              <span>Tests</span>
-              <div class="tests-controls">
-                <button id="tests-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-                  <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
-                </button>
-                <button id="tests-browse" class="btn-soft btn-sm" type="button" title="Upload files">
-                  <span class="btn-icon" aria-hidden="true">⬆</span><span class="btn-text">Upload</span>
-                </button>
-              </div>
-            </label>
-
-            <div id="tests-drop" class="cv-drop tests-drop" tabindex="0">
-              <input id="tests-input" type="file" multiple hidden />
-              <div class="cv-cta">
-                Drop PDF, Excel, CSV, images or any files here
-              </div>
-              <div class="cv-hint">Or click Upload to select multiple documents.</div>
-            </div>
-            <p id="tests-error" class="tests-error" role="alert"></p>
-            <div id="tests-list" class="tests-list"></div>
-          </div>
-        
-
-          <!-- === Resignation Letter & References (full width) === -->
-          <div class="field full doc-check cute" id="resig-ref-block">
-            <div class="doc-check__head">
-              <span class="doc-check__emoji">📎✨</span>
-              <div class="doc-check__titlewrap">
-                <span class="doc-check__title">Resignation letter & references</span>
-              </div>
-            </div>
-
-            <div class="check-row">
+            <!-- BLACKLIST (checkbox; el JS le pone is-blacklisted / not-blacklisted) -->
+            <div class="blacklist-card ov-blacklist" id="blacklist-card">
               <label class="pretty-check">
-                <input type="checkbox" id="resig-ref-check" />
+                <input type="checkbox" id="blacklist-toggle" />
                 <span class="box" aria-hidden="true"></span>
                 <span class="txt">
-                  All set! I requested and uploaded both items.
+                  <span class="blacklist-card-title">Blacklist (dangerous)</span>
+                  <span class="blacklist-card-description u-muted">
+                    Keep risky candidates hidden from searches.
+                  </span>
                 </span>
               </label>
+              <small class="u-muted" id="blacklist-status-text" style="display:none; margin-top:6px;"></small>
             </div>
-          </div>
+          </section>
 
-          <div class="field doc-card" id="reference-request-card">
-            <label class="doc-card-label">
-              <span>Reference request</span>
-              <a id="reference-request-link" class="pill pill-link" href="#" target="_blank" rel="noopener noreferrer">Open form →</a>
-            </label>
-            <div class="reference-request-copy">
-              Share this form with the candidate so they can submit two professional references linked to this profile.
+          <!-- ===== AVAILABILITY ===== -->
+          <section class="ov-section">
+            <h3 class="ov-section-title">Availability</h3>
+            <div class="ov-grid">
+              <div class="ov-field ov-note">
+                <label for="other-process">Other process</label>
+                <textarea id="other-process" class="ov-input" placeholder="—"></textarea>
+              </div>
+              <div class="ov-field ov-note">
+                <label for="vacations">Vacation</label>
+                <textarea id="vacations" class="ov-input" placeholder="—"></textarea>
+              </div>
             </div>
+          </section>
+
+          <!-- ===== NOTES (Red Flags / Process Error / Comments) ===== -->
+          <section class="ov-section">
+            <h3 class="ov-section-title">Notes</h3>
+            <div class="ov-grid">
+              <div class="ov-field ov-note ov-note-flag">
+                <label for="redFlags">
+                  <img src="assets/img/flag.png" alt="" class="ov-ico">
+                  Red Flags
+                </label>
+                <textarea id="redFlags" placeholder="No red flags"></textarea>
+              </div>
+
+              <div class="ov-field ov-note ov-note-error process-error">
+                <label for="processError">
+                  <span aria-hidden="true">⚠️</span>
+                  Process Error
+                </label>
+                <textarea id="processError" placeholder="No process errors"></textarea>
+              </div>
+
+              <div class="ov-field ov-note ov-note-comments ov-span-2">
+                <label for="comments">
+                  <img src="assets/img/comment.png" alt="" class="ov-ico">
+                  Comments
+                </label>
+                <textarea id="comments" placeholder="No comments"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== CANDIDATE SUCCESS (rich toolbar + contenteditable) ===== -->
+          <section class="ov-section">
+            <div class="ov-section-head">
+              <h3 class="ov-section-title">
+                <img src="assets/img/success.png" alt="" class="ov-ico">
+                Candidate success
+              </h3>
+              <a id="candidate-success-overview-link" class="pill pill-link" href="candidate-success-overview.html" target="_blank" rel="noopener">🧭 Success overview →</a>
+            </div>
+            <div class="ov-field ov-note">
+              <div class="rich-toolbar" id="candidate-succes-toolbar">
+                <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
+                <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
+                <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
+              </div>
+              <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
+            </div>
+          </section>
+
+        </div>
+        <!-- Columna derecha, mismo lenguaje que la izquierda (.ov-section).
+             Todo sigue enganchado por id en candidate-details.js: cv-*, resig-*,
+             tests-*, reference-*, overview-reference-*, resig-ref-check, equipments-*,
+             own-computer-*. -->
+        <aside class="sidebar ov-side">
+
+          <!-- ===== DOCUMENTS: CV + Resignation letter + Tests ===== -->
+          <section class="ov-section">
+            <h3 class="ov-section-title">Documents</h3>
+
+            <div class="ov-doc" id="cv-card">
+              <div class="ov-doc-head">
+                <span class="ov-doc-title">Candidate CV</span>
+                <div class="ov-doc-actions">
+                  <button id="cv-refresh" class="ov-mini-btn" type="button" title="Refresh" aria-label="Refresh CVs"><span class="ov-spin-ico" aria-hidden="true">↻</span></button>
+                </div>
+              </div>
+              <div id="cv-drop" class="cv-drop ov-drop" tabindex="0">
+                <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
+                <div class="cv-cta">
+                  Drop a PDF here or
+                  <button id="cv-browse" type="button" class="ov-link-btn">browse</button>
+                </div>
+              </div>
+              <div id="cv-list" class="cv-list"></div>
+            </div>
+
+            <div class="ov-doc" id="resig-card">
+              <div class="ov-doc-head">
+                <span class="ov-doc-title">Resignation letter</span>
+                <div class="ov-doc-actions">
+                  <button id="resig-refresh" class="ov-mini-btn" type="button" title="Refresh" aria-label="Refresh resignation letters"><span class="ov-spin-ico" aria-hidden="true">↻</span></button>
+                </div>
+              </div>
+              <div id="resig-drop" class="cv-drop ov-drop" tabindex="0">
+                <input id="resig-input" type="file" accept=".pdf" hidden />
+                <div class="cv-cta">
+                  Drop a PDF here or
+                  <button id="resig-browse" type="button" class="ov-link-btn">browse</button>
+                </div>
+              </div>
+              <div id="resig-list" class="cv-list"></div>
+            </div>
+
+            <div class="ov-doc" id="tests-card">
+              <div class="ov-doc-head">
+                <span class="ov-doc-title">Tests</span>
+                <div class="ov-doc-actions tests-controls">
+                  <button id="tests-refresh" class="ov-mini-btn" type="button" title="Refresh" aria-label="Refresh tests"><span class="ov-spin-ico" aria-hidden="true">↻</span></button>
+                </div>
+              </div>
+              <!-- Misma estructura que CV y Resignation: "browse" adentro de la zona. -->
+              <div id="tests-drop" class="cv-drop tests-drop ov-drop" tabindex="0">
+                <input id="tests-input" type="file" multiple hidden />
+                <div class="cv-cta">
+                  Drop any files here or
+                  <button id="tests-browse" type="button" class="ov-link-btn">browse</button>
+                </div>
+              </div>
+              <p id="tests-error" class="tests-error" role="alert"></p>
+              <div id="tests-list" class="tests-list"></div>
+            </div>
+          </section>
+
+          <!-- ===== REFERENCES ===== -->
+          <section class="ov-section" id="reference-request-card">
+            <div class="ov-section-head">
+              <h3 class="ov-section-title">References</h3>
+              <a id="reference-request-link" class="pill pill-link ov-pill-link" href="#" target="_blank" rel="noopener noreferrer">Open form →</a>
+            </div>
+            <p class="reference-request-copy ov-muted">
+              Share this form with the candidate so they can submit two professional references linked to this profile.
+            </p>
             <div id="overview-reference-status" class="reference-status-badge">Waiting for references</div>
             <div class="reference-overview-list">
               <article class="reference-overview-item">
@@ -566,34 +545,40 @@
                 <div id="overview-reference-2-actions" class="reference-overview-actions"></div>
               </article>
             </div>
-          </div>
 
-          <!-- Toast contenedor (si no tienes ya uno global) -->
+            <!-- Resignation letter & references: el check de la HR lead (check_hr_lead) -->
+            <div id="resig-ref-block" class="ov-allset">
+              <label class="pretty-check ov-chip">
+                <input type="checkbox" id="resig-ref-check" />
+                <span class="box" aria-hidden="true"></span>
+                <span class="txt">All set: resignation letter &amp; references requested and uploaded</span>
+              </label>
+            </div>
+          </section>
+
+          <!-- Toast del check de arriba -->
           <div id="cuteToast" class="cute-toast" role="status" aria-live="polite"></div>
 
-          <div class="field" id="equipments-card">
-            <!-- EQUIPMENTS (chips + external details link) -->
-            <div class="field">
-              <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>
-                  Equipments
-                  <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>                
-                </span>
-                
-              </label>
-              <div id="equipments-chips" class="chips-row">—</div>
+          <!-- ===== EQUIPMENT (+ Own computer) ===== -->
+          <section class="ov-section" id="equipments-card">
+            <div class="ov-section-head">
+              <h3 class="ov-section-title">Equipment</h3>
+              <a id="equipments-details-link" class="pill pill-link ov-pill-link" href="#" target="_blank" rel="noopener">Details →</a>
             </div>
-          </div>
-          <div class="field" id="own-computer-card">
-            <label class="toggle-row" for="own-computer-toggle">
-              <span class="toggle-label">Own computer</span>
-              <span class="toggle-control">
-                <input type="checkbox" id="own-computer-toggle" role="switch" />
-                <span class="toggle-track" aria-hidden="true"></span>
-              </span>
-            </label>
-            <div class="toggle-helper">Personal laptop or desktop available.</div>
-          </div>
+            <div id="equipments-chips" class="chips-row">—</div>
+
+            <!-- #own-computer-card se conserva: sus estilos cuelgan de ese id. -->
+            <div id="own-computer-card" class="ov-own-computer">
+              <label class="toggle-row" for="own-computer-toggle">
+                <span class="toggle-label">Own computer</span>
+                <span class="toggle-control">
+                  <input type="checkbox" id="own-computer-toggle" role="switch" />
+                  <span class="toggle-track" aria-hidden="true"></span>
+                </span>
+              </label>
+              <div class="toggle-helper">Personal laptop or desktop available.</div>
+            </div>
+          </section>
         </aside>
       </div>
     </div>
@@ -1373,9 +1358,9 @@
   <!-- ===================== Scripts ===================== -->
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="./assets/js/rich-comment-box.js"></script>
-  <script defer src="./assets/js/resume.js?v=20260729-2"></script>
+  <script defer src="./assets/js/resume.js?v=20260928-cvonly"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260918-hslink"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260928-cvonly"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

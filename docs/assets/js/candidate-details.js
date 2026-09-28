@@ -2746,13 +2746,19 @@ function paintWaBtn(){
           onBlur: (html) => ensureCandidatePatch('comments', html)
         });
         if (commentsEditor) commentsEditor.setHTML(data.comments || '');
+
+        const processErrorEditor = window.RichComments.enhance('processError', {
+          placeholder: 'No process errors',
+          onBlur: (html) => ensureCandidatePatch('process_error', html)
+        });
+        if (processErrorEditor) processErrorEditor.setHTML(data.process_error || '');
       } else {
-        (['redFlags','comments']).forEach((id) => {
+        const plainFields = { redFlags: 'red_flags', comments: 'comments', processError: 'process_error' };
+        Object.entries(plainFields).forEach(([id, field]) => {
           const ta = document.getElementById(id);
           if (!ta) return;
-          ta.value = id === 'redFlags' ? (data.red_flags || '') : (data.comments || '');
+          ta.value = data[field] || '';
           ta.addEventListener('blur', () => {
-            const field = id === 'redFlags' ? 'red_flags' : 'comments';
             ensureCandidatePatch(field, ta.value.trim());
           });
         });
@@ -4786,149 +4792,37 @@ function wireVideoLinkDedupe() {
 wireVideoLinkDedupe();
 
 
-  // ====== Candidate CVs (listar / subir / abrir) — sin AI ni extracción ======
-(() => {
-  // ✅ Flag global realmente compartido entre archivos
-  if (!window.__VINTTI_WIRED) window.__VINTTI_WIRED = {};
-  if (window.__VINTTI_WIRED.cvWidgetOnce) return;
-  window.__VINTTI_WIRED.cvWidgetOnce = true;
-
-  const apiBase = candidatesApiBase();
-  const cid     = new URLSearchParams(window.location.search).get('id');
-  const drop      = document.getElementById('cv-drop');
-  const input     = document.getElementById('cv-input');
-  const browseBtn = document.getElementById('cv-browse');
-  const refreshBtn= document.getElementById('cv-refresh');
-  const list      = document.getElementById('cv-list');
-  if (!cid || !list) return;
-
-  let inFlight = false;               // bloqueo duro por request
-  const BIND = (el, type, fn) => {    // helper para no duplicar listeners
-    if (!el) return;
-    el.__wired = el.__wired || {};
-    const key = `on:${type}`;
-    if (el.__wired[key]) return;
-    el.addEventListener(type, fn);
-    el.__wired[key] = true;
-  };
-
-function render(items = []) {
-  list.innerHTML = '';
-  if (!items.length) {
-    list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
-    return;
-  }
-  items.forEach(it => {
-    if (!it || !it.name || !it.url) { console.warn('item malformado:', it); return; }
-    const row = document.createElement('div');
-    row.className = 'cv-item';
-    row.innerHTML = `
-      <span class="cv-name" title="${it.name}">${it.name}</span>
-      <div class="cv-actions">
-        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
-        <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
-      </div>
-    `;
-    const delBtn = row.querySelector('.danger');
-    BIND(delBtn, 'click', async (e) => {
-      const key = e.currentTarget.getAttribute('data-key');
-      if (!key) return;
-      if (!confirm('Delete this CV?')) return;
-      await fetch(`${apiBase}/candidates/${cid}/cvs`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key })
-      });
-      await loadCVs(); // 👈 recarga la lista de CVs (no resignations)
-    });
-    list.appendChild(row);
-  });
+// Abre el selector de archivos UNA vez por click.
+// El botón "browse" vive dentro de la zona de arrastre, y el widget del CV lo
+// engancha también resume.js: un solo click llegaba a pedir input.click() 4 veces
+// (botón + zona, en los dos archivos) y el navegador terminaba sin abrir nada.
+// La marca va en el propio <input>, así la comparten los dos archivos.
+function openFilePicker(input, event) {
+  if (!input || input.disabled) return;
+  // El click sintético del input rebota hasta la zona: no volver a abrir.
+  if (event && event.target === input) return;
+  const now = Date.now();
+  if (input.__pickerOpenedAt && now - input.__pickerOpenedAt < 800) return;
+  input.__pickerOpenedAt = now;
+  input.click();
 }
+window.openFilePicker = openFilePicker;
 
-  async function loadCVs() {
-    try {
-      const r = await fetch(`${apiBase}/candidates/${cid}/cvs`);
-      const data = await r.json();
-      render(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.warn('Failed to load CVs', e);
-      render([]);
-    }
-  }
-  window.loadCVs = loadCVs;
+// Los ↻ de Documents recargan la lista, pero si no hay archivos nuevos la lista
+// vuelve igual y parecía que el botón no hacía nada: un giro corto lo confirma.
+document.addEventListener('click', (e) => {
+  const btn = e.target instanceof Element ? e.target.closest('#cv-refresh, #resig-refresh, #tests-refresh') : null;
+  if (!btn) return;
+  btn.classList.remove('is-spinning');
+  void btn.offsetWidth; // reinicia la animación si se aprieta dos veces seguidas
+  btn.classList.add('is-spinning');
+  setTimeout(() => btn.classList.remove('is-spinning'), 700);
+});
 
-    async function uploadFile(file) {
-      if (!file) return;
-
-      // 🔒 De-dupe: si es exactamente el mismo archivo en < 3s, ignorar
-      const sig = [file.name, file.size, file.lastModified].join(':');
-      const now = Date.now();
-      if (sig === lastUploadSig && (now - lastUploadTs) < 3000) {
-        console.debug('⛔️ Ignorado: intento duplicado de upload', sig);
-        return;
-      }
-      lastUploadSig = sig;
-      lastUploadTs  = now;
-
-      if (inFlight) {
-        console.debug('⛔️ Ignorado: upload en curso');
-        return;
-      }
-      inFlight = true;
-
-    const allowedMimes = new Set([
-      'application/pdf','image/png','image/jpeg','image/webp','application/octet-stream',''
-    ]);
-    const extOk = /\.(pdf|png|jpe?g|webp)$/i.test(file?.name || '');
-    const typeOk = allowedMimes.has(file?.type || '');
-    if (!extOk && !typeOk) { alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.'); inFlight = false; return; }
-
-    const fd = new FormData();
-    fd.append('file', file);
-
-    try {
-      drop?.classList.add('dragover');
-      const r = await fetch(`${apiBase}/candidates/${cid}/cvs`, { method: 'POST', body: fd });
-      if (!r.ok) throw new Error(await r.text().catch(()=> 'Upload failed'));
-      const data = await r.json();
-      render(data.items || []);
-    } catch (e) {
-      console.error('Upload failed', e); alert('Upload failed');
-    } finally {
-      drop?.classList.remove('dragover');
-      if (input) input.value = '';
-      setTimeout(() => { inFlight = false; }, 600); // antes estaba en 200ms
-    }
-  }
-
-  // Drag & Drop (con BIND para no repetir listeners)
-  if (drop) {
-    ['dragenter','dragover'].forEach(ev => BIND(drop, ev, e => {
-      e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover');
-    }));
-    ['dragleave','dragend','drop'].forEach(ev => BIND(drop, ev, e => {
-      e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover');
-    }));
-    BIND(drop, 'drop', (e) => {
-      const files = e.dataTransfer?.files;
-      if (files?.length) uploadFile(files[0]);
-    });
-    BIND(drop, 'click', (e) => {
-      if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
-      input?.click();
-    });
-  }
-
-  // Browse
-  BIND(browseBtn, 'click', () => input?.click());
-  BIND(input, 'change', () => { const f = input.files?.[0]; if (f) uploadFile(f); });
-
-  // Refresh
-  BIND(refreshBtn, 'click', loadCVs);
-
-  // Carga inicial
-  loadCVs();
-})();
+// ====== Candidate CVs ======================================================
+// La caja "Candidate CV" la maneja SÓLO resume.js (listar, subir, borrar, refresh
+// y extraer el texto del PDF para el AI Assistant). Acá había una segunda copia
+// del mismo widget: cada acción salía dos veces y cada CV se subía dos veces.
 
 // ====== Candidate Tests documents (any file type) ==========================
 (() => {
@@ -4982,7 +4876,7 @@ function render(items = []) {
     if (!normalized.length) {
       const empty = document.createElement('div');
       empty.className = 'tests-empty';
-      empty.textContent = 'No files yet.';
+      empty.textContent = 'No files yet';
       list.appendChild(empty);
       return;
     }
@@ -5120,7 +5014,12 @@ function render(items = []) {
     if (files?.length) uploadTests(files);
   });
 
-  browseBtn?.addEventListener('click', () => input?.click());
+  // Igual que CV y Resignation: "browse" dentro de la zona y click en la zona abre el selector.
+  browseBtn?.addEventListener('click', (e) => openFilePicker(input, e));
+  drop.addEventListener('click', (e) => {
+    if (busy) return;
+    openFilePicker(input, e);
+  });
   input?.addEventListener('change', (e) => {
     if (busy) return;
     uploadTests(e.target.files);
@@ -5273,12 +5172,12 @@ async function loadResignations() {
     });
     BIND(drop, 'click', (e) => {
       if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
-      input?.click();
+      openFilePicker(input, e);
     });
   }
 
   // Browse
-  BIND(browseBtn, 'click', () => input?.click());
+  BIND(browseBtn, 'click', (e) => openFilePicker(input, e));
   BIND(input, 'change', () => { const f = input.files?.[0]; if (f) uploadResignationFile(f); });
 
   // Refresh
@@ -5317,7 +5216,7 @@ if (drop) {
   // Click en la zona → abrir file picker
   BIND(drop, 'click', (e) => {
     if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
-    input?.click();
+    openFilePicker(input, e);
   });
 }
 
