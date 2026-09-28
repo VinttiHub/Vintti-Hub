@@ -3,8 +3,9 @@
 Misma dona que `op_churn_reasons`, pero la población NO es "todas las caídas de la
 ventana": es el cohorte de **churn M3** de la card "3/6m Churn" de Account Management
 (dataset `candidate_churn_window_summary` con meses=3). Es decir, candidatos de
-Staffing cuyo `start` cae en la ventana trailing de 90 días y que ya tienen fecha de
-baja (`end_d <= corte`) → los que "se fueron en sus primeros 3 meses".
+Staffing cuyo `start_date` cae en la ventana trailing de 90 días y que ya tienen
+`end_date <= corte` → los que "se fueron en sus primeros 3 meses". Se usan las fechas
+reales del hire, no `carga_active` / `carga_inactive` (sólo de respaldo si faltan).
 
 Se replica el mismo cohorte (Staffing, cuenta no-interna, roll-up a grano CANDIDATO:
 BAJA solo si NINGÚN hire suyo en la ventana sigue activo) para que el total de la dona
@@ -20,6 +21,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from ._now import today_ar
 from ._periods import window_bounds
+from ._window_label import window_label_sql
 
 
 _WINDOW_DAYS = 90  # M3 = ventana de exposure de 90 días (igual que meses=3 en el summary).
@@ -68,14 +70,15 @@ COHORT_CTES = """
         h.account_id,
         h.opportunity_id,
         TRIM(h.inactive_reason) AS reason,
+        -- Fechas reales del hire (start_date / end_date); carga_active /
+        -- carga_inactive son cuándo se marcó en el hub y quedan sólo de respaldo.
         CASE
-          WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
-          ELSE NULLIF(h.start_date::text, '')::date
+          WHEN NULLIF(h.start_date::text, '') IS NOT NULL THEN h.start_date::date
+          ELSE h.carga_active::date
         END AS start_d,
         CASE
-          WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
-          WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
-          ELSE h.end_date::date
+          WHEN NULLIF(h.end_date::text, '') IS NOT NULL THEN h.end_date::date
+          ELSE h.carga_inactive::date
         END AS end_d,
         CASE
           WHEN NULLIF(TRIM(h.buyout_daterange), '') IS NOT NULL
@@ -142,7 +145,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           bh.reason AS reason,
           COUNT(*)::int AS count,
-          ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS share_pct
+          ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS share_pct,
+          (SELECT """ + window_label_sql("v.win_ini", "v.corte_d") + """ FROM ventana v) AS ventana_label
         FROM baja_hire bh
         LEFT JOIN opportunity o ON o.opportunity_id = bh.opportunity_id
         LEFT JOIN account a     ON a.account_id      = bh.account_id
@@ -166,6 +170,7 @@ DATASET = {
     "measures": [
         {"key": "count", "label": "Candidatos", "type": "number"},
         {"key": "share_pct", "label": "% del total", "type": "percent"},
+        {"key": "ventana_label", "label": "Ventana", "type": "string"},
     ],
     "default_filters": {},
     "query": query,

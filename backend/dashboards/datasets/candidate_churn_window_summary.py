@@ -5,6 +5,7 @@ from ._now import today_ar
 
 from ._periods import window_bounds
 from ._sales_scope import origen_clause
+from ._window_label import window_label_sql
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -63,14 +64,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             SELECT
               h.candidate_id,
               h.account_id,
+              -- Fechas reales del hire (start_date / end_date); carga_active /
+              -- carga_inactive son cuándo se marcó en el hub y quedan sólo de respaldo.
               CASE
-                WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
-                ELSE NULLIF(h.start_date::text, '')::date
+                WHEN NULLIF(h.start_date::text, '') IS NOT NULL THEN h.start_date::date
+                ELSE h.carga_active::date
               END AS start_d,
               CASE
-                WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
-                WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
-                ELSE h.end_date::date
+                WHEN NULLIF(h.end_date::text, '') IS NOT NULL THEN h.end_date::date
+                ELSE h.carga_inactive::date
               END AS end_d,
               CASE
                 WHEN NULLIF(TRIM(h.buyout_daterange), '') IS NOT NULL
@@ -156,8 +158,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           activos_al_corte                                                       AS activos_al_corte,
           ROUND(100.0 * bajas::numeric        / NULLIF(starts, 0), 2)::float     AS churn_pct,
           ROUND(100.0 * bajas_real::numeric   / NULLIF(starts, 0), 2)::float     AS churn_real_pct,
-          ROUND(100.0 * bajas_buyout::numeric / NULLIF(starts, 0), 2)::float     AS buyout_pct
-        FROM totals;
+          ROUND(100.0 * bajas_buyout::numeric / NULLIF(starts, 0), 2)::float     AS buyout_pct,
+          """ + window_label_sql("v.win_ini", "v.corte_d") + """                AS ventana_label
+        FROM totals
+        CROSS JOIN ventana v;
     """
 
     # Filtro General / AE / AM de la card Churn M3 (override `origen`). Filtra a
@@ -182,6 +186,7 @@ DATASET = {
         {"key": "churn_pct", "label": "Churn total %", "type": "percent"},
         {"key": "churn_real_pct", "label": "Churn Staffing %", "type": "percent"},
         {"key": "buyout_pct", "label": "Churn Buyout %", "type": "percent"},
+        {"key": "ventana_label", "label": "Ventana", "type": "string"},
     ],
     "default_filters": {},
     "query": query,
