@@ -262,8 +262,16 @@ def _build_hire_churn_email(cur, candidate_id, opportunity_id):
         SELECT
             c.name AS candidate_name,
             o.opp_position_name,
+            o.opp_model,
             a.client_name,
+            h.start_date,
             h.end_date,
+            -- Misma regla M3 que la página Staffing (churn_m3_calc en staffing_routes):
+            -- se fue antes de cumplir 3 meses desde el start_date.
+            (NULLIF(h.end_date::text, '')::date
+               < NULLIF(h.start_date::text, '')::date + INTERVAL '3 months') AS is_m3,
+            (NULLIF(h.end_date::text, '')::date
+               - NULLIF(h.start_date::text, '')::date) AS days_worked,
             h.inactive_reason,
             h.inactive_comments,
             h.inactive_vinttierror
@@ -278,8 +286,20 @@ def _build_hire_churn_email(cur, candidate_id, opportunity_id):
     )
     row = cur.fetchone() or {}
     candidate_name = (row.get('candidate_name') or f'Candidate #{candidate_id}').strip()
+    is_m3 = row.get('is_m3')
+    days_worked = row.get('days_worked')
+    if (row.get('opp_model') or '').strip().lower() == 'recruiting':
+        m3_label = 'N/A (Recruiting)'
+    elif is_m3 is None:
+        m3_label = 'Unknown (missing start date)'
+    elif is_m3:
+        m3_label = f'Yes - left after {days_worked} days, within the first 3 months'
+    else:
+        m3_label = f'No - left after {days_worked} days'
     detail_rows = [
         ('Employee', candidate_name),
+        ('M3 churn', m3_label),
+        ('Start date', row.get('start_date')),
         ('End date', row.get('end_date')),
         ('Client', row.get('client_name')),
         ('Role', row.get('opp_position_name')),
@@ -290,7 +310,7 @@ def _build_hire_churn_email(cur, candidate_id, opportunity_id):
     ]
     intro = f'A churn was just logged for <strong>{html.escape(candidate_name)}</strong>.'
     return {
-        'subject': f'Churn alert - {candidate_name}',
+        'subject': f"Churn alert{' (M3)' if is_m3 and m3_label.startswith('Yes') else ''} - {candidate_name}",
         'body': email_shell(intro, email_detail_table(detail_rows)),
     }
 
