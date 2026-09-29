@@ -887,6 +887,41 @@ recibe un mail en su `email_vintti` cada 24 h, sin CC. Todo en
 - Modo prueba: `TEST_ONLY_RECIPIENT` en el módulo (hoy `None` = producción, desde el
   2026-09-29). Con un email ahí, todo va sólo a esa dirección con `[TEST]` en el asunto.
 
+## Cumpleaños → calendario "Birthdays/ Team Personal Stuff"
+
+Al guardar **Date of Birth** en `docs/profile.html`, `update_user` (`profile_routes.py`)
+dispara, **después del commit y en un hilo**, `sync_birthday_event_async()`: el hub crea el
+evento anual (día completo, `transparent`, invita a `team@vintti.com`, título
+`Cumple <nombre> :)` para todos: el hub no guarda género) o lo mueve si cambió la fecha. Todo en `backend/utils/birthday_calendar.py`.
+
+- **Escribe con el Google de Jazmín** (`CALENDAR_OWNER_EMAIL`, token de
+  `google_calendar_tokens`), no con una cuenta de servicio. Sin su token no se crea nada: el
+  panel muestra **Connect Google Calendar** y el mail semanal lo avisa. El calendario se busca
+  por nombre en su `calendarList`.
+- **Nunca duplica un manual.** Antes de crear busca eventos de cumpleaños (`_BIRTHDAY_RE`) del
+  mismo día del año: si el título tiene un prefijo del nombre ("Agos" ⊂ "Agostina") lo
+  **adopta** sin tocarlo (`source='adopted'`); si hay uno ese día con otro nombre, o uno con su
+  nombre en otro día, queda **review** y no se crea. Un adoptado con fecha distinta tampoco se
+  mueve solo: es de Jazmín.
+- **Google devuelve cada cumple manual dos veces**: con `singleEvents=False` vienen la serie y
+  sus excepciones (una ocurrencia a la que alguien respondió) con `recurringEventId`. Se
+  descartan, y dos series iguales el mismo día cuentan como una. Sin eso todos los manuales
+  caían en review ("Cumple Agos <3, Cumple Agos <3").
+- **Nombres repetidos**: un evento con su nombre en otro día sólo frena si ese día no cumple
+  nadie del hub (activo o no); "Cumple Vale" del 18-ago es de otra Valentina. Y un evento del
+  MISMO día que nombra a otra persona que cumple ese día es suyo ("Cumple Mia" no frena a
+  Benjamin, los dos el 7-mar). Si el nombre/nickname se repite entre activos, el título lleva
+  apellido: "Cumple Valentina Cadirola :)" (`_display_name`). Lo que quede en
+  review se destraba con **Create anyway** (`POST /birthdays/sync/<id> {"force": true}`).
+- Mapeo persona → evento en `birthday_calendar_events` (autocreada). Si borran el evento en
+  Google, la fila se suelta sola en el próximo sync.
+- Detección: pestaña **Birthdays** de profile.html (sólo `PANEL_EMAILS` = jazmin + pgonzales,
+  igual a `BIRTHDAY_PANEL_EMAILS` de profile.js) con los próximos 30 días y quién no tiene
+  fecha, + mail semanal a Jazmín (`.github/workflows/birthday-weekly-report.yml` →
+  `POST /reminders/birthdays/weekly`, X-Audit-Token; `birthday_report_log` = 1 por semana).
+- `POST /birthdays/backfill` es **dry-run por defecto**; el botón "Preview full sync" lo muestra
+  y "Create missing events" lo aplica. Arranque: Jazmín conecta → preview → aplicar.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):

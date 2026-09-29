@@ -5526,3 +5526,25 @@ input:focus, select:focus, textarea:focus{
     gap:10px;
   }
 }
+
+
+/* ===== Team birthdays (panel-birthdays) ===== */
+.bd-subtitle{ margin:22px 0 10px; font-size:15px; font-weight:700; color:var(--ink, #111927); }
+.bd-list{ display:flex; flex-direction:column; gap:8px; }
+.bd-row{ display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--border, #e6eaf0); border-radius:12px; background:#fff; }
+.bd-main{ flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; }
+.bd-muted{ color:#52606d; font-size:13px; }
+.bd-detail{ flex-basis:100%; }
+.bd-detail:empty{ display:none; }
+.bd-pill{ flex-shrink:0; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; }
+.bd-ok{ background:color-mix(in srgb, #c1ff72 45%, #fff); color:#3a6b00; }
+.bd-warn{ background:#fff4d6; color:#8a5a00; }
+.bd-bad{ background:color-mix(in srgb, #ff1fdb 14%, #fff); color:#a3008a; }
+.bd-empty{ color:#52606d; font-size:14px; padding:8px 2px; }
+.bd-connect{ margin-top:14px; padding:14px; border-radius:12px; background:#fffbeb; }
+.bd-connect p{ margin:0 0 10px; }
+.bd-chip-off{ background:#fff4d6 !important; color:#8a5a00 !important; }
+.bd-foot{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:22px 0 12px; }
+@media (max-width: 600px){
+  .bd-row{ flex-wrap:wrap; }
+}

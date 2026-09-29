@@ -576,8 +576,15 @@ def update_user(user_id: int):
 
     vals.append(user_id)
     conn = get_connection()
+    birthday_changed = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
+        if "fecha_nacimiento" in fields:
+            cur.execute("SELECT fecha_nacimiento FROM users WHERE user_id = %s", (user_id,))
+            prev = cur.fetchone()
+            old_birth = str(prev["fecha_nacimiento"])[:10] if prev and prev["fecha_nacimiento"] else None
+            new_birth = str(fields["fecha_nacimiento"])[:10] if fields["fecha_nacimiento"] else None
+            birthday_changed = bool(new_birth) and new_birth != old_birth
         cur.execute(f"""
             UPDATE users
             SET {", ".join(sets)}, updated_at = NOW() AT TIME ZONE 'UTC'
@@ -588,6 +595,13 @@ def update_user(user_id: int):
         conn.commit()
     conn.close()
     if not updated: return jsonify({"error":"not found"}), 404
+    if birthday_changed:
+        # Después del commit y en un hilo: Google no puede frenar ni romper el guardado.
+        try:
+            from utils.birthday_calendar import sync_birthday_event_async
+            sync_birthday_event_async(user_id)
+        except Exception:
+            logging.exception("birthday sync could not start user_id=%s", user_id)
     return jsonify({"ok": True})
 
 # ---------- PROFILE / ME ----------

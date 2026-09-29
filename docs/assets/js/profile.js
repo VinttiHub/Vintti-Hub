@@ -3832,6 +3832,9 @@ async function loadMe(uid){
     setupAdminDeleteControls();
     loadAdminUsersList();
   }
+  if (BIRTHDAY_PANEL_EMAILS.has(normalizedEmail)){
+    enableBirthdaysTab();
+  }
 
   // Vista
   renderProfileView(PROFILE_CACHE);
@@ -4364,5 +4367,215 @@ async function onOffboardingSubmit(e){
     document.getElementById("offbFormStatus").textContent = err.message || "Could not send.";
   }finally{
     btn.disabled = false;
+  }
+}
+
+
+// ===== Team birthdays (backend/utils/birthday_calendar.py) =====
+// Tiene que quedar igual a PANEL_EMAILS del backend.
+const BIRTHDAY_PANEL_EMAILS = new Set(["jazmin@vintti.com", "pgonzales@vintti.com"]);
+const BIRTHDAY_CALENDAR_OWNER = "jazmin@vintti.com";
+const BD_STATUS = {
+  ok:           { label: "In calendar",          cls: "bd-ok" },
+  manual_event: { label: "In calendar",          cls: "bd-ok" },
+  no_event:     { label: "Missing",              cls: "bd-bad" },
+  review:       { label: "Check",                cls: "bd-warn" },
+  wrong_date:   { label: "Date changed",         cls: "bd-warn" },
+  unknown:      { label: "Unknown",              cls: "bd-warn" },
+};
+const BD_ACTION = {
+  create: "Missing", adopt: "In calendar", ok: "In calendar",
+  move: "Date changed", review: "Check",
+};
+// Reviews que se destraban con "Create anyway": el evento parecido es de otra persona.
+const BD_FORCEABLE = new Set(['same_day_event_other_name', 'named_event_other_day']);
+let BD_LOADED = false;
+
+function enableBirthdaysTab(){
+  const tabsBar = document.getElementById('tabsBar');
+  if (!tabsBar || tabsBar.querySelector('[data-tab="birthdays"]')) return;
+  const btn = document.createElement('button');
+  btn.className = 'tab';
+  btn.dataset.tab = 'birthdays';
+  btn.id = 'tab-birthdays';
+  btn.type = 'button';
+  btn.setAttribute('aria-selected', 'false');
+  btn.textContent = 'Birthdays';
+  tabsBar.appendChild(btn);
+  wireTabs();
+  btn.addEventListener('click', () => { if (!BD_LOADED) loadBirthdays(); });
+  document.getElementById('bdBackfillPreview')?.addEventListener('click', () => runBirthdayBackfill(true));
+  document.getElementById('bdBackfillRun')?.addEventListener('click', () => runBirthdayBackfill(false));
+  if (new URLSearchParams(location.search).get('tab') === 'birthdays') btn.click();
+}
+
+function bdStatus(msg){
+  const el = document.getElementById('bdStatus');
+  if (el) el.textContent = msg || '';
+}
+
+// Una frase por caso, en criollo: qué ve el hub y qué hacer.
+function bdDetail(detail){
+  if (!detail) return '';
+  if (detail.error) return detail.error;
+  const list = (detail.summaries || []).join(', ');
+  switch (detail.reason){
+    case 'same_day_event_other_name':
+      return `That day already has "${list}". If it's someone else's, use Create anyway.`;
+    case 'named_event_other_day':
+      return `Found a similar event on another day: ${list}. If it's someone else's, use Create anyway; if it's hers/his, one of the two dates is wrong.`;
+    case 'adopted_event_other_date':
+      return 'The profile date changed but the event was made by hand — move it in Google Calendar.';
+  }
+  if (detail.action === 'adopt') return `Made by hand: "${detail.summary}". Nothing to do.`;
+  if (detail.action === 'create')
+    return detail.title ? `No event yet — the Hub will create "${detail.title}".` : 'No event yet — the Hub will create it.';
+  if (detail.action === 'move') return 'The profile date changed — the Hub will move the event.';
+  return '';
+}
+
+function bdButton(userId, plan){
+  if (plan?.action === 'create') return `<button type="button" class="btn pill ghost" data-bd-one="${userId}">Create</button>`;
+  if (plan?.action === 'move') return `<button type="button" class="btn pill ghost" data-bd-one="${userId}">Move</button>`;
+  if (plan?.action === 'review' && BD_FORCEABLE.has(plan.reason))
+    return `<button type="button" class="btn pill ghost" data-bd-one="${userId}" data-bd-force="1">Create anyway</button>`;
+  return '';
+}
+
+function bindBirthdayButtons(root){
+  root.querySelectorAll('[data-bd-one]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Create/update this birthday event? A new event sends an invite to team@vintti.com.')) return;
+    b.disabled = true;
+    bdStatus('Syncing…');
+    try {
+      const r = await api(`/birthdays/sync/${b.dataset.bdOne}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: b.dataset.bdForce === '1' }),
+      });
+      const res = (await r.json()).results?.[0];
+      b.textContent = res?.done ? 'Done ✓' : 'Error';
+      if (res?.done){
+        // La fila de la simulación queda vieja: se marca a mano en vez de re-simular.
+        const pill = b.closest('.bd-row')?.querySelector('.bd-pill');
+        if (pill){ pill.textContent = 'In calendar'; pill.className = 'bd-pill bd-ok'; }
+      }
+      bdStatus(res?.error || (res?.done ? 'Done.' : bdDetail(res) || 'Nothing to do.'));
+    } catch (err){
+      console.error(err);
+      bdStatus('Sync failed.');
+    }
+    loadBirthdays();
+  }));
+}
+
+async function loadBirthdays(){
+  BD_LOADED = true;
+  const up = document.getElementById('bdUpcoming');
+  const miss = document.getElementById('bdMissing');
+  try {
+    const r = await api('/birthdays/overview');
+    if (!r.ok) throw new Error(await r.text());
+    const ov = await r.json();
+    renderBirthdayConnection(ov);
+    up.innerHTML = ov.upcoming.length ? ov.upcoming.map(u => {
+      const st = BD_STATUS[u.status] || BD_STATUS.unknown;
+      const when = u.in_days === 0 ? 'Today' : `In ${u.in_days} day${u.in_days === 1 ? '' : 's'}`;
+      return `<div class="bd-row">
+        <div class="bd-main"><strong>${escapeHtml(u.name || '')}</strong>
+          <span class="bd-muted">${escapeHtml(u.birthday.slice(5))} · ${when}</span>
+          <span class="bd-muted bd-detail">${escapeHtml(bdDetail(u.detail))}</span></div>
+        <span class="bd-pill ${st.cls}">${st.label}</span>
+        ${ov.connected ? bdButton(u.user_id, u.detail) : ''}
+      </div>`;
+    }).join('') : '<div class="bd-empty">No birthdays in the next 30 days.</div>';
+    miss.innerHTML = ov.missing_birthday.length ? ov.missing_birthday.map(u =>
+      `<div class="bd-row"><div class="bd-main"><strong>${escapeHtml(u.name || '')}</strong>
+        <span class="bd-muted">${escapeHtml(u.email || '')}</span></div></div>`
+    ).join('') : '<div class="bd-empty">Everyone has their Date of Birth. 🎉</div>';
+    bindBirthdayButtons(up);
+  } catch (err){
+    console.error('loadBirthdays', err);
+    up.innerHTML = '<div class="bd-empty">Could not load birthdays.</div>';
+  }
+}
+
+function renderBirthdayConnection(ov){
+  const chip = document.getElementById('bdConnChip');
+  const box = document.getElementById('bdConnect');
+  chip.textContent = ov.connected ? 'Google connected' : 'Google not connected';
+  chip.classList.toggle('bd-chip-off', !ov.connected);
+  document.getElementById('bdBackfillPreview').disabled = !ov.connected;
+  if (ov.connected){ box.hidden = true; return; }
+  box.hidden = false;
+  const isOwner = currentProfileEmail() === BIRTHDAY_CALENDAR_OWNER;
+  // Sólo tiene sentido (re)conectar si falta o venció el token. Si el problema es
+  // del servidor o del nombre del calendario, el botón no arregla nada.
+  const canReconnect = ov.error_kind === 'no_token' || ov.error_kind === 'token_invalid';
+  chip.textContent = canReconnect ? 'Google not connected' : 'Calendar unavailable';
+  if (!canReconnect){
+    box.innerHTML = `<p>${escapeHtml(ov.error || '')}</p>`;
+    return;
+  }
+  box.innerHTML = `<p>${escapeHtml(ov.error || '')}</p>` + (isOwner
+    ? '<button type="button" class="btn primary" id="bdConnectBtn">Connect Google Calendar</button>'
+    : `<p class="bd-muted">${escapeHtml(BIRTHDAY_CALENDAR_OWNER)} has to open this tab and connect her Google Calendar.</p>`);
+  document.getElementById('bdConnectBtn')?.addEventListener('click', connectBirthdayCalendar);
+}
+
+async function connectBirthdayCalendar(){
+  try {
+    const back = new URL(location.href);
+    back.searchParams.set('tab', 'birthdays');
+    const r = await fetch(`${API_BASE}/google-calendar/auth-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: CURRENT_USER_ID, redirect_to: back.toString() }),
+      credentials: 'include',
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    if (data.auth_url) location.href = data.auth_url;
+  } catch (err){
+    console.error(err);
+    bdStatus('Could not start the Google connection.');
+  }
+}
+
+async function runBirthdayBackfill(dry){
+  const box = document.getElementById('bdBackfill');
+  const runBtn = document.getElementById('bdBackfillRun');
+  if (!dry && !confirm('Create the missing birthday events? Each one sends an invite to team@vintti.com.')) return;
+  bdStatus(dry ? 'Checking the calendar…' : 'Creating events…');
+  try {
+    const r = await api('/birthdays/backfill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: dry }),
+    });
+    const out = await r.json();
+    if (!out.connected){ bdStatus(out.error || 'Google not connected.'); return; }
+    const rows = out.results || [];
+    // Los hechos a mano ("adopt") no cambian nada en el calendario: no se listan.
+    const pending = rows.filter(x => x.action === 'create' || x.action === 'move');
+    const reviews = rows.filter(x => x.action === 'review');
+    box.hidden = false;
+    box.innerHTML = rows.filter(x => x.action !== 'ok' && (!dry || x.action !== 'adopt')).map(x => `<div class="bd-row">
+        <div class="bd-main"><strong>${escapeHtml(x.name || '')}</strong>
+          <span class="bd-muted">${escapeHtml(x.birthday)}</span>
+          <span class="bd-muted bd-detail">${escapeHtml(bdDetail(x))}</span></div>
+        <span class="bd-pill ${x.action === 'review' || x.error ? 'bd-warn' : 'bd-ok'}">${
+          dry ? (BD_ACTION[x.action] || x.action) : (x.done ? 'Done' : (x.error ? 'Error' : BD_ACTION[x.action] || x.action))}</span>
+        ${dry ? bdButton(x.user_id, x) : ''}
+      </div>`).join('') || '<div class="bd-empty">Everything is already in the calendar.</div>';
+    bindBirthdayButtons(box);
+    runBtn.hidden = !(dry && pending.length);
+    bdStatus(dry
+      ? `${pending.length} event(s) to create/move · ${reviews.length} to check. Birthdays made by hand are left as they are.`
+      : 'Done.');
+    if (!dry) loadBirthdays();
+  } catch (err){
+    console.error(err);
+    bdStatus('Could not run the sync.');
   }
 }

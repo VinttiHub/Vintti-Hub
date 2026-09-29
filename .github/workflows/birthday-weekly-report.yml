@@ -1,0 +1,28 @@
+name: Weekly birthday report
+
+# Mail semanal a Jazmin (utils/birthday_calendar.py): cumples de los proximos 30
+# dias sin evento en el calendario "Birthdays/ Team Personal Stuff" + activos sin
+# Date of Birth en su perfil.
+#
+# Pega tres veces el lunes porque el cron de GitHub llega horas tarde; la tabla
+# `birthday_report_log` hace que salga UN solo mail por semana.
+on:
+  schedule:
+    - cron: "0 11,14,17 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = arma el reporte, NO manda el mail"
+        required: false
+        default: ""
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mandar el reporte semanal de cumpleanos
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/birthdays/weekly?dry=${{ github.event.inputs.dry }}"

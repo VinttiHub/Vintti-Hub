@@ -5,7 +5,7 @@
   <title>My Profile • Vintti Hub</title>
   <script src="./assets/js/auth-guard.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="./assets/css/profile.css?v=20260921-orgchart" rel="stylesheet" />
+  <link href="./assets/css/profile.css?v=20260929-birthdays" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=14" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -673,6 +673,31 @@
   </div>
 </section>
 
+<!-- ===== Team birthdays (Jazmín + owner) — backend/utils/birthday_calendar.py ===== -->
+<section class="panel" id="panel-birthdays" role="tabpanel" aria-labelledby="tab-birthdays" hidden>
+  <div class="admin-card">
+    <header class="admin-card__head">
+      <div>
+        <p class="eyebrow">Birthdays / Team Personal Stuff</p>
+        <h2 class="admin-card__title">Team birthdays</h2>
+        <p class="admin-card__sub">When someone saves their Date of Birth, the Hub creates the yearly event in the shared calendar and invites team@vintti.com. Events created by hand are kept as they are, never duplicated.</p>
+      </div>
+      <span class="admin-chip" id="bdConnChip">…</span>
+    </header>
+    <div id="bdConnect" class="bd-connect" hidden></div>
+    <h3 class="bd-subtitle">Next 30 days</h3>
+    <div id="bdUpcoming" class="bd-list" aria-live="polite"><div class="skeleton-row"></div></div>
+    <h3 class="bd-subtitle">No Date of Birth in their profile</h3>
+    <div id="bdMissing" class="bd-list" aria-live="polite"></div>
+    <div class="bd-foot">
+      <button type="button" class="btn" id="bdBackfillPreview">Preview full sync</button>
+      <button type="button" class="btn primary" id="bdBackfillRun" hidden>Create missing events</button>
+      <span id="bdStatus" class="toast" role="status" aria-live="polite"></span>
+    </div>
+    <div id="bdBackfill" class="bd-list" hidden></div>
+  </div>
+</section>
+
   </main>
   <!-- ——— Modal: Quick Profile ——— -->
 <div id="userQuickModal" class="modal" aria-hidden="true">
@@ -823,7 +848,7 @@
 <script src="./assets/js/avatar-map.js?v=20260630-1" defer></script>
 <script src="./assets/js/monthly-mood.js?v=14" defer></script>
 <script src="./assets/js/main.js?v=20260921-am-pilar" defer></script>
-<script src="./assets/js/profile.js?v=20260921-orgchart" defer></script>
+<script src="./assets/js/profile.js?v=20260929-birthdays6" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

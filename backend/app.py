@@ -47,6 +47,7 @@ from routes.cv_review_routes import bp as cv_review_bp
 from routes.jd_review_routes import bp as jd_review_bp
 from routes.resume_tracking_routes import bp as resume_tracking_bp
 from routes.google_calendar_routes import bp as google_calendar_bp
+from routes.birthday_routes import bp as birthday_bp
 from routes.hubspot_routes import bp as hubspot_bp
 from routes.turvo_routes import bp as turvo_bp
 from routes.dashboards_routes import bp as dashboards_bp
@@ -124,6 +125,7 @@ def create_app() -> Flask:
     app.register_blueprint(admin_bp)
     app.register_blueprint(offboarding_bp)
     app.register_blueprint(google_calendar_bp)
+    app.register_blueprint(birthday_bp)
     app.register_blueprint(hubspot_bp)
     app.register_blueprint(turvo_bp)
     app.register_blueprint(bp_candidate_search, url_prefix="")

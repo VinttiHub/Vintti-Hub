@@ -10,6 +10,7 @@ from utils.credit_loop import run_due_credit_loop_reminders
 from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
 from utils.second_interview_refs import run_due_second_interview_refs_reminders
 from utils.profile_completion_reminder import run_due_profile_reminders
+from utils.birthday_calendar import run_weekly_birthday_report
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -1531,6 +1532,20 @@ def send_due_profile_completion_reminders():
         return jsonify({"error": "unauthorized"}), 401
     dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
     return jsonify(run_due_profile_reminders(dry_run=dry)), 200
+
+
+@bp.route("/reminders/birthdays/weekly", methods=["POST"])
+def send_weekly_birthday_report():
+    """Mail semanal a Jazmín (utils/birthday_calendar.py): cumples de los próximos
+    30 días sin evento en el calendario + activos sin Date of Birth. El cron pega
+    varias veces el lunes; `birthday_report_log` corta el doble envío. ?dry=1 no manda.
+    """
+    expected = os.environ.get("DASHBOARD_AUDIT_TOKEN")
+    given = request.headers.get("X-Audit-Token") or request.args.get("token")
+    if not expected or not given or given != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
+    return jsonify(run_weekly_birthday_report(dry_run=dry)), 200
 
 
 @bp.route("/reminders/client_checks/due", methods=["POST"])
