@@ -1011,7 +1011,8 @@ const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
   'constanza@vintti.com',
   'valentina@vintti.com',
   'pilar@vintti.com',
-  'julieta@vintti.com'
+  'julieta@vintti.com',
+  'benjamin@vintti.com'
 ]);
 const HIDDEN_HR_EMAILS = new Set([
   'agustina.barbero@vintti.com',

@@ -32,6 +32,7 @@ const RESTRICTED_EMAILS = new Set([
   "julieta@vintti.com",
   "paz@vintti.com",
   "valentina@vintti.com",
+  "benjamin@vintti.com",
 ]);
 const RESTRICTION_EXCEPTIONS = new Set([
   "agostina@vintti.com",

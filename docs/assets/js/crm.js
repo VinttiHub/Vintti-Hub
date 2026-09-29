@@ -2552,7 +2552,8 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'pilar@vintti.com',
     'julieta@vintti.com',
     'paz@vintti.com',
-    'valentina@vintti.com'
+    'valentina@vintti.com',
+    'benjamin@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados
@@ -2594,7 +2595,9 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'pgonzales@vintti.com',
     'agostina@vintti.com',
     'julieta@vintti.com',
-    'paz@vintti.com'
+    'paz@vintti.com',
+    'benjamin@vintti.com',
+    'valentina@vintti.com'
   ]);
 
   candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';

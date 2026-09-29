@@ -109,7 +109,8 @@
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pgonzales@vintti.com','agostina@vintti.com',
-      'julieta@vintti.com','paz@vintti.com'
+      'julieta@vintti.com','paz@vintti.com','benjamin@vintti.com',
+      'valentina@vintti.com'
     ]).has(email));
 
     setDisplay('salesLink', new Set([
@@ -129,7 +130,7 @@
     setDisplay('recruiterPowerLink', new Set([
       'pgonzales@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
       'constanza@vintti.com','pilar@vintti.com','julieta@vintti.com','paz@vintti.com',
-      'valentina@vintti.com'
+      'valentina@vintti.com','benjamin@vintti.com'
     ]).has(email));
 
     // Gate del CV Review: sales leads + la supervisión (pgonzales y agostina). Se mantiene
