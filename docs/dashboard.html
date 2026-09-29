@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=125">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=126">
 </head>
 <body>
 
@@ -6782,7 +6782,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Headcount · Multi-window</span>
             <h3 class="kpi-drawer__title">Churn contractors</h3>
-            <p class="kpi-drawer__sub">Contractors que salieron de Staffing (baja real, sin buyout) en cada ventana.</p>
+            <p class="kpi-drawer__sub">Contractors que salieron de Staffing en cada ventana. Los números cuentan sólo bajas reales; los buyouts aparecen en la lista, marcados, pero no suman.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -6832,17 +6832,17 @@
               </div>
             </section>
             <section class="kpi-drawer__section" data-drawer-detail-section="churn-contractors">
-              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-where-field="estado" data-where-value="Baja - Real">—</span>
                 <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="churn-contractors" aria-label="Volver a vista por mes">—</button>
                 <span class="kpi-drawer__window-chip" data-drawer-window-chip="churn-contractors" hidden></span>
               </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
-                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d" data-limit="60"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-value="estado" data-list-date="end_d" data-limit="60"
                    data-month-aware
                    data-drawer-window-target="churn-contractors"></div>
             </section>
-            <p class="kpi-drawer__note">Esta vista cuenta sólo bajas reales (no buyouts). Para Buyouts mirá el tile separado en el dashboard.</p>
+            <p class="kpi-drawer__note">Los números cuentan sólo bajas reales. La lista muestra también los buyouts, marcados como tales, pero no suman al churn: para esos mirá el tile de Buyouts.</p>
           </div>
         </div>
 
@@ -9726,14 +9726,14 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Account Management · churn</span>
             <h3 class="kpi-drawer__title">Candidate churn · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">Candidatos dados de baja en el período (<span data-window-label>30d</span>), sobre el total de candidatos activos.</p>
+            <p class="kpi-drawer__sub">Candidatos dados de baja en el período (<span data-window-label>30d</span>), sobre el total de candidatos activos. La lista muestra también los buyouts, pero el % y el contador cuentan sólo las bajas reales.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Candidates · <span data-window-label>30d</span> <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Candidates · <span data-window-label>30d</span> <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="estado" data-where-value="Baja - Real" title="Bajas reales: las que cuenta la card">—</span></h4>
               <div class="dlist" data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
-                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="estado" data-limit="120"></div>
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-value="estado" data-list-date="end_d" data-limit="120"></div>
             </section>
           </div>
         </div>

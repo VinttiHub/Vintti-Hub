@@ -89,6 +89,10 @@ class Node:
     empty_text: str | None
     is_hero: bool
     line: int
+    # data-where-field / data-where-value: renderBinding() filtra las filas antes
+    # de reducir. Sin esto el auditor contaria filas que la pantalla no cuenta.
+    where_field: str | None = None
+    where_value: str | None = None
     tab: str | None = None
     subtab: str | None = None
     panel: str | None = None
@@ -223,6 +227,8 @@ class _DashboardParser(HTMLParser):
                 empty_text=a.get("data-empty-text"),
                 is_hero="kpi-drawer__hero__value" in _class_tokens(classes),
                 line=line,
+                where_field=a.get("data-where-field"),
+                where_value=a.get("data-where-value"),
                 _ancestors=list(self.stack) + [frame],
             ))
 

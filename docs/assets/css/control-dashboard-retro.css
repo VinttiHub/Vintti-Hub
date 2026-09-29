@@ -1356,6 +1356,9 @@ body.is-loading .kpi-card::after {
 .dlist__val[data-val="AE"]      { background: color-mix(in srgb, #6c38ff 14%, #fff); color: #6c38ff; }
 .dlist__val[data-val="AM"]      { background: color-mix(in srgb, #4ba9ff 20%, #fff); color: color-mix(in srgb, #4ba9ff 60%, #000); }
 .dlist__val[data-val="AE + AM"] { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: color-mix(in srgb, #ff1fdb 75%, #000); }
+/* Tipo de baja en el drawer Candidate churn 30d: real = magenta, buyout = celeste. */
+.dlist__val[data-val="Baja - Real"] { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: color-mix(in srgb, #ff1fdb 75%, #000); }
+.dlist__val[data-val="Buyout"]      { background: color-mix(in srgb, #4ba9ff 20%, #fff); color: color-mix(in srgb, #4ba9ff 60%, #000); }
 
 /* ---------- LOW-SAMPLE FLAG (aviso "muestra baja" cuando el denominador es chico) ---------- */
 .lowsample-flag {

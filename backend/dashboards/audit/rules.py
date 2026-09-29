@@ -89,7 +89,11 @@ class Context:
         ex = self.ex(node)
         if ex is None or ex.error is not None:
             return None
-        return reduce_rows(ex.rows, node.field, node.reduce)
+        rows = ex.rows
+        if node.where_field and node.where_value is not None:
+            # Mismo filtro que renderBinding(): comparacion como string.
+            rows = [r for r in rows if str(r.get(node.where_field)) == node.where_value]
+        return reduce_rows(rows, node.field, node.reduce)
 
     def _base(self, node, ex=None) -> dict:
         ex = ex or self.ex(node)

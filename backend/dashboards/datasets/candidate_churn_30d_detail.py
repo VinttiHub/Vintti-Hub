@@ -113,8 +113,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND c.start_d <= v.win_ini
             AND (c.end_d IS NULL OR c.end_d >= v.win_ini)
         ),
-        -- Only return "Baja - Real" rows so the detail count matches the
-        -- bajas_real card. Filters out Activo, Alta, and Buyout categories.
+        -- Bajas de la ventana, clasificadas en "Baja - Real" / "Buyout" con el
+        -- mismo criterio que bajas_real / bajas_buyout del summary. La card
+        -- cuenta sólo las reales: el contador del drawer filtra por estado.
         bajas_inicio AS (
           SELECT
             d.win_ini,
@@ -123,11 +124,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             d.fee,
             d.start_d,
             d.end_d,
-            'Baja - Real'::text AS estado
+            CASE WHEN d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d)
+                 THEN 'Buyout' ELSE 'Baja - Real' END::text AS estado
           FROM activos_inicio d
           WHERE d.end_d IS NOT NULL
             AND d.end_d BETWEEN d.win_ini AND d.win_fin
-            AND NOT (d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d))
         ),
         bajas_starts AS (
           SELECT
@@ -137,14 +138,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             c.fee,
             c.start_d,
             c.end_d,
-            'Baja - Real'::text AS estado
+            CASE WHEN c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
+                 THEN 'Buyout' ELSE 'Baja - Real' END::text AS estado
           FROM candidatos c
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.end_d IS NOT NULL
             AND c.start_d BETWEEN v.win_ini AND v.win_fin
             AND c.end_d   BETWEEN v.win_ini AND v.win_fin
-            AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
         ),
         all_rows AS (
           SELECT
