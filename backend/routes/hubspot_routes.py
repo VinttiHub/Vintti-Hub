@@ -27,6 +27,7 @@ from utils import hubspot_opportunities as hs_opps
 from utils import hubspot_push as hs_push
 from utils import hubspot_push_values as hs_push_values
 from utils.hubspot_waiting_alert import alerta_en_pausa, send_waiting_deals_alert
+from utils.opp_model_edits import model_edited_at
 from dashboards.datasets._now import today_ar
 
 
@@ -2706,8 +2707,14 @@ def _load_opportunity_by_id(cursor, opportunity_id, schema_ready=True):
 #
 # La excepcion es el momento de ATAR el deal (seen NULL): ahi gana HubSpot. Una opp
 # creada a mano desde el modal arranca con Staffing por default, y cuando el sync la
-# adopta ese Staffing no es una decision de nadie (PGAM #838: deal Recruiting). Las
-# opps ya atadas antes de esta regla tienen todas su foto, asi que 808/825 no se tocan.
+# adopta ese Staffing no es una decision de nadie (PGAM #838: deal Recruiting).
+#
+# Salvo que una persona ya lo haya corregido en el hub (`opp_model_edited_at`, ver
+# utils/opp_model_edits.py). Se asumio que al deployar esta regla todas las opps
+# atadas ya tenian foto, y era falso: el sync es incremental y 808/825 no se habian
+# movido en HubSpot en esas horas. El 24-sep se movieron de stage, el sync las vio
+# "por primera vez" y les piso el Recruiting de la recruiter con Staffing.
+# scripts/backfill_hubspot_model_seen.py saca la foto de las que quedaron en NULL.
 # ---------------------------------------------------------------------------
 
 _MODEL_SEEN_READY = False
@@ -2771,6 +2778,9 @@ def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
             pass
         elif _opp_esta_cerrada(opp.get("opp_stage")):
             reporte["modelo_distinto_cerrada"] = {"hub": hub_model, "hubspot": model}
+        elif column_ready and model_edited_at(cursor, opportunity_id):
+            # Una persona ya corrigio el Model en el hub: no es el default del modal.
+            reporte["modelo_distinto_manual"] = {"hub": hub_model, "hubspot": model}
         else:
             nuevo_model = model
             reporte["modelo_actualizado"] = {
@@ -2784,6 +2794,11 @@ def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
         else:
             nuevo_model = model
             reporte["modelo_actualizado"] = {"antes": hub_model or None, "despues": model}
+    elif hub_model and hub_model.lower() != model.strip().lower():
+        # HubSpot no cambio y el hub difiere: gana el hub, pero que se vea. El
+        # desfase casi siempre es HubSpot mal cargado (founderfirst #825: Staffing
+        # desde el Deep Dive) y se arregla del lado de HubSpot.
+        reporte["modelo_distinto"] = {"hub": hub_model, "hubspot": model}
 
     # Fuera de dry run la columna siempre existe (_ensure_model_seen_column corre
     # antes del loop). En un dry run sin ella todo se lee como "primera vez".
@@ -4202,6 +4217,110 @@ def hubspot_deals_waiting():
     finally:
         if conn:
             conn.close()
+
+
+_MODEL_MISMATCH_CACHE_KEY = "hubspot_model_mismatches"
+_MODEL_MISMATCH_TTL = 600
+
+
+@bp.route("/hubspot/opportunities/model-mismatches", methods=["GET", "OPTIONS"])
+def hubspot_model_mismatches():
+    """Opps abiertas cuyo Model en el hub no coincide con el del deal en HubSpot.
+
+    El sync deja ganar al hub cuando la recruiter corrigio el Model (ver
+    _apply_model_from_hubspot), asi que el desfase no se arregla solo: casi siempre
+    es HubSpot mal cargado en el popup del Deep Dive (founderfirst #825) y hay que
+    corregirlo alla. El hub no le manda el Model a HubSpot.
+
+    Compara TODAS las opps abiertas atadas, no solo las de la ventana de 24 h del
+    sync: un deal que nadie toca se caeria del reporte aunque siga distinto. Lee
+    HubSpot en lote (batch/read, 100 por llamada) y cachea 10 min en app_cache
+    porque la pagina lo consulta al abrirse. `?refresh=1` saltea el cache.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    from utils import shared_cache
+
+    if request.args.get("refresh") != "1":
+        hit, cached = shared_cache.get(_MODEL_MISMATCH_CACHE_KEY)
+        if hit:
+            return jsonify(cached)
+
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT o.opportunity_id, o.opp_model, o.opp_stage, o.opp_position_name,
+                       o.hubspot_deal_id, a.client_name
+                  FROM opportunity o
+                  LEFT JOIN account a ON a.account_id = o.account_id
+                 WHERE NULLIF(o.hubspot_deal_id, '') IS NOT NULL
+                """
+            )
+            opps = [
+                dict(f) for f in cursor.fetchall()
+                if not _opp_esta_cerrada(f["opp_stage"])
+            ]
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("No se pudieron leer las opps atadas")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+    try:
+        client = HubSpotClient()
+        modelos = {}
+        ids = sorted({str(o["hubspot_deal_id"]).strip() for o in opps})
+        for i in range(0, len(ids), 100):
+            payload = client._request(
+                "POST",
+                "/crm/v3/objects/deals/batch/read",
+                json={
+                    "properties": ["model", "dealname"],
+                    "inputs": [{"id": deal_id} for deal_id in ids[i:i + 100]],
+                },
+            )
+            for deal in payload.get("results", []):
+                props = deal.get("properties") or {}
+                modelos[str(deal.get("id"))] = (
+                    (props.get("model") or "").strip(), props.get("dealname")
+                )
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("No se pudo leer el Model de los deals en HubSpot")
+        return jsonify({"success": False, "error": str(exc)}), 502
+
+    distintas = []
+    for o in opps:
+        hubspot_model, dealname = modelos.get(str(o["hubspot_deal_id"]).strip(), ("", None))
+        hub_model = (o["opp_model"] or "").strip()
+        # HubSpot vacio no es un desfase: no hay nada que corregir alla.
+        if not hubspot_model or hub_model.lower() == hubspot_model.lower():
+            continue
+        distintas.append({
+            "opportunity_id": o["opportunity_id"],
+            "account_name": o["client_name"],
+            "position": o["opp_position_name"],
+            "opp_stage": o["opp_stage"],
+            "deal_id": str(o["hubspot_deal_id"]).strip(),
+            "dealname": dealname,
+            "hub_model": hub_model or None,
+            "hubspot_model": hubspot_model,
+        })
+    distintas.sort(key=lambda d: d["opportunity_id"])
+
+    out = {
+        "success": True,
+        "checked": len(opps),
+        "count": len(distintas),
+        "opportunities": distintas,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    shared_cache.set(_MODEL_MISMATCH_CACHE_KEY, out, _MODEL_MISMATCH_TTL)
+    return jsonify(out)
 
 
 @bp.route("/hubspot/deals/<deal_id>/mark-new", methods=["POST", "OPTIONS"])

@@ -3090,3 +3090,14 @@ button.is-busy::after {
 }
 /* "No Collab" es el "ninguna de las anteriores": fila propia. */
 #closeWinPopup .cw-mkt-options label:last-child{ grid-column: 1 / -1; }
+
+/* Panel "Model distinto entre el hub y HubSpot" (mostrarModelosDistintos en main.js).
+   Reusa .hs-report; el cian lo distingue del violeta del reporte del sync. */
+.hs-model-mismatch {
+  border-color: color-mix(in srgb, #4ba9ff 40%, #fff);
+  background: color-mix(in srgb, #4ba9ff 6%, #fff);
+}
+.hs-model-mismatch .hs-report-head h3 { color: #1f5f9e; }
+.hs-model-mismatch-list { margin: .3rem 0 .1rem; padding-left: 1.1rem; }
+.hs-model-mismatch-list li { margin: .15rem 0; color: #4a4a63; }
+.hs-model-mismatch-list a { color: inherit; text-decoration: underline; }

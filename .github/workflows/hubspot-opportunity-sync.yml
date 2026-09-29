@@ -76,6 +76,16 @@ jobs:
           if frenados:
               print(f"::warning::{len(frenados)} deal(s) frenados esperando decision: "
                     + ", ".join(str(i.get("dealname")) for i in frenados[:10]))
+          # Model distinto entre el hub y HubSpot: el sync deja ganar al hub (la
+          # recruiter lo corrigio), pero HubSpot sigue mal cargado y hay que
+          # arreglarlo alla (founderfirst #825).
+          for i in d.get("items", []):
+              for key in ("modelo_distinto", "modelo_distinto_manual", "modelo_distinto_cerrada"):
+                  m = i.get(key)
+                  if m:
+                      print(f"::warning::{i.get('dealname')} (opp #{i.get('opportunity_id')}): "
+                            f"Model hub={m.get('hub')} / HubSpot={m.get('hubspot')}; "
+                            f"quedo el del hub, corregir HubSpot si corresponde")
           errs = d.get("errors") or []
           if errs:
               for e in errs[:10]:

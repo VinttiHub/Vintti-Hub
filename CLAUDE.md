@@ -512,10 +512,28 @@ Por eso `opportunity.hubspot_model_seen` guarda el **último valor visto en HubS
   sync o con Vincular): **gana HubSpot** si la opp está abierta; si está cerrada sólo
   `modelo_distinto_cerrada`. Una opp creada a mano desde el modal arranca en Staffing por
   default y ese valor no es una decisión: PGAM #838 (2026-09-23) quedó Staffing con el
-  deal en Recruiting. Hasta ese día la primera vez sólo tomaba la foto, para que el deploy
-  no pisara 808/825; todas las opps atadas ya tienen foto, así que no las toca.
-  `unlink-deal` borra la foto para que un deal nuevo vuelva a contar como "primera vez".
-- HubSpot igual a lo visto: gana el hub, aunque difieran.
+  deal en Recruiting. **Excepción: si una persona ya cambió el Model en el hub**
+  (`opportunity.opp_model_edited_at`, lo sella `PATCH /opportunities/<id>/fields` vía
+  `utils/opp_model_edits.py`), la primera vez sólo toma la foto y reporta
+  `modelo_distinto_manual`. `unlink-deal` borra la foto para que un deal nuevo vuelva a
+  contar como "primera vez".
+- **"Todas las opps atadas ya tienen foto" era falso.** La regla de arriba se deployó
+  horas después de crear la columna, y el sync es incremental: sólo mira un deal cuando
+  alguien lo toca en HubSpot. 808 y 825 quedaron en NULL, el 24-sep se movieron de stage y
+  el sync les pisó el Recruiting de la recruiter con Staffing. Parecía que "cambiar de
+  stage en HubSpot pasa la opp a Staffing": el stage no era la causa, sólo hizo que el sync
+  mirara el deal. El historial de HubSpot (`propertiesWithHistory=model`) muestra que en
+  esos deals el Model **siempre** fue Staffing, cargado por el AE en el popup del Deep
+  Dive. `backend/scripts/backfill_hubspot_model_seen.py` (dry-run por defecto) saca la
+  foto de las que quedaron en NULL sin tocar `opp_model`.
+- HubSpot igual a lo visto: gana el hub, aunque difieran. El desfase sale como
+  `modelo_distinto` en el reporte y como `::warning::` del cron: casi siempre es HubSpot
+  mal cargado y se arregla del lado de HubSpot (el hub no le manda el Model). Lo que ve
+  una persona es el panel **"Model distinto entre el hub y HubSpot"** de
+  `docs/opportunities.html` (`mostrarModelosDistintos()`, misma allow-list que los deals
+  frenados), que lee `GET /hubspot/opportunities/model-mismatches`: compara **todas** las
+  opps abiertas atadas en lote contra HubSpot, no sólo la ventana de 24 h del sync, y
+  cachea 10 min en `app_cache` (`?refresh=1` lo saltea).
 - HubSpot cambió y la opp está abierta: `modelo_actualizado` en el reporte.
 - HubSpot cambió y la opp está cerrada: sólo `modelo_distinto_cerrada`, sin tocarla. El modelo
   decide si el revenue cuenta como Staffing o Recruiting.

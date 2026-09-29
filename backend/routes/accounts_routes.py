@@ -46,6 +46,7 @@ from utils.storage_utils import (
 from utils.html_utils import clean_html_for_webflow as _clean_html_for_webflow
 from utils.html_utils import clean_job_description_html
 from utils.am_roster import normalize_account_manager
+from utils.opp_model_edits import mark_model_edited
 
 bp = Blueprint('accounts', __name__)
 
@@ -1582,6 +1583,14 @@ def update_opportunity_fields(opportunity_id):
         conn = get_connection()
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                previous_model = None
+                if "opp_model" in data:
+                    cursor.execute(
+                        "SELECT opp_model FROM opportunity WHERE opportunity_id = %s",
+                        (opportunity_id,),
+                    )
+                    previous_model = (cursor.fetchone() or {}).get("opp_model")
+
                 previous = None
                 if "opp_hr_lead" in data or "replacement_of" in data:
                     cursor.execute(
@@ -1603,6 +1612,11 @@ def update_opportunity_fields(opportunity_id):
                          WHERE opportunity_id = %s
                     """, values)
                     logging.info("✅ UPDATE opportunity (%s filas)", cursor.rowcount)
+
+                    # Que el sync de HubSpot no pise esta correccion la primera vez que
+                    # vea el deal (utils/opp_model_edits.py, caso founderfirst #825).
+                    if "opp_model" in data:
+                        mark_model_edited(cursor, opportunity_id, previous_model, data.get("opp_model"))
 
                 # 2) Efectos de Close Win (si vino candidato_contratado)
                 if candidate_hired_id is not None:

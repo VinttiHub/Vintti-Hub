@@ -2431,6 +2431,45 @@ async function mostrarDealsFrenados() {
   }
 }
 
+// Model distinto entre el hub y HubSpot. El sync deja ganar al hub cuando la
+// recruiter lo corrigio, asi que el desfase no se arregla solo: casi siempre es
+// HubSpot mal cargado en el popup del Deep Dive (founderfirst #825) y se corrige
+// en HubSpot. El hub no le manda el Model. Panel propio, aparte del reporte del
+// sync, para que no se pisen.
+async function mostrarModelosDistintos() {
+  try {
+    const res = await fetch(`${API_BASE}/hubspot/opportunities/model-mismatches`);
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || !payload.count) return;
+
+    document.getElementById('hsModelMismatch')?.remove();
+    const panel = document.createElement('section');
+    panel.id = 'hsModelMismatch';
+    panel.className = 'hs-report hs-model-mismatch';
+    const filas = payload.opportunities.map(o => `<li>`
+      + `<a href="opportunity-detail.html?id=${encodeURIComponent(o.opportunity_id)}"><b>${escapeHtml(o.account_name || o.dealname || '—')}</b></a>`
+      + `${o.position ? ` · ${escapeHtml(o.position)}` : ''} · opp #${escapeHtml(o.opportunity_id)}`
+      + ` · hub: <b>${escapeHtml(o.hub_model || '—')}</b> / HubSpot: <b>${escapeHtml(o.hubspot_model)}</b>`
+      + `</li>`).join('');
+    panel.innerHTML = `
+      <div class="hs-report-head">
+        <h3>Model distinto entre el hub y HubSpot (${payload.count})</h3>
+        <button type="button" class="hs-report-close" aria-label="Cerrar">×</button>
+      </div>
+      <p class="hs-report-note">El sync no los cambia: queda el Model del hub. Si el del hub es el correcto, hay que corregir el deal en HubSpot.</p>
+      <ul class="hs-model-mismatch-list">${filas}</ul>`;
+    panel.querySelector('.hs-report-close').addEventListener('click', () => panel.remove());
+
+    // Debajo del panel de deals frenados si ya esta, si no debajo del header.
+    const ancla = document.getElementById('hsSyncReport')
+               || document.querySelector('.main-content .page-header');
+    if (ancla && ancla.parentNode) ancla.parentNode.insertBefore(panel, ancla.nextSibling);
+    else document.body.prepend(panel);
+  } catch (e) {
+    console.warn('No se pudo comparar el Model con HubSpot', e);
+  }
+}
+
 function dealsDeLaUrl() {
   const crudo = new URLSearchParams(location.search).get('hs_deals');
   if (!crudo) return null;
@@ -2500,7 +2539,8 @@ function initOpportunitiesHubSpotSyncButton(botonId = 'oppHubSpotSyncBtn', dryRu
 initOpportunitiesHubSpotSyncButton('oppHubSpotDryRunBtn', true);
 initOpportunitiesHubSpotSyncButton();
 if (OPP_HUBSPOT_WAITING_ALLOWED.includes((localStorage.getItem('user_email') || '').toLowerCase().trim())) {
-  mostrarDealsFrenados();
+  // En orden: el de modelos se ancla debajo del de frenados si este aparece.
+  mostrarDealsFrenados().then(mostrarModelosDistintos);
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
 if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
