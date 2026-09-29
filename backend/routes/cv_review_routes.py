@@ -533,6 +533,28 @@ def _client_process_gate(conn, cur, candidate_id, opportunity_id, actor):
                                       "count": n, "is_new": False}
 
 
+def _current_jd_block(cur, opportunity_id, client_name, opp_position_name):
+    """(jd_plain, jd_block) de la vacante tal como está AHORA.
+
+    Único lugar que arma el bloque que lee el juez: lo usan el envío, el re-score manual, el
+    aviso de "la JD cambió" y el re-score automático. Si cada uno lo armara por su lado, la
+    huella `_jd_hash` dejaría de ser comparable y el aviso quedaría prendido para siempre.
+    Mismo helper que el generador de CVs (precedencia hr_jd → career_desc → career_reqs y el
+    mismo RESUME_JD_LIMIT).
+    """
+    from ai_routes import _build_resume_target_role_block, _build_opportunity_context
+    from ai_routes import RESUME_JD_LIMIT, _truncate_preserving_edges
+    jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
+    jd_block = _build_resume_target_role_block({
+        "client_name": client_name or "",
+        "position": opp_ctx.get("position", "") or (opp_position_name or ""),
+        "career_country": opp_ctx.get("career_country", ""),
+        "years_experience": str(opp_ctx.get("years_experience") or ""),
+        "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
+    })
+    return jd_plain, jd_block
+
+
 def _prepare_review(conn, cur, candidate_id, opportunity_id, actor):
     """Valida y arma todo lo que necesita un review. Devuelve (ctx, error_code, gate).
 
@@ -588,16 +610,8 @@ def _prepare_review(conn, cur, candidate_id, opportunity_id, actor):
     # La JD la trae el mismo helper que usa el generador, así el juez ve exactamente la JD
     # que vio el generador (misma precedencia hr_jd → career_desc → career_reqs y el mismo
     # RESUME_JD_LIMIT).
-    from ai_routes import _build_resume_target_role_block, _build_opportunity_context
-    from ai_routes import RESUME_JD_LIMIT, _truncate_preserving_edges
-    jd_plain, opp_ctx = _build_opportunity_context(cur, opportunity_id)
-    jd_block = _build_resume_target_role_block({
-        "client_name": opp["client_name"],
-        "position": opp_ctx.get("position", "") or (opp["opp_position_name"] or ""),
-        "career_country": opp_ctx.get("career_country", ""),
-        "years_experience": str(opp_ctx.get("years_experience") or ""),
-        "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
-    })
+    jd_plain, jd_block = _current_jd_block(cur, opportunity_id, opp["client_name"],
+                                           opp["opp_position_name"])
 
     return {
         "candidate_id": candidate_id,
@@ -1138,6 +1152,130 @@ def _store_analysis(review_id, score, analysis, ai_error):
         conn.close()
 
 
+# --- re-score automático cuando cambia la JD ----------------------------------
+#
+# Un review se califica una vez, al enviarse, contra la JD de ese momento. Si después se
+# edita la JD, los reviews que el sales lead todavía no decidió quedaban medidos contra
+# requisitos viejos (opp 799, 2026-09-29). Decisión de la owner: re-calificar solos SÓLO los
+# `pending`. Los decididos no se tocan: el score de la 1ª ronda es la métrica de calidad de
+# la recruiter y re-scorearlo movería un número histórico.
+#
+# Se compara la HUELLA y no se dispara en cada PATCH: el blur del editor guarda la JD aunque
+# nadie la haya tocado, y abrir la vacante a veces re-guarda la JD formateada. Sin cambio
+# real en el bloque que lee el juez, no hay llamada a OpenAI.
+
+_RESCORE_LOCK = Lock()
+_RESCORE_RUNNING: set = set()   # opps con un hilo en curso
+_RESCORE_DIRTY: set = set()     # opps que cambiaron mientras su hilo corría
+
+
+def _rescore_pending_once(opportunity_id):
+    ensure_cv_review_tables()
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            """
+            SELECT o.opp_position_name, COALESCE(a.client_name, '') AS client_name
+            FROM opportunity o
+            LEFT JOIN account a ON a.account_id = o.account_id
+            WHERE o.opportunity_id = %s LIMIT 1
+            """,
+            (opportunity_id,),
+        )
+        opp = cur.fetchone()
+        if not opp:
+            return
+        jd_plain, jd_block = _current_jd_block(cur, opportunity_id, opp["client_name"],
+                                               opp["opp_position_name"])
+        if not (jd_plain or "").strip():
+            # Borraron la JD: mejor el score viejo que ninguno.
+            return
+        jd_hash = cv_review_ai.jd_fingerprint(jd_block)
+        cur.execute(
+            """
+            SELECT r.review_id, r.resume_snapshot, r.resume_hash,
+                   c.cv_pdf_scrapper, c.affinda_scrapper,
+                   c.linkedin_scrapper, c.coresignal_scrapper
+            FROM cv_reviews r
+            LEFT JOIN candidates c ON c.candidate_id = r.candidate_id
+            WHERE r.opportunity_id = %s
+              AND r.status = 'pending'
+              AND (r.ai_analysis->>'_jd_hash') IS DISTINCT FROM %s
+            ORDER BY r.review_id
+            """,
+            (opportunity_id, jd_hash),
+        )
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    for row in rows:
+        source_text = cv_review_ai.build_source_text(row)
+        fingerprint = cv_review_ai.input_hash({
+            "s": row["resume_hash"], "j": jd_block,
+            "src": cv_review_ai.input_hash(source_text),
+            "v": cv_review_ai.ANALYSIS_VERSION,
+        })
+        # Siempre sobre el SNAPSHOT que se envió, nunca sobre el CV vivo.
+        score, analysis, ai_error = cv_review_ai.score_cv(
+            snapshot=row["resume_snapshot"] or {}, jd_block=jd_block,
+            source_text=source_text, fingerprint=fingerprint,
+        )
+        if ai_error == "budget":
+            # Cuota mensual agotada: reintentar el resto sólo gasta requests que van a fallar.
+            logging.warning("cv_review rescore opp %s: OpenAI budget exhausted", opportunity_id)
+            return
+        if ai_error:
+            # No se pisa el análisis anterior con un error: queda el aviso de JD cambiada.
+            logging.warning("cv_review rescore review %s failed: %s", row["review_id"], ai_error)
+            continue
+        _store_analysis(row["review_id"], score, analysis, None)
+        logging.info("cv_review rescore review %s (opp %s) after JD change: score %s",
+                     row["review_id"], opportunity_id, score)
+
+
+def rescore_pending_for_opportunity(opportunity_id):
+    """Re-califica en segundo plano los CV Reviews `pending` de la vacante cuya JD cambió.
+
+    La llama el PATCH de campos de la opportunity después del commit. Nunca levanta.
+    Un hilo por vacante: si la JD cambia otra vez mientras corre, se marca y se hace una
+    pasada más al terminar (la pasada lee la JD en ese momento, así que alcanza con una).
+    """
+    try:
+        opportunity_id = int(opportunity_id)
+        with _RESCORE_LOCK:
+            if opportunity_id in _RESCORE_RUNNING:
+                _RESCORE_DIRTY.add(opportunity_id)
+                return
+            _RESCORE_RUNNING.add(opportunity_id)
+
+        def _run():
+            try:
+                while True:
+                    try:
+                        _rescore_pending_once(opportunity_id)
+                    except Exception:
+                        logging.exception("cv_review: rescore after JD change failed (opp %s)",
+                                          opportunity_id)
+                    with _RESCORE_LOCK:
+                        if opportunity_id in _RESCORE_DIRTY:
+                            _RESCORE_DIRTY.discard(opportunity_id)
+                            continue
+                        _RESCORE_RUNNING.discard(opportunity_id)
+                        return
+            except Exception:
+                with _RESCORE_LOCK:
+                    _RESCORE_RUNNING.discard(opportunity_id)
+                    _RESCORE_DIRTY.discard(opportunity_id)
+
+        threading.Thread(target=_run, name=f"cv-review-rescore-{opportunity_id}",
+                         daemon=True).start()
+    except Exception:
+        logging.exception("cv_review: could not start rescore for opp %s", opportunity_id)
+
+
 # --- habilitaciones de client process ---------------------------------------
 
 _CLEARANCE_COLS = """
@@ -1595,16 +1733,8 @@ def get_cv_review(review_id):
         jd_checked = bool(isinstance(blob, dict) and blob.get("_jd_hash"))
         if isinstance(blob, dict) and blob.get("_jd_hash"):
             # El MISMO bloque que arma la ruta de análisis, o la huella no es comparable.
-            from ai_routes import (_build_opportunity_context, _build_resume_target_role_block,
-                                   RESUME_JD_LIMIT, _truncate_preserving_edges)
-            jd_now, opp_ctx = _build_opportunity_context(cur, row["opportunity_id"])
-            block_now = _build_resume_target_role_block({
-                "client_name": row["client_name"],
-                "position": opp_ctx.get("position", "") or (row["opp_position_name"] or ""),
-                "career_country": opp_ctx.get("career_country", ""),
-                "years_experience": str(opp_ctx.get("years_experience") or ""),
-                "jd": _truncate_preserving_edges(jd_now, RESUME_JD_LIMIT),
-            })
+            _, block_now = _current_jd_block(cur, row["opportunity_id"], row["client_name"],
+                                             row["opp_position_name"])
             jd_changed = cv_review_ai.jd_fingerprint(block_now) != blob["_jd_hash"]
     finally:
         cur.close()
@@ -1955,22 +2085,14 @@ def analyze_cv_review(review_id):
         if not row:
             return jsonify({"error": "review not found"}), 404
 
-        from ai_routes import _build_resume_target_role_block, _build_opportunity_context
-        from ai_routes import RESUME_JD_LIMIT, _truncate_preserving_edges
-        jd_plain, opp_ctx = _build_opportunity_context(cur, row["opportunity_id"])
+        jd_plain, jd_block = _current_jd_block(cur, row["opportunity_id"], row["client_name"],
+                                               row["opp_position_name"])
         if not (jd_plain or "").strip():
             return jsonify({
                 "error": f"Opportunity #{row['opportunity_id']} has no job description, "
                          "so a quality score would be meaningless.",
                 "code": "no_jd",
             }), 422
-        jd_block = _build_resume_target_role_block({
-            "client_name": row["client_name"],
-            "position": opp_ctx.get("position", "") or (row["opp_position_name"] or ""),
-            "career_country": opp_ctx.get("career_country", ""),
-            "years_experience": str(opp_ctx.get("years_experience") or ""),
-            "jd": _truncate_preserving_edges(jd_plain, RESUME_JD_LIMIT),
-        })
     finally:
         cur.close()
         conn.close()

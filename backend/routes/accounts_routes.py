@@ -1461,6 +1461,14 @@ def get_candidates_by_batch(batch_id):
         if conn:
             conn.close()
 
+# Los campos que arman el bloque contra el que el CV Review califica un CV
+# (cv_review_routes._current_jd_block).
+_CV_REVIEW_JD_FIELDS = (
+    'hr_job_description', 'career_description', 'career_requirements',
+    'opp_position_name', 'career_country', 'years_experience',
+)
+
+
 @bp.route('/opportunities/<int:opportunity_id>/fields', methods=['PATCH'])
 def update_opportunity_fields(opportunity_id):
     from datetime import date, datetime
@@ -1654,6 +1662,16 @@ def update_opportunity_fields(opportunity_id):
                         new_replacement = data.get("replacement_of")
                         if new_replacement and new_replacement != previous.get("replacement_of"):
                             create_replacement_todo(cursor, opportunity_id)
+
+        # Fuera del `with conn:` (ya commiteado) y sin levanta: si cambió algo de lo que lee el
+        # juez del CV Review, los reviews todavía pendientes se re-califican contra la JD
+        # nueva. Adentro compara la huella, así que un blur sin cambios no llama a OpenAI.
+        if any(k in data for k in _CV_REVIEW_JD_FIELDS):
+            try:
+                from routes.cv_review_routes import rescore_pending_for_opportunity
+                rescore_pending_for_opportunity(opportunity_id)
+            except Exception:
+                logging.exception("cv_review rescore trigger failed (opp=%s)", opportunity_id)
 
         return jsonify({'success': True}), 200
 

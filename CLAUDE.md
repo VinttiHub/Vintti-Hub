@@ -831,6 +831,13 @@ lead decide en `docs/jd-review.html`.
   el campo del link tiene un transcript pegado (pasó), se usa como texto.
 - El popup del AI Assistant ahora precarga los links guardados, y si la opp no los tenía guarda
   los que se usaron para generar (sólo si el campo está vacío).
+- **Editar la JD re-califica los CV Reviews `pending` de esa vacante** (2026-09-29, pregunta
+  sobre la opp 799). `PATCH /opportunities/<id>/fields` con algún campo del bloque del juez
+  llama, después del commit, a `cv_review_routes.rescore_pending_for_opportunity()`: un hilo
+  que re-scorea el snapshot enviado sólo si `_jd_hash` difiere de la JD actual (el blur guarda
+  aunque no cambie nada). Los decididos **no** se tocan: el score de la 1ª ronda es la métrica
+  de la recruiter. Esos siguen con el aviso ámbar + Re-run manual. El bloque lo arma sólo
+  `_current_jd_block()`; si se arma distinto en otro lado, la huella deja de ser comparable.
 - Métricas: `GET /jd_reviews/metrics` (sección "Per recruiter" de jd-review.html y pestaña **JD
   quality** de Recruiter Power, las dos con la tarjeta de `jd-review-cards.js`). Una vacante cuenta
   una vez, en el período de su primer envío.
