@@ -1,0 +1,31 @@
+name: Second Interview references reminder
+
+# Recordatorio de referencias para los candidatos en la columna Second Interview
+# del Pipeline (utils/second_interview_refs.py): mail a Agostina + la recruiter
+# cada 24 h hasta que marquen "References filled" en candidate-details.
+#
+# Corre CADA HORA a proposito: las 24 h las mide la tabla
+# `second_interview_refs_reminders` (last_sent_at), no el cron. Con un cron
+# diario el atraso de GitHub (2h27 a 9h40 medido, ver daily-digest.yml) hacia
+# que "24 h" se saltee un dia; asi el atraso solo corre el envio unos minutos.
+# Sabado y domingo (hora Argentina) el endpoint no manda: se posterga al lunes.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = lista los vencidos, NO manda mails"
+        required: false
+        default: ""
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mandar los recordatorios vencidos
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/second_interview_refs/due?dry=${{ github.event.inputs.dry }}"

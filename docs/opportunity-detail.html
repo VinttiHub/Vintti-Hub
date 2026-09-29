@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260916-qcheck" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260929-board11" />
   <link rel="stylesheet" href="./assets/css/jd-review.css?v=20260925-7" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
@@ -413,7 +413,7 @@
       <div class="pipeline-columns">
         <!-- Column: Applicant -->
         <div class="column" data-status="applicant">
-          <h3 class="column-title" style="background-color:#fff7ed;">
+          <h3 class="column-title">
             <span class="column-name">Applicant</span>
             <span class="column-count" id="count-applicant">0</span>
           </h3>
@@ -422,7 +422,7 @@
 
         <!-- Column: Contacted -->
         <div class="column" data-status="contacted">
-          <h3 class="column-title" style="background-color:#fef2f2;">
+          <h3 class="column-title">
             <span class="column-name">Contacted</span>
             <span class="column-count" id="count-contacted">0</span>
           </h3>
@@ -431,7 +431,7 @@
 
         <!-- Column: First interview -->
         <div class="column" data-status="first-interview">
-          <h3 class="column-title" style="background-color:#edf4ff;">
+          <h3 class="column-title">
             <span class="column-name">First Interview</span>
             <span class="column-count" id="count-first-interview">0</span>
           </h3>
@@ -440,7 +440,7 @@
 
         <!-- Column: No avanza -->
         <div class="column" data-status="no-advance">
-          <h3 class="column-title" style="background-color:#effaf0;">
+          <h3 class="column-title">
             <span class="column-name">No Advance</span>
             <span class="column-count" id="count-no-advance">0</span>
           </h3>
@@ -449,11 +449,22 @@
 
         <!-- Column: Client process -->
         <div class="column" data-status="client-process">
-          <h3 class="column-title" style="background-color:#fef3fb;">
+          <h3 class="column-title">
             <span class="column-name">In Client Process</span>
             <span class="column-count" id="count-client-process">0</span>
           </h3>
           <div class="card-container" id="client-process"></div>
+        </div>
+
+        <!-- Column: Second interview. Entrar acá dispara el recordatorio de
+             referencias (Agostina + recruiter) cada 24 h hasta que se marque
+             "References filled" en candidate-details. -->
+        <div class="column" data-status="second-interview">
+          <h3 class="column-title">
+            <span class="column-name">Second Interview</span>
+            <span class="column-count" id="count-second-interview">0</span>
+          </h3>
+          <div class="card-container" id="second-interview"></div>
         </div>
       </div>
 
@@ -1113,8 +1124,8 @@
   <!-- Your app bundles -->
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260916-qcheck" defer></script>
-  <script src="./assets/js/pipeline.js?v=20260916-qcheck" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260925-jd-review" defer></script>
+  <script src="./assets/js/pipeline.js?v=20260929-board5" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20260929-2nd-int" defer></script>
   <script src="./assets/js/jd-review-opp.js?v=20260925-1" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 

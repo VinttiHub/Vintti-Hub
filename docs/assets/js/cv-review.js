@@ -1795,6 +1795,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     'No avanza primera': 'No advance',
     'Primera entrevista': 'First interview',
     [CLIENT_PROCESS_STAGE]: 'In client process',
+    'Segunda entrevista': 'Second interview',
   };
   // Los mismos tintes que las columnas del pipeline en opportunity-detail, para que la
   // fila se reconozca sin leerla.
@@ -1804,6 +1805,7 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     'No avanza primera': 'is-noadv',
     'Primera entrevista': 'is-first',
     [CLIENT_PROCESS_STAGE]: 'is-client',
+    'Segunda entrevista': 'is-second',
   };
 
   // Desde que existe el gate, "está en 4 procesos" ya no es sólo un dato: puede haber una

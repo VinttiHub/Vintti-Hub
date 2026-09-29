@@ -1,5 +1,6 @@
 # reminders_routes.py
 import logging
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
@@ -7,6 +8,7 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
 from utils.credit_loop import run_due_credit_loop_reminders
 from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
+from utils.second_interview_refs import run_due_second_interview_refs_reminders
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -1494,6 +1496,23 @@ def send_due_hr_lead_signed_resig_ref_reminders():
         sent = _run_due_hr_lead_signed_resig_ref_reminders(cur)
         conn.commit()
         return jsonify({"sent": sent}), 200
+
+
+@bp.route("/reminders/second_interview_refs/due", methods=["POST"])
+def send_due_second_interview_refs_reminders():
+    """Recordatorio de referencias de Second Interview (utils/second_interview_refs.py).
+
+    Va aparte de /reminders/due a propósito: ese endpoint sólo corre en la ventana
+    de 05:00-07:59 de Guatemala y el cron de GitHub llega ~4 h tarde, así que casi
+    nunca manda nada. Este lo pega un cron CADA HORA con el token del auditor; las
+    24 h las mide la tabla, no el cron. ?dry=1 lista los vencidos sin mandar.
+    """
+    expected = os.environ.get("DASHBOARD_AUDIT_TOKEN")
+    given = request.headers.get("X-Audit-Token") or request.args.get("token")
+    if not expected or not given or given != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
+    return jsonify(run_due_second_interview_refs_reminders(dry_run=dry)), 200
 
 
 @bp.route("/reminders/client_checks/due", methods=["POST"])

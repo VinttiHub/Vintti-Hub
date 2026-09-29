@@ -14,7 +14,7 @@ from db import get_connection
 bp = Blueprint('opportunity_metrics', __name__)
 
 
-# Las 5 columnas del Pipeline, en el mismo orden que opportunity-detail.html.
+# Las 6 columnas del Pipeline, en el mismo orden que opportunity-detail.html.
 # La key es el valor crudo que guarda `opportunity_candidates.stage_pipeline`.
 #
 # Los colores salen de los pasteles que cada columna tiene inline en el HTML del
@@ -29,6 +29,7 @@ PIPELINE_STAGES = [
     ('Primera entrevista',     'First interview',   '#5b90e4'),  # ← #edf4ff
     ('En proceso con Cliente', 'In client process', '#e45bbf'),  # ← #fef3fb
     ('No avanza primera',      'No advance',        '#1ba628'),  # ← #effaf0
+    ('Segunda entrevista',     'Second interview',  '#8a6cf0'),  # ← #f3efff
 ]
 
 # Outcomes de batch, en el mismo orden que el dropdown de estados de

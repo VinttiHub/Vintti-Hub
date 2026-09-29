@@ -38,6 +38,7 @@ from utils.transactional_email import (
 )
 from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.types import to_bool
+from utils.second_interview_refs import ensure_second_interview_refs_schema_standalone
 
 bp = Blueprint('candidates', __name__)
 
@@ -1364,6 +1365,9 @@ def delete_candidate_test(candidate_id):
 @bp.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):
     try:
+        # La columna references_filled se autocrea: sin esto el SELECT fallaría en
+        # un entorno donde todavía no corrió el recordatorio de Second Interview.
+        ensure_second_interview_refs_schema_standalone()
         # Marca del CV client-version (resume-readonly). La decide LA VACANTE, no el
         # candidato: la misma persona puede estar en un proceso de Vintti AI y en uno de
         # Vintti normal, y el CV tiene que salir con la marca de la cuenta a la que se lo
@@ -1458,6 +1462,7 @@ def get_candidate_by_id(candidate_id):
                 c.coresignal_scrapper,
                 c.candidate_succes,
                 c.check_hr_lead,
+                c.references_filled,
                 c.address,
                 c.dni,
                 c.compu_propia,
@@ -1650,6 +1655,9 @@ def update_candidate_fields(candidate_id):
         'discount_daterange',
         'candidate_succes',
         'check_hr_lead',
+        # Corta el recordatorio de referencias de Second Interview
+        # (utils/second_interview_refs.py). No es check_hr_lead.
+        'references_filled',
         'address',
         'dni',
         'other_process',
@@ -1679,7 +1687,7 @@ def update_candidate_fields(candidate_id):
         if field in data:
             val = data[field]
             # 👉 fuerza tipos especiales
-            if field == 'check_hr_lead':
+            if field in ('check_hr_lead', 'references_filled'):
                 val = to_bool(val)
             if field == 'usa_nationality':
                 val = to_bool(val)
@@ -1696,6 +1704,8 @@ def update_candidate_fields(candidate_id):
     values.append(candidate_id)
 
     try:
+        if 'references_filled' in data:
+            ensure_second_interview_refs_schema_standalone()
         conn = get_connection()
         cursor = conn.cursor()
         if 'process_error' in data:

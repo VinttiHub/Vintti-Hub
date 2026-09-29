@@ -5827,3 +5827,303 @@ input:checked + .slider::before {
   color: #4a4a63;
   cursor: default;
 }
+
+/* ===========================================================
+   Pipeline · tablero estilo Hirex (2026-09-29)
+   Con 6 columnas el grid de repeat(5) mandaba Second Interview a un
+   segundo renglón. Ahora es una fila de columnas fijas de 272px con
+   scroll horizontal, mismo lenguaje que el kanban de hirex.css
+   (.hx-board / .hx-col / .hx-card). Va al final a propósito: le gana
+   a las reglas viejas de #pipeline sin tener que borrarlas.
+   =========================================================== */
+#pipeline .pipeline-columns {
+  display: flex;
+  flex-wrap: nowrap;
+  grid-template-columns: none;
+  gap: 14px;
+  align-items: flex-start;
+  overflow-x: auto !important;   /* le gana al overflow:visible !important de más arriba */
+  overflow-y: hidden !important;
+  padding: 4px 2px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #c9cdd4 transparent;
+}
+#pipeline .pipeline-columns::-webkit-scrollbar { height: 8px; }
+#pipeline .pipeline-columns::-webkit-scrollbar-thumb { background: #c9cdd4; border-radius: 999px; }
+
+/* Alto fijo según la pantalla: si una columna tiene muchos candidatos, scrollea
+   SÓLO esa columna (.card-container) y el resto del tablero queda quieto. */
+#pipeline .column {
+  flex: 0 0 272px;
+  width: 272px;
+  min-width: 272px;
+  height: max(420px, calc(100vh - 240px));
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fafbfc;
+  border: 1px solid #e6e8ec;
+  border-radius: 16px;
+  transition: background .15s, border-color .15s;
+}
+#pipeline .column:last-child { padding-right: 0; }
+#pipeline .column::after { display: none !important; }
+
+#pipeline .column.drag-over {
+  background: #eef1ff;
+  border-color: #003bff;
+}
+
+/* Header: punto de color + nombre + contador */
+#pipeline .column-title {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 15px 15px 0 0;
+  /* Lleno con un tinte del color del stage, como los pasteles de antes */
+  background: color-mix(in srgb, var(--pl-dot, #9aa2ad) var(--pl-tint, 14%), #fff) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--pl-dot, #9aa2ad) 28%, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+#pipeline .column-title::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pl-dot-solid, var(--pl-dot, #9aa2ad));
+}
+#pipeline .column[data-status="applicant"]        { --pl-dot: #4ba9ff; }
+#pipeline .column[data-status="contacted"]        { --pl-dot: #ff1fdb; }
+#pipeline .column[data-status="first-interview"]  { --pl-dot: #003bff; }
+#pipeline .column[data-status="no-advance"]       { --pl-dot: #9aa2ad; }
+/* El lime de marca sobre fondo claro casi no se ve: el encabezado usa el lime,
+   pero el punto va en un verde lima más saturado, lleno como los demás. */
+#pipeline .column[data-status="client-process"]   { --pl-dot: #c1ff72; --pl-dot-solid: #7ed321; --pl-tint: 38%; }
+#pipeline .column[data-status="second-interview"] { --pl-dot: #6c38ff; }
+#pipeline .column[data-status="no-advance"]       { --pl-tint: 22%; }
+
+#pipeline .column-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: #0e1116;
+}
+#pipeline .column-count {
+  margin-left: auto;
+  min-width: 0;
+  height: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e6e8ec;
+  color: #6b7480;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cuerpo de la columna */
+#pipeline .card-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 10px;
+  padding: 8px;
+  min-height: 0;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  /* Sólo en Y: con `contain` en los dos ejes el gesto horizontal del trackpad
+     sobre una columna quedaba atrapado y el tablero no scrolleaba de costado. */
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c9cdd4 transparent;
+}
+#pipeline .card-container::after { display: none; }
+/* Con alto fijo las tarjetas no se achican: la columna scrollea. */
+#pipeline .card-container > * { flex: none; }
+#pipeline .card-container:empty::before {
+  content: "Drop here";
+  display: block;
+  border: 1.5px dashed #e6e8ec;
+  border-radius: 10px;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #9aa2ad;
+}
+
+/* Tarjeta */
+#pipeline .pipeline-card {
+  padding: 13px 12px 12px;
+  min-height: 0;
+  border-radius: 10px;
+  border: 1px solid #e6e8ec;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16,17,22,.04), 0 1px 3px rgba(16,17,22,.06);
+  cursor: grab;
+  transition: box-shadow .15s, border-color .15s;
+}
+#pipeline .pipeline-card:hover {
+  transform: none;
+  border-color: #d6dae1;
+  box-shadow: 0 3px 10px rgba(16,17,22,.09);
+}
+#pipeline .pipeline-card:active { cursor: grabbing; }
+
+#pipeline .pipeline-card .candidate-info {
+  grid-template-rows: auto auto;
+  gap: 12px;
+  padding-right: 0;
+  padding-bottom: 0;
+}
+/* Estrella + sign-off arriba a la derecha (como siempre): el nombre se corre
+   para no pisarlos y baja de línea si hace falta. */
+#pipeline .pipeline-card .candidate-topline { min-height: 0; padding-right: 50px; box-sizing: border-box; } /* width:100% de más arriba: sin border-box el padding no achica el nombre */
+#pipeline .pipeline-card .candidate-identity {
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+
+/* Avatar con iniciales; la bandera queda como badge en la esquina */
+#pipeline .pipeline-card .pl-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .02em;
+}
+#pipeline .pipeline-card .pl-avatar .country {
+  position: absolute;
+  right: -5px;
+  bottom: -4px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #e6e8ec;
+}
+#pipeline .pipeline-card .pl-avatar .country:empty { display: none; }
+
+#pipeline .pipeline-card .candidate-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0e1116;
+  line-height: 1.2;
+  /* Nombres largos: hasta 2 líneas y después "…" */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Pie: salario a la izquierda, WhatsApp/borrar a la derecha; el chip de
+   Apriora en su propia línea abajo (pipeline.js lo inserta antes de
+   .star-wrapper, por eso el `order`). */
+#pipeline .pipeline-card .candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+#pipeline .pipeline-card .candidate-meta .salary { order: 0; margin-right: auto; }
+/* WhatsApp / 🤝 / borrar siempre abajo a la derecha, haya o no chip de Apriora */
+#pipeline .pipeline-card .candidate-meta { padding-right: 78px; }
+#pipeline .pipeline-card .candidate-meta .alex-interview { order: 2; flex-basis: 100%; }
+#pipeline .pipeline-card .salary {
+  font-size: 12px;
+  color: #6b7480;
+  font-variant-numeric: tabular-nums;
+}
+#pipeline .pipeline-card .alex-interview { margin: 0; }
+#pipeline .pipeline-card .alex-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+#pipeline .pipeline-card .card-header-actions {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  width: auto;
+  gap: 7px;
+}
+#pipeline .pipeline-card .star-wrapper {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: auto;
+  gap: 10px;
+}
+#pipeline .pipeline-card .star-icon { color: #dcdfe4; font-size: 13px; }
+#pipeline .pipeline-card .star-icon.starred { color: #ffb020; }
+#pipeline .pipeline-card .wa-icon { font-size: 14px; }
+#pipeline .pipeline-card .delete-icon { font-size: 12px; opacity: .7; }
+#pipeline .pipeline-card .delete-icon:hover { opacity: 1; }
+
+@media (max-width: 1100px) {
+  #pipeline .pipeline-columns { grid-template-columns: none; }
+}
+@media (max-width: 900px) {
+  #pipeline .column { flex: 0 0 248px; width: 248px; min-width: 248px; scroll-snap-align: start; }
+  #pipeline .pipeline-columns { scroll-snap-type: x proximity; }
+}
+
+/* ===========================================================
+   Pipeline · todo más arriba (2026-09-29)
+   Menos aire entre las pestañas y el tablero, y los controles en
+   una sola fila compacta, para que entren más tarjetas.
+   Sólo aplica mientras la pestaña Pipeline está visible.
+   =========================================================== */
+.detail-main:has(> #pipeline:not(.hidden)) { padding-top: 0.25rem; }
+
+#pipeline.pipeline-section { padding: 0 18px 12px; }
+#pipeline .pipeline-header { margin-bottom: 10px; align-items: center; }
+#pipeline .pipeline-actions { align-items: center; gap: 8px; }
+
+#pipeline .interview-count {
+  padding: 5px 6px 5px 12px;
+  gap: 8px;
+  margin-right: 0;
+}
+#pipeline .interview-count .alex-fetch-btn {
+  padding: 6px 12px;
+  border-radius: 10px;
+}
+
+/* Verificación de Apriora: cuando está todo bien es un chip en la misma fila;
+   cuando falta alguna pregunta sigue en su propia fila, porque es una frase. */
+#pipeline .apriora-qcheck.is-ok {
+  flex: 0 1 auto;
+  align-items: center;
+  padding: 6px 12px;
+  line-height: 1.3;
+}
+#pipeline .apriora-qcheck.is-ok .apriora-qcheck-hint {
+  display: inline;
+  margin: 0 0 0 6px;
+}
+
+/* + Add Candidate a la derecha de la misma fila */
+#pipeline #pipelineAddCandidateBtn { margin-left: auto; padding: 8px 14px; }
+
+/* Las columnas ganan el alto que se liberó arriba */
+#pipeline .column { height: max(420px, calc(100vh - 190px)); }

@@ -3103,6 +3103,10 @@ if (save){
       : /^(1|y|yes|true|✓|\[v\])$/i.test(String(raw ?? '').trim());
 
     check.checked = !!initial;
+
+    // References filled (Second Interview): mismo GET, otra columna.
+    const refs = document.getElementById('references-filled-check');
+    if (refs) refs.checked = row?.references_filled === true;
   } catch(e) {
     console.warn('No se pudo leer check_hr_lead inicial', e);
   }
@@ -4505,7 +4509,8 @@ if (hireRevenue){
     Contactado: 'Contacted',
     'No avanza primera': 'No Advance',
     'Primera entrevista': 'First Interview',
-    'En proceso con Cliente': 'In Client Process'
+    'En proceso con Cliente': 'In Client Process',
+    'Segunda entrevista': 'Second Interview'
   };
 
   function formatCandidatePipelineStage(stage) {
@@ -4628,6 +4633,37 @@ function wireVideoLinkDedupe() {
       }
     } catch (e) {
       console.error('❌ Saving check_hr_lead failed', e);
+      check.checked = !val; // revertir si falló
+      alert('We could not save this change. Please try again.');
+    }
+  });
+})();
+
+// === References filled: corta el recordatorio de 24 h de Second Interview ====
+(function wireReferencesFilledCheck(){
+  const check = document.getElementById('references-filled-check');
+  if (!check) return;
+
+  const API  = candidatesApiBase();
+  const cid  = new URLSearchParams(window.location.search).get('id');
+
+  check.addEventListener('change', async () => {
+    if (!cid) return;
+    const val = !!check.checked;
+
+    try {
+      const r = await fetch(`${API}/candidates/${cid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ references_filled: val })
+      });
+      if (!r.ok) throw new Error(await r.text().catch(()=> 'PATCH failed'));
+
+      if (val) {
+        showCuteToast(`📎 References filled — the daily reminder stops here. 💖`, 5000);
+      }
+    } catch (e) {
+      console.error('❌ Saving references_filled failed', e);
       check.checked = !val; // revertir si falló
       alert('We could not save this change. Please try again.');
     }

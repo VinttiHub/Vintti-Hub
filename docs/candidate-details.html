@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260928-ov9" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20260929-2nd-int" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -546,8 +546,16 @@
               </article>
             </div>
 
-            <!-- Resignation letter & references: el check de la HR lead (check_hr_lead) -->
+            <!-- References filled (references_filled): corta el recordatorio de 24 h
+                 que arranca al pasar el candidato a Second Interview en el Pipeline.
+                 Resignation letter & references (check_hr_lead): corta el de Signed.
+                 Son dos checks distintos a propósito. -->
             <div id="resig-ref-block" class="ov-allset">
+              <label class="pretty-check ov-chip" title="Stops the daily Second Interview references reminder">
+                <input type="checkbox" id="references-filled-check" />
+                <span class="box" aria-hidden="true"></span>
+                <span class="txt">References filled (stops the Second Interview reminders)</span>
+              </label>
               <label class="pretty-check ov-chip">
                 <input type="checkbox" id="resig-ref-check" />
                 <span class="box" aria-hidden="true"></span>
@@ -1360,7 +1368,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260928-cvonly"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20260928-cvonly"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20260929-2nd-int"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

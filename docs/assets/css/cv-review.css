@@ -420,6 +420,7 @@
 .cvr-opp-pipe.is-contacted { background: #fef2f2; color: #a3323a; }
 .cvr-opp-pipe.is-first     { background: #edf4ff; color: #24518f; }
 .cvr-opp-pipe.is-noadv     { background: #effaf0; color: #1b6b2b; }
+.cvr-opp-pipe.is-second    { background: #f3efff; color: #4b2aa8; }
 /* Client process va en tinte suave como los demás. Se pinta lleno SÓLO cuando el
    candidato está en el límite o pasado: ahí el pill dice cuál de las filas es el
    problema. Lleno siempre gritaba en el caso normal, que es la mayoría. */

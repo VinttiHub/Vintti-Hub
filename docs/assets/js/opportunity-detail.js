@@ -4859,9 +4859,11 @@ async function loadAvailableCandidatesForBatch(batchId) {
       getAssignedCandidateIdsForOpportunity(opportunityId)
     ]);
 
-    // Filtra: solo "En proceso con Cliente" y NO en ningún batch de esta opp
+    // Filtra: "En proceso con Cliente" o "Segunda entrevista" (la columna que le
+    // sigue) y NO en ningún batch de esta opp
     const available = (oppCands || []).filter(c =>
-      c.stage === "En proceso con Cliente" && !assignedSet.has(c.candidate_id)
+      (c.stage === "En proceso con Cliente" || c.stage === "Segunda entrevista") &&
+      !assignedSet.has(c.candidate_id)
     );
 
     // Pinta lista

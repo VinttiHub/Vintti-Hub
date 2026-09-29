@@ -30,6 +30,7 @@ from utils.credit_loop import (
     update_credit_status,
 )
 from utils.hire_state import clear_stale_hire_for_opportunity
+from utils.second_interview_refs import SECOND_INTERVIEW_STAGE, start_second_interview_refs_reminder
 from utils.transactional_email import post_transactional_email
 from utils.signoff_email import (
     ensure_signoff_sent_column,
@@ -1844,6 +1845,12 @@ def update_stage_pipeline(opportunity_id, candidate_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
+            SELECT stage_pipeline FROM opportunity_candidates
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (opportunity_id, candidate_id))
+        prev = cursor.fetchone()
+        previous_stage = (prev[0] or '').strip() if prev else ''
+        cursor.execute("""
             UPDATE opportunity_candidates
             SET stage_pipeline = %s
             WHERE opportunity_id = %s AND candidate_id = %s
@@ -1852,7 +1859,15 @@ def update_stage_pipeline(opportunity_id, candidate_id):
         cursor.close()
         conn.close()
         print("✅ stage_pipeline actualizado")
-        return jsonify({'success': True}), 200
+
+        # Entró a Second Interview: mail de referencias a Agostina + la recruiter,
+        # que se repite cada 24 h hasta que marquen "References filled". Va después
+        # del commit y nunca levanta: un mail fallido no deshace el movimiento.
+        reminder = None
+        if (str(stage_pipeline).strip() == SECOND_INTERVIEW_STAGE
+                and previous_stage != SECOND_INTERVIEW_STAGE):
+            reminder = start_second_interview_refs_reminder(opportunity_id, candidate_id)
+        return jsonify({'success': True, 'references_reminder': reminder}), 200
     except Exception as e:
         print("❌ ERROR DB:", e)
         return jsonify({'error': str(e)}), 500

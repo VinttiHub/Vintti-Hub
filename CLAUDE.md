@@ -817,6 +817,33 @@ lead decide en `docs/jd-review.html`.
   quality** de Recruiter Power, las dos con la tarjeta de `jd-review-cards.js`). Una vacante cuenta
   una vez, en el período de su primer envío.
 
+## Second Interview: recordatorio de referencias cada 24 h
+
+La 6ª columna del Pipeline de `docs/opportunity-detail.html` es **Second Interview**
+(`opportunity_candidates.stage_pipeline = 'Segunda entrevista'`, última en `stageOrder` de
+`pipeline.js`). Al entrar ahí, `PATCH /opportunities/<id>/candidates/<cid>/stage` llama
+`start_second_interview_refs_reminder()` (**después del commit y nunca levanta**) y sale un
+mail a `agostina@vintti.com` + `opp_hr_lead` para que pidan y carguen las referencias.
+Toda la lógica vive en `backend/utils/second_interview_refs.py`.
+
+- **Se repite cada 24 h hasta que la recruiter marca "References filled"** en la Overview de
+  `candidate-details.html` (`candidates.references_filled`, por candidato). También se corta
+  si el candidato sale de la columna (`left_stage`). Si vuelve a entrar, la fila se reabre.
+- **`references_filled` NO es `check_hr_lead`.** Ese ("All set: resignation letter &
+  references") corta el recordatorio de Signed, que pide además la carta de renuncia.
+  Reusarlo lo apagaba de antemano (decisión de la owner, 2026-09-29).
+- **Cron propio y horario**: `.github/workflows/second-interview-references.yml` →
+  `POST /reminders/second_interview_refs/due` con `X-Audit-Token` (= `DASHBOARD_AUDIT_TOKEN`).
+  Las 24 h las mide `second_interview_refs_reminders.last_sent_at`, no el cron. No va dentro
+  de `/reminders/due` porque ese sólo corre en la ventana 05:00-07:59 de Guatemala y el cron de
+  GitHub llega ~4 h tarde: casi nunca manda nada (así está roto hoy el recordatorio de Signed).
+- **Sábado y domingo (hora Argentina) no manda**: se posterga al lunes (`alerta_en_pausa()`).
+  El primer mail sí sale al instante aunque sea fin de semana, porque lo disparó una persona.
+- Un primer envío fallido (`last_sent_at` NULL) se reintenta en la próxima corrida.
+- Esquema autocreado (columna + tabla), sin migración a mano. `?dry=1` lista los vencidos.
+- Modo prueba: `TEST_ONLY_RECIPIENT` en el módulo (hoy `None` = producción). Con un email ahí,
+  todo va sólo a esa dirección con `[TEST]` en el asunto y un aviso de a quién habría ido.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):

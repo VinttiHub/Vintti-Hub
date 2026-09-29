@@ -7421,6 +7421,10 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   flex: 0 0 auto;
 }
 
+#overview .ov-allset .ov-chip + .ov-chip {
+  margin-top: 8px;
+}
+
 /* ---------- Equipment ---------- */
 #overview #equipments-card .chips-row {
   font-size: 13px;

@@ -736,6 +736,22 @@ async function resolvePhone(candidate){
   }catch{ return ''; }
 }
 
+// Avatar con iniciales de las tarjetas del Pipeline, mismo criterio que Hirex
+// (hirex-detail.js: avatarColor): el color sale de un hash del nombre, así que la
+// misma persona tiene siempre el mismo color.
+const PIPELINE_AVATAR_COLORS = ["#0028ff", "#6c38ff", "#4ba9ff", "#ff1fdb", "#d99a1c", "#12a150", "#e0115f"];
+function pipelineAvatarColor(name) {
+  const s = String(name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return PIPELINE_AVATAR_COLORS[Math.abs(h) % PIPELINE_AVATAR_COLORS.length];
+}
+function pipelineInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  const txt = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || '?').slice(0, 2);
+  return txt.toUpperCase().replace(/[&<>"']/g, '');
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const containers = document.querySelectorAll(".card-container");
     const stageMap = {
@@ -743,9 +759,12 @@ document.addEventListener("DOMContentLoaded", () => {
       'no-advance': 'No avanza primera',
       'first-interview': 'Primera entrevista',
       'client-process': 'En proceso con Cliente',
+      // Al entrar acá el backend manda el mail de referencias a Agostina + la
+      // recruiter, y lo repite cada 24 h hasta que marquen "References filled".
+      'second-interview': 'Segunda entrevista',
       'applicant': 'Applicant'  
     };
-    const stageOrder = ['applicant', 'contacted', 'first-interview', 'no-advance', 'client-process'];
+    const stageOrder = ['applicant', 'contacted', 'first-interview', 'no-advance', 'client-process', 'second-interview'];
     const stageIndexLookup = stageOrder.reduce((acc, key, idx) => {
       acc[key] = idx;
       return acc;
@@ -810,11 +829,15 @@ document.addEventListener("DOMContentLoaded", () => {
         container.parentElement.classList.add('drag-over'); // añade clase visual a .column
       });
 
-      container.addEventListener("dragleave", () => {
-        container.parentElement.classList.remove('drag-over');
+      // Sólo se saca el resaltado si el puntero salió de la columna de verdad: al
+      // pasar por encima de una tarjeta hija también dispara dragleave y parpadeaba.
+      container.addEventListener("dragleave", (e) => {
+        const column = container.parentElement;
+        if (!column.contains(e.relatedTarget)) column.classList.remove('drag-over');
       });
       container.addEventListener("drop", (e) => {
         e.preventDefault();
+        container.parentElement.classList.remove('drag-over');
         console.log('📥 Drop event triggered');
 
         // Recuperar candidateId desde dataTransfer
@@ -1427,7 +1450,8 @@ function loadPipelineCandidates() {
         'contacted': 0,
         'no-advance': 0,
         'first-interview': 0,
-        'client-process': 0
+        'client-process': 0,
+        'second-interview': 0
       };
       // Limpiar todas las columnas antes
       document.querySelectorAll('.card-container').forEach(container => {
@@ -1459,7 +1483,7 @@ card.innerHTML = `
   <div class="candidate-info">
     <div class="candidate-topline">
       <div class="candidate-identity">
-        <span class="country"></span>
+        <span class="pl-avatar" style="background:${pipelineAvatarColor(candidate.name)}" aria-hidden="true">${pipelineInitials(candidate.name)}<span class="country"></span></span>
         <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
       </div>
       <div class="card-header-actions">
@@ -1705,6 +1729,9 @@ switch (stageVal) {
     break;
   case 'En proceso con Cliente':
     columnId = 'client-process';
+    break;
+  case 'Segunda entrevista':
+    columnId = 'second-interview';
     break;
   default:
     console.warn(`Stage desconocido: ${stageVal}`);
