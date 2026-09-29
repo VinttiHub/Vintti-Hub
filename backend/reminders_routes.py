@@ -9,6 +9,7 @@ from db import get_connection   # ya lo tienes
 from utils.credit_loop import run_due_credit_loop_reminders
 from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
 from utils.second_interview_refs import run_due_second_interview_refs_reminders
+from utils.profile_completion_reminder import run_due_profile_reminders
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -1513,6 +1514,23 @@ def send_due_second_interview_refs_reminders():
         return jsonify({"error": "unauthorized"}), 401
     dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
     return jsonify(run_due_second_interview_refs_reminders(dry_run=dry)), 200
+
+
+@bp.route("/reminders/profile_completion/due", methods=["POST"])
+def send_due_profile_completion_reminders():
+    """Recordatorio de perfil incompleto (utils/profile_completion_reminder.py).
+
+    Mail a cada persona activa a la que le falte Address / Emergency Contact /
+    Date of Birth / Vintti Start Date, cada 24 h (Lun-Vie) hasta que los complete.
+    Mismo esquema que el de Second Interview: cron horario con el token del
+    auditor, las 24 h las mide la tabla. ?dry=1 lista a quién le toca sin mandar.
+    """
+    expected = os.environ.get("DASHBOARD_AUDIT_TOKEN")
+    given = request.headers.get("X-Audit-Token") or request.args.get("token")
+    if not expected or not given or given != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
+    return jsonify(run_due_profile_reminders(dry_run=dry)), 200
 
 
 @bp.route("/reminders/client_checks/due", methods=["POST"])

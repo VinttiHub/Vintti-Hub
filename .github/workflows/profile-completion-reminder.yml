@@ -1,0 +1,29 @@
+name: Profile completion reminder
+
+# Recordatorio de perfil incompleto (utils/profile_completion_reminder.py): mail a
+# cada persona activa a la que le falte Address / Emergency Contact / Date of
+# Birth / Vintti Start Date en docs/profile.html, cada 24 h hasta completarlos.
+#
+# Corre CADA HORA a proposito: las 24 h las mide la tabla
+# `profile_completion_reminders` (last_sent_at), no el cron, porque el cron de
+# GitHub llega horas tarde. Sabado y domingo (hora Argentina) el endpoint no manda.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = lista a quien le toca, NO manda mails"
+        required: false
+        default: ""
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mandar los recordatorios vencidos
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/profile_completion/due?dry=${{ github.event.inputs.dry }}"

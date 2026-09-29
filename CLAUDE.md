@@ -862,6 +862,24 @@ Toda la lógica vive en `backend/utils/second_interview_refs.py`.
 - Modo prueba: `TEST_ONLY_RECIPIENT` en el módulo (hoy `None` = producción). Con un email ahí,
   todo va sólo a esa dirección con `[TEST]` en el asunto y un aviso de a quién habría ido.
 
+## Perfil incompleto: recordatorio diario hasta completarlo
+
+Cada persona activa (`COALESCE(admin_user_access.is_active, TRUE)`) a la que le falte
+**Address, Emergency Contact, Date of Birth o Vintti Start Date** en `docs/profile.html`
+recibe un mail en su `email_vintti` cada 24 h, sin CC. Todo en
+`backend/utils/profile_completion_reminder.py` (`REQUIRED_FIELDS` es la única lista).
+
+- **El corte es por construcción**: el runner mira `users` en cada corrida; quien guarda los
+  4 campos desde su perfil deja de salir solo. `profile_completion_reminders` sólo lleva
+  `last_sent_at` (las 24 h) y sella `completed_at` como registro.
+- **Vacío incluye `''`**: `profile.js` guarda Emergency Contact en blanco como `''` (los 13
+  que faltaban al 2026-09-29 eran todos `''`, ninguno NULL).
+- Cron horario `.github/workflows/profile-completion-reminder.yml` →
+  `POST /reminders/profile_completion/due` con `X-Audit-Token`; `?dry=1` lista a quién le toca.
+  Sábado y domingo (hora Argentina) no manda.
+- Modo prueba: `TEST_ONLY_RECIPIENT` en el módulo (hoy `None` = producción, desde el
+  2026-09-29). Con un email ahí, todo va sólo a esa dirección con `[TEST]` en el asunto.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):
