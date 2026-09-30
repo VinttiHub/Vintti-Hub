@@ -913,6 +913,14 @@ evento anual (día completo, `transparent`, invita a `team@vintti.com`, título
   Benjamin, los dos el 7-mar). Si el nombre/nickname se repite entre activos, el título lleva
   apellido: "Cumple Valentina Cadirola :)" (`_display_name`). Lo que quede en
   review se destraba con **Create anyway** (`POST /birthdays/sync/<id> {"force": true}`).
+- **Una baja borra el cumple** (pedido de la owner, 2026-09-30): `_deactivate_endpoint` de
+  `admin_routes.py` llama `remove_birthday_event_async()` después del commit. Borra la serie
+  entera, **también si era un evento manual**, con `sendUpdates="none"`: desaparece de los
+  calendarios de todos sin mandar un "Canceled event" que anuncie la baja. Nunca borra un
+  evento registrado a nombre de alguien activo ni uno que nombre a una persona activa que
+  cumple ese día. Las bajas anteriores salen en el panel ("No longer at Vintti, still in the
+  calendar") con **Remove** y en el mail semanal. No hay ruta de reactivación: si alguien
+  vuelve, su cumple se recrea con Create desde el panel.
 - Mapeo persona → evento en `birthday_calendar_events` (autocreada). Si borran el evento en
   Google, la fila se suelta sola en el próximo sync.
 - Detección: pestaña **Birthdays** de profile.html (sólo `PANEL_EMAILS` = jazmin + pgonzales,

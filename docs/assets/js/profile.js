@@ -4494,6 +4494,7 @@ async function loadBirthdays(){
         <span class="bd-muted">${escapeHtml(u.email || '')}</span></div></div>`
     ).join('') : '<div class="bd-empty">Everyone has their Date of Birth. 🎉</div>';
     bindBirthdayButtons(up);
+    renderInactiveBirthdays(ov.inactive_in_calendar || []);
   } catch (err){
     console.error('loadBirthdays', err);
     up.innerHTML = '<div class="bd-empty">Could not load birthdays.</div>';
@@ -4540,6 +4541,34 @@ async function connectBirthdayCalendar(){
     console.error(err);
     bdStatus('Could not start the Google connection.');
   }
+}
+
+// Bajas anteriores a este panel: su cumple sigue en el calendario. Las bajas
+// nuevas lo borran solas (admin_routes → remove_birthday_event_async).
+function renderInactiveBirthdays(rows){
+  const wrap = document.getElementById('bdInactiveWrap');
+  const box = document.getElementById('bdInactive');
+  if (!wrap || !box) return;
+  wrap.hidden = !rows.length;
+  box.innerHTML = rows.map(u => `<div class="bd-row">
+      <div class="bd-main"><strong>${escapeHtml(u.name || '')}</strong>
+        <span class="bd-muted bd-detail">${escapeHtml(u.summaries.join(', '))}</span></div>
+      <button type="button" class="btn pill ghost" data-bd-remove="${u.user_id}">Remove</button>
+    </div>`).join('');
+  box.querySelectorAll('[data-bd-remove]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Remove this birthday from the team calendar? It disappears for everyone (no email is sent).')) return;
+    b.disabled = true;
+    bdStatus('Removing…');
+    try {
+      const r = await api(`/birthdays/remove/${b.dataset.bdRemove}`, { method: 'POST' });
+      const out = await r.json();
+      bdStatus(out.error || (out.removed?.length ? 'Removed.' : 'Nothing to remove.'));
+    } catch (err){
+      console.error(err);
+      bdStatus('Could not remove it.');
+    }
+    loadBirthdays();
+  }));
 }
 
 async function runBirthdayBackfill(dry){

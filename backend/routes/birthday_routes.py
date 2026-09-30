@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from db import get_connection
-from utils.birthday_calendar import PANEL_EMAILS, birthday_overview, sync_users
+from utils.birthday_calendar import PANEL_EMAILS, birthday_overview, remove_birthday_event, sync_users
 
 bp = Blueprint("birthdays", __name__)
 
@@ -63,3 +63,12 @@ def backfill():
     data = request.get_json(silent=True) or {}
     dry = data.get("dry_run", True) is not False
     return jsonify(sync_users(dry_run=dry))
+
+
+@bp.post("/birthdays/remove/<int:user_id>")
+def remove_one(user_id: int):
+    """Borra el cumple de alguien dado de baja (si está activo no hace nada)."""
+    denied = _deny()
+    if denied:
+        return denied
+    return jsonify(remove_birthday_event(user_id))

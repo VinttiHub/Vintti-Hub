@@ -514,6 +514,14 @@ def _deactivate_endpoint(user_id: int):
     finally:
         conn.close()
 
+    # Su cumple sale del calendario del equipo. Después del commit y en un hilo:
+    # un error de Google no puede deshacer ni demorar la baja.
+    try:
+        from utils.birthday_calendar import remove_birthday_event_async
+        remove_birthday_event_async(user_id)
+    except Exception:
+        logging.exception("birthday removal could not start user_id=%s", user_id)
+
     return jsonify({"ok": True, "deactivated_user_id": user_id}), 200
 
 

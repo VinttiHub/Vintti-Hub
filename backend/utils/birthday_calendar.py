@@ -505,6 +505,99 @@ def sync_birthday_event_async(user_id: int) -> None:
     threading.Thread(target=_run, daemon=True).start()
 
 
+# ------------------------------------------------------------------- bajas ----
+#
+# Cuando se da de baja a alguien en el hub (admin_user_access.is_active = FALSE),
+# su cumple sale del calendario (pedido de la owner, 2026-09-30). Se borra la
+# serie entera con sendUpdates="none": el evento desaparece de los calendarios
+# del equipo igual, pero sin mandar a 35 personas un "Canceled event: Cumple X"
+# que anuncie la baja. Aplica también a los eventos hechos a mano.
+
+def _inactive_users(cur, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    cur.execute(
+        f"""
+        SELECT u.user_id, u.user_name, u.nickname, u.fecha_nacimiento
+          FROM users u
+          JOIN admin_user_access aua ON aua.user_id = u.user_id
+         WHERE aua.is_active = FALSE
+           {"AND u.user_id = %s" if user_id else ""}
+         ORDER BY u.user_name
+        """,
+        (user_id,) if user_id else None,
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def _events_of_inactive(user, row, events, active_people, active_event_ids) -> List[Dict[str, Any]]:
+    """Qué eventos del calendario son el cumple de esta persona dada de baja.
+
+    El que el hub tiene registrado (creado o adoptado) y, si no, los de su día con
+    su nombre. Nunca uno registrado a nombre de alguien activo, ni uno que nombre
+    a una persona activa que cumple ese mismo día (Benjamin y Mia, el 7-mar).
+    """
+    birth = _as_date(user["fecha_nacimiento"])
+    found = []
+    for e in events:
+        if e["ids"] & active_event_ids:
+            continue
+        if row and row["event_id"] in e["ids"]:
+            found.append(e)
+        elif birth and e["md"] == _md(birth) and _name_matches(e["summary"], user) \
+                and not _belongs_to_other(e, user, active_people):
+            found.append(e)
+    return found
+
+
+def remove_birthday_event(user_id: int, dry_run: bool = False) -> Dict[str, Any]:
+    """Borra del calendario el cumple de una persona dada de baja. Si está activa, no toca nada."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            ensure_birthday_schema(cur)
+            conn.commit()
+            users = _inactive_users(cur, user_id)
+            if not users:
+                return {"removed": [], "reason": "user_is_active"}
+            try:
+                service, calendar_id = _service_and_calendar(cur)
+            except NotConnected as exc:
+                return {"connected": False, "error": str(exc), "error_kind": exc.kind, "removed": []}
+            mapped = _mapped(cur)
+            active_ids = {u["user_id"] for u in _active_users(cur)}
+            active_people = [p for p in _all_birthdays(cur) if p["user_id"] in active_ids]
+            active_event_ids = {r["event_id"] for uid, r in mapped.items() if uid in active_ids}
+            targets = _events_of_inactive(users[0], mapped.get(user_id), _birthday_events(service, calendar_id),
+                                          active_people, active_event_ids)
+            removed = []
+            if not dry_run:
+                for e in targets:
+                    for eid in e["ids"]:
+                        try:
+                            service.events().delete(calendarId=calendar_id, eventId=eid, sendUpdates="none").execute()
+                        except Exception as exc:
+                            if getattr(getattr(exc, "resp", None), "status", None) not in (404, 410):
+                                raise
+                    removed.append(e["summary"])
+                cur.execute("DELETE FROM birthday_calendar_events WHERE user_id = %s", (user_id,))
+                conn.commit()
+            return {"connected": True, "dry_run": dry_run, "removed": removed,
+                    "would_remove": [e["summary"] for e in targets] if dry_run else None}
+    finally:
+        conn.close()
+
+
+def remove_birthday_event_async(user_id: int) -> None:
+    """Lo llama la baja de usuario (admin_routes) después del commit. Nunca levanta."""
+    def _run():
+        try:
+            out = remove_birthday_event(user_id)
+            logging.info("birthday removal user_id=%s → %s", user_id, out)
+        except Exception:
+            logging.exception("birthday removal crashed user_id=%s", user_id)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def birthday_overview() -> Dict[str, Any]:
     """Panel + mail semanal: sin fecha, próximos 30 días y su estado."""
     today = today_ar()
@@ -550,10 +643,24 @@ def birthday_overview() -> Dict[str, Any]:
                 upcoming.append({**who, "birthday": nxt.isoformat(), "in_days": days,
                                  "status": status, "detail": plan})
             upcoming.sort(key=lambda r: r["in_days"])
+
+            # Gente dada de baja cuyo cumple sigue en el calendario (bajas previas a
+            # que esto existiera, o una baja en la que Google falló).
+            inactive_in_calendar = []
+            if connected:
+                active_ids = {u["user_id"] for u in users}
+                active_people = [p for p in people if p["user_id"] in active_ids]
+                active_event_ids = {r["event_id"] for uid, r in mapped.items() if uid in active_ids}
+                for u in _inactive_users(cur):
+                    evs = _events_of_inactive(u, mapped.get(u["user_id"]), events, active_people, active_event_ids)
+                    if evs:
+                        inactive_in_calendar.append({"user_id": u["user_id"], "name": u["user_name"],
+                                                     "summaries": [e["summary"] for e in evs]})
             return {
                 "today": today.isoformat(), "connected": connected, "error": error, "error_kind": error_kind,
                 "calendar_owner": CALENDAR_OWNER_EMAIL, "calendar_name": CALENDAR_NAME,
                 "missing_birthday": missing, "upcoming": upcoming,
+                "inactive_in_calendar": inactive_in_calendar,
             }
     finally:
         conn.close()
@@ -587,6 +694,14 @@ def _report_email(ov: Dict[str, Any]) -> tuple[str, str]:
         )
         parts.append(f'<p style="margin:0 0 8px;">Upcoming birthdays (next {UPCOMING_DAYS} days) without a confirmed event:</p>'
                      f'<ul style="margin:0 0 18px;padding-left:20px;">{items}</ul>')
+    if ov.get("inactive_in_calendar"):
+        items = "".join(
+            f"<li {li}>{html.escape(u['name'] or '')} — {html.escape(', '.join(u['summaries']))}</li>"
+            for u in ov["inactive_in_calendar"]
+        )
+        parts.append(f'<p style="margin:0 0 8px;">No longer at Vintti but still in the birthday calendar '
+                     f'(remove them from the Birthdays tab):</p>'
+                     f'<ul style="margin:0 0 18px;padding-left:20px;">{items}</ul>')
     if ov["missing_birthday"]:
         items = "".join(
             f"<li {li}>{html.escape(u['name'] or '')} <span style=\"color:#52606d;\">({html.escape(u['email'] or '')})</span></li>"
@@ -615,7 +730,7 @@ def run_weekly_birthday_report(dry_run: bool = False) -> Dict[str, Any]:
     week_start = today - timedelta(days=today.weekday())
     ov = birthday_overview()
     pending = [u for u in ov["upcoming"] if u["status"] not in ("ok", "manual_event")]
-    has_news = bool(pending or ov["missing_birthday"] or not ov["connected"])
+    has_news = bool(pending or ov["missing_birthday"] or ov.get("inactive_in_calendar") or not ov["connected"])
     if dry_run:
         return {"dry_run": True, "would_send": has_news, "overview": ov}
     if not has_news:
