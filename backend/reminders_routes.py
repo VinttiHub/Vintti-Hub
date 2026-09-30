@@ -11,6 +11,7 @@ from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
 from utils.second_interview_refs import run_due_second_interview_refs_reminders
 from utils.profile_completion_reminder import run_due_profile_reminders
 from utils.birthday_calendar import run_weekly_birthday_report
+from utils.stale_opps_slack import run_stale_opps_alert
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -1532,6 +1533,20 @@ def send_due_profile_completion_reminders():
         return jsonify({"error": "unauthorized"}), 401
     dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
     return jsonify(run_due_profile_reminders(dry_run=dry)), 200
+
+
+@bp.route("/reminders/stale_opps_slack/due", methods=["POST"])
+def send_stale_opps_slack_alert():
+    """Aviso diario a Slack (utils/stale_opps_slack.py): opps de Mariano con más de
+    20 días en Deep Dive / NDA Sent. Cron horario con el token del auditor; un solo
+    mensaje por día lo garantiza `stale_opps_slack_log`. ?dry=1 lista sin postear.
+    """
+    expected = os.environ.get("DASHBOARD_AUDIT_TOKEN")
+    given = request.headers.get("X-Audit-Token") or request.args.get("token")
+    if not expected or not given or given != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
+    return jsonify(run_stale_opps_alert(dry_run=dry)), 200
 
 
 @bp.route("/reminders/birthdays/weekly", methods=["POST"])

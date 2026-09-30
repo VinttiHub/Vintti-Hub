@@ -946,3 +946,16 @@ Rules of thumb:
 - "Green" ALWAYS means lime `#c1ff72` (use it for arcs/fills/tints; keep big numbers/labels dark for legibility). Do NOT substitute `#2e9b5d`, `#33b277`, etc.
 - The funnel gauge cards use one primary each: SQL→Deep Dive=violet, Deep Dive→NDA=lime, NDA→Client Win=cyan, SQL→Client Win=magenta, SQL→Close Win=blue (via `.wr-violet/.wr-lime/.wr-cyan/.wr-magenta/.wr-blue` → `--wr`).
 - Monochrome shades are generated with `color-mix(in srgb, var(--wr) N%, #fff)`. 
+## Slack: opps de Mariano paradas +20 días en Deep Dive / NDA Sent
+
+`backend/utils/stale_opps_slack.py`: un mensaje por día hábil (desde las 09:00 ART) que
+menciona a Mariano con las opps suyas (`opp_sales_lead`) que llevan 20 días o más en la
+etapa actual — `deep_dive_date` si está en Deep Dive, `nda_sent_date` si está en NDA Sent —
+para que las cierre o las mueva. Sin vencidas no se postea nada.
+
+- Cron horario `.github/workflows/stale-opps-slack.yml` →
+  `POST /reminders/stale_opps_slack/due` con `X-Audit-Token`; `?dry=1` lista sin postear.
+  Un solo mensaje por día lo garantiza `stale_opps_slack_log` (autocreada), reclamada antes
+  de postear; si Slack falla se suelta y la próxima corrida reintenta.
+- Canal **Sales & Opps** (`SLACK_CHANNEL_ID = "C07GZ8RQWF3"`, hardcodeado, definitivo desde
+  el 2026-09-30; antes era el de prueba `C0C0UQ7SYBW`). El bot tiene que estar invitado.

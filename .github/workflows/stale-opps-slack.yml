@@ -1,0 +1,29 @@
+name: Stale opps Slack alert
+
+# Aviso a Slack (utils/stale_opps_slack.py): opps de Mariano con mas de 20 dias
+# en Deep Dive / NDA Sent, para que las cierre o las mueva.
+#
+# Corre CADA HORA a proposito, igual que second-interview-references.yml: el
+# atraso de GitHub (2h27 a 9h40 medido, ver daily-digest.yml) no garantiza un
+# horario. El endpoint postea UNA sola vez por dia (tabla stale_opps_slack_log),
+# solo desde las 09:00 hora Argentina y solo de lunes a viernes.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = lista las opps vencidas, NO postea a Slack"
+        required: false
+        default: ""
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Postear las opps vencidas
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/stale_opps_slack/due?dry=${{ github.event.inputs.dry }}"
