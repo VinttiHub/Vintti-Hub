@@ -43,6 +43,7 @@ body{font-family:'Onest',sans-serif;color:#000000;padding:8px;}
 .sw-ipill.sw-on{border-color:var(--purple);color:var(--white);background:var(--purple);box-shadow:0 0 14px rgba(108,56,255,0.18);}
 .sw-country-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;align-items:center;}
 .sw-clbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--slate2);margin-right:4px;}
+.sw-flag{width:16px;height:12px;border-radius:2px;object-fit:cover;vertical-align:-1px;margin-right:6px;box-shadow:0 0 0 1px rgba(0,0,0,0.06);}
 .sw-cpill{font-family:'Onest',sans-serif;font-size:11px;font-weight:700;padding:5px 13px;border-radius:100px;border:1.5px solid var(--border);color:var(--slate);cursor:pointer;transition:all .12s;background:var(--gray);}
 .sw-cpill:hover{border-color:rgba(0,59,255,0.35);color:var(--blue);}
 .sw-cpill.sw-on{border-color:var(--blue);color:var(--blue);background:rgba(0,59,255,0.07);}
@@ -311,18 +312,22 @@ const INDUSTRIES = Object.assign({
 }, EXTRA_INDUSTRIES);
 
 const SW_C = {
-  mexico:{name:'Mexico',flag:'🇲🇽'},
-  argentina:{name:'Argentina',flag:'🇦🇷'},
-  colombia:{name:'Colombia',flag:'🇨🇴'},
-  chile:{name:'Chile',flag:'🇨🇱'},
-  brazil:{name:'Brazil',flag:'🇧🇷'},
-  peru:{name:'Peru',flag:'🇵🇪'},
-  uruguay:{name:'Uruguay',flag:'🇺🇾'},
-  ecuador:{name:'Ecuador',flag:'🇪🇨'},
-  venezuela:{name:'Venezuela',flag:'🇻🇪'},
-  bolivia:{name:'Bolivia',flag:'🇧🇴'},
-  paraguay:{name:'Paraguay',flag:'🇵🇾'},
+  mexico:{name:'Mexico',flag:'mx'},
+  argentina:{name:'Argentina',flag:'ar'},
+  colombia:{name:'Colombia',flag:'co'},
+  chile:{name:'Chile',flag:'cl'},
+  brazil:{name:'Brazil',flag:'br'},
+  peru:{name:'Peru',flag:'pe'},
+  uruguay:{name:'Uruguay',flag:'uy'},
+  ecuador:{name:'Ecuador',flag:'ec'},
+  venezuela:{name:'Venezuela',flag:'ve'},
+  bolivia:{name:'Bolivia',flag:'bo'},
+  paraguay:{name:'Paraguay',flag:'py'},
 };
+// Banderas como imagen: Windows no dibuja los emojis de bandera (muestra "MX", "AR"...).
+function swFlag(code){
+  return `<img class="sw-flag" src="https://flagcdn.com/w40/${code}.png" alt="" width="16" height="12" loading="lazy">`;
+}
 const SW_SL = {junior:'Junior',semi:'Semi-Senior',senior:'Senior'};
 
 let swI = 'accounting', swR = 'bookkeeper', swC = 'mexico', swS = 'junior';
@@ -362,7 +367,7 @@ function buildCountries(){
   const avail = Object.keys(SW_C).filter(c => currentRole().d[c]);
   if(!avail.includes(swC)) swC = avail[0];
   document.getElementById('sw-countries').innerHTML = '<span class="sw-clbl">Country</span>' + avail.map(c =>
-    `<button type="button" class="sw-cpill${c===swC?' sw-on':''}" data-country="${c}">${SW_C[c].flag} ${SW_C[c].name}</button>`
+    `<button type="button" class="sw-cpill${c===swC?' sw-on':''}" data-country="${c}">${swFlag(SW_C[c].flag)}${SW_C[c].name}</button>`
   ).join('');
 }
 
@@ -389,14 +394,14 @@ function swRender(){
         ${lH>36?'':`<span class="sw-bar-val sw-bar-val-out">${swFmt(d.mid,t)}</span>`}
         <div class="sw-bar sw-latam" style="height:${lH}px;width:78%">${lH>36?`<span class="sw-bar-val">${swFmt(d.mid,t)}</span>`:''}</div>
       </div>
-      <div class="sw-bar-name sw-ln">${SW_C[swC].flag} ${SW_C[swC].name}</div>
+      <div class="sw-bar-name sw-ln">${swFlag(SW_C[swC].flag)}${SW_C[swC].name}</div>
     </div>
     <div class="sw-bar-col">
       <div class="sw-bar-wrap" style="height:${MAX+44}px">
         <div style="height:44px;flex-shrink:0"></div>
         <div class="sw-bar sw-usa" style="height:${uH}px;width:78%"><span class="sw-bar-val">${swFmt(d.usaMid,t)}</span></div>
       </div>
-      <div class="sw-bar-name sw-un">🇺🇸 USA</div>
+      <div class="sw-bar-name sw-un">${swFlag('us')}USA</div>
     </div>`;
   postHeight();
 }
