@@ -3503,8 +3503,10 @@
         // Sólo `origen` (toggle General / AM) viaja: sin él el detalle mensual
         // quedaba en General con el toggle en AM. Los demás data-override-* de
         // estos paneles (stage_min del tab Sales) nunca se mandaron y mandarlos
-        // cambiaría lo que muestran.
+        // cambiaría lo que muestran. `requiere_nda` sí: sólo lo lleva el detalle
+        // mensual de NDA → Close Win (Operations), y sin él no cuadra con su línea.
         const ov = el.dataset.overrideOrigen ? { origen: el.dataset.overrideOrigen } : {};
+        if (el.dataset.overrideRequiereNda) ov.requiere_nda = el.dataset.overrideRequiereNda;
         const res = await fetchChart(chartKey, { ...ov, mes: month, corte: endOfMonth(month) });
         renderMonthDetail(el, res.rows || [], { month });
       } catch (e) {
@@ -4133,7 +4135,7 @@
         fetchChart('op_line_placement_time').catch(() => ({ rows: [] })),
         fetchChart('op_line_placement_time_repl').catch(() => ({ rows: [] })),
         fetchChart('op_line_batch_delivery_time_month').catch(() => ({ rows: [] })),
-        fetchChart('op_line_nda_close_win').catch(() => ({ rows: [] })),
+        fetchChart('op_line_nda_close_win', { requiere_nda: '1' }).catch(() => ({ rows: [] })),
         fetchChart('op_line_interview_conversion').catch(() => ({ rows: [] })),
       ]);
       const ym = (s) => String(s || '').slice(0, 7);

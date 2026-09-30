@@ -45,6 +45,9 @@ def _resolve_resultado(filters: dict) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _resolve_modelo(filters)
     resultado = _resolve_resultado(filters)
+    # Sólo el tab Operations lo prende (data-override-requiere-nda): ahí la métrica
+    # es "de los que firmaron NDA", así que una opp cerrada sin fecha de NDA no cuenta.
+    requiere_nda = str(filters.get("requiere_nda") or "").strip().lower() in {"1", "true", "si", "yes"}
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
     mes = (
@@ -74,6 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NULLIF(TRIM(o.opp_sales_lead),'') IS NOT NULL
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            AND (NOT %(requiere_nda)s OR NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL)
             AND (%(desde)s::date  IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
             AND (%(hasta)s::date  IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
         ),
@@ -96,6 +100,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     return sql, {
         "modelo": modelo,
         "resultado": resultado,
+        "requiere_nda": requiere_nda,
         "desde": desde,
         "hasta": hasta,
         "mes": mes,

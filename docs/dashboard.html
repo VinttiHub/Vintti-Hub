@@ -5056,11 +5056,11 @@
               <button type="button" class="hero-kpi__icon" data-kpi-detail-open="op-nda-close-win" aria-label="Ver detalle NDA → Close Win">⚐</button>
             </div>
             <div>
-              <div class="hero-kpi__value" data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
               <div class="hero-kpi__label">
-                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
-                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost ·
-                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
+                <span data-chart="op_kpi_nda_close_win_30d" data-override-requiere-nda="1" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+                <span data-chart="op_kpi_nda_close_win_30d" data-override-requiere-nda="1" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+                <span data-chart="op_kpi_nda_close_win_30d" data-override-requiere-nda="1" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
               </div>
             </div>
           </div>
@@ -5286,12 +5286,12 @@
             <p class="card__sub">% de NDAs cerrados como Close Win por mes (todas las opps).</p>
           </div>
           <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
             · <span data-window-label>30d</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="op_line_nda_close_win" data-bind="line" data-axis="xy"
+          <svg data-chart="op_line_nda_close_win" data-override-requiere-nda="1" data-bind="line" data-axis="xy"
                data-x="mes_close" data-y="conversion_pct" data-color="violet"
                data-labels="Conversion %" data-fmt-y="percent"
                data-tooltip-extras="total_closed|Total cerradas|int,close_win|Close Win|int,close_lost|Closed Lost|int"
@@ -5308,7 +5308,7 @@
             Ver detalle mensual <span class="arrow">▾</span>
           </button>
           <div class="expander__panel">
-            <div data-chart="op_table_nda_close_win_detail" data-bind="month-detail"
+            <div data-chart="op_table_nda_close_win_detail" data-override-requiere-nda="1" data-bind="month-detail"
                  data-list-month="close_d" data-list-name="client_name" data-list-sub="opp_model"
                  data-list-date="close_d" data-list-state="opp_stage"
                  data-empty-text="No closings this month"></div>
@@ -10484,8 +10484,8 @@
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">NDA → Win · <span data-window-label>30d</span> <span class="count" data-chart="op_table_nda_close_win_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <div class="dlist" data-chart="op_table_nda_close_win_30d_detail" data-bind="list"
+              <h4 class="kpi-drawer__section-title">NDA → Win · <span data-window-label>30d</span> <span class="count" data-chart="op_table_nda_close_win_30d_detail" data-override-requiere-nda="1" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="op_table_nda_close_win_30d_detail" data-override-requiere-nda="1" data-bind="list"
                    data-list-name="client_name" data-list-sub="opp_stage" data-list-date="close_d" data-limit="80"></div>
             </section>
           </div>
@@ -10607,7 +10607,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=160" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=161" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>
