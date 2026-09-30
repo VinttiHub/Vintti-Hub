@@ -58,6 +58,7 @@ body{font-family:'Onest',sans-serif;color:#000000;padding:8px;}
 .sw-bar.sw-latam{background:linear-gradient(180deg,#003bff 0%,rgba(0,59,255,0.35) 100%);}
 .sw-bar.sw-usa{background:linear-gradient(180deg,#6c38ff 0%,rgba(108,56,255,0.35) 100%);}
 .sw-bar-val{font-size:14px;font-weight:800;color:#fff;white-space:nowrap;}
+.sw-bar-val.sw-bar-val-out{color:var(--blue);margin-bottom:6px;}  /* barra muy baja: el monto va arriba */
 .sw-bar-name{font-size:13px;font-weight:700;text-align:center;}
 .sw-bar-name.sw-ln{color:var(--blue);}
 .sw-bar-name.sw-un{color:var(--purple);}
@@ -386,6 +387,7 @@ function swRender(){
     <div class="sw-bar-col">
       <div class="sw-bar-wrap" style="height:${MAX+54}px">
         <div class="sw-save-badge">Save ${sv}%</div>
+        ${lH>36?'':`<span class="sw-bar-val sw-bar-val-out">${swFmt(d.mid,t)}</span>`}
         <div class="sw-bar sw-latam" style="height:${lH}px;width:78%">${lH>36?`<span class="sw-bar-val">${swFmt(d.mid,t)}</span>`:''}</div>
       </div>
       <div class="sw-bar-name sw-ln">${SW_C[swC].flag} ${SW_C[swC].name}</div>
