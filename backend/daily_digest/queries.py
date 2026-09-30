@@ -233,7 +233,8 @@ def job_description() -> tuple[str, dict]:
         NULLIF(TRIM(a.client_name), '')       AS client_name,
         NULLIF(TRIM(o.opp_position_name), '') AS position,
         NULL::text AS candidate_name,
-        COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) AS anchor_date,
+        COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date) AS anchor_date,
         ARRAY['Job description']::text[] AS missing,
         LEFT(COALESCE(NULLIF(TRIM(o.hr_job_description), ''),
                       NULLIF(TRIM(o.career_description), ''),
@@ -243,8 +244,10 @@ def job_description() -> tuple[str, dict]:
       WHERE TRIM(o.opp_stage) IN ({_stage_list(people.STAGES_ABIERTOS)})
 {_SCOPE_CUENTA}
         AND {_no_vacio('o.opp_hr_lead')}
-        AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) IS NULL
-             OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing)
+        AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date) IS NULL
+             OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date)
                 <= CURRENT_DATE - %(gracia)s::int)
         AND LENGTH(COALESCE(o.hr_job_description, '')
                    || COALESCE(o.career_description, '')
@@ -277,7 +280,8 @@ def base_data() -> tuple[str, dict]:
     campo: si no, una opp recien creada escribe ocho lineas de Slack sola.
 
     Que campos entran lo decide `people.CAMPOS_BASE`, y ahi esta explicado por
-    que `years_experience` arranca apagado.
+    que `years_experience` arranca apagado y por que Expected Fee no se reclama
+    en Recruiting.
     """
     c = people.CAMPOS_BASE
     cond, etiquetas = [], []
@@ -298,6 +302,12 @@ def base_data() -> tuple[str, dict]:
     add(c["salary_range"], "COALESCE(o.min_salary, 0) = 0 OR COALESCE(o.max_salary, 0) = 0",
         "Candidate Salary Range")
     add(c["years_experience"], "COALESCE(o.years_experience, 0) = 0", "Years of Experience")
+    # Expected Fee/Revenue: falta = NULL, no 0. El input guarda NULL si se deja
+    # vacio, y un 0 es una carga a proposito (arrangements que no se cobran,
+    # pedido de Lara 2026-09-30).
+    add(c["expected_fee"], "(TRIM(LOWER(COALESCE(o.opp_model, ''))) <> 'recruiting'"
+                           " AND o.expected_fee IS NULL)", "Expected Fee")
+    add(c["expected_revenue"], "o.expected_revenue IS NULL", "Expected Revenue")
 
     if not cond:
         return "SELECT 1 WHERE FALSE", {}
@@ -317,14 +327,17 @@ def base_data() -> tuple[str, dict]:
         NULLIF(TRIM(a.client_name), '')       AS client_name,
         NULLIF(TRIM(o.opp_position_name), '') AS position,
         NULL::text AS candidate_name,
-        COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) AS anchor_date,
+        COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date) AS anchor_date,
         ARRAY_REMOVE(ARRAY[{', '.join(etiquetas)}], NULL) AS missing
       FROM opportunity o
       LEFT JOIN account a ON a.account_id = o.account_id
       WHERE TRIM(o.opp_stage) IN ({_stage_list(people.STAGES_ABIERTOS)})
 {_SCOPE_CUENTA}
-        AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing) IS NULL
-             OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing)
+        AND (COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date) IS NULL
+             OR COALESCE(o.deep_dive_date, o.nda_sent_date, o.since_sourcing,
+                 o.nda_signature_or_start_date)
                 <= CURRENT_DATE - %(gracia)s::int)
         AND ({' OR '.join(f'({x})' for x in cond)})
     )

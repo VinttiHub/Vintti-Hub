@@ -121,6 +121,12 @@ CAMPOS_BASE = {
     "budget": True,         # min_budget / max_budget
     "salary_range": True,   # min_salary / max_salary
     "years_experience": False,
+    # Pedido de la owner, 2026-09-30: el equipo veia "no hay nada por llenar" con
+    # opps sin estos dos. Expected Fee solo fuera de Recruiting: ahi la UI lo
+    # esconde (opportunity-detail.html), reclamarlo seria pedir algo que no se
+    # puede cargar.
+    "expected_fee": True,      # expected_fee (no Recruiting)
+    "expected_revenue": True,  # expected_revenue
 }
 
 # Stages del pipeline ACTIVO, para las reglas de JD y datos base.
