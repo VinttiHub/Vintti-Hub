@@ -959,3 +959,18 @@ para que las cierre o las mueva. Sin vencidas no se postea nada.
   de postear; si Slack falla se suelta y la próxima corrida reintenta.
 - Canal **Sales & Opps** (`SLACK_CHANNEL_ID = "C07GZ8RQWF3"`, hardcodeado, definitivo desde
   el 2026-09-30; antes era el de prueba `C0C0UQ7SYBW`). El bot tiene que estar invitado.
+
+## Stop ya no borra la start date (NDA)
+
+Hasta el 2026-10-01, mover una opp a **Stop** en `docs/opportunities.html` hacía
+`patchOppFields(id, { nda_signature_or_start_date: null })` (`dispatchStageChange()` en
+`main.js`). Al reactivarla se pedía una fecha nueva y la original se perdía sin dejar rastro, y
+esa columna es ancla de ~10 datasets. Se notó cuando **NDA → Close Win** de Operations pasó a
+excluir las opps sin start date (`data-override-requiere-nda`, filtro `requiere_nda` de los 4
+`nda_close_win_*.py`) y se cayeron 582, 623, 624 y 712. Ahora Stop deja la fecha y volver a
+Sourcing abre el popup de nueva ronda (`POST /sourcing`).
+
+Las 11 opps afectadas se restauraron con `backend/scripts/restore_nda_dates_stop_20261001.py`.
+El valor tipeado no se guardaba en ningún lado: se usó el día (hora ARG) del primer
+`saveSourcingDate` en `tracks`, que puede diferir unos días del real. `tracks` arranca en
+feb-2026, así que si aparece una opp más vieja sin fecha no hay de dónde sacarla.

@@ -3123,19 +3123,9 @@ async function dispatchStageChange(opportunityId, newStage, previousStage, dropd
       openCloseLostPopup(opportunityId, dropdownElement);
       return;
     }
-    if (newStage === 'Stop') {
-      showOppBusy('Updating stage…', 'Clearing the start date.');
-      try {
-        await patchOppFields(opportunityId, { nda_signature_or_start_date: null });
-      } catch (err) {
-        alert(err.message || 'Failed to clear start date.');
-        dropdownElement.value = previousStage;
-        updateStageDropdownStyle(dropdownElement, previousStage);
-        return;
-      } finally {
-        hideOppBusy();
-      }
-    }
+    // Stop NO borra la start date (hasta 2026-10-01 sí lo hacía): es la fecha de NDA
+    // firmado, ancla de ~10 datasets, y no se podía recuperar. Al volver a Sourcing
+    // se abre el popup de nueva ronda (POST /sourcing), que es lo que corresponde.
     if (requiresStageConfirm(newStage) && !skipConfirm) {
       dropdownElement.value = previousStage;
       updateStageDropdownStyle(dropdownElement, previousStage);
