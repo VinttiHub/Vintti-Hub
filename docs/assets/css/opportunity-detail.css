@@ -6135,6 +6135,11 @@ input:checked + .slider::before {
 .approval-li-item summary { cursor: pointer; font-size: 13px; }
 .approval-li-item summary b { color: #172036; }
 .approval-li-item summary span { color: #7a4a00; font-size: 12px; margin-left: 6px; }
+.approval-li-item summary .approval-li-open {
+  margin-left: 10px; font-size: 12.5px; font-weight: 600; color: #4338ca; text-decoration: none;
+}
+.approval-li-item summary .approval-li-open:hover { text-decoration: underline; }
+.approval-li-item summary .approval-li-nolink { margin-left: 10px; font-size: 12px; color: #8a8f99; }
 .approval-li-item textarea {
   width: 100%; box-sizing: border-box; margin-top: 6px; font: inherit; font-size: 12.5px;
   border: 1px solid #e7cf98; border-radius: 8px; padding: 8px; resize: vertical;

@@ -2443,6 +2443,7 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
     btn.disabled = true;
     const ok = await approvalLinkedinGate().catch(() => true);
     btn.disabled = false;
+    setApprovalSendLabel();
     if (!ok) return;
   }
 
@@ -4546,7 +4547,24 @@ function approvalBrandNote() {
 // (LINKEDIN_STALE_DAYS en backend/utils/cv_review_ai.py) el chequeo no resta y la sales
 // lead ve "not scored". Se pide pegar el de hoy; si no, el segundo click manda igual.
 let approvalLiWarned = false;
+
+// Tras el aviso, el botón dice lo que va a pasar ("Send without LinkedIn update") en vez de
+// pedir "click Send again". Sólo en modo review: en modo cliente no hay chequeo de LinkedIn.
+function setApprovalSendLabel() {
+  const btn = document.getElementById('sendApprovalEmailBtn');
+  if (!btn || btn.disabled) return;   // mientras manda dice "Sending…"; no pisarlo
+  btn.textContent = approvalLiWarned && approvalMode() === 'review'
+    ? 'Send without LinkedIn update' : 'Send';
+}
 const approvalLiDate = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
+// Mismo criterio que normalizeLinkedinUrl() de candidate-details.js. Sin algo que parezca
+// una URL (un "—", un nombre) no se ofrece link.
+function approvalLiUrl(u) {
+  let v = String(u || '').trim();
+  if (!v || !/linkedin\.com|^https?:\/\//i.test(v)) return '';
+  if (!/^https?:\/\//i.test(v)) v = 'https://' + v.replace(/^\/+/, '');
+  return v;
+}
 
 async function loadApprovalLinkedin(candidates) {
   const block = document.getElementById('approval-li-block');
@@ -4554,6 +4572,7 @@ async function loadApprovalLinkedin(candidates) {
   const msg = document.getElementById('approval-li-msg');
   if (!block || !list) return;
   approvalLiWarned = false;
+  setApprovalSendLabel();
   block.hidden = true;
   list.innerHTML = '';
   if (msg) msg.textContent = '';
@@ -4576,9 +4595,14 @@ async function loadApprovalLinkedin(candidates) {
     const why = newest
       ? `LinkedIn from ${approvalLiDate(newest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
       : 'no LinkedIn yet';
+    const url = approvalLiUrl(st.linkedin_url);
+    // stopPropagation: el link vive dentro del <summary> y si no, el click abre/cierra el desplegable.
+    const open = url
+      ? `<a class="approval-li-open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Open LinkedIn ↗</a>`
+      : `<em class="approval-li-nolink">no LinkedIn link</em>`;
     rows.push(`<details class="approval-li-item" data-cid="${id}">
-        <summary><b>${escapeHtml(st.name || `#${id}`)}</b><span>${why}</span></summary>
-        <textarea rows="5" placeholder="Not the link — open their LinkedIn, select the whole Experience section, copy it and paste the text here."></textarea>
+        <summary><b>${escapeHtml(st.name || `#${id}`)}</b><span>${why}</span>${open}</summary>
+        <textarea rows="5" placeholder="Not the link — open their LinkedIn (link above), select the whole Experience section, copy it and paste the text here."></textarea>
       </details>`);
   });
   if (!rows.length) return;
@@ -4614,11 +4638,18 @@ async function approvalLinkedinGate() {
     it.remove();
   }
   const left = block.querySelectorAll('.approval-li-item').length;
-  if (!left) { block.hidden = true; return true; }
+  if (!left) {
+    block.hidden = true;
+    approvalLiWarned = false;
+    setApprovalSendLabel();
+    return true;
+  }
   if (!approvalLiWarned) {
     approvalLiWarned = true;
-    if (msg) msg.textContent = `${left} still without a current LinkedIn. Paste it above — or `
-      + `click Send again to send anyway (their LinkedIn check will show as "not scored").`;
+    if (msg) msg.textContent = `${left} still without a current LinkedIn. Paste it above, or `
+      + `send without the update: their LinkedIn check will show as "not scored" and nothing `
+      + `comes off the score.`;
+    // El llamador re-habilita el botón después de esto; el label se pone ahí abajo.
     return false;
   }
   return true;
@@ -4645,6 +4676,7 @@ function renderApprovalMode() {
     ? '<span class="approval-mode-note">You set this manually — detection said the opposite.</span>'
     : '';
   banner.className = `approval-mode approval-mode--${mode}`;
+  setApprovalSendLabel();
   banner.innerHTML = mode === 'review'
     ? `<div class="approval-mode-head">Internal review</div>
        <div class="approval-mode-body">

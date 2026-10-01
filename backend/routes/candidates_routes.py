@@ -3584,7 +3584,7 @@ def candidates_linkedin_status():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute("""
-            SELECT candidate_id, name,
+            SELECT candidate_id, name, linkedin,
                    to_jsonb(c) ->> 'linkedin_scrapper_at' AS pasted_at,
                    COALESCE(coresignal_scrapper, '') AS cs
               FROM candidates c WHERE candidate_id = ANY(%s)
@@ -3595,6 +3595,8 @@ def candidates_linkedin_status():
             cs_as_of = profile_as_of(profile) if profile else None
             out[str(row['candidate_id'])] = {
                 'name': row['name'],
+                # El link que ya está cargado: el popup lo muestra para no buscarlo a mano.
+                'linkedin_url': (row['linkedin'] or '').strip() or None,
                 'pasted_at': row['pasted_at'],
                 'coresignal_as_of': cs_as_of.isoformat() if cs_as_of else None,
             }

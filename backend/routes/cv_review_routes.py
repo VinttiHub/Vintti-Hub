@@ -1246,7 +1246,7 @@ def _rescore_pending_once(opportunity_id):
         jd_hash = cv_review_ai.jd_fingerprint(jd_block)
         cur.execute(
             """
-            SELECT r.review_id, r.resume_snapshot, r.resume_hash,
+            SELECT r.review_id, r.candidate_id, r.resume_snapshot, r.resume_hash,
                    c.cv_pdf_scrapper, c.affinda_scrapper,
                    c.linkedin_scrapper, c.coresignal_scrapper
             FROM cv_reviews r
@@ -1265,15 +1265,20 @@ def _rescore_pending_once(opportunity_id):
 
     for row in rows:
         source_text = cv_review_ai.build_source_text(row)
+        # El chequeo CV vs LinkedIn (v18) también: sin esto el re-score por JD cambiada
+        # dejaba el review sin el descuento de LinkedIn y el score subía solo.
+        linkedin, li_unavailable = _linkedin_for_review(row["candidate_id"])
         fingerprint = cv_review_ai.input_hash({
             "s": row["resume_hash"], "j": jd_block,
             "src": cv_review_ai.input_hash(source_text),
+            "li": cv_review_ai.input_hash(linkedin),
             "v": cv_review_ai.ANALYSIS_VERSION,
         })
         # Siempre sobre el SNAPSHOT que se envió, nunca sobre el CV vivo.
         score, analysis, ai_error = cv_review_ai.score_cv(
             snapshot=row["resume_snapshot"] or {}, jd_block=jd_block,
             source_text=source_text, fingerprint=fingerprint,
+            linkedin=linkedin, linkedin_unavailable=li_unavailable,
         )
         if ai_error == "budget":
             # Cuota mensual agotada: reintentar el resto sólo gasta requests que van a fallar.
