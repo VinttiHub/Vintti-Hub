@@ -134,6 +134,15 @@ function formatDateLabel(value) {
   return ymd || String(value);
 }
 
+// El salario es la única plata con centavos (columna numeric(12,2)); el backend lo
+// manda como string "1500.00", así que los enteros se muestran sin ".00".
+function formatSalary(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return Number.isInteger(num) ? String(num) : num.toFixed(2);
+}
+
 function formatMoneyLabel(value) {
   const num = Number(value || 0);
   if (!Number.isFinite(num)) return '$0';
@@ -1079,7 +1088,7 @@ const endVal   = dateInputValue(candidate.end_date);
         </td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
-        <td>$${candidate.employee_salary ?? '—'}</td>
+        <td>$${formatSalary(candidate.employee_salary) ?? '—'}</td>
         <td>$${candidate.employee_revenue ?? '—'}</td>
 
         <!-- Discount $ -->
@@ -1646,8 +1655,8 @@ function createRecruitingRow(candidate, options = {}) {
     : (probationValueRaw ?? '—');
 
   const salaryCellContent = isBuyoutRow
-    ? `<input type="number" class="buyout-salary-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${candidate.employee_salary ?? ''}" />`
-    : `$${candidate.employee_salary ?? '—'}`;
+    ? `<input type="number" class="buyout-salary-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${formatSalary(candidate.employee_salary) ?? ''}" />`
+    : `$${formatSalary(candidate.employee_salary) ?? '—'}`;
   const revenueCellContent = isBuyoutRow
     ? `<input type="number" class="buyout-revenue-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? ''}" />`
     : `$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}`;

@@ -2987,7 +2987,7 @@ function formatDateHumanES(isoLike){
       row.className = 'salary-entry';
       const d = (window.formatDateHumanES ? window.formatDateHumanES(up.date) : formatDateHumanES(up.date));
       row.innerHTML = `
-        <span>$${up.salary}</span>
+        <span>$${Number.isInteger(Number(up.salary)) ? Number(up.salary) : Number(up.salary).toFixed(2)}</span>
         <span>${up.fee != null ? '$'+up.fee : ''}</span>
         <span>${d}</span>
         <button class="delete-salary-update" data-id="${up.update_id}">🗑️</button>
@@ -4241,7 +4241,7 @@ if (hireRevenue){
         const setupEl = document.getElementById('hire-setup-fee');
 
         if (setupEl) setupEl.value = data.setup_fee || '';
-        if (salaryInput) salaryInput.value = data.employee_salary || '';
+        if (salaryInput) salaryInput.value = data.employee_salary ? Number(data.employee_salary) : '';
         if (feeInput)    feeInput.value    = data.employee_fee    || '';
         try { renderHubspotHireSuggestion(hsOppData, data); }
         catch (err) { console.warn('No se pudo pintar la sugerencia de HubSpot', err); }

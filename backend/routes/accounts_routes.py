@@ -584,8 +584,10 @@ def get_account_by_id(account_id):
                                 THEN COALESCE(h.revenue,0) END), 0) AS trr,
             COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'
                                 THEN COALESCE(h.fee,0) END), 0)     AS tsf,
-            COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'
-                                THEN COALESCE(h.salary,0)+COALESCE(h.fee,0) END), 0) AS tsr
+            -- h.salary es numeric(12,2) (salario con centavos); el TSR se sigue
+            -- mostrando entero como el resto de los totales.
+            ROUND(COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'
+                                THEN COALESCE(h.salary,0)+COALESCE(h.fee,0) END), 0))::bigint AS tsr
             FROM opportunity o
             LEFT JOIN h_active h ON h.opportunity_id = o.opportunity_id
             WHERE o.account_id = %s;
