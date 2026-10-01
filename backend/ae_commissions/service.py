@@ -18,12 +18,12 @@ log = logging.getLogger(__name__)
 # no puede redirigir el reporte ni sumar destinatarios de mas. Para agregar o
 # sacar a alguien hay que editar esta linea y que lo pida la owner.
 #   - pgonzales@vintti.com  Priscila Gonzales (owner)
-#   - bahia@vintti.com      Bahia (Account Executive) - agregada 2026-09-08
 #   - lara@vintti.com       Lara (Account Manager) - agregada 2026-10-01
-# OJO: esta lista NO es la de acceso a la seccion. Quien recibe el mail (3) y
+#   (bahia@vintti.com estuvo del 2026-09-08 al 2026-10-01; la saco la owner)
+# OJO: esta lista NO es la de acceso a la seccion. Quien recibe el mail (2) y
 # quien puede abrir la pagina (5) son cosas distintas a proposito; el acceso
 # vive en AE_COMMISSIONS_ALLOWED, en routes/ae_commissions_routes.py.
-RECIPIENTS = ["pgonzales@vintti.com", "bahia@vintti.com", "lara@vintti.com"]
+RECIPIENTS = ["pgonzales@vintti.com", "lara@vintti.com"]
 
 
 # --------------------------------------------------------------------------- #
