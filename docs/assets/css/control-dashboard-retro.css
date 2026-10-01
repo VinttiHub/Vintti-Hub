@@ -1359,6 +1359,9 @@ body.is-loading .kpi-card::after {
 /* Tipo de baja en el drawer Candidate churn 30d: real = magenta, buyout = celeste. */
 .dlist__val[data-val="Baja - Real"] { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: color-mix(in srgb, #ff1fdb 75%, #000); }
 .dlist__val[data-val="Buyout"]      { background: color-mix(in srgb, #4ba9ff 20%, #fff); color: color-mix(in srgb, #4ba9ff 60%, #000); }
+/* Drawer Churn → Replacement: con = lime (texto oscuro, el lime no se lee), sin = magenta. */
+.dlist__val[data-val="Con replacement"] { background: color-mix(in srgb, #c1ff72 45%, #fff); color: #3a6b00; }
+.dlist__val[data-val="Sin replacement"] { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: color-mix(in srgb, #ff1fdb 75%, #000); }
 
 /* ---------- LOW-SAMPLE FLAG (aviso "muestra baja" cuando el denominador es chico) ---------- */
 .lowsample-flag {

@@ -809,6 +809,39 @@ MAIN_CHARTS = [
         "sort_order": 80,
     },
     {
+        "chart_key": "am_kpi_churn_replacement_30d",
+        "tab_key": "account-management",
+        "title": "Churn → Replacement (Staffing) — Por ventana",
+        "type": "kpi",
+        "dataset_key": "churn_replacement_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "bajas_real", "label": "Bajas reales", "formatter": "number"},
+                    {"key": "con_replacement", "label": "Abrieron replacement", "formatter": "number"},
+                    {"key": "sin_replacement", "label": "Sin replacement", "formatter": "number"},
+                    {"key": "replacement_pct", "label": "% con replacement", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 20, "w": 6, "h": 5},
+        "sort_order": 81,
+    },
+    {
+        "chart_key": "am_table_churn_replacement_detail",
+        "tab_key": "account-management",
+        "title": "Details - Churn → Replacement",
+        "type": "table",
+        "dataset_key": "churn_replacement_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "end_d", "estado", "replacement_name", "replacement_stage", "detalle"],
+            },
+        },
+        "position": {"x": 6, "y": 20, "w": 6, "h": 5},
+        "sort_order": 82,
+    },
+    {
         "chart_key": "am_table_buyouts_detail",
         "tab_key": "account-management",
         "title": "Details - Buyouts - ventana",

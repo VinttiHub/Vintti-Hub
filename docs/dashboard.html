@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=126">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=127">
 </head>
 <body>
 
@@ -106,7 +106,7 @@
        TABS
        ============================================================ -->
   <nav class="tabs" role="tablist">
-    <label class="tabs__btn" for="tab-growth-new">Management Dashboard <span class="ct">16</span></label>
+    <label class="tabs__btn" for="tab-growth-new">Management Dashboard <span class="ct">17</span></label>
     <label class="tabs__btn" for="tab-am">Account Management <span class="ct">48</span></label>
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">32</span></label>
@@ -421,6 +421,38 @@
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-contractors" aria-label="Ver detalle Churn contractors">Ver detalle</button>
+        </div>
+
+        <!-- Row 3b · Churn → Replacement (by window): de las bajas reales de
+             "Churn contractors", cuántas abrieron una opp Replacement. -->
+        <div class="skpi-group s-12">
+          <div class="skpi-group__head">
+            <span class="skpi-group__title">Churn → Replacement</span>
+            <span class="skpi-group__tag">By window · % de bajas que abrieron replacement</span>
+          </div>
+          <div class="skpi-group__grid">
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last week</span>
+              <span class="skpi-sub__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="skpi-sub__hint"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last 30d</span>
+              <span class="skpi-sub__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="skpi-sub__hint"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last month</span>
+              <span class="skpi-sub__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="skpi-sub__hint"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">MTD</span>
+              <span class="skpi-sub__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="skpi-sub__hint"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+            </div>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-replacement" aria-label="Ver detalle Churn → Replacement">Ver detalle</button>
         </div>
 
         <!-- Row 4 · Active clients / Active contractors / Buyouts -->
@@ -6843,6 +6875,60 @@
                    data-drawer-window-target="churn-contractors"></div>
             </section>
             <p class="kpi-drawer__note">Los números cuentan sólo bajas reales. La lista muestra también los buyouts, marcados como tales, pero no suman al churn: para esos mirá el tile de Buyouts.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Churn → Replacement -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="churn-replacement">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Headcount · Multi-window</span>
+            <h3 class="kpi-drawer__title">Churn → Replacement</h3>
+            <p class="kpi-drawer__sub">De las bajas reales de Staffing en cada ventana (las mismas de "Churn contractors"), cuántas tienen una opp de Replacement abierta para cubrir a esa persona.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--mag">
+              <span class="kpi-drawer__hero__label">Abrieron replacement · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana · % con replacement</h4>
+              <div class="kpi-drawer__stats" data-drawer-window-group="churn-replacement">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="replacement_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="con_replacement" data-reduce="first" data-fmt="int">—</span> de <span data-chart="am_kpi_churn_replacement_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas</span>
+                </button>
+              </div>
+            </section>
+            <section class="kpi-drawer__section" data-drawer-detail-section="churn-replacement">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_churn_replacement_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="churn-replacement" data-where-field="estado" data-where-value="Con replacement">—</span> con replacement
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="churn-replacement" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="churn-replacement" hidden></span>
+              </h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_churn_replacement_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="detalle" data-list-value="estado" data-list-date="end_d" data-limit="60"
+                   data-month-aware
+                   data-drawer-window-target="churn-replacement"></div>
+            </section>
+            <p class="kpi-drawer__note">Cuenta una opp Replacement de la misma cuenta con "Replacement of" = esa persona, en cualquier stage (también si después quedó en Closed Lost o Stop), abierta antes o después de la baja. Las bajas más recientes pueden todavía no tener el replacement cargado, así que el % de Last week madura con los días. Los replacements sin "Replacement of" cargado no se pueden atar a una baja y no suman.</p>
           </div>
         </div>
 
