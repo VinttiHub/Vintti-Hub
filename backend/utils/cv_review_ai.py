@@ -19,8 +19,10 @@ la deciden primero nuestras reglas y, sólo para lo que ellas no cubren, una lla
 dedicada que se cachea por texto de requisito — así el mismo bullet de JD da siempre el
 mismo veredicto (ver apply_requirement_kinds).
 
-El material fuente (el CV propio del candidato, su LinkedIn) NO puntúa nada. Se lee sólo
-para avisar de lo que el CV afirma sin respaldo y para que los "fixes" no pidan inventar.
+El material fuente (el CV propio del candidato, su LinkedIn) no puntúa en el juez principal:
+se lee para avisar de lo que el CV afirma sin respaldo y para que los "fixes" no pidan
+inventar. La única excepción (v18) es aparte: los trabajos de LinkedIn que el CV omite restan
+5 c/u, tope 15 (ver apply_linkedin_coverage).
 Que el candidato no encaje con la vacante no es un defecto del CV: se dice en `fit_note`.
 """
 from __future__ import annotations
@@ -159,7 +161,14 @@ MODEL = "gpt-4o"
 # que es el entregable. El source se sigue leyendo, pero únicamente para avisar de lo que
 # el CV afirma sin respaldo y para que los "fixes" no pidan inventar. Sin bump, los scores
 # capeados y con piso de la v6 se promediarían con los nuevos en la métrica por recruiter.
-ANALYSIS_VERSION = 17
+# 18: se compara el CV contra el LinkedIn del candidato. Las recruiters a veces se comen
+# trabajos que están en LinkedIn y no los ponen; el source ya se leía, pero sólo para
+# invenciones, que no mueven el número. Ahora cada trabajo de LinkedIn que falta en el CV
+# resta 5 (tope 15), salvo los de menos de 3 meses y los no laborales, que sólo se avisan
+# (decisión de la owner, 2026-09-25). Va en una llamada APARTE (apply_linkedin_coverage),
+# como años y kinds: el prompt del juez principal no se tocó, así que requisitos, tools y
+# job hopping dan lo mismo que en la v17. Bump porque el score se mueve.
+ANALYSIS_VERSION = 18
 COOLDOWN_SECONDS = 60
 
 CV_TEXT_LIMIT = 14000
@@ -226,6 +235,24 @@ JOB_HOPPING_MIN_MONTHS = 12
 # es la que sostiene la política de la v9/v10: el score no castiga a la recruiter por la
 # carrera del candidato, y escribir el motivo de salida sí es algo que ella puede hacer.
 JOB_HOPPING_PENALTY = 10
+
+# --- trabajos de LinkedIn que el CV omite (v18) --------------------------------------
+# Éste SÍ es por rol, a diferencia de tools y job hopping: cada trabajo omitido es algo
+# distinto que la recruiter tiene que agregar. Con tope, para que tres omisiones no hundan
+# un CV que por lo demás está bien (decisión de la owner).
+LINKEDIN_MISSING_PENALTY = 5
+LINKEDIN_MISSING_CAP = 15
+# Menos de esto se avisa pero no resta: pasantías cortas, pruebas. Se compara contra la
+# duración MÍNIMA posible (ver _li_months): con fechas de sólo año, "2021 → 2021" pudo ser
+# un mes, y el error tiene que caer del lado de NO acusar, igual que en job hopping.
+LINKEDIN_MIN_MONTHS = 3
+# Un LinkedIn con 40 roles es ruido; los más nuevos son los que importan en un CV.
+LINKEDIN_MAX_ROLES = 25
+# LinkedIn no se lee en vivo: sale de la copia de Coresignal, que puede tener un año. Con
+# una copia de más de 90 días los faltantes se AVISAN pero no restan (decisión de la owner,
+# 2026-09-25). Caso que lo motivó: review 196 — la copia era de oct-2025 y tenía un trabajo
+# que el candidato después borró de su LinkedIn; el CV coincidía con el LinkedIn de hoy.
+LINKEDIN_STALE_DAYS = 90
 
 ANALYSIS_SCHEMA_HINT = """You MUST return ONLY a JSON object with EXACTLY these keys and shapes:
 {
@@ -2088,7 +2115,8 @@ def _requirements_summary(reqs: List[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-def derive_verdict(score, req_summary, hard_claims, tools_penalty, hopping_penalty=0):
+def derive_verdict(score, req_summary, hard_claims, tools_penalty, hopping_penalty=0,
+                   linkedin_penalty=0):
     """El veredicto sale de qué HAY QUE HACER, no del número.
 
     Lo elegía el modelo y el prompt no le daba ninguna guía, así que salía un "needs work"
@@ -2110,6 +2138,8 @@ def derive_verdict(score, req_summary, hard_claims, tools_penalty, hopping_penal
     # un CV flaco. Si saltan los dos, se dicen los dos — la escalera devuelve el primero que
     # matchea, y quedarse con uno solo esconde la mitad de lo que hay que arreglar.
     reasons = []
+    if linkedin_penalty:
+        reasons.append("job(s) on the candidate's LinkedIn are missing from the CV — add them")
     if hopping_penalty:
         reasons.append("short stint(s) the CV never explains — say why they ended")
     if tools_penalty:
@@ -2252,7 +2282,8 @@ supported, and (b) whether JD-relevant facts were available and left out.
 
 
 def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
-             fingerprint: str, jd_text: Any = None) -> Dict[str, Any]:
+             fingerprint: str, jd_text: Any = None,
+             linkedin: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Calcula el score desde la checklist de requisitos y estampa la metadata que hace
     auditable el número. El modelo REPORTA; la aritmética es nuestra."""
     unsupported = _clean_unsupported(parsed.get("unsupported_claims"))
@@ -2308,11 +2339,17 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
     tools_check["jd_tools"] = jd_tools
     # Lo único que se evalúa fuera de la checklist además de las herramientas. Ver job_hopping().
     hopping = job_hopping(snapshot)
+    # v18: trabajos de LinkedIn que el CV no tiene. Lo decide apply_linkedin_coverage(),
+    # que corre aparte; acá sólo entra el descuento. Sin chequeo (no hay LinkedIn, falló
+    # Coresignal o el modelo) resta 0 — nunca se castiga lo que no se pudo mirar.
+    linkedin = linkedin or {"status": "not_run", "penalty": 0}
     composite, score_detail, basis = requirements_score(requirements, [
         {"key": "tools", "label": "tools list nothing backs up",
          "points": tools_check["penalty"]},
         {"key": "job_hopping", "label": "short stint the CV never explains",
          "points": hopping["penalty"]},
+        {"key": "linkedin", "label": "LinkedIn jobs missing from the CV",
+         "points": linkedin.get("penalty") or 0},
     ])
 
     # Un denominador demostrablemente incompleto sesga el score HACIA ARRIBA: los requisitos
@@ -2324,7 +2361,8 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
 
     hard_claims = [c for c in unsupported if c["severity"] == "hard"]
     verdict, verdict_reason = derive_verdict(
-        composite, req_summary, hard_claims, tools_check["penalty"], hopping["penalty"])
+        composite, req_summary, hard_claims, tools_check["penalty"], hopping["penalty"],
+        linkedin.get("penalty") or 0)
 
     return {
         "summary": str(parsed.get("summary") or "").strip(),
@@ -2353,6 +2391,7 @@ def finalize(parsed: Dict[str, Any], snapshot: Dict[str, Any], source_len: int,
         "_score_detail": score_detail,
         "_tools_check": tools_check,
         "_job_hopping": hopping,
+        "_linkedin_check": linkedin,
         "_cv_years": cv_years,
         "_fabrication_check": "ran" if checked else "skipped_no_source",
         # Un solo lugar decide, en vez de booleanos sueltos que pueden contradecirse: todo
@@ -2808,8 +2847,351 @@ def apply_requirement_kinds(parsed: Dict[str, Any]) -> None:
             logging.exception("cv_review: no se pudo guardar el cache de kind")
 
 
+# --- CV vs LinkedIn: trabajos que el CV omite (v18) ----------------------------------
+# Pasada APARTE, igual que años y kinds: el juez principal no se enteró de que existe. El
+# modelo sólo empareja (las empresas se escriben distinto — "KTB Services" vs "KTBSERVICES
+# LLC" —, un ascenso en LinkedIn son dos roles y en el CV uno) y dice si el rol es trabajo.
+# Cuánto duró y cuánto resta lo calculamos nosotros, desde las fechas.
+_LINKEDIN_SYSTEM = """You do exactly one thing: check whether each job on a candidate's
+LinkedIn appears in the WORK EXPERIENCE of a CV a recruiter wrote for them. You do not
+judge the CV, the candidate or the writing.
+
+For EACH LinkedIn role [L#], find the CV role [R#] that is THE SAME JOB, or null if the CV
+has no such role.
+
+IT IS THE SAME JOB when the employer is the same, even if:
+- the name is spelled differently, abbreviated, has or lacks a legal suffix (LLC, S.A.,
+  Inc.), or is a known rebrand / parent company;
+- the title is worded differently;
+- the dates differ a bit.
+- the company name is TRANSLATED ("Irrazonables" and "Unreasonable México" are one
+  company; so are "Grupo X" and "X Group").
+Several LinkedIn roles at one company (a promotion ladder) may all map to ONE CV role —
+that is fine, give each of them that R number. The same LinkedIn job listed twice (two
+entries with the same title and dates) maps to the same R too.
+AGENCIES / OUTSOURCING / BPO: people placed by a staffing or outsourcing firm often list
+the firm on LinkedIn and the client on the CV, or the other way round ("Lean Solutions
+Group" on LinkedIn, "Ignite International" on the CV; a call-center "Telvista" on LinkedIn,
+the brand they answered for on the CV). So: when a CV role has the SAME OR A VERY SIMILAR
+TITLE and its dates overlap the LinkedIn role's by most of their length, it is the same job
+even if the company names have nothing in common — match it.
+
+IT IS NOT IN THE CV when it only shows up in the About/summary, in Education, or not at
+all. Only WORK EXPERIENCE roles count. Do not force a match: a different company is
+null, even if the title is identical.
+
+"is_work": false ONLY for things that are not a job: volunteering, student / studying,
+"open to work" / "looking for opportunities", career break, and freelance / self-employed /
+independent entries. Internships and part-time jobs ARE work.
+
+"dates_differ": true when you matched it and the start or end on the CV is off by more
+than about 3 months from LinkedIn.
+
+Return ONLY this JSON:
+{"roles":[{"li":<L number>,
+           "cv_role":<R number or null>,
+           "is_work":true|false,
+           "dates_differ":true|false,
+           "why":"<one short line>"}]}
+Every LinkedIn role exactly once."""
+
+# Cuando no hay JSON de Coresignal y sólo tenemos el LinkedIn como texto (pegado a mano en
+# linkedin_scrapper), el mismo modelo primero lista los roles. Sin eso no hay fechas para
+# calcular duraciones.
+_LINKEDIN_TEXT_ADDENDUM = """
+
+The LinkedIn profile is given as RAW TEXT. First list its jobs yourself, newest first,
+numbering them L1, L2, ... and include for each: "title", "company", "start" and "end".
+Write dates as "YYYY-MM" (or "YYYY" if the text gives no month), translating month names
+from any language ("nov. 2025" -> "2025-11", "ago. 2021" -> "2021-08"); "" if absent;
+"Present" if ongoing ("actualidad", "presente", "atualmente"). LinkedIn groups several
+roles under one company header: each role is its own item, with that company. So each
+item is:
+{"li":<n>,"title":"...","company":"...","start":"...","end":"...","cv_role":<R or null>,
+ "is_work":true|false,"dates_differ":true|false,"why":"..."}"""
+
+_MONTHS = {m: i for i, m in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+# El LinkedIn pegado a mano viene en el idioma de quien lo copió ("nov. 2025", "ago. 2021").
+# El modelo ya normaliza a YYYY-MM; esto es por si no lo hace.
+_MONTHS.update({"ene": 1, "abr": 4, "ago": 8, "dic": 12,          # español
+                "fev": 2, "mai": 5, "set": 9, "out": 10, "dez": 12})  # portugués
+_LI_MONTH_NAME = re.compile(
+    r"\b(jan|ene|feb|fev|mar|apr|abr|may|mai|jun|jul|aug|ago|sep|set|oct|out|nov|dec|dic|dez)"
+    r"[a-z]*\.?\s*(?:de\s+)?,?\s*(\d{4})\b", re.I)
+_LI_NUMERIC = re.compile(r"\b(\d{1,2})[/-](\d{4})\b")
+
+
+def _li_month(value: Any, default_month: int) -> Tuple[Optional[int], bool]:
+    """Una fecha de LinkedIn a meses. Devuelve (meses, tenía_mes).
+
+    Coresignal escribe "Jan 2021" / "January 2021"; el texto pegado a veces "03/2021"; y
+    las de _as_month ("2021-03", "2021"). `tenía_mes` importa para la duración mínima.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None, False
+    m = _LI_MONTH_NAME.search(text)
+    if m:
+        return int(m.group(2)) * 12 + _MONTHS[m.group(1).lower()[:3]] - 1, True
+    m = _LI_NUMERIC.search(text)
+    if m and 1 <= int(m.group(1)) <= 12:
+        return int(m.group(2)) * 12 + int(m.group(1)) - 1, True
+    m = _DATE_RE.search(text)
+    if not m:
+        return None, False
+    return _as_month(text, default_month), bool(m.group(2))
+
+
+def _li_months(role: Dict[str, Any], now: int) -> Tuple[Optional[int], Optional[int]]:
+    """(duración máxima, duración MÍNIMA posible) en meses, o (None, None) sin fechas.
+
+    La mínima decide si castiga: con fechas de sólo año se asume el peor caso para el
+    castigo (empezó en diciembre, terminó en enero), así "2021 → 2021" no puede probar
+    que duró 3 meses. La máxima es la que se muestra.
+    """
+    start_lo, has_m = _li_month(role.get("start"), 1)
+    start_hi, _ = _li_month(role.get("start"), 12)
+    if start_lo is None:
+        return None, None
+    end_raw = str(role.get("end") or "")
+    if role.get("current") or end_raw.lower().startswith("present") or not end_raw:
+        if not role.get("current") and not end_raw.lower().startswith("present"):
+            return None, None  # sin fin y sin "en curso": no sabemos cuánto duró
+        end_hi = end_lo = now
+    else:
+        end_hi, _ = _li_month(end_raw, 12)
+        end_lo, _ = _li_month(end_raw, 1)
+        if end_hi is None:
+            return None, None
+    end_hi, end_lo = min(end_hi, now), min(end_lo, now)
+    longest = end_hi - start_lo + 1
+    shortest = end_lo - start_hi + 1
+    if longest < 1:
+        return None, None
+    return longest, max(1, shortest)
+
+
+def linkedin_input(candidate_row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Lo que el chequeo necesita del LinkedIn, o None si no hay nada que leer.
+
+    Dos fuentes: el JSON de Coresignal (estructurado, pero es una copia que ellos refrescan
+    cuando quieren) y el texto que la recruiter pegó del LinkedIn de hoy (linkedin_scrapper,
+    fechado en linkedin_scrapper_at). Gana la MÁS NUEVA. Un texto pegado sin fecha es
+    legado (lo escribe también el modal de React) y sólo se usa si no hay Coresignal.
+
+    Se arma en la ruta, antes del fingerprint, para que un LinkedIn nuevo cambie la huella
+    y el guard de 60s no devuelva un análisis sin él.
+    """
+    from utils.coresignal_profile import load_profile, work_roles, profile_as_of
+    profile = load_profile(candidate_row.get("coresignal_scrapper"))
+    cs_roles = work_roles(profile)[:LINKEDIN_MAX_ROLES] if profile else []
+    cs_as_of = profile_as_of(profile) if profile else None
+    text = _strip_html(candidate_row.get("linkedin_scrapper"))
+    pasted_at = _as_date(candidate_row.get("linkedin_scrapper_at"))
+
+    pasted = None
+    if len(text) >= 200:
+        pasted = {"source": "linkedin_text", "text": text[:SOURCE_TEXT_LIMIT],
+                  "as_of": pasted_at.isoformat() if pasted_at else None}
+    coresignal = None
+    if profile:
+        # Perfil sin un solo rol: se chequeó y no hay nada que comparar (status no_roles).
+        coresignal = {"source": "coresignal", "roles": cs_roles,
+                      "as_of": cs_as_of.isoformat() if cs_as_of else None}
+
+    if pasted and pasted_at and (not coresignal or not cs_as_of or pasted_at >= cs_as_of):
+        return pasted
+    if coresignal and cs_roles:
+        return coresignal
+    return pasted or coresignal
+
+
+def _as_date(value: Any) -> Optional[_dt.date]:
+    if isinstance(value, _dt.datetime):
+        return value.date()
+    if isinstance(value, _dt.date):
+        return value
+    try:
+        return _dt.date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return None
+
+
+def linkedin_is_stale(li: Optional[Dict[str, Any]]) -> bool:
+    """¿La copia de LinkedIn es demasiado vieja para castigar con ella?
+
+    Sin fecha no se puede saber: el texto pegado a mano en linkedin_scrapper no la trae, y
+    ahí se sigue castigando como antes (hoy no lo usa ningún candidato con review).
+    """
+    raw = (li or {}).get("as_of")
+    if not raw:
+        return False
+    try:
+        as_of = _dt.date.fromisoformat(raw)
+    except ValueError:
+        return False
+    return (_dt.date.today() - as_of).days > LINKEDIN_STALE_DAYS
+
+
+def _linkedin_prompt(li: Dict[str, Any], snapshot: Dict[str, Any]) -> str:
+    out = ["CV — WORK EXPERIENCE"]
+    work = _as_list(snapshot.get("work_experience"))
+    if not work:
+        out.append("(empty)")
+    for i, entry in enumerate(work, start=1):
+        end = "Present" if entry.get("current") else (entry.get("end_date") or "?")
+        out.append(f"[R{i}] {entry.get('title') or '(no title)'} — "
+                   f"{entry.get('company') or '(no company)'} "
+                   f"[{entry.get('start_date') or '?'} → {end}]")
+    out.append("\nLINKEDIN")
+    if li.get("source") == "linkedin_text":
+        out.append(li.get("text") or "")
+    else:
+        for i, r in enumerate(li.get("roles") or [], start=1):
+            end = "Present" if r.get("current") else (r.get("end") or "?")
+            out.append(f"[L{i}] {r.get('title') or '(no title)'} — "
+                       f"{r.get('company') or '(no company)'} [{r.get('start') or '?'} → {end}]")
+    return "\n".join(out)
+
+
+def linkedin_coverage(li_roles: List[Dict[str, Any]], matches: Dict[int, Dict[str, Any]],
+                      cv_role_count: int, source: str, as_of: Optional[str] = None,
+                      stale: bool = False) -> Dict[str, Any]:
+    """La aritmética: qué roles faltan, cuáles restan y cuánto. Sin modelo."""
+    today = _dt.date.today()
+    now = today.year * 12 + today.month - 1
+    roles, missing = [], []
+    for i, r in enumerate(li_roles, start=1):
+        m = matches.get(i) or {}
+        cv_role = _role_number(m.get("cv_role"))
+        if cv_role is not None and not (1 <= cv_role <= cv_role_count):
+            cv_role = None
+        longest, shortest = _li_months(r, now)
+        is_work = m.get("is_work") is not False
+        item = {
+            "li": i, "title": r.get("title") or "", "company": r.get("company") or "",
+            "start": r.get("start") or "", "end": "Present" if r.get("current") else (r.get("end") or ""),
+            "months": longest, "cv_role": cv_role, "is_work": is_work,
+            "dates_differ": bool(m.get("dates_differ")) and cv_role is not None,
+            "why": str(m.get("why") or "").strip(),
+        }
+        if cv_role is None:
+            if not is_work:
+                item["no_penalty_reason"] = "not_work"
+            elif shortest is None:
+                item["no_penalty_reason"] = "no_dates"
+            elif shortest < LINKEDIN_MIN_MONTHS:
+                item["no_penalty_reason"] = "short"
+            elif stale:
+                item["no_penalty_reason"] = "stale"
+            item["penalized"] = "no_penalty_reason" not in item
+            missing.append(item)
+        roles.append(item)
+    penalized = [r for r in missing if r["penalized"]]
+    return {
+        "status": "ran",
+        "source": source,
+        "as_of": as_of,
+        "stale": stale,
+        "stale_days": LINKEDIN_STALE_DAYS,
+        "roles": roles,
+        "missing": missing,
+        "penalized": len(penalized),
+        "penalty": min(LINKEDIN_MISSING_CAP, LINKEDIN_MISSING_PENALTY * len(penalized)),
+        "per_role": LINKEDIN_MISSING_PENALTY,
+        "cap": LINKEDIN_MISSING_CAP,
+        "min_months": LINKEDIN_MIN_MONTHS,
+    }
+
+
+def apply_linkedin_coverage(snapshot: Dict[str, Any],
+                            li: Optional[Dict[str, Any]],
+                            unavailable: Optional[str] = None) -> Dict[str, Any]:
+    """El chequeo CV vs LinkedIn. Nunca levanta: cualquier fallo es penalty 0."""
+    if not li:
+        return {"status": unavailable or "no_linkedin", "penalty": 0}
+    source = li.get("source") or ""
+    if source == "coresignal" and not li.get("roles"):
+        return {"status": "no_roles", "source": source, "as_of": li.get("as_of"),
+                "penalty": 0}
+    system = _LINKEDIN_SYSTEM + (_LINKEDIN_TEXT_ADDENDUM if source == "linkedin_text" else "")
+    try:
+        from ai_routes import call_openai_with_retry
+        resp = call_openai_with_retry(
+            MODEL,
+            [{"role": "system", "content": system},
+             {"role": "user", "content": _linkedin_prompt(li, snapshot)}],
+            temperature=0, max_tokens=2400,
+            response_format={"type": "json_object"},
+        )
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            logging.warning("cv_review: el chequeo contra LinkedIn salió truncado")
+            return {"status": "error", "source": source, "penalty": 0}
+        data = parse_json(resp.choices[0].message.content or "")
+    except Exception:
+        logging.exception("cv_review: falló el chequeo contra LinkedIn")
+        return {"status": "error", "source": source, "penalty": 0}
+    items = data.get("roles") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return {"status": "error", "source": source, "penalty": 0}
+
+    matches: Dict[int, Dict[str, Any]] = {}
+    extracted: List[Dict[str, Any]] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        n = _role_number(it.get("li"))  # 3, "3" o "L3"
+        if n is None or n in matches:
+            continue
+        matches[n] = it
+        if source == "linkedin_text":
+            end = str(it.get("end") or "").strip()
+            extracted.append({"n": n, "title": str(it.get("title") or "").strip(),
+                              "company": str(it.get("company") or "").strip(),
+                              "start": str(it.get("start") or "").strip(),
+                              "end": "" if end.lower().startswith("present") else end,
+                              "current": end.lower().startswith("present")})
+
+    if source == "linkedin_text":
+        extracted.sort(key=lambda r: r["n"])
+        extracted = extracted[:LINKEDIN_MAX_ROLES]
+        # Renumerar 1..N por si el modelo salteó números: la aritmética indexa por posición.
+        matches = {i: matches[r["n"]] for i, r in enumerate(extracted, start=1)}
+        li_roles = [{k: v for k, v in r.items() if k != "n"} for r in extracted]
+        if not li_roles:
+            return {"status": "no_roles", "source": source, "penalty": 0}
+    else:
+        li_roles = li.get("roles") or []
+        # Un rol que el modelo no devolvió NO se da por omitido: sería castigar por un
+        # descuido suyo. Se da por encontrado y se anota.
+        for i in range(1, len(li_roles) + 1):
+            if i not in matches:
+                logging.warning("cv_review: el chequeo de LinkedIn no devolvió L%s", i)
+                matches[i] = {"cv_role": 0, "is_work": True, "why": "not checked",
+                              "_unchecked": True}
+
+    check = linkedin_coverage(li_roles, matches,
+                              len(_as_list(snapshot.get("work_experience"))), source,
+                              as_of=li.get("as_of"), stale=linkedin_is_stale(li))
+    # Los que el modelo salteó: no restan, no se muestran como omitidos.
+    unchecked = {i for i, m in matches.items() if m.get("_unchecked")}
+    if unchecked:
+        check["missing"] = [r for r in check["missing"] if r["li"] not in unchecked]
+        for r in check["roles"]:
+            if r["li"] in unchecked:
+                r["cv_role"], r["unchecked"] = None, True
+        pen = [r for r in check["missing"] if r["penalized"]]
+        check["penalized"] = len(pen)
+        check["penalty"] = min(LINKEDIN_MISSING_CAP, LINKEDIN_MISSING_PENALTY * len(pen))
+        check["unchecked"] = len(unchecked)
+    return check
+
+
 def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
-             fingerprint: str) -> Tuple[Optional[int], Optional[Dict[str, Any]], Optional[str]]:
+             fingerprint: str, linkedin: Optional[Dict[str, Any]] = None,
+             linkedin_unavailable: Optional[str] = None,
+             ) -> Tuple[Optional[int], Optional[Dict[str, Any]], Optional[str]]:
     """Corre el juez. Devuelve (score, analysis, error_code).
 
     Nunca levanta excepción: el gate no puede depender de que OpenAI esté arriba, así que
@@ -2849,7 +3231,9 @@ def score_cv(*, snapshot: Dict[str, Any], jd_block: str, source_text: str,
     apply_years_roles(parsed, snapshot)
     # Y si un requisito es técnico o soft, también. Ver apply_requirement_kinds.
     apply_requirement_kinds(parsed)
+    # Y si el CV omite trabajos que están en LinkedIn. Ver apply_linkedin_coverage.
+    li_check = apply_linkedin_coverage(snapshot, linkedin, linkedin_unavailable)
 
     analysis = finalize(parsed, snapshot, len(source_text or ""), fingerprint,
-                        jd_text=jd_block)
+                        jd_text=jd_block, linkedin=li_check)
     return analysis["_composite_score"], analysis, None

@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20260929-board11" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20261001-li-reapply" />
   <link rel="stylesheet" href="./assets/css/jd-review.css?v=20260925-7" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
@@ -888,6 +888,15 @@
           The email is built for you: every CV in this batch with its AI quality score, the
           flags worth checking, and a button that opens the review queue.
         </p>
+
+        <!-- Candidatos con el LinkedIn viejo (>90 días) o sin LinkedIn: el score compara el
+             CV contra el LinkedIn, así que se pide pegar el de hoy antes de mandar. Lo pinta
+             loadApprovalLinkedin() en opportunity-detail.js. -->
+        <div id="approval-li-block" class="approval-li" hidden>
+          <p class="approval-li-lead"></p>
+          <div id="approval-li-list" class="approval-li-list"></div>
+          <p id="approval-li-msg" class="approval-li-msg"></p>
+        </div>
       </div>
 
       <button id="sendApprovalEmailBtn">Send</button>
@@ -1125,7 +1134,7 @@
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260916-qcheck" defer></script>
   <script src="./assets/js/pipeline.js?v=20260929-board5" defer></script>
-  <script src="./assets/js/opportunity-detail.js?v=20260929-benjamin" defer></script>
+  <script src="./assets/js/opportunity-detail.js?v=20261001-li-reapply" defer></script>
   <script src="./assets/js/jd-review-opp.js?v=20260925-1" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>
 
