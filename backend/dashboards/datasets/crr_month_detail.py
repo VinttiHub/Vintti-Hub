@@ -74,9 +74,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             h.account_id
           FROM ventana_mes v
           JOIN hires h
-            -- Base = cierre del mes anterior, igual que crr_history (ver ahí).
+            -- Bordes con `end_d >` (la baja es el ultimo dia), igual que crr_history (ver ahi).
             ON h.start_d <= (v.mes - 1)
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= (v.mes - 1)
+           AND COALESCE(h.end_d, DATE '9999-12-31') > (v.mes - 1)
         ),
         activos_fin AS (
           SELECT DISTINCT
@@ -86,7 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM ventana_mes v
           JOIN hires h
             ON h.start_d <= v.mes_fin
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.mes_fin
+           AND COALESCE(h.end_d, DATE '9999-12-31') > v.mes_fin
         ),
         full_set AS (
           SELECT mes, mes_fin, account_id FROM activos_inicio

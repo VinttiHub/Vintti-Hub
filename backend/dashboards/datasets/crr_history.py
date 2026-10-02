@@ -62,9 +62,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE (%(desde)s::date IS NULL OR m.mes >= DATE_TRUNC('month', %(desde)s::date))
             AND (%(hasta)s::date IS NULL OR m.mes <= DATE_TRUNC('month', %(hasta)s::date))
         ),
-        -- Base = cierre del mes ANTERIOR (`prev_end` del NRR), no el día 1: con el día 1,
-        -- un cliente cuyo último contractor se iba el último día del mes anterior
-        -- quedaba retenido ese mes y fuera de la base de éste (churn que no se contaba).
+        -- La fecha de baja (`end_d`) es el ULTIMO dia del contractor: desde el dia
+        -- siguiente ya no esta. Por eso los dos bordes piden `end_d > borde`:
+        --   base  = arranco antes de la ventana y seguia el primer dia (end_d >= win_ini)
+        --   cierre = seguia despues del ultimo dia (end_d > win_fin)
+        -- Asi una baja del 30-sep es churn de septiembre (como en Client churn) y
+        -- octubre arranca sin ese cliente. Con `>=` en los dos bordes la contabamos
+        -- en octubre y el mismo cliente se perdia en dos meses distintos segun la
+        -- card (Restor Medical SPA, reportado por la AM el 2026-10-02).
         activos_inicio AS (
           SELECT DISTINCT
             m.mes,
@@ -72,7 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM meses_filtrado m
           JOIN hires h
             ON h.start_d <= (m.mes - 1)
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= (m.mes - 1)
+           AND COALESCE(h.end_d, DATE '9999-12-31') > (m.mes - 1)
         ),
         activos_fin AS (
           SELECT DISTINCT
@@ -81,7 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM meses_filtrado m
           JOIN hires h
             ON h.start_d <= (m.mes + interval '1 month - 1 day')::date
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= (m.mes + interval '1 month - 1 day')::date
+           AND COALESCE(h.end_d, DATE '9999-12-31') > (m.mes + interval '1 month - 1 day')::date
         ),
         inicio_agg AS (
           SELECT mes, COUNT(DISTINCT account_id)::int AS clientes_activos_inicio

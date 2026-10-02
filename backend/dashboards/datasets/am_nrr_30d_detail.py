@@ -31,8 +31,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = f"""
         WITH {HIRES_CTE},
         {unit_info_cte('hires', close_col='close_d')},
-        {am_unit_snapshot('unit_ini', D_INI)},
-        {am_unit_snapshot('unit_fin', D_FIN)},
+        {am_unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
+        {am_unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
         {am_unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN, col='close_d'))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires',
                     D_INI, D_FIN, owned=True)}

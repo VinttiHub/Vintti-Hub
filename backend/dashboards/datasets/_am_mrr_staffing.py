@@ -333,7 +333,9 @@ SNAPSHOT_CTE = (
 HIRES_CTE = _HIRES_CTE
 
 
-def am_unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> str:
+def am_unit_snapshot(
+    name: str, dexpr: str, where_extra: str | None = None, exclude_end_day: bool = False
+) -> str:
     """CTE de MRR efectivo por (candidato, cuenta) a `dexpr`, con la marca `am_owned`.
 
     El gemelo de `_mrr_staffing.unit_snapshot()` para el scope del AM: mismo dedup de
@@ -347,10 +349,14 @@ def am_unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> s
     `where_extra` reemplaza el filtro de poblacion (por defecto: activos a `dexpr`).
     Lo usa el upsell del NRR, que se cuenta por `opp_close_date` y puede no estar
     activo a ninguna fecha.
+    `exclude_end_day=True` deja afuera a quien termina justo en `dexpr` (`end_d >`): la
+    baja es su ultimo dia, asi que despues de ese dia ya no esta. Lo usa el NRR en sus dos
+    bordes para que una baja del 30-sep caiga en septiembre y no en la base de octubre.
     """
+    op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
         f"h.start_d IS NOT NULL AND h.start_d <= {dexpr}"
-        f" AND (h.end_d IS NULL OR h.end_d >= {dexpr})"
+        f" AND (h.end_d IS NULL OR h.end_d {op} {dexpr})"
     )
     owned = _AM_OWNED.format(cutoff=dexpr)
     return f"""
@@ -411,15 +417,19 @@ def am_unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> s
     """
 
 
-def am_unit_snapshot_monthly(name: str, dcol: str, where_extra: str | None = None) -> str:
+def am_unit_snapshot_monthly(
+    name: str, dcol: str, where_extra: str | None = None, exclude_end_day: bool = False
+) -> str:
     """`am_unit_snapshot()` para una serie: un snapshot por cada fila de `meses`.
 
     Requiere `hires` y `meses` en el WITH. `dcol` es la columna de `meses` que hace de
     fecha del snapshot, y tambien la fecha contra la que se mide el reloj del M3.
+    `exclude_end_day` como en `am_unit_snapshot()`.
     """
+    op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
         f"h.start_d IS NOT NULL AND h.start_d <= m.{dcol}"
-        f" AND (h.end_d IS NULL OR h.end_d >= m.{dcol})"
+        f" AND (h.end_d IS NULL OR h.end_d {op} m.{dcol})"
     )
     owned = _AM_OWNED.format(cutoff=f"m.{dcol}")
     return f"""

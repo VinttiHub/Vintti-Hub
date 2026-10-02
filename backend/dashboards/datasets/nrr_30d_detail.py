@@ -91,8 +91,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = f"""
         WITH {HIRES_FULL_CTE},
         {unit_info_cte()},
-        {unit_snapshot('unit_ini', D_INI)},
-        {unit_snapshot('unit_fin', D_FIN)},
+        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
+        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
         {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
         {DETAIL_SELECT.format(mes=D_FIN)}

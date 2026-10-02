@@ -54,13 +54,19 @@ HIRES_FULL_CTE = """
 """
 
 
-def unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> str:
+def unit_snapshot(
+    name: str, dexpr: str, where_extra: str | None = None, exclude_end_day: bool = False
+) -> str:
     """CTE de MRR efectivo por (candidato, cuenta) a la fecha `dexpr`.
 
     `where_extra` reemplaza el filtro de población (por defecto: activos a `dexpr`).
+    `exclude_end_day=True` deja afuera a quien termina justo en `dexpr` (`end_d >`): la
+    baja es su ultimo dia, asi que despues de ese dia ya no esta. Lo usa el NRR en sus dos
+    bordes para que una baja del 30-sep caiga en septiembre y no en la base de octubre.
     """
+    op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
-        f"h.start_d <= {dexpr} AND (h.end_d IS NULL OR h.end_d >= {dexpr})"
+        f"h.start_d <= {dexpr} AND (h.end_d IS NULL OR h.end_d {op} {dexpr})"
     )
     return f"""
         {name}_opps AS (
@@ -115,16 +121,20 @@ def unit_snapshot(name: str, dexpr: str, where_extra: str | None = None) -> str:
     """
 
 
-def unit_snapshot_monthly(name: str, dcol: str, where_extra: str | None = None) -> str:
+def unit_snapshot_monthly(
+    name: str, dcol: str, where_extra: str | None = None, exclude_end_day: bool = False
+) -> str:
     """`unit_snapshot()` pero para una serie: un snapshot por cada fila de `meses`.
 
     Requiere que `hires_full` y `meses` ya existan en el WITH. `dcol` es la columna de
     `meses` que hace de fecha del snapshot (`prev_end` para el inicio de la ventana del
     mes, `fin_mes` para el cierre). Termina en
     `{name}(mes, candidate_id, account_id, opportunity_id, salary, fee)`.
+    `exclude_end_day` como en `unit_snapshot()`.
     """
+    op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
-        f"h.start_d <= m.{dcol} AND (h.end_d IS NULL OR h.end_d >= m.{dcol})"
+        f"h.start_d <= m.{dcol} AND (h.end_d IS NULL OR h.end_d {op} m.{dcol})"
     )
     return f"""
         {name}_opps AS (

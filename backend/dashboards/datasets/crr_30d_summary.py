@@ -63,23 +63,27 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               OR NULLIF(ho.start_date::text, '') IS NOT NULL
             )
         ),
-        -- Base = cierre del día ANTERIOR a la ventana, igual que el NRR (`D_INI` en
-        -- nrr_30d_summary.py). Con la base en win_ini, un cliente cuyo último
-        -- contractor se iba el último día del mes anterior quedaba retenido ese mes y
-        -- fuera de la base del siguiente: su churn no se contaba nunca.
+        -- La fecha de baja (`end_d`) es el ULTIMO dia del contractor: desde el dia
+        -- siguiente ya no esta. Por eso los dos bordes piden `end_d > borde`:
+        --   base  = arranco antes de la ventana y seguia el primer dia (end_d >= win_ini)
+        --   cierre = seguia despues del ultimo dia (end_d > win_fin)
+        -- Asi una baja del 30-sep es churn de septiembre (como en Client churn) y
+        -- octubre arranca sin ese cliente. Con `>=` en los dos bordes la contabamos
+        -- en octubre y el mismo cliente se perdia en dos meses distintos segun la
+        -- card (Restor Medical SPA, reportado por la AM el 2026-10-02).
         activos_inicio AS (
           SELECT DISTINCT v.cutoff_d, h.account_id
           FROM ventana v
           JOIN hires h
             ON h.start_d <= v.base_d
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.base_d
+           AND COALESCE(h.end_d, DATE '9999-12-31') > v.base_d
         ),
         activos_fin AS (
           SELECT DISTINCT v.cutoff_d, h.account_id
           FROM ventana v
           JOIN hires h
             ON h.start_d <= v.win_fin
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_fin
+           AND COALESCE(h.end_d, DATE '9999-12-31') > v.win_fin
         ),
         retenidos AS (
           SELECT ai.cutoff_d, COUNT(DISTINCT ai.account_id)::int AS retenidos

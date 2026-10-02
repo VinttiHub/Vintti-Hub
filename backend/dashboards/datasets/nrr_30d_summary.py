@@ -14,6 +14,9 @@ from ._nrr_decomp import (
 # `prev_end` en la serie mensual: asi, al elegir un mes, esta card da exactamente el
 # mismo numero que el punto de ese mes en el chart. Anclarla al primer dia de la ventana
 # dejaba una diferencia de un dia entre las dos lecturas.
+# Los dos snapshots van con `exclude_end_day=True`: quien termina justo en D_INI (baja
+# del 30-sep) no entra en la base de octubre, y quien termina en D_FIN ya no esta al
+# cierre. Asi la baja cae en su propio mes, como en el CRR y en Client churn.
 D_INI = "(%(win_ini)s::date - 1)"
 D_FIN = "%(win_fin)s::date"
 
@@ -39,8 +42,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # este mismo numero por construccion.
     sql = f"""
         WITH {HIRES_FULL_CTE},
-        {unit_snapshot('unit_ini', D_INI)},
-        {unit_snapshot('unit_fin', D_FIN)},
+        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
+        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
         {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
         SELECT

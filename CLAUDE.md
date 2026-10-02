@@ -134,7 +134,9 @@ Cinco cosas que no son obvias:
   Es decisión de la owner (2026-09-22). Consecuencia asumida: la identidad
   `MRR(fin) = mrr_inicial + componentes` **no cierra** contra `mrr_history`, así que esa
   reconciliación no sirve como test. Lo que sí tiene que cerrar es card == drawer, y
-  `mrr_inicial` del mes M == GMRR de Management del mes M−1.
+  card de un mes == punto de ese mes en el chart. `mrr_inicial` del mes M ya **no** es
+  el GMRR de Management del cierre de M−1: le faltan las bajas de ese último día (ver
+  abajo).
 - **Por eso los upsells se valúan con un snapshot sin filtro de actividad**: el
   `where_extra` de `unit_snapshot()` / `am_unit_snapshot()`. Con la cláusula de actividad
   un upsell que todavía no arrancó se valuaría en cero.
@@ -175,6 +177,15 @@ Cinco cosas que no son obvias:
 - **La base es el cierre del día ANTERIOR al inicio de la ventana** (`D_INI` es
   `win_ini − 1`), igual que `prev_end` en la serie mensual. Así, al elegir un mes, la
   card de 30d da exactamente el mismo número que el punto de ese mes en el chart.
+- **La fecha de baja es el ÚLTIMO día del contractor, y CRR y NRR la tratan igual**
+  (2026-10-02): los dos bordes piden `end_d > borde` (`exclude_end_day=True` en
+  `unit_snapshot()` / `am_unit_snapshot()` y sus `_monthly`; `end_d >` en los 4
+  `crr_*.py`). Antes era `>=`: una baja del 30-sep seguía "activa" ese día, quedaba
+  retenida en septiembre y entraba en la base de octubre para perderse en octubre.
+  Restor Medical SPA (baja 30-sep) salía como churn de septiembre en Client churn y de
+  octubre en el CRR — la AM lo leyó como contarlo dos veces, y tenía razón en el mes.
+  Ahora la baja cae en su propio mes, como en Client churn. El default `False` de los
+  snapshots queda para GMRR/MRR: no lo cambies ahí.
 - **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Sin ella se
   lee como si fuera el GMRR de hoy y no cuadra con el tile de al lado: con corte
   22-sep, GMRR · AM da $237,4K y la base del NRR $208,1K, que es el GMRR · AM del

@@ -61,8 +61,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS mes
           ) m
         ),
-        {unit_snapshot_monthly('unit_ini', 'prev_end')},
-        {unit_snapshot_monthly('unit_fin', 'fin_mes')},
+        {unit_snapshot_monthly('unit_ini', 'prev_end', exclude_end_day=True)},
+        {unit_snapshot_monthly('unit_fin', 'fin_mes', exclude_end_day=True)},
         {unit_snapshot_monthly('unit_ups', 'fin_mes', UPS_POBLACION)},
         {decomp_cte(
             'unit_ini', 'unit_fin', 'unit_ups', 'hires_full',
