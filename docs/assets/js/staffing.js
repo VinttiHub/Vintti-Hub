@@ -86,7 +86,10 @@
   function money(value) {
     var num = Number(value || 0);
     if (!num) return "—";
-    return "$" + num.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    // El salary tiene centavos (numeric(12,2)): enteros sin ".00", el resto a 2 decimales.
+    var cents = !Number.isInteger(num);
+    return "$" + num.toLocaleString("en-US", {
+      minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
   }
 
   function fmtDate(iso) {
