@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prospecting · Vintti Hub</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=4" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
+</head>
+
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content page pr-page">
+    <header class="pr-head">
+      <div>
+        <h1 class="pr-head__title">Prospecting</h1>
+        <p class="pr-head__sub">Companies loaded from Clay for BDR prospecting.</p>
+      </div>
+      <div class="pr-head__actions">
+        <button type="button" class="pr-btn" id="prTestBtn" hidden>
+          <i class="fa-solid fa-flask"></i> Test panel
+        </button>
+      </div>
+    </header>
+
+    <div class="pr-denied" id="prDenied" hidden>
+      <i class="fa-solid fa-lock"></i>
+      <p>You do not have access to Prospecting. It is available to users with the BDR role.</p>
+    </div>
+
+    <div id="prApp" hidden>
+      <div class="pr-tabs" role="tablist">
+        <button type="button" class="pr-tab is-active" data-view="all" role="tab">Prospecting Companies</button>
+        <button type="button" class="pr-tab" data-view="mine" role="tab">My companies</button>
+        <button type="button" class="pr-tab" data-view="unassigned" role="tab">Unassigned</button>
+        <button type="button" class="pr-tab" data-view="recycled" role="tab">Recycled</button>
+      </div>
+
+      <div class="pr-card">
+        <div class="pr-filters">
+          <label class="pr-filter">
+            <span class="pr-filter__label">Prospecting Owner</span>
+            <select class="pr-filter__input" id="prFOwner"></select>
+          </label>
+          <label class="pr-filter">
+            <span class="pr-filter__label">Week</span>
+            <select class="pr-filter__input" id="prFWeek"></select>
+          </label>
+          <label class="pr-filter">
+            <span class="pr-filter__label">Prospecting Status</span>
+            <select class="pr-filter__input" id="prFStatus"></select>
+          </label>
+          <label class="pr-filter">
+            <span class="pr-filter__label">Start date from</span>
+            <input type="date" class="pr-filter__input" id="prFStartFrom">
+          </label>
+          <label class="pr-filter">
+            <span class="pr-filter__label">to</span>
+            <input type="date" class="pr-filter__input" id="prFStartTo">
+          </label>
+          <label class="pr-filter pr-filter--wide">
+            <span class="pr-filter__label">Search</span>
+            <input type="text" class="pr-filter__input pr-filter__input--search" id="prFQ" placeholder="Company or domain…" autocomplete="off">
+          </label>
+          <label class="pr-filter" id="prFDummyWrap" hidden>
+            <span class="pr-filter__label">Dummy data</span>
+            <select class="pr-filter__input" id="prFDummy">
+              <option value="exclude">Hide</option>
+              <option value="include">Show</option>
+              <option value="only">Only dummies</option>
+            </select>
+          </label>
+          <div class="pr-filters__actions">
+          <button type="button" class="pr-btn" id="prClear"><i class="fa-solid fa-rotate-left"></i> Clear</button>
+          <div class="pr-cols">
+            <button type="button" class="pr-btn" id="prColsBtn" aria-expanded="false">
+              <i class="fa-solid fa-table-columns"></i> Columns <span class="pr-cols__count" id="prColsCount"></span>
+            </button>
+            <div class="pr-cols__menu" id="prColsMenu" hidden></div>
+          </div>
+          </div>
+        </div>
+
+        <div class="pr-table-wrap">
+          <table class="pr-table">
+            <thead><tr id="prHead"></tr></thead>
+            <tbody id="prBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pr-pager">
+          <span class="pr-count" id="prCount"></span>
+          <span class="pr-pager__spacer"></span>
+          <select class="pr-filter__input pr-pager__size" id="prPageSize">
+            <option value="25" selected>25 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+          </select>
+          <button type="button" class="pr-btn" id="prPrev"><i class="fa-solid fa-chevron-left"></i></button>
+          <span class="pr-pager__page" id="prPage"></span>
+          <button type="button" class="pr-btn" id="prNext"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================== Drawer ============================== -->
+  <div class="pr-drawer" id="prDrawer" aria-hidden="true">
+    <div class="pr-drawer__backdrop" data-drawer-close></div>
+    <aside class="pr-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="prDrawerTitle">
+      <header class="pr-drawer__head">
+        <span class="pr-drawer__eyebrow" id="prDrawerEyebrow">Company</span>
+        <h2 class="pr-drawer__title" id="prDrawerTitle">—</h2>
+        <p class="pr-drawer__sub" id="prDrawerSub"></p>
+        <button type="button" class="pr-drawer__close" data-drawer-close aria-label="Close">&times;</button>
+      </header>
+      <div class="pr-drawer__body" id="prDrawerBody"></div>
+      <footer class="pr-drawer__foot" id="prDrawerFoot">
+        <span class="pr-drawer__status" id="prDrawerStatus"></span>
+        <button type="button" class="pr-btn pr-btn--primary" id="prDrawerSave">Save</button>
+      </footer>
+    </aside>
+  </div>
+
+  <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js?v=20261002-prospecting" defer></script>
+  <script src="./assets/js/prospecting.js?v=5" defer></script>
+</body>
+</html>

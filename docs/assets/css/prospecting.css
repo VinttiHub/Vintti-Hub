@@ -1,0 +1,566 @@
+/* =====================================================================
+   Prospecting — CRM de los BDRs (empresas desde Clay).
+   Mismo lenguaje visual que staffing.css, con prefijo `pr-`.
+   ===================================================================== */
+
+:root {
+  --pr-violet: #6c38ff;
+  --pr-lime:   #c1ff72;
+  --pr-cyan:   #4ba9ff;
+  --pr-mag:    #ff1fdb;
+  --pr-blue:   #003bff;
+
+  --pr-card:      #ffffff;
+  --pr-card-soft: #f6f7fb;
+  --pr-rule:      rgba(13, 18, 30, 0.08);
+  --pr-ink:       #0e1117;
+  --pr-ink-2:     #4d5363;
+  --pr-ink-3:     #8a90a0;
+}
+
+.pr-page,
+.pr-drawer {
+  font-family: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--pr-ink);
+}
+.pr-page { padding: 28px 32px 60px; }
+.pr-page [hidden], .pr-drawer [hidden] { display: none !important; }
+.pr-page *, .pr-page *::before, .pr-page *::after,
+.pr-drawer *, .pr-drawer *::before, .pr-drawer *::after { box-sizing: border-box; }
+
+/* ---------- Encabezado ---------- */
+.pr-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.pr-head__title { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.pr-head__sub { margin: 0; font-size: 13px; color: var(--pr-ink-3); }
+.pr-head__actions { display: flex; gap: 10px; align-items: center; }
+
+.pr-btn {
+  appearance: none;
+  border: 1px solid var(--pr-rule);
+  background: var(--pr-card);
+  color: var(--pr-ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+.pr-btn:hover { border-color: rgba(108, 56, 255, .35); color: var(--pr-ink); }
+.pr-btn:disabled { opacity: .45; cursor: default; }
+.pr-btn--primary { background: var(--pr-violet); border-color: var(--pr-violet); color: #fff; }
+.pr-btn--primary:hover { background: #5b2ce6; border-color: #5b2ce6; color: #fff; }
+.pr-btn--danger:hover { border-color: rgba(255, 31, 219, .45); color: #b0129a; }
+
+.pr-denied {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  background: var(--pr-card-soft);
+  border: 1px solid var(--pr-rule);
+  border-radius: 14px;
+  color: var(--pr-ink-2);
+}
+.pr-denied p { margin: 0; }
+
+/* ---------- Pestañas (vistas) ---------- */
+.pr-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  background: var(--pr-card-soft);
+  border: 1px solid var(--pr-rule);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 18px;
+}
+.pr-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pr-ink-3);
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.pr-tab:hover { color: var(--pr-ink); }
+.pr-tab.is-active { background: #fff; color: var(--pr-ink); box-shadow: 0 1px 3px rgba(13, 18, 30, .08); }
+
+/* ---------- Card + filtros ---------- */
+.pr-card {
+  background: var(--pr-card);
+  border: 1px solid var(--pr-rule);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(13, 18, 30, .04);
+  /* visible: el menú de Columns se despliega por fuera de la card. */
+  overflow: visible;
+}
+.pr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--pr-rule);
+}
+.pr-filter { display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.pr-filter--wide { flex: 1 1 220px; }
+.pr-filter__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--pr-ink-3);
+}
+.pr-filter__input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--pr-ink);
+  background: #fff;
+  border: 1px solid var(--pr-rule);
+  border-radius: 9px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.pr-filter__input:focus { outline: none; border-color: rgba(108, 56, 255, .5); }
+
+/* ---------- Tabla ---------- */
+.pr-table-wrap { overflow-x: auto; }
+.pr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pr-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--pr-ink-3);
+  padding: 11px 14px;
+  background: var(--pr-card-soft);
+  border-bottom: 1px solid var(--pr-rule);
+  white-space: nowrap;
+}
+.pr-table th[data-sort] { cursor: pointer; }
+.pr-table th[data-sort]:hover { color: var(--pr-ink); }
+.pr-table th.is-sorted { color: var(--pr-violet); }
+.pr-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--pr-rule);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.pr-table tbody tr:hover { background: #fafaff; }
+.pr-num { text-align: right; }
+.pr-empty { padding: 36px 14px !important; text-align: center; color: var(--pr-ink-3); }
+
+.pr-company { display: flex; flex-direction: column; gap: 2px; max-width: 280px; }
+.pr-company__name {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--pr-ink);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-company__name:hover { color: var(--pr-violet); }
+.pr-company__domain { font-size: 12px; color: var(--pr-ink-3); text-decoration: none; }
+.pr-company__domain:hover { text-decoration: underline; }
+.pr-dummy-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pr-lime) 60%, #fff);
+  color: #3a6b00;
+  vertical-align: middle;
+}
+
+/* Selects inline de la tabla */
+.pr-cell-select {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 6px;
+  max-width: 200px;
+  cursor: pointer;
+  color: var(--pr-ink);
+}
+.pr-cell-select:hover, .pr-cell-select:focus { border-color: var(--pr-rule); background: #fff; outline: none; }
+.pr-cell-select.is-saving { opacity: .5; }
+.pr-cell-select.is-error { border-color: var(--pr-mag); }
+
+/* Chip de status (el select mismo hace de chip) */
+.pr-status { font-weight: 600; padding-left: 10px; }
+.pr-status[data-status=""]            { color: var(--pr-ink-3); }
+.pr-status[data-status="In Progress"] { background: color-mix(in srgb, var(--pr-cyan) 16%, #fff); color: #0f5fae; }
+.pr-status[data-status="DQL"]         { background: color-mix(in srgb, var(--pr-mag) 13%, #fff); color: #a3108d; }
+.pr-status[data-status="Recycled"]    { background: color-mix(in srgb, var(--pr-violet) 13%, #fff); color: #4a1fd1; }
+
+/* ---------- Paginado ---------- */
+.pr-pager { display: flex; align-items: center; gap: 8px; padding: 12px 18px; }
+.pr-pager__spacer { flex: 1; }
+.pr-pager__size { width: auto; }
+.pr-pager__page { font-size: 13px; color: var(--pr-ink-2); min-width: 80px; text-align: center; }
+.pr-count { font-size: 13px; color: var(--pr-ink-3); }
+
+/* ---------- Drawer ---------- */
+.pr-drawer { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.pr-drawer.is-open { pointer-events: auto; }
+.pr-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 18, 30, .28);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.pr-drawer.is-open .pr-drawer__backdrop { opacity: 1; }
+.pr-drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(560px, 100vw);
+  background: #fff;
+  box-shadow: -10px 0 40px rgba(13, 18, 30, .14);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .22s ease;
+}
+.pr-drawer.is-open .pr-drawer__panel { transform: none; }
+.pr-drawer__head { position: relative; padding: 22px 56px 16px 24px; border-bottom: 1px solid var(--pr-rule); }
+.pr-drawer__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--pr-violet);
+}
+.pr-drawer__title { margin: 4px 0 2px; font-size: 20px; font-weight: 700; }
+.pr-drawer__sub { margin: 0; font-size: 13px; color: var(--pr-ink-3); }
+.pr-drawer__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: 0;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--pr-ink-3);
+  cursor: pointer;
+}
+.pr-drawer__body { flex: 1; overflow-y: auto; padding: 18px 24px 24px; }
+.pr-drawer__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--pr-rule);
+}
+.pr-drawer__status { font-size: 13px; color: var(--pr-ink-3); margin-right: auto; }
+
+.pr-section { margin-bottom: 22px; }
+.pr-section__title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pr-ink-2);
+}
+.pr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.pr-grid .pr-filter { min-width: 0; }
+.pr-kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 12px; font-size: 13px; }
+.pr-kv dt { color: var(--pr-ink-3); }
+.pr-kv dd { margin: 0; word-break: break-word; white-space: pre-wrap; }
+.pr-kv a { color: var(--pr-violet); }
+
+.pr-events { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+.pr-events li { padding: 8px 0; border-bottom: 1px dashed var(--pr-rule); color: var(--pr-ink-2); }
+.pr-events__when { color: var(--pr-ink-3); font-size: 11.5px; display: block; }
+.pr-events__src { font-weight: 600; color: var(--pr-ink); }
+.pr-events__src--wf { color: var(--pr-violet); }
+
+/* Panel de pruebas */
+.pr-note { font-size: 12.5px; color: var(--pr-ink-3); margin: 0 0 10px; }
+.pr-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.pr-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--pr-ink-2); }
+.pr-result {
+  margin-top: 12px;
+  background: var(--pr-card-soft);
+  border: 1px solid var(--pr-rule);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+}
+.pr-result h4 { margin: 0 0 8px; font-size: 13px; }
+.pr-result ul { margin: 0; padding-left: 18px; max-height: 260px; overflow-y: auto; }
+.pr-result li { margin-bottom: 4px; }
+
+@media (max-width: 720px) {
+  .pr-page { padding: 18px 16px 40px; }
+  .pr-grid { grid-template-columns: 1fr; }
+  .pr-kv { grid-template-columns: 1fr; }
+  .pr-filter { min-width: calc(50% - 6px); }
+}
+
+/* ---------- Columnas configurables ---------- */
+.pr-cols { position: relative; }
+.pr-cols__count { font-weight: 500; color: var(--pr-ink-3); }
+.pr-cols__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  width: 290px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--pr-rule);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(13, 18, 30, .14);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.pr-cols__foot {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid var(--pr-rule);
+}
+.pr-long {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.pr-link {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  color: var(--pr-violet);
+  text-decoration: none;
+}
+.pr-link:hover { text-decoration: underline; }
+
+/* =====================================================================
+   Controles propios (sin el look nativo del navegador)
+   ===================================================================== */
+:root {
+  --pr-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a90a0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ---------- Filtros: todos a la misma altura ---------- */
+.pr-filters { align-items: flex-end; gap: 12px 14px; }
+.pr-filter { min-width: 160px; flex: 0 1 180px; }
+.pr-filter--wide { flex: 1 1 240px; }
+
+.pr-page .pr-filter__input,
+.pr-drawer .pr-filter__input {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 38px;
+  padding: 0 12px;
+  background-color: #fff;
+  background-image: none;
+  border: 1px solid rgba(13, 18, 30, .12);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(13, 18, 30, .04);
+  font: inherit;
+  font-size: 13px;
+  color: var(--pr-ink);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.pr-page select.pr-filter__input,
+.pr-drawer select.pr-filter__input {
+  padding-right: 32px;
+  background-image: var(--pr-chevron);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+.pr-page .pr-filter__input:hover,
+.pr-drawer .pr-filter__input:hover { border-color: rgba(108, 56, 255, .35); }
+.pr-page .pr-filter__input:focus,
+.pr-drawer .pr-filter__input:focus {
+  outline: none;
+  border-color: var(--pr-violet);
+  box-shadow: 0 0 0 3px rgba(108, 56, 255, .14);
+}
+.pr-page .pr-filter__input::placeholder { color: var(--pr-ink-3); }
+.pr-page input[type="date"].pr-filter__input { color: var(--pr-ink-2); }
+.pr-page input[type="date"].pr-filter__input::-webkit-calendar-picker-indicator {
+  opacity: .5;
+  cursor: pointer;
+}
+.pr-filter__input--search {
+  padding-left: 34px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a90a0' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: 12px center !important;
+}
+.pr-filters .pr-btn { height: 38px; }
+.pr-filters__actions { display: flex; gap: 10px; align-items: flex-end; margin-left: auto; }
+
+/* ---------- Selects de la tabla: pill limpio, chevron al pasar ---------- */
+.pr-page .pr-cell-select {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 30px;
+  padding: 0 26px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background-color: transparent;
+  background-image: none;
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--pr-ink);
+  max-width: 210px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease;
+}
+.pr-page .pr-cell-select:hover,
+.pr-page .pr-cell-select:focus {
+  outline: none;
+  background-color: #fff;
+  background-image: var(--pr-chevron);
+  border-color: rgba(13, 18, 30, .12);
+}
+.pr-page .pr-cell-select:focus { border-color: var(--pr-violet); box-shadow: 0 0 0 3px rgba(108, 56, 255, .12); }
+
+/* Chip de status: siempre pill de color */
+.pr-page .pr-cell-select.pr-status {
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 0 26px 0 12px;
+  background-image: var(--pr-chevron);
+}
+.pr-page .pr-status[data-status=""]            { background-color: var(--pr-card-soft); color: var(--pr-ink-3); }
+.pr-page .pr-status[data-status="In Progress"] { background-color: color-mix(in srgb, var(--pr-cyan) 16%, #fff); color: #0f5fae; }
+.pr-page .pr-status[data-status="DQL"]         { background-color: color-mix(in srgb, var(--pr-mag) 13%, #fff); color: #a3108d; }
+.pr-page .pr-status[data-status="Recycled"]    { background-color: color-mix(in srgb, var(--pr-violet) 13%, #fff); color: #4a1fd1; }
+.pr-page .pr-status:hover { border-color: transparent; filter: brightness(.97); }
+
+/* ---------- Checkboxes (Columns, Test panel) ---------- */
+.pr-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--pr-ink);
+  cursor: pointer;
+  user-select: none;
+}
+.pr-check:hover { background: var(--pr-card-soft); }
+.pr-check input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid rgba(13, 18, 30, .22);
+  border-radius: 5px;
+  background: #fff center / 12px no-repeat;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.pr-check input[type="checkbox"]:checked {
+  background-color: var(--pr-violet);
+  border-color: var(--pr-violet);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.pr-check input[type="checkbox"]:focus-visible { outline: 3px solid rgba(108, 56, 255, .25); outline-offset: 1px; }
+.pr-check input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
+.pr-check:has(input:disabled) { cursor: default; color: var(--pr-ink-3); }
+
+.pr-cols__menu { gap: 1px; padding: 8px; width: 300px; }
+.pr-cols__head {
+  padding: 4px 8px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pr-ink-3);
+}
+.pr-cols__foot { padding: 8px 4px 2px; }
+.pr-cols__foot .pr-btn { flex: 1; justify-content: center; padding: 7px 10px; }
+
+/* =====================================================================
+   Scroll sólo dentro de la tabla: la página ocupa exactamente la pantalla,
+   así encabezado, vistas y filtros quedan fijos y el paginado siempre visible.
+   En celular se vuelve al scroll normal de página.
+   ===================================================================== */
+@media (min-width: 721px) {
+  .pr-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 20px;
+  }
+  .pr-head, .pr-tabs { flex: 0 0 auto; }
+  .pr-tabs { align-self: flex-start; }
+  #prApp:not([hidden]) {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  #prApp .pr-card {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pr-filters, .pr-pager { flex: 0 0 auto; }
+  .pr-pager { border-top: 1px solid var(--pr-rule); }
+  .pr-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
+/* Títulos de columna fijos mientras se scrollea la tabla */
+.pr-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}

@@ -974,3 +974,29 @@ Las 11 opps afectadas se restauraron con `backend/scripts/restore_nda_dates_stop
 El valor tipeado no se guardaba en ningún lado: se usó el día (hora ARG) del primer
 `saveSourcingDate` en `tracks`, que puede diferir unos días del real. `tracks` arranca en
 feb-2026, así que si aparece una opp más vieja sin fecha no hay de dónde sacarla.
+
+## Prospecting: el CRM de los BDRs (Clay → Hub, sin HubSpot)
+
+`docs/prospecting.html` reemplaza a HubSpot para la prospección: Clay manda cada empresa
+al Hub, los BDRs la trabajan ahí y los workflows que corría HubSpot viven en el backend.
+Es un módulo **aparte** del CRM de clientes (`account`): otras empresas, otro volumen.
+Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
+`backend/routes/prospecting_routes.py`. Tablas autocreadas: `prospect_companies`,
+`prospect_company_events` (historial por campo), `prospect_workflow_runs`.
+
+- **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales siempre**
+  (`ADMIN_EMAILS`). El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
+  La UI limitada de `crm.js` (abril, luca, felipe, felicitas) deja pasar el link por texto.
+- **Clay**: columna "HTTP API" → `POST /prospecting/clay/webhook` con `X-Clay-Token`
+  (= env `CLAY_WEBHOOK_TOKEN`, propia). Acepta snake_case o los nombres de la planilla de
+  HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
+  **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
+  semana): esos sólo se rellenan si están vacíos.
+- **Workflows**: una entrada por workflow en `WORKFLOWS` (`workflows.py`). Hoy sólo
+  `recycle_60d` (In Progress con start date de hace más de 60 días → borra owner, owner
+  Apollo y start date, status Recycled). `as_of` simula la fecha. Cron
+  `.github/workflows/prospecting-workflows.yml` con el **schedule comentado** hasta validar.
+- **Pruebas**: botón *Test panel* (sólo admin) siembra empresas `is_dummy`, que los BDRs no
+  ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
+  manda payloads con la forma de Clay.
+- Las listas cerradas (status, Not ICP reasons, sizes) viven sólo en `constants.py`.

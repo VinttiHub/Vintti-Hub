@@ -2457,7 +2457,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
 (function enforceLimitedUI() {
   const LIMITED_USERS = new Set(['felipe@vintti.com','felicitas@vintti.com','luca@vintti.com','abril@vintti.com']);
   const ALLOWED_IDS = new Set(['crmLink','opportunitiesLink']);
-  const ALLOWED_TEXT_KEYWORDS = ['crm', 'opportunit'];
+  const ALLOWED_TEXT_KEYWORDS = ['crm', 'opportunit', 'prospecting'];
 
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
   if (!LIMITED_USERS.has(email)) return;

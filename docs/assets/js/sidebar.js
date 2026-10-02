@@ -106,6 +106,11 @@
       'pgonzales@vintti.com'
     ]).has(email));
 
+    // Prospecting (CRM de los BDRs). Sin Set hardcodeado: quién es BDR lo dice
+    // `users.role` en la base, así que se le pregunta al backend (que es el gate
+    // real, backend/routes/prospecting_routes.py) y se cachea 10 min por usuario.
+    paintProspectingLink(email, setDisplay);
+
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pgonzales@vintti.com','agostina@vintti.com',
@@ -175,6 +180,33 @@
       'justo@vintti.com','ana@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
+  }
+
+  /* -------------------------
+     Prospecting: visible para rol BDR + la owner
+  ------------------------- */
+  const PROSPECTING_CACHE_KEY = 'prospecting_access_cache';
+  const PROSPECTING_CACHE_MS = 10 * 60 * 1000;
+
+  function paintProspectingLink(email, setDisplay) {
+    if (email === 'pgonzales@vintti.com') { setDisplay('prospectingLink', true); return; }
+    try {
+      const c = JSON.parse(sessionStorage.getItem(PROSPECTING_CACHE_KEY) || 'null');
+      if (c && c.email === email && Date.now() - c.at < PROSPECTING_CACHE_MS) {
+        setDisplay('prospectingLink', !!c.ok);
+        return;
+      }
+    } catch {}
+    fetch(`${apiBase}/prospecting/me`, { headers: { 'X-User-Email': email } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(me => {
+        const ok = !!(me && me.has_access);
+        setDisplay('prospectingLink', ok);
+        try {
+          sessionStorage.setItem(PROSPECTING_CACHE_KEY, JSON.stringify({ email, ok, at: Date.now() }));
+        } catch {}
+      })
+      .catch(() => {});
   }
 
   /* -------------------------

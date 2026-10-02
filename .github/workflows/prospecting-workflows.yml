@@ -1,0 +1,33 @@
+name: Prospecting workflows
+
+# Workflows del CRM de prospección de los BDRs (backend/prospecting/workflows.py),
+# los que antes corría HubSpot. Hoy: Recycle a 60 días.
+#
+# El schedule está APAGADO a propósito hasta validar los workflows con datos dummy
+# desde el panel de pruebas de docs/prospecting.html. Para prenderlo, descomentar
+# las dos líneas de `schedule`. Los workflows dependen de la fecha y no de la hora,
+# así que el atraso de GitHub (~4 h) no importa.
+on:
+  # schedule:
+  #   - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = sólo lista qué cambiaría"
+        required: false
+        default: "true"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Correr los workflows
+        run: |
+          DRY="${{ github.event.inputs.dry_run }}"
+          [ -z "$DRY" ] && DRY="false"
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "Content-Type: application/json" \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            -d "{\"dry_run\": $DRY}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/prospecting/workflows/run"
