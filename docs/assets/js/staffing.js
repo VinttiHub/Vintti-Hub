@@ -219,7 +219,8 @@
   var PLATFORM_OPTIONS = [
     { value: "Bank Account", cls: "stf-badge--plat-orange" },
     { value: "Deel",         cls: "stf-badge--plat-lilac" },
-    { value: "Ontop",        cls: "stf-badge--plat-cyan" }
+    { value: "Ontop",        cls: "stf-badge--plat-cyan" },
+    { value: "Payoneer",     cls: "stf-badge--plat-magenta" }
   ];
   var PLATFORM_VALUES = PLATFORM_OPTIONS.map(function (o) { return o.value; });
   var PLATFORM_CLASS = {};
@@ -435,11 +436,6 @@
     var cols = colsOf(tab);
     var rows = sortRows(tab, visibleRows(tab));
 
-    if (!rows.length) {
-      host.innerHTML = '<div class="stf-empty">' + esc(opts.empty) + "</div>";
-      return rows;
-    }
-
     var sort = state.sort[tab];
     var head = cols.map(function (col) {
       var active = !!state.filters[tab][col.key];
@@ -467,9 +463,15 @@
       }).join("");
       return '<tr data-row="' + index + '">' + cells + "</tr>";
     }).join("");
+    // Sin filas se dibuja igual el encabezado: los filtros por columna viven ahí,
+    // y sin él no habría forma de sacar el filtro que dejó la tabla vacía.
+    if (!rows.length) {
+      body = '<tr class="stf-empty-row"><td colspan="' + cols.length + '">' +
+        '<div class="stf-empty">' + esc(opts.empty) + "</div></td></tr>";
+    }
 
     var foot = "";
-    if (opts.totalLabel) {
+    if (opts.totalLabel && rows.length) {
       foot = "<tfoot><tr>" + cols.map(function (col, i) {
         if (i === 0) return '<td class="stf-td-name">' + esc(opts.totalLabel) + "</td>";
         return "<td>" + (col.total ? money(totals[col.key] || 0) : "") + "</td>";
@@ -479,7 +481,7 @@
     host.innerHTML = '<div class="stf-scroll"><table class="stf-table">' +
       "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody>" + foot + "</table></div>";
 
-    host.querySelectorAll("tbody tr").forEach(function (tr) {
+    host.querySelectorAll("tbody tr[data-row]").forEach(function (tr) {
       tr.addEventListener("click", function () { opts.onRow(rows[Number(tr.dataset.row)]); });
     });
     host.querySelectorAll("[data-pay]").forEach(function (cb) {

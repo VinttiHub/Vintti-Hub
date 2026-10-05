@@ -424,6 +424,10 @@ datalist { display: none; }
 .stf-td-name { z-index: 2; min-width: 240px; }
 .stf-table tbody tr { cursor: pointer; }
 .stf-table tbody tr:hover { background: rgba(108, 56, 255, .04); }
+.stf-table tbody tr.stf-empty-row { cursor: default; }
+.stf-table tbody tr.stf-empty-row:hover { background: none; }
+.stf-table td:has(> .stf-empty) { padding: 0; }
+.stf-empty-row .stf-empty { position: sticky; left: 0; max-width: 100vw; }
 /* La columna sticky tiene que quedar opaca en hover o los chips se filtran por debajo. */
 .stf-table tbody tr:hover .stf-td-name { background: var(--stf-card); }
 .stf-td-name__primary {
@@ -512,6 +516,7 @@ datalist { display: none; }
 .stf-badge--plat-orange { background: rgba(244, 140, 66, .30); color: #a1500f; }
 .stf-badge--plat-lilac  { background: rgba(108, 56, 255, .12); color: #5b2ce6; }
 .stf-badge--plat-cyan   { background: rgba(75, 169, 255, .32); color: #0f4f88; }
+.stf-badge--plat-magenta { background: rgba(255, 31, 219, .16); color: #a3007f; }
 
 /* En el desplegable del filtro el valor viene como chip, no como texto pelado. */
 .stf-pop__opt .stf-badge { padding: 2px 8px; font-size: 11px; }
