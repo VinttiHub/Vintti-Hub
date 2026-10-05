@@ -3428,6 +3428,101 @@
       </div><!-- /.funnel-row -->
 
 
+      <!-- ============================================================
+           Conversion Rate per Opportunity — NDA Signed → Closed Win SIN dedupe por
+           cuenta: 20 opps de un mismo cliente cuentan 20, porque mide deals y no
+           clientes (spec Bahía punto 5). Va debajo de Conversion Rate (pedido de la
+           owner, 2026-10-05). Usa el filtro global del dashboard. M+B por opp_sales_lead.
+           ============================================================ -->
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--cyan">C</div>
+          <h2 class="skpi-header__title">Conversion Rate per Opportunity</h2>
+        </div>
+      </header>
+
+      <div class="funnel-row s-12">
+        <div class="card wrchan-card wr-cyan setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NDA Signed &rarr; Closed Win <span class="card__title-qual">(per Opportunity)</span> <span data-window-label>30d</span></h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-nda-closewin-opp"
+                  aria-label="Ver detalle NDA Signed a Closed Win per opportunity">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                    data-field="total_win" data-reduce="first" data-fmt="int">&mdash;</span> /
+              <span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                    data-field="total_opps" data-reduce="first" data-fmt="int">&mdash;</span>
+            </span>
+          </div>
+
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="sales_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="mkt_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="ref_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div><!-- /.funnel-row per opportunity -->
+
+
       <header class="skpi-header s-12">
         <div class="skpi-header__lead">
           <div class="skpi-header__avatar skpi-header__avatar--mag">R</div>
@@ -4019,93 +4114,6 @@
         </div>
       </div>
 
-      <!-- ============================================================
-           NDA Signed → Closed Win · PER OPPORTUNITY (AE · ventana) — spec Bahía
-           punto 5. Es la card "NDA (Sourcing) → Close Win" SIN dedupe por cuenta:
-           acá 20 opps de un mismo cliente cuentan 20, porque mide deals y no clientes.
-           Vive al final de Referrals, fuera del bloque Conversion Rate, así que NO
-           sigue el toggle 30/90/180 de esa sección (sería un efecto a distancia
-           invisible): usa el filtro global del dashboard, como el resto de las cards.
-           M+B por opp_sales_lead.
-           ============================================================ -->
-        <div class="card wrchan-card wr-cyan setupfee-card s-4">
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">NDA Signed &rarr; Closed Win <span class="card__title-qual">(per Opportunity)</span> <span data-window-label>30d</span></h3>
-          </div>
-          <button type="button" class="skpi-tile__detail-btn"
-                  data-kpi-detail-open="sales-nda-closewin-opp"
-                  aria-label="Ver detalle NDA Signed a Closed Win per opportunity">Ver detalle</button>
-        </div>
-
-        <div class="wrchan">
-          <div class="wrchan-total">
-            <div class="wrchan-gauge"
-                 data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
-                 data-field="total_pct" data-reduce="first"
-                 data-axis="css-var" data-css-var="--pct"></div>
-            <div class="wrchan-total__row">
-              <span class="wrchan-total__pct"
-                    data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                    data-field="total_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
-            </div>
-            <span class="wrchan-total__cap">
-              <span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                    data-field="total_win" data-reduce="first" data-fmt="int">&mdash;</span> /
-              <span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                    data-field="total_opps" data-reduce="first" data-fmt="int">&mdash;</span>
-            </span>
-          </div>
-
-          <div class="wrchan-bars">
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Sales</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
-                      data-field="sales_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                      data-field="sales_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="sales_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
-              </span>
-            </div>
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Mkt</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
-                      data-field="mkt_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="mkt_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
-              </span>
-            </div>
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Ref</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="progress-fill"
-                      data-field="ref_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text"
-                      data-field="ref_pct" data-reduce="first" data-fmt="percent">&mdash;</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">&mdash;</span>/<span data-chart="sa_kpi_nda_closewin_opp_30d" data-bind="text" data-field="ref_opps" data-reduce="first" data-fmt="int">&mdash;</span></span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
 
     </div>
     </div>
