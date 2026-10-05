@@ -1026,3 +1026,31 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.
 - Las listas cerradas (status, Not ICP reasons, sizes) viven sólo en `constants.py`.
+
+## Staffing: columnas y opciones desde la vista
+
+En `docs/staffing.html` (las 3 pestañas) las 4 personas de `STAFFING_ALLOWED` crean
+columnas (lista, texto, número, fecha, Sí/No) y editan las opciones de cualquier
+desplegable sin tocar código; los valores se cargan en la celda, tipo Excel. Desde el
+2026-10-05 los catálogos ya **no** están en `staffing.js` (quedan sólo como fallback si
+`GET /staffing/schema` falla). Todo en `backend/routes/staffing_routes.py`:
+
+- `staffing_options` (catálogo, también el de Platform/Performance/Provider/Exit
+  type/Invoice/Paid) y `staffing_columns` (columnas nuevas), autocreadas + seed único
+  desde `SEED_OPTIONS`. Sin migración a mano.
+- Los valores de las columnas nuevas van en el JSONB `custom` de `staffing_extra`
+  (Database y Churn comparten el par) o de `bonus_requests`. Clave = `c_<column_id>`,
+  estable aunque se renombre. El PATCH **mezcla** (`custom || ...`), no pisa.
+- **Renombrar una opción actualiza las filas** que la tenían, en la misma transacción
+  (`BUILTIN_SELECTS` dice dónde vive cada built-in). Ocultar no toca las filas: el valor
+  queda y se ve en gris. Ocultar una columna conserva sus valores; se restaura desde
+  "Add column".
+- **Eliminar** (`DELETE ...?hard=1`, con confirm en el front) sí borra: una opción deja
+  vacías las filas que la tenían; una columna se lleva su catálogo y su valor en cada
+  fila. Sin vuelta atrás. Las opciones `locked` y las columnas de fábrica no se eliminan.
+- `locked`: "Resigned"/"Terminated" y "Paid" sólo se pueden recolorear — los KPIs
+  cuentan ese texto y Exit type además se deriva del motivo de baja.
+- Colores: paleta cerrada `OPTION_COLORS` ↔ clases `stf-badge--c-<color>` en
+  `staffing.css`. Si sumás un color, van los dos.
+- Provider no se edita en la celda cuando el equipo trae proveedor
+  (`provider_locked`): `equipments.proveedor` gana y el cambio no se vería.

@@ -29,7 +29,7 @@ import io
 from datetime import date
 
 from flask import Blueprint, Response, jsonify, request
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 
 from db import get_connection
 
@@ -111,7 +111,182 @@ def _ensure_schema(cur) -> None:
     )
     cur.execute("ALTER TABLE bonus_requests ADD COLUMN IF NOT EXISTS invoice_status TEXT")
     cur.execute("ALTER TABLE bonus_requests ADD COLUMN IF NOT EXISTS candidate_status TEXT")
+
+    # Columnas y opciones que se crean desde la página (ver "Columnas y opciones
+    # editables" más abajo). Los valores de las columnas custom van en `custom`.
+    cur.execute(
+        "ALTER TABLE staffing_extra ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}'::jsonb"
+    )
+    cur.execute(
+        "ALTER TABLE bonus_requests ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}'::jsonb"
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS staffing_columns (
+            column_id   BIGSERIAL PRIMARY KEY,
+            tab         TEXT NOT NULL,
+            label       TEXT NOT NULL,
+            type        TEXT NOT NULL,
+            position    INTEGER NOT NULL DEFAULT 0,
+            archived_at TIMESTAMPTZ,
+            created_by  TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS staffing_options (
+            option_id   BIGSERIAL PRIMARY KEY,
+            tab         TEXT NOT NULL,
+            col_key     TEXT NOT NULL,
+            value       TEXT NOT NULL,
+            color       TEXT NOT NULL DEFAULT 'gray',
+            position    INTEGER NOT NULL DEFAULT 0,
+            locked      BOOLEAN NOT NULL DEFAULT FALSE,
+            archived_at TIMESTAMPTZ,
+            updated_by  TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_staffing_options_value
+          ON staffing_options (tab, col_key, LOWER(value))
+          WHERE archived_at IS NULL
+        """
+    )
+    _seed_options(cur)
     _SCHEMA_READY = True
+
+
+# --------------------------------------------------------------------------- #
+# Columnas y opciones editables desde la página
+#
+# Hasta el 2026-10-05 cada desplegable estaba escrito a mano en staffing.js y
+# agregar "Payoneer" era un cambio de código. Ahora los catálogos viven en
+# `staffing_options` y las columnas nuevas en `staffing_columns`; sus valores, en
+# el JSONB `custom` de `staffing_extra` (Database y Churn, mismo par) o de
+# `bonus_requests` (Bonuses). La clave de una columna custom es `c_<column_id>`:
+# estable aunque se renombre, y única entre pestañas.
+# --------------------------------------------------------------------------- #
+TABS = ("database", "churn", "bonos")
+COLUMN_TYPES = {"select", "text", "number", "date", "checkbox"}
+# Paleta cerrada: cada clave es una clase `stf-badge--c-<color>` en staffing.css.
+OPTION_COLORS = (
+    "gray", "red", "orange", "yellow", "green", "teal",
+    "cyan", "blue", "lilac", "purple", "magenta",
+)
+
+# Las columnas de lista que ya existían, y dónde guardan su valor. Renombrar una
+# opción actualiza esa columna en las filas que la tenían.
+BUILTIN_SELECTS = {
+    ("database", "platform"): ("staffing_extra", "platform"),
+    ("database", "performance"): ("staffing_extra", "performance"),
+    ("database", "provider"): ("staffing_extra", "provider"),
+    ("churn", "exit_type"): ("staffing_extra", "exit_type"),
+    ("bonos", "invoice_status"): ("bonus_requests", "invoice_status"),
+    ("bonos", "candidate_status"): ("bonus_requests", "candidate_status"),
+}
+
+# Lo que estaba hardcodeado en el JS, con sus colores. Se siembra una sola vez por
+# columna. `locked` = la página tiene lógica atada a ese texto (los KPIs de Churn
+# cuentan "Terminated"/"Resigned", que además se derivan del motivo de baja, y los
+# de Bonuses cuentan "Paid"): se les puede cambiar el color, no el nombre.
+SEED_OPTIONS = {
+    ("database", "platform"): [
+        ("Bank Account", "orange"), ("Deel", "lilac"), ("Ontop", "cyan"), ("Payoneer", "magenta"),
+    ],
+    ("database", "performance"): [
+        ("Not performing", "red"), ("Performing", "green"), ("Under review", "yellow"),
+        ("Feedback", "orange"), ("Salary review", "blue"), ("Computer repair", "purple"),
+        ("Computer pedido", "magenta"), ("Onboarding", "teal"),
+    ],
+    ("database", "provider"): [("Quipteams", "blue"), ("Onbordea", "teal")],
+    ("churn", "exit_type"): [("Resigned", "cyan", True), ("Terminated", "red", True)],
+    ("bonos", "invoice_status"): [("Paid", "green", True), ("Sent, not paid", "yellow")],
+    ("bonos", "candidate_status"): [("Paid", "green", True), ("Not Paid", "yellow")],
+}
+
+
+def _seed_options(cur) -> None:
+    for (tab, key), options in SEED_OPTIONS.items():
+        cur.execute(
+            "SELECT 1 FROM staffing_options WHERE tab = %s AND col_key = %s LIMIT 1", (tab, key)
+        )
+        if cur.fetchone():
+            continue
+        for position, opt in enumerate(options, 1):
+            cur.execute(
+                """
+                INSERT INTO staffing_options (tab, col_key, value, color, position, locked)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+                """,
+                (tab, key, opt[0], opt[1], position, len(opt) > 2 and opt[2]),
+            )
+
+
+class _BadValue(ValueError):
+    """Valor inválido para una columna custom: se devuelve como 400."""
+
+
+def _custom_columns(cur, tabs) -> dict:
+    """{c_<id>: type} de las columnas custom activas de esas pestañas."""
+    cur.execute(
+        "SELECT column_id, type FROM staffing_columns WHERE tab = ANY(%s) AND archived_at IS NULL",
+        (list(tabs),),
+    )
+    return {f"c_{r['column_id']}": r["type"] for r in cur.fetchall()}
+
+
+def _coerce_custom(kind: str, raw):
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
+    if kind == "number":
+        try:
+            return float(str(raw).replace(",", "").replace("$", "").strip())
+        except ValueError:
+            raise _BadValue(f"'{raw}' is not a number.")
+    if kind == "checkbox":
+        return _tri_bool(raw)
+    if kind == "date":
+        txt = str(raw).strip()[:10]
+        try:
+            date.fromisoformat(txt)
+        except ValueError:
+            raise _BadValue(f"'{raw}' is not a date (YYYY-MM-DD).")
+        return txt
+    txt = _clean(raw)
+    return txt[:2000] if txt else None
+
+
+def _custom_patch(cur, raw, tabs):
+    """Valida `custom` del request -> (claves a escribir, claves a borrar).
+
+    Las claves tienen que ser columnas activas de esas pestañas. Vacío = borrar la
+    clave (no guardar un "" que después aparece como valor en el filtro).
+    """
+    if not isinstance(raw, dict):
+        raise _BadValue("custom must be an object.")
+    known = _custom_columns(cur, tabs)
+    to_set, to_del = {}, []
+    for key, value in raw.items():
+        if key not in known:
+            raise _BadValue(f"Unknown column: {key}")
+        coerced = _coerce_custom(known[key], value)
+        if coerced is None:
+            to_del.append(key)
+        else:
+            to_set[key] = coerced
+    return to_set, to_del
+
+
+# Mezcla en vez de pisar: editar una celda no borra las demás columnas custom.
+CUSTOM_MERGE_SQL = (
+    "custom = (COALESCE(custom, '{}'::jsonb) - %(custom_del)s::text[]) || %(custom_set)s::jsonb"
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -411,6 +586,9 @@ PAIRS_SELECT = """
       p.computer                                             AS computer,
       COALESCE(NULLIF(TRIM(COALESCE(eq.proveedor, '')), ''),
                se.provider)                                  AS provider,
+      -- Si el equipo trae proveedor, ése gana y editar el de acá no se vería.
+      (NULLIF(TRIM(COALESCE(eq.proveedor, '')), '') IS NOT NULL) AS provider_locked,
+      COALESCE(se.custom, '{}'::jsonb)                       AS custom,
       p.inactive_reason                                      AS inactive_reason,
       p.inactive_comments                                    AS inactive_comments,
       p.inactive_vinttierror                                 AS inactive_vinttierror,
@@ -467,6 +645,8 @@ ORPHANS_SQL = """
       0::numeric(12,2)      AS client_payment,
       NULL::text            AS computer,
       se.provider           AS provider,
+      FALSE                 AS provider_locked,
+      COALESCE(se.custom, '{}'::jsonb) AS custom,
       NULL::text            AS inactive_reason,
       NULL::text            AS inactive_comments,
       NULL::text            AS inactive_vinttierror,
@@ -554,6 +734,14 @@ def staffing_database_csv():
         _ensure_schema(cur)
         conn.commit()
         rows = _fetch_pairs(cur, include_orphans=True)
+        cur.execute(
+            """
+            SELECT column_id, label, type FROM staffing_columns
+             WHERE tab = 'database' AND archived_at IS NULL
+             ORDER BY position, column_id
+            """
+        )
+        custom_cols = cur.fetchall()
         cur.close()
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -562,6 +750,13 @@ def staffing_database_csv():
             conn.close()
 
     rows.sort(key=lambda r: (r.get("candidate_name") or "").lower())
+    for row in rows:
+        custom = row.get("custom") or {}
+        for c in custom_cols:
+            value = custom.get(f"c_{c['column_id']}")
+            if c["type"] == "checkbox" and value is not None:
+                value = "Yes" if value else "No"
+            row[f"c_{c['column_id']}"] = value
     cols = [
         ("candidate_name", "Candidate"), ("status", "Status"), ("mail", "Mail"),
         ("performance", "Performance"), ("client_name", "Client"), ("country", "Country"),
@@ -569,7 +764,7 @@ def staffing_database_csv():
         ("platform", "Platform"), ("payment", "Payments"),
         ("salary", "Salary"), ("equipment", "Equipment"), ("provider", "Provider"),
         ("recruiter", "Recruiter"), ("notes", "Comments"),
-    ]
+    ] + [(f"c_{c['column_id']}", c["label"]) for c in custom_cols]
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([label for _, label in cols])
@@ -646,7 +841,7 @@ def patch_staffing_extra():
         return jsonify({"error": "candidate_id and account_id are required"}), 400
 
     fields = {k: v for k, v in data.items() if k in EDITABLE}
-    if not fields:
+    if not fields and "custom" not in data:
         return jsonify({"error": "Nothing to update"}), 400
 
     if "churn_m3_override" in fields:
@@ -665,30 +860,42 @@ def patch_staffing_extra():
         _ensure_schema(cur)
         conn.commit()
 
-        assignments = ", ".join(f"{k} = %({k})s" for k in fields)
+        assignments = [f"{k} = %({k})s" for k in fields]
+        insert_cols = list(fields)
+        insert_vals = [f"%({k})s" for k in fields]
         params = dict(fields, candidate_id=candidate_id, account_id=account_id, email=email)
+        if "custom" in data:
+            # Database y Churn comparten la fila de staffing_extra del par.
+            to_set, to_del = _custom_patch(cur, data["custom"], ("database", "churn"))
+            params.update(custom_set=Json(to_set), custom_del=to_del)
+            assignments.append(CUSTOM_MERGE_SQL)
+            insert_cols.append("custom")
+            insert_vals.append("%(custom_set)s::jsonb")
+
         cur.execute(
             f"""
             UPDATE staffing_extra
-               SET {assignments}, updated_by = %(email)s, updated_at = NOW()
+               SET {", ".join(assignments)}, updated_by = %(email)s, updated_at = NOW()
              WHERE candidate_id = %(candidate_id)s AND account_id = %(account_id)s
             RETURNING staffing_extra_id
             """,
             params,
         )
         if cur.fetchone() is None:
-            cols = ", ".join(fields)
-            placeholders = ", ".join(f"%({k})s" for k in fields)
             cur.execute(
                 f"""
-                INSERT INTO staffing_extra (candidate_id, account_id, {cols}, updated_by)
-                VALUES (%(candidate_id)s, %(account_id)s, {placeholders}, %(email)s)
+                INSERT INTO staffing_extra (candidate_id, account_id, {", ".join(insert_cols)}, updated_by)
+                VALUES (%(candidate_id)s, %(account_id)s, {", ".join(insert_vals)}, %(email)s)
                 """,
                 params,
             )
         conn.commit()
         cur.close()
         return jsonify({"ok": True})
+    except _BadValue as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         if conn is not None:
             conn.rollback()
@@ -774,7 +981,8 @@ BONUS_SELECT = """
       NULLIF(TRIM(CAST(br.notes AS TEXT)), '')                        AS notes,
       br.status                                                       AS status,
       br.invoice_status                                               AS invoice_status,
-      br.candidate_status                                             AS candidate_status
+      br.candidate_status                                             AS candidate_status,
+      COALESCE(br.custom, '{}'::jsonb)                                AS custom
     FROM bonus_requests br
     LEFT JOIN account a    ON a.account_id    = br.account_id
     LEFT JOIN candidates c ON c.candidate_id  = br.candidate_id
@@ -806,17 +1014,20 @@ def staffing_bonuses():
             if not data.get("account_id"):
                 cur.close()
                 return jsonify({"error": "The bonus must be linked to an account."}), 400
+            custom_set = {}
+            if data.get("custom"):
+                custom_set, _ = _custom_patch(cur, data["custom"], ("bonos",))
             cur.execute(
                 """
                 INSERT INTO bonus_requests (
                     account_id, candidate_id, employee_name_manual, currency, amount,
                     payout_date, reason, notes, status,
-                    invoice_status, candidate_status, created_at, updated_at
+                    invoice_status, candidate_status, custom, created_at, updated_at
                 ) VALUES (
                     %(account_id)s, %(candidate_id)s, %(employee_name_manual)s,
                     %(currency)s, %(amount)s, %(payout_date)s, %(reason)s,
                     %(notes)s, %(status)s, %(invoice_status)s, %(candidate_status)s,
-                    NOW(), NOW()
+                    %(custom)s::jsonb, NOW(), NOW()
                 )
                 RETURNING bonus_request_id
                 """,
@@ -832,6 +1043,7 @@ def staffing_bonuses():
                     "status": _clean(data.get("status")) or "approved",
                     "invoice_status": _clean(data.get("invoice_status")),
                     "candidate_status": _clean(data.get("candidate_status")),
+                    "custom": Json(custom_set),
                 },
             )
             new_id = cur.fetchone()["bonus_request_id"]
@@ -849,6 +1061,10 @@ def staffing_bonuses():
         if year not in ("all", ""):
             rows = [r for r in rows if (r.get("payout_date") or "")[:4] == year]
         return jsonify({"rows": rows, "years": [y for y in years if y]})
+    except _BadValue as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         if conn is not None:
             conn.rollback()
@@ -873,7 +1089,7 @@ def patch_bonus(bonus_id: int):
 
     data = request.get_json(silent=True) or {}
     fields = {k: v for k, v in data.items() if k in BONUS_EDITABLE}
-    if not fields:
+    if not fields and "custom" not in data:
         return jsonify({"error": "Nothing to update"}), 400
     for key in ("payout_date", "reason", "notes", "status", "invoice_status", "candidate_status"):
         if key in fields:
@@ -882,13 +1098,19 @@ def patch_bonus(bonus_id: int):
     conn = None
     try:
         conn = get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         _ensure_schema(cur)
         conn.commit()
-        assignments = ", ".join(f"{k} = %({k})s" for k in fields)
+        assignments = [f"{k} = %({k})s" for k in fields]
+        params = dict(fields, bonus_id=bonus_id)
+        if "custom" in data:
+            to_set, to_del = _custom_patch(cur, data["custom"], ("bonos",))
+            params.update(custom_set=Json(to_set), custom_del=to_del)
+            assignments.append(CUSTOM_MERGE_SQL)
         cur.execute(
-            f"UPDATE bonus_requests SET {assignments}, updated_at = NOW() WHERE bonus_request_id = %(bonus_id)s",
-            dict(fields, bonus_id=bonus_id),
+            f"UPDATE bonus_requests SET {', '.join(assignments)}, updated_at = NOW() "
+            "WHERE bonus_request_id = %(bonus_id)s",
+            params,
         )
         updated = cur.rowcount
         conn.commit()
@@ -896,6 +1118,10 @@ def patch_bonus(bonus_id: int):
         if not updated:
             return jsonify({"error": "Bonus not found"}), 404
         return jsonify({"ok": True})
+    except _BadValue as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         if conn is not None:
             conn.rollback()
@@ -903,3 +1129,372 @@ def patch_bonus(bonus_id: int):
     finally:
         if conn is not None:
             conn.close()
+
+
+# --------------------------------------------------------------------------- #
+# Columnas y opciones: endpoints
+# --------------------------------------------------------------------------- #
+class _Conflict(ValueError):
+    """Choque con otra opción/columna: se devuelve como 409."""
+
+
+def _with_schema(fn):
+    """Corre `fn(cur, email)` en una transacción, con el mismo gate que el resto.
+
+    `fn` devuelve (payload, status). _BadValue -> 400, _Conflict -> 409, y
+    cualquier error deshace todo: renombrar una opción y actualizar las filas que
+    la tenían tiene que pasar junto o no pasar.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+    email = _current_email()
+    if email not in STAFFING_ALLOWED:
+        return _forbidden()
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        _ensure_schema(cur)
+        conn.commit()
+        payload, status = fn(cur, email)
+        conn.commit()
+        cur.close()
+        return jsonify(payload), status
+    except _BadValue as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 400
+    except _Conflict as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _column_out(r) -> dict:
+    return {
+        "id": r["column_id"], "key": f"c_{r['column_id']}", "tab": r["tab"],
+        "label": r["label"], "type": r["type"], "position": r["position"],
+        "archived": r["archived_at"] is not None,
+    }
+
+
+def _option_out(r) -> dict:
+    return {
+        "id": r["option_id"], "tab": r["tab"], "col_key": r["col_key"], "value": r["value"],
+        "color": r["color"], "position": r["position"], "locked": r["locked"],
+    }
+
+
+def _clean_label(raw, what="name") -> str:
+    txt = _clean(raw)
+    if not txt:
+        raise _BadValue(f"The {what} cannot be empty.")
+    return txt[:80]
+
+
+def _clean_color(raw) -> str:
+    color = (_clean(raw) or "gray").lower()
+    if color not in OPTION_COLORS:
+        raise _BadValue(f"Unknown color: {color}")
+    return color
+
+
+def _check_select_column(cur, tab, col_key) -> None:
+    """Sólo se le cargan opciones a una columna de lista: built-in o custom."""
+    if tab not in TABS:
+        raise _BadValue("Unknown tab.")
+    if (tab, col_key) in BUILTIN_SELECTS:
+        return
+    if col_key.startswith("c_") and col_key[2:].isdigit():
+        cur.execute(
+            "SELECT 1 FROM staffing_columns WHERE column_id = %s AND tab = %s AND type = 'select'",
+            (int(col_key[2:]), tab),
+        )
+        if cur.fetchone():
+            return
+    raise _BadValue("That column does not take a list of options.")
+
+
+def _insert_option(cur, tab, col_key, value, color, email) -> dict:
+    """Agrega una opción. Si había una oculta con el mismo texto, la revive."""
+    cur.execute(
+        """
+        SELECT * FROM staffing_options
+         WHERE tab = %s AND col_key = %s AND LOWER(value) = LOWER(%s)
+         ORDER BY archived_at IS NULL DESC, option_id DESC
+         LIMIT 1
+        """,
+        (tab, col_key, value),
+    )
+    found = cur.fetchone()
+    if found and found["archived_at"] is None:
+        raise _Conflict(f"'{found['value']}' is already an option.")
+    cur.execute(
+        "SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM staffing_options "
+        "WHERE tab = %s AND col_key = %s AND archived_at IS NULL",
+        (tab, col_key),
+    )
+    pos = cur.fetchone()["pos"]
+    if found:
+        cur.execute(
+            """
+            UPDATE staffing_options
+               SET archived_at = NULL, color = %s, position = %s, updated_by = %s
+             WHERE option_id = %s RETURNING *
+            """,
+            (color, pos, email, found["option_id"]),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO staffing_options (tab, col_key, value, color, position, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+            """,
+            (tab, col_key, value, color, pos, email),
+        )
+    return _option_out(cur.fetchone())
+
+
+def _custom_table(tab: str) -> str:
+    """Dónde viven los valores custom de esa pestaña (constante, nunca del request)."""
+    return "bonus_requests" if tab == "bonos" else "staffing_extra"
+
+
+def _hard_delete(flag) -> bool:
+    return str(flag or "").strip().lower() in ("1", "true", "yes")
+
+
+def _clear_option_rows(cur, tab, col_key, value) -> int:
+    """Vacía el valor en las filas que tenían esa opción (para eliminarla de verdad)."""
+    params = {"value": value, "key": col_key}
+    if (tab, col_key) in BUILTIN_SELECTS:
+        table, column = BUILTIN_SELECTS[(tab, col_key)]
+        cur.execute(
+            f"UPDATE {table} SET {column} = NULL "
+            f"WHERE LOWER(TRIM({column})) = LOWER(TRIM(%(value)s))",
+            params,
+        )
+    else:
+        cur.execute(
+            f"""
+            UPDATE {_custom_table(tab)} SET custom = custom - %(key)s
+             WHERE LOWER(TRIM(custom->>%(key)s)) = LOWER(TRIM(%(value)s))
+            """,
+            params,
+        )
+    return cur.rowcount
+
+
+def _rename_option_rows(cur, tab, col_key, old, new) -> int:
+    """Lleva el renombre a las filas que tenían el valor viejo.
+
+    Tabla y columna salen de BUILTIN_SELECTS (constantes), nunca del request.
+    """
+    params = {"old": old, "new": new, "key": col_key}
+    if (tab, col_key) in BUILTIN_SELECTS:
+        table, column = BUILTIN_SELECTS[(tab, col_key)]
+        cur.execute(
+            f"UPDATE {table} SET {column} = %(new)s "
+            f"WHERE LOWER(TRIM({column})) = LOWER(TRIM(%(old)s))",
+            params,
+        )
+    else:
+        table = "bonus_requests" if tab == "bonos" else "staffing_extra"
+        cur.execute(
+            f"""
+            UPDATE {table}
+               SET custom = jsonb_set(custom, ARRAY[%(key)s], to_jsonb(%(new)s::text))
+             WHERE LOWER(TRIM(custom->>%(key)s)) = LOWER(TRIM(%(old)s))
+            """,
+            params,
+        )
+    return cur.rowcount
+
+
+@bp.route("/schema", methods=["GET", "OPTIONS"])
+def staffing_schema():
+    """Columnas custom (también las ocultas, para poder restaurarlas) + catálogos."""
+    def run(cur, _email):
+        cur.execute("SELECT * FROM staffing_columns ORDER BY tab, position, column_id")
+        columns = [_column_out(r) for r in cur.fetchall()]
+        cur.execute(
+            "SELECT * FROM staffing_options WHERE archived_at IS NULL ORDER BY position, option_id"
+        )
+        options: dict = {}
+        for r in cur.fetchall():
+            options.setdefault(f"{r['tab']}.{r['col_key']}", []).append(_option_out(r))
+        return {"columns": columns, "options": options, "colors": list(OPTION_COLORS)}, 200
+    return _with_schema(run)
+
+
+@bp.route("/columns", methods=["POST", "OPTIONS"])
+def create_staffing_column():
+    def run(cur, email):
+        data = request.get_json(silent=True) or {}
+        tab = _clean(data.get("tab"))
+        if tab not in TABS:
+            raise _BadValue("Unknown tab.")
+        kind = _clean(data.get("type"))
+        if kind not in COLUMN_TYPES:
+            raise _BadValue("Unknown column type.")
+        label = _clean_label(data.get("label"), "column name")
+        cur.execute(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM staffing_columns WHERE tab = %s",
+            (tab,),
+        )
+        pos = cur.fetchone()["pos"]
+        cur.execute(
+            """
+            INSERT INTO staffing_columns (tab, label, type, position, created_by)
+            VALUES (%s, %s, %s, %s, %s) RETURNING *
+            """,
+            (tab, label, kind, pos, email),
+        )
+        column = _column_out(cur.fetchone())
+        options = []
+        if kind == "select":
+            seen = set()
+            for opt in data.get("options") or []:
+                value = _clean(opt.get("value") if isinstance(opt, dict) else opt)
+                if not value or value.lower() in seen:
+                    continue
+                seen.add(value.lower())
+                color = _clean_color(opt.get("color") if isinstance(opt, dict) else None)
+                options.append(_insert_option(cur, tab, column["key"], value[:80], color, email))
+        return {"column": column, "options": options}, 201
+    return _with_schema(run)
+
+
+@bp.route("/columns/<int:column_id>", methods=["PATCH", "DELETE", "OPTIONS"])
+def edit_staffing_column(column_id: int):
+    """PATCH: label / position / archived. DELETE: la oculta (los valores quedan).
+
+    DELETE ?hard=1 la elimina de verdad: la columna, su catálogo y el valor en cada
+    fila, todo en la misma transacción. No tiene vuelta atrás; el front lo confirma.
+    """
+    def run(cur, _email):
+        data = request.get_json(silent=True) or {}
+        sets, params = [], {"id": column_id}
+        if request.method == "DELETE" and _hard_delete(request.args.get("hard")):
+            cur.execute("SELECT * FROM staffing_columns WHERE column_id = %s", (column_id,))
+            col = cur.fetchone()
+            if not col:
+                return {"error": "Column not found"}, 404
+            key = f"c_{column_id}"
+            cur.execute(
+                f"UPDATE {_custom_table(col['tab'])} SET custom = custom - %(key)s "
+                "WHERE custom->>%(key)s IS NOT NULL",
+                {"key": key},
+            )
+            cleared = cur.rowcount
+            cur.execute("DELETE FROM staffing_options WHERE tab = %s AND col_key = %s", (col["tab"], key))
+            cur.execute("DELETE FROM staffing_columns WHERE column_id = %s", (column_id,))
+            return {"deleted": True, "cleared_rows": cleared}, 200
+        if request.method == "DELETE":
+            sets.append("archived_at = COALESCE(archived_at, NOW())")
+        else:
+            if "label" in data:
+                sets.append("label = %(label)s")
+                params["label"] = _clean_label(data["label"], "column name")
+            if "position" in data:
+                sets.append("position = %(position)s")
+                params["position"] = int(data["position"])
+            if "archived" in data:
+                sets.append("archived_at = CASE WHEN %(archived)s THEN COALESCE(archived_at, NOW()) END")
+                params["archived"] = bool(data["archived"])
+        if not sets:
+            raise _BadValue("Nothing to update.")
+        cur.execute(
+            f"UPDATE staffing_columns SET {', '.join(sets)} WHERE column_id = %(id)s RETURNING *",
+            params,
+        )
+        row = cur.fetchone()
+        if not row:
+            return {"error": "Column not found"}, 404
+        return {"column": _column_out(row)}, 200
+    return _with_schema(run)
+
+
+@bp.route("/options", methods=["POST", "OPTIONS"])
+def create_staffing_option():
+    def run(cur, email):
+        data = request.get_json(silent=True) or {}
+        tab = _clean(data.get("tab"))
+        col_key = _clean(data.get("col_key")) or ""
+        _check_select_column(cur, tab, col_key)
+        value = _clean_label(data.get("value"), "option")
+        option = _insert_option(cur, tab, col_key, value, _clean_color(data.get("color")), email)
+        return {"option": option}, 201
+    return _with_schema(run)
+
+
+@bp.route("/options/<int:option_id>", methods=["PATCH", "DELETE", "OPTIONS"])
+def edit_staffing_option(option_id: int):
+    """PATCH: value (renombra también las filas) / color / position. DELETE: la oculta.
+
+    Ocultar no toca las filas: el valor sigue ahí y el filtro lo muestra como un
+    valor fuera del catálogo, igual que cualquier texto viejo del Sheet.
+    DELETE ?hard=1 la elimina y deja vacías las filas que la tenían.
+    """
+    def run(cur, email):
+        data = request.get_json(silent=True) or {}
+        cur.execute("SELECT * FROM staffing_options WHERE option_id = %s", (option_id,))
+        current = cur.fetchone()
+        if not current or current["archived_at"] is not None:
+            return {"error": "Option not found"}, 404
+
+        if request.method == "DELETE" and _hard_delete(request.args.get("hard")):
+            if current["locked"]:
+                raise _BadValue(f"'{current['value']}' is used by the page's totals and cannot be deleted.")
+            cleared = _clear_option_rows(cur, current["tab"], current["col_key"], current["value"])
+            cur.execute("DELETE FROM staffing_options WHERE option_id = %s", (option_id,))
+            return {"deleted": True, "cleared_rows": cleared}, 200
+
+        renamed_rows = 0
+        sets, params = ["updated_by = %(email)s"], {"id": option_id, "email": email}
+        if request.method == "DELETE":
+            if current["locked"]:
+                raise _BadValue(f"'{current['value']}' is used by the page's totals and cannot be hidden.")
+            sets.append("archived_at = NOW()")
+        else:
+            if "value" in data:
+                value = _clean_label(data["value"], "option")
+                if value != current["value"]:
+                    if current["locked"]:
+                        raise _BadValue(
+                            f"'{current['value']}' is used by the page's totals and cannot be renamed."
+                        )
+                    cur.execute(
+                        """
+                        SELECT 1 FROM staffing_options
+                         WHERE tab = %s AND col_key = %s AND LOWER(value) = LOWER(%s)
+                           AND archived_at IS NULL AND option_id <> %s
+                        """,
+                        (current["tab"], current["col_key"], value, option_id),
+                    )
+                    if cur.fetchone():
+                        raise _Conflict(f"'{value}' is already an option.")
+                    sets.append("value = %(value)s")
+                    params["value"] = value
+                    renamed_rows = _rename_option_rows(
+                        cur, current["tab"], current["col_key"], current["value"], value
+                    )
+            if "color" in data:
+                sets.append("color = %(color)s")
+                params["color"] = _clean_color(data["color"])
+            if "position" in data:
+                sets.append("position = %(position)s")
+                params["position"] = int(data["position"])
+        cur.execute(
+            f"UPDATE staffing_options SET {', '.join(sets)} WHERE option_id = %(id)s RETURNING *",
+            params,
+        )
+        return {"option": _option_out(cur.fetchone()), "renamed_rows": renamed_rows}, 200
+    return _with_schema(run)

@@ -29,7 +29,7 @@
   try { sticky = localStorage.getItem("staffing_api"); } catch (e) {}
 
   var API = (override && override.replace(/\/$/, "")) || sticky ||
-            (isLocal ? "http://localhost:8080" : PROD);
+            (isLocal ? "http://127.0.0.1:5000" : PROD);
   // Abrir la página en local no obliga a tener el backend levantado: si no
   // contesta, se cae al deployado una sola vez y se sigue usando ese.
   var canFallBack = isLocal && !override && !sticky && API !== PROD;
@@ -64,7 +64,7 @@
       if (!err.offline || !canFallBack) {
         if (err.offline) {
           err.message += " If you are running locally, start the backend with " +
-                         "`python app.py` from backend/, or open the page with ?api=<url>.";
+                         "`flask --app app.py --debug run --port 5000` from backend/, or open the page with ?api=<url>.";
         }
         throw err;
       }
@@ -198,33 +198,76 @@
       ' aria-label="Payments">';
   }
 
-  // Catálogo fijo de Performance: el desplegable del filtro y el del drawer
-  // ofrecen SIEMPRE estas opciones, aunque hoy ninguna fila las use todavía.
-  // El orden es el que quiere la owner, no alfabético.
-  var PERFORMANCE_OPTIONS = [
-    { value: "Not performing",  cls: "stf-badge--perf-red" },
-    { value: "Performing",      cls: "stf-badge--perf-green" },
-    { value: "Under review",    cls: "stf-badge--perf-yellow" },
-    { value: "Feedback",        cls: "stf-badge--perf-orange" },
-    { value: "Salary review",   cls: "stf-badge--perf-blue" },
-    { value: "Computer repair", cls: "stf-badge--perf-purple" },
-    { value: "Computer pedido", cls: "stf-badge--perf-magenta" },
-    { value: "Onboarding",      cls: "stf-badge--perf-teal" }
-  ];
-  var PERFORMANCE_VALUES = PERFORMANCE_OPTIONS.map(function (o) { return o.value; });
-  var PERFORMANCE_CLASS = {};
-  PERFORMANCE_OPTIONS.forEach(function (o) { PERFORMANCE_CLASS[o.value.toLowerCase()] = o.cls; });
+  /* ---------- Catálogos y columnas custom (GET /staffing/schema) ----------
+     Las opciones de cada desplegable y las columnas nuevas se cargan desde la
+     página y viven en la base (staffing_options / staffing_columns). Esto es
+     sólo el respaldo si /schema no contesta: el orden es el que quiere la owner. */
+  var FALLBACK_OPTIONS = {
+    "database.platform": [["Bank Account", "orange"], ["Deel", "lilac"], ["Ontop", "cyan"], ["Payoneer", "magenta"]],
+    "database.performance": [["Not performing", "red"], ["Performing", "green"], ["Under review", "yellow"],
+      ["Feedback", "orange"], ["Salary review", "blue"], ["Computer repair", "purple"],
+      ["Computer pedido", "magenta"], ["Onboarding", "teal"]],
+    "database.provider": [["Quipteams", "blue"], ["Onbordea", "teal"]],
+    "churn.exit_type": [["Resigned", "cyan"], ["Terminated", "red"]],
+    "bonos.invoice_status": [["Paid", "green"], ["Sent, not paid", "yellow"]],
+    "bonos.candidate_status": [["Paid", "green"], ["Not Paid", "yellow"]]
+  };
+  var COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "cyan", "blue", "lilac", "purple", "magenta"];
 
-  // Lo mismo para Platform: catálogo fijo y un color por plataforma.
-  var PLATFORM_OPTIONS = [
-    { value: "Bank Account", cls: "stf-badge--plat-orange" },
-    { value: "Deel",         cls: "stf-badge--plat-lilac" },
-    { value: "Ontop",        cls: "stf-badge--plat-cyan" },
-    { value: "Payoneer",     cls: "stf-badge--plat-magenta" }
-  ];
-  var PLATFORM_VALUES = PLATFORM_OPTIONS.map(function (o) { return o.value; });
-  var PLATFORM_CLASS = {};
-  PLATFORM_OPTIONS.forEach(function (o) { PLATFORM_CLASS[o.value.toLowerCase()] = o.cls; });
+  var schema = { columns: [], options: {}, ready: false };
+
+  function optionsOf(tab, key) {
+    var list = schema.options[tab + "." + key];
+    if (list) return list;
+    return (FALLBACK_OPTIONS[tab + "." + key] || []).map(function (pair) {
+      return { value: pair[0], color: pair[1] };
+    });
+  }
+
+  function optionValues(tab, key) {
+    return optionsOf(tab, key).map(function (o) { return o.value; });
+  }
+
+  function findOption(tab, key, value) {
+    var needle = String(value == null ? "" : value).trim().toLowerCase();
+    var list = optionsOf(tab, key);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].value.toLowerCase() === needle) return list[i];
+    }
+    return null;
+  }
+
+  function colorBadge(color, value) {
+    return '<span class="stf-badge stf-badge--c-' + esc(color || "gray") + '">' + esc(value) + "</span>";
+  }
+
+  // Un valor que ya no está en el catálogo (opción oculta, texto viejo del Sheet)
+  // se sigue mostrando, en gris.
+  function optionBadge(tab, key, value) {
+    if (value == null || value === "") return "—";
+    var opt = findOption(tab, key, value);
+    return colorBadge(opt ? opt.color : "gray", value);
+  }
+
+  // Un desplegable del drawer tiene que incluir el valor actual aunque esté fuera
+  // del catálogo: si no, el <select> cae en "" y el Save lo borra sin avisar.
+  function withCurrent(values, current) {
+    if (current == null || current === "") return values;
+    var has = values.some(function (v) { return String(v).toLowerCase() === String(current).toLowerCase(); });
+    return has ? values : values.concat([String(current)]);
+  }
+
+  // Columna de lista "de fábrica": su catálogo se edita desde la página y la celda
+  // se edita en el lugar. `field` es el campo del PATCH; por defecto, la clave.
+  function selectCol(tab, key, label, extra) {
+    return Object.assign({
+      key: key, label: label, type: "text", editable: "select",
+      options: function () { return optionValues(tab, key); },
+      badge: function (v) { return optionBadge(tab, key, v); },
+      value: function (r) { return r[key]; },
+      cell: function (r) { return optionBadge(tab, key, r[key]); }
+    }, extra || {});
+  }
 
   var COLUMNS = {
     database: [
@@ -258,18 +301,15 @@
       { key: "payment", label: "Payments", type: "text", options: ["Yes", "No"],
         value: function (r) { return r.payment ? "Yes" : "No"; },
         cell: paymentCell },
-      { key: "platform", label: "Platform", type: "text",
-        options: PLATFORM_VALUES, badge: platformBadge,
-        value: function (r) { return r.platform; },
-        cell: function (r) { return platformBadge(r.platform); } },
-      { key: "performance", label: "Performance", type: "text",
-        options: PERFORMANCE_VALUES, badge: performanceBadge,
-        value: function (r) { return r.performance; },
-        cell: function (r) { return performanceBadge(r.performance); } },
+      selectCol("database", "platform", "Platform"),
+      selectCol("database", "performance", "Performance"),
       { key: "equipment", label: "Equipment", type: "text", muted: true,
         value: function (r) { return r.equipment; } },
-      { key: "provider", label: "Provider", type: "text", muted: true,
-        value: function (r) { return r.provider; } },
+      // Si el equipo trae proveedor (equipments.proveedor), ése gana en el backend:
+      // editar el de acá no cambiaría lo que se ve, así que esa celda no se edita.
+      selectCol("database", "provider", "Provider", {
+        canEdit: function (r) { return !r.provider_locked; }
+      }),
       { key: "recruiter", label: "Recruiter", type: "text", muted: true,
         value: function (r) { return personText(r.recruiter); } }
     ],
@@ -284,13 +324,7 @@
       { key: "end_date", label: "End", type: "date", muted: true,
         value: function (r) { return r.end_date; },
         cell: function (r) { return fmtDate(r.end_date); } },
-      { key: "exit_type", label: "Exit type", type: "text",
-        value: function (r) { return r.exit_type; },
-        cell: function (r) {
-          if (!r.exit_type) return "—";
-          var cls = r.exit_type === "Terminated" ? "stf-badge--bad" : "stf-badge--info";
-          return '<span class="stf-badge ' + cls + '">' + esc(r.exit_type) + "</span>";
-        } },
+      selectCol("churn", "exit_type", "Exit type"),
       { key: "inactive_reason", label: "Reason", type: "text", align: "left", muted: true,
         value: function (r) { return r.inactive_reason || "No reason"; } },
       { key: "vintti_fault", label: "Vintti's fault", type: "text",
@@ -322,12 +356,8 @@
         value: function (r) { return r.amount; }, cell: moneyCell("stf-money--solid") },
       { key: "reason", label: "Concept", type: "text", align: "left", muted: true,
         value: function (r) { return bonusTypeText(r); } },
-      { key: "invoice_status", label: "Invoice (client)", type: "text",
-        value: function (r) { return r.invoice_status; },
-        cell: function (r) { return payBadge(r.invoice_status); } },
-      { key: "candidate_status", label: "Paid to candidate", type: "text",
-        value: function (r) { return r.candidate_status; },
-        cell: function (r) { return payBadge(r.candidate_status); } }
+      selectCol("bonos", "invoice_status", "Invoice (client)"),
+      selectCol("bonos", "candidate_status", "Paid to candidate")
     ]
   };
 
@@ -336,7 +366,64 @@
     return state[tab].rows;
   }
 
-  function colsOf(tab) { return COLUMNS[tab]; }
+  function numText(value) {
+    var n = Number(value);
+    if (value == null || value === "" || isNaN(n)) return "—";
+    return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  }
+
+  function customValue(row, key) {
+    return (row.custom || {})[key];
+  }
+
+  // Una columna creada desde la página, traducida al mismo contrato que las de
+  // COLUMNS: así el filtro, el orden y los totales no saben la diferencia.
+  function customCol(def) {
+    var key = def.key;
+    var col = {
+      key: key, label: def.label, custom: def, editable: def.type,
+      type: def.type === "number" ? "number" : (def.type === "date" ? "date" : "text"),
+      value: function (r) { return customValue(r, key); }
+    };
+    if (def.type === "select") {
+      col.options = function () { return optionValues(def.tab, key); };
+      col.badge = function (v) { return optionBadge(def.tab, key, v); };
+      col.cell = function (r) { return optionBadge(def.tab, key, customValue(r, key)); };
+    } else if (def.type === "checkbox") {
+      col.options = ["Yes", "No"];
+      col.value = function (r) {
+        var v = customValue(r, key);
+        return v === true ? "Yes" : (v === false ? "No" : null);
+      };
+      col.cell = function (r) {
+        return '<input type="checkbox" class="stf-pay" data-custom-check' +
+          (customValue(r, key) === true ? " checked" : "") + (r.orphan ? " disabled" : "") +
+          ' aria-label="' + esc(def.label) + '">';
+      };
+    } else if (def.type === "number") {
+      col.total = true;
+      col.fmtTotal = numText;
+      col.cell = function (r) { return numText(customValue(r, key)); };
+    } else if (def.type === "date") {
+      col.muted = true;
+      col.cell = function (r) { return fmtDate(customValue(r, key)); };
+    } else {
+      col.align = "left";
+    }
+    return col;
+  }
+
+  function customDefs(tab, archived) {
+    return schema.columns.filter(function (c) {
+      return c.tab === tab && !!c.archived === !!archived;
+    });
+  }
+
+  function colsOf(tab) { return COLUMNS[tab].concat(customDefs(tab).map(customCol)); }
+
+  function colOptions(col) {
+    return typeof col.options === "function" ? col.options() : col.options;
+  }
 
   function findCol(tab, key) {
     var cols = colsOf(tab);
@@ -447,6 +534,9 @@
         '<i class="fa-solid fa-filter stf-th__icon"></i>' +
         "</button></th>";
     }).join("");
+    // Última columna: "+" para crear una columna nueva (o restaurar una oculta).
+    head += '<th class="stf-th-add"><button type="button" class="stf-th__add" data-add-col ' +
+      'title="Add a column"><i class="fa-solid fa-plus"></i></button></th>';
 
     var totals = {};
     var body = rows.map(function (row, index) {
@@ -458,15 +548,20 @@
       var cells = cols.map(function (col) {
         var cls = col.sticky ? "stf-td-name" : (col.align === "left" ? "stf-td--left" : "");
         if (col.muted) cls += " stf-td--muted";
+        var attrs = "";
+        if (isCellEditable(tab, col, row)) {
+          cls += " stf-td--edit";
+          attrs = ' data-cell="' + esc(col.key) + '"';
+        }
         var html = col.cell ? col.cell(row, col) : dash(col.value(row));
-        return '<td class="' + cls + '">' + html + "</td>";
+        return '<td class="' + cls + '"' + attrs + ">" + html + "</td>";
       }).join("");
-      return '<tr data-row="' + index + '">' + cells + "</tr>";
+      return '<tr data-row="' + index + '">' + cells + "<td></td></tr>";
     }).join("");
     // Sin filas se dibuja igual el encabezado: los filtros por columna viven ahí,
     // y sin él no habría forma de sacar el filtro que dejó la tabla vacía.
     if (!rows.length) {
-      body = '<tr class="stf-empty-row"><td colspan="' + cols.length + '">' +
+      body = '<tr class="stf-empty-row"><td colspan="' + (cols.length + 1) + '">' +
         '<div class="stf-empty">' + esc(opts.empty) + "</div></td></tr>";
     }
 
@@ -474,15 +569,46 @@
     if (opts.totalLabel && rows.length) {
       foot = "<tfoot><tr>" + cols.map(function (col, i) {
         if (i === 0) return '<td class="stf-td-name">' + esc(opts.totalLabel) + "</td>";
-        return "<td>" + (col.total ? money(totals[col.key] || 0) : "") + "</td>";
-      }).join("") + "</tr></tfoot>";
+        return "<td>" + (col.total ? (col.fmtTotal || money)(totals[col.key] || 0) : "") + "</td>";
+      }).join("") + "<td></td></tr></tfoot>";
     }
+
+    // Editar una celda vuelve a dibujar la tabla: sin esto, la tabla vuelve al
+    // principio y se pierde de vista la columna que se estaba editando.
+    var oldScroller = host.querySelector(".stf-scroll");
+    var keepLeft = oldScroller ? oldScroller.scrollLeft : 0;
+    var keepTop = oldScroller ? oldScroller.scrollTop : 0;
 
     host.innerHTML = '<div class="stf-scroll"><table class="stf-table">' +
       "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody>" + foot + "</table></div>";
 
+    var newScroller = host.querySelector(".stf-scroll");
+    newScroller.scrollLeft = keepLeft;
+    newScroller.scrollTop = keepTop;
+    var restoredLeft = newScroller.scrollLeft;
+    var restoredTop = newScroller.scrollTop;
+
     host.querySelectorAll("tbody tr[data-row]").forEach(function (tr) {
       tr.addEventListener("click", function () { opts.onRow(rows[Number(tr.dataset.row)]); });
+    });
+    host.querySelectorAll("td[data-cell]").forEach(function (td) {
+      td.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (e.target.matches("input[type=checkbox]")) return;
+        openCellEditor(tab, rows[Number(td.closest("tr").dataset.row)], findCol(tab, td.dataset.cell), td);
+      });
+    });
+    host.querySelectorAll("[data-custom-check]").forEach(function (cb) {
+      cb.addEventListener("click", function (e) { e.stopPropagation(); });
+      cb.addEventListener("change", function () {
+        var td = cb.closest("td");
+        saveCell(tab, rows[Number(td.closest("tr").dataset.row)], findCol(tab, td.dataset.cell),
+          cb.checked);
+      });
+    });
+    host.querySelector("[data-add-col]").addEventListener("click", function (e) {
+      e.stopPropagation();
+      openAddColumn(tab, e.currentTarget);
     });
     host.querySelectorAll("[data-pay]").forEach(function (cb) {
       // El click de la fila abre el drawer: el checkbox no tiene que propagarlo.
@@ -493,8 +619,13 @@
     });
     // El popover se posiciona contra el documento: si la tabla scrollea en
     // horizontal, el encabezado se mueve y quedaría flotando desanclado.
-    var scroller = host.querySelector(".stf-scroll");
-    if (scroller) scroller.addEventListener("scroll", closePopover);
+    // Restaurar el scroll de arriba dispara un "scroll" propio: ése no cierra nada
+    // (si no, el editor de opciones se cerraría solo apenas se repinta la tabla).
+    newScroller.addEventListener("scroll", function () {
+      if (newScroller.scrollLeft === restoredLeft && newScroller.scrollTop === restoredTop) return;
+      restoredLeft = restoredTop = -1;
+      closePopover();
+    });
     host.querySelectorAll(".stf-th__btn").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -543,9 +674,10 @@
       });
       // Columnas con catálogo (Performance): primero el catálogo en su orden,
       // después lo que haya en los datos y no esté en él, y (Blank) al final.
-      if (col.options) {
-        var extra = list.filter(function (v) { return col.options.indexOf(v) === -1 && v !== BLANK; });
-        list = col.options.concat(extra).concat(values[BLANK] ? [BLANK] : []);
+      var catalog = colOptions(col);
+      if (catalog) {
+        var extra = list.filter(function (v) { return catalog.indexOf(v) === -1 && v !== BLANK; });
+        list = catalog.concat(extra).concat(values[BLANK] ? [BLANK] : []);
       }
       var chosen = current ? current.values : list;
       html += '<input type="text" class="stf-pop__search" placeholder="Search values…">' +
@@ -570,6 +702,18 @@
     html += '<div class="stf-pop__foot">' +
       '<button type="button" data-reset>Clear</button>' +
       '<button type="button" class="stf-pop__apply" data-apply>Apply</button></div>';
+
+    // Lo que se puede hacer con la columna en sí, no con el filtro.
+    var manage = "";
+    if (col.editable === "select") {
+      manage += '<button type="button" data-manage="options"><i class="fa-solid fa-list"></i> Edit options</button>';
+    }
+    if (col.custom) {
+      manage += '<button type="button" data-manage="rename"><i class="fa-solid fa-pen"></i> Rename column</button>' +
+        '<button type="button" data-manage="hide"><i class="fa-regular fa-eye-slash"></i> Hide column</button>' +
+        '<button type="button" class="is-danger" data-manage="delete"><i class="fa-regular fa-trash-can"></i> Delete column</button>';
+    }
+    if (manage) html += '<div class="stf-pop__manage">' + manage + "</div>";
     pop.innerHTML = html;
     document.body.appendChild(pop);
 
@@ -627,7 +771,491 @@
       closePopover();
       renderTab(tab);
     });
+    pop.querySelectorAll("[data-manage]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var action = btn.dataset.manage;
+        if (action === "options") return openOptionsEditor(tab, col, anchor);
+        if (action === "rename") return renameColumn(tab, col);
+        if (action === "hide") return hideColumn(tab, col);
+        if (action === "delete") return deleteColumn(tab, col.custom);
+      });
+    });
     pop.addEventListener("click", function (e) { e.stopPropagation(); });
+  }
+
+  // Abre un popover vacío anclado a `anchor`, compartiendo el `pop` del filtro:
+  // así cualquier click afuera, Esc o un scroll lo cierran igual que al filtro.
+  function openPanel(className, anchor, html, width) {
+    closePopover();
+    pop = document.createElement("div");
+    pop.className = "stf-pop " + className;
+    if (width) pop.style.width = width + "px";
+    pop.innerHTML = html;
+    document.body.appendChild(pop);
+    placePanel(anchor);
+    pop.addEventListener("click", function (e) { e.stopPropagation(); });
+    return pop;
+  }
+
+  // `anchor` es un elemento o un punto ya medido ({left, bottom}). El punto sirve
+  // para los paneles que se redibujan después de repintar la tabla: para entonces
+  // el elemento original ya no está en el documento y mediría 0,0.
+  function anchorSpot(anchor) {
+    if (!anchor.getBoundingClientRect) return anchor;
+    var box = anchor.getBoundingClientRect();
+    return { left: box.left, bottom: box.bottom + window.scrollY };
+  }
+
+  function placePanel(anchor) {
+    if (!pop) return;
+    var spot = anchorSpot(anchor);
+    var left = Math.min(spot.left, window.innerWidth - pop.offsetWidth - 12);
+    pop.style.left = Math.max(12, left) + "px";
+    pop.style.top = (spot.bottom + 6) + "px";
+  }
+
+  /* =====================================================================
+     Columnas y opciones editables desde la página
+     ===================================================================== */
+  function loadSchema() {
+    return api("/staffing/schema").then(function (data) {
+      schema.columns = data.columns || [];
+      schema.options = data.options || {};
+      if (data.colors && data.colors.length) COLORS = data.colors;
+      schema.ready = true;
+    }).catch(function (err) {
+      // Sin /schema la página sigue andando con los catálogos de respaldo; lo único
+      // que no se ve son las columnas custom.
+      schema.ready = false;
+      if (window.console) console.warn("Staffing: could not load columns/options —", err.message);
+    });
+  }
+
+  // Después de tocar columnas u opciones: se recarga el catálogo y, si el cambio
+  // movió valores en las filas (renombre), también los datos de la pestaña.
+  function refreshSchema(tab, reloadRows) {
+    return loadSchema().then(function () {
+      if (reloadRows) {
+        state.loaded[tab] = false;
+        return loadTab(tab, true);
+      }
+      renderTab(tab);
+    });
+  }
+
+  function nextColor(list) {
+    var used = {};
+    list.forEach(function (o) { used[o.color] = true; });
+    var free = COLORS.filter(function (c) { return c !== "gray" && !used[c]; });
+    return free[0] || COLORS[(list.length + 1) % COLORS.length];
+  }
+
+  function columnTab(col) { return col.custom ? col.custom.tab : null; }
+
+  // La pestaña dueña del catálogo de una columna de lista.
+  function optionsTab(tab, col) { return columnTab(col) || tab; }
+
+  var TYPE_LABELS = {
+    select: "List of options", text: "Text", number: "Number", date: "Date", checkbox: "Yes / No"
+  };
+
+  function openAddColumn(tab, anchor) {
+    var hidden = customDefs(tab, true);
+    var html = '<div class="stf-pop__title">New column</div>' +
+      '<label class="stf-pop__lbl">Name<input type="text" class="stf-pop__search" data-new-label ' +
+        'placeholder="e.g. Laptop" maxlength="80"></label>' +
+      '<label class="stf-pop__lbl">Type<select class="stf-pop__search" data-new-type>' +
+        Object.keys(TYPE_LABELS).map(function (k) {
+          return '<option value="' + k + '">' + esc(TYPE_LABELS[k]) + "</option>";
+        }).join("") + "</select></label>" +
+      '<label class="stf-pop__lbl" data-new-options-wrap>Options <em>(one per line)</em>' +
+        '<textarea class="stf-pop__search stf-pop__textarea" data-new-options ' +
+        'placeholder="Mac&#10;Windows"></textarea></label>' +
+      '<div class="stf-pop__msg" data-msg></div>' +
+      '<div class="stf-pop__foot"><span></span>' +
+        '<button type="button" class="stf-pop__apply" data-create>Create column</button></div>';
+    if (hidden.length) {
+      html += '<div class="stf-pop__title stf-pop__title--sub">Hidden columns</div>' +
+        hidden.map(function (c) {
+          return '<div class="stf-pop__row"><span>' + esc(c.label) + ' <em>' + esc(TYPE_LABELS[c.type] || c.type) +
+            '</em></span><span><button type="button" class="stf-pop__link" data-restore="' + c.id + '">Show</button>' +
+            '<button type="button" class="stf-pop__link is-danger" data-purge="' + c.id + '">Delete</button></span></div>';
+        }).join("");
+    }
+    var panel = openPanel("stf-pop--form", anchor, html, 280);
+
+    var label = panel.querySelector("[data-new-label]");
+    var type = panel.querySelector("[data-new-type]");
+    var optWrap = panel.querySelector("[data-new-options-wrap]");
+    var msg = panel.querySelector("[data-msg]");
+    label.focus();
+    type.addEventListener("change", function () {
+      optWrap.style.display = type.value === "select" ? "" : "none";
+    });
+    var create = panel.querySelector("[data-create]");
+    function submit() {
+      var name = label.value.trim();
+      if (!name) { msg.textContent = "Give the column a name."; label.focus(); return; }
+      var used = [];
+      var options = type.value !== "select" ? [] :
+        panel.querySelector("[data-new-options]").value.split("\n")
+          .map(function (v) { return v.trim(); }).filter(Boolean)
+          .map(function (v) {
+            var opt = { value: v, color: nextColor(used) };
+            used.push(opt);
+            return opt;
+          });
+      create.disabled = true;
+      msg.textContent = "Creating…";
+      api("/staffing/columns", {
+        method: "POST",
+        body: JSON.stringify({ tab: tab, label: name, type: type.value, options: options })
+      }).then(function () {
+        closePopover();
+        return refreshSchema(tab);
+      }).catch(function (err) {
+        create.disabled = false;
+        msg.textContent = err.message;
+      });
+    }
+    create.addEventListener("click", submit);
+    label.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+    panel.querySelectorAll("[data-purge]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var def = hidden.filter(function (c) { return String(c.id) === btn.dataset.purge; })[0];
+        if (def) deleteColumn(tab, def);
+      });
+    });
+    panel.querySelectorAll("[data-restore]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        api("/staffing/columns/" + btn.dataset.restore, {
+          method: "PATCH", body: JSON.stringify({ archived: false })
+        }).then(function () {
+          closePopover();
+          return refreshSchema(tab);
+        }).catch(function (err) { btn.disabled = false; alert(err.message); });
+      });
+    });
+  }
+
+  // Cuántas filas cargadas tienen algo en esa columna/opción: va en el confirm,
+  // para que "eliminar" diga qué se pierde. Si la pestaña no está cargada, null.
+  function countRows(tab, test) {
+    if (!state.loaded[tab]) return null;
+    return rowsOf(tab).filter(test).length;
+  }
+
+  function rowsPhrase(n) {
+    if (n === null) return "the rows that have it";
+    return n === 1 ? "1 row" : n + " rows";
+  }
+
+  function deleteColumn(tab, def) {
+    var n = countRows(tab, function (r) {
+      var v = customValue(r, def.key);
+      return v !== undefined && v !== null && v !== "";
+    });
+    var lost = n === 0 ? "No row has a value in it yet. "
+      : "This also deletes its value on " + rowsPhrase(n) + ". ";
+    if (!confirm('Delete the column "' + def.label + '" for good?\n\n' + lost +
+                 "This cannot be undone. If you only want it out of sight, use Hide instead.")) return;
+    closePopover();
+    delete state.filters[tab][def.key];
+    if (state.sort[tab] && state.sort[tab].key === def.key) state.sort[tab] = null;
+    api("/staffing/columns/" + def.id + "?hard=1", { method: "DELETE" })
+      .then(function () { return refreshSchema(tab, true); })
+      .catch(function (err) { alert("Could not delete the column: " + err.message); });
+  }
+
+  function renameColumn(tab, col) {
+    var name = prompt("New name for the column:", col.label);
+    if (name == null) return;
+    name = name.trim();
+    if (!name || name === col.label) return;
+    closePopover();
+    api("/staffing/columns/" + col.custom.id, { method: "PATCH", body: JSON.stringify({ label: name }) })
+      .then(function () { return refreshSchema(tab); })
+      .catch(function (err) { alert("Could not rename: " + err.message); });
+  }
+
+  function hideColumn(tab, col) {
+    if (!confirm('Hide the column "' + col.label + '"? The values are kept, and you can ' +
+                 'show it again from the + at the end of the table.')) return;
+    closePopover();
+    // Un filtro u orden sobre una columna que ya no está dejaría filas escondidas
+    // sin forma de sacarlo.
+    delete state.filters[tab][col.key];
+    if (state.sort[tab] && state.sort[tab].key === col.key) state.sort[tab] = null;
+    api("/staffing/columns/" + col.custom.id, { method: "DELETE" })
+      .then(function () { return refreshSchema(tab); })
+      .catch(function (err) { alert("Could not hide the column: " + err.message); });
+  }
+
+  function swatches(current) {
+    return '<div class="stf-swatches">' + COLORS.map(function (c) {
+      return '<button type="button" class="stf-swatch stf-badge--c-' + c + (c === current ? " is-active" : "") +
+        '" data-color="' + c + '" title="' + c + '"></button>';
+    }).join("") + "</div>";
+  }
+
+  // Editor del catálogo de una columna de lista: agregar, renombrar, recolorear,
+  // ocultar. Cada cambio se guarda al toque y el editor se vuelve a dibujar.
+  function openOptionsEditor(tab, col, anchor) {
+    var otab = optionsTab(tab, col);
+    var key = col.key;
+    var spot = anchorSpot(anchor);
+
+    function draw(message) {
+      var list = optionsOf(otab, key);
+      var html = '<div class="stf-pop__title">' + esc(col.label) + " · options</div>" +
+        '<div class="stf-opts">' + list.map(function (o) {
+          var lockTitle = "Used by the totals at the top of the page: it can be recolored, not renamed, hidden or deleted.";
+          return '<div class="stf-opt" data-id="' + esc(o.id || "") + '">' +
+            '<button type="button" class="stf-opt__color stf-badge--c-' + esc(o.color) + '" data-pick title="Change color"></button>' +
+            '<input type="text" class="stf-opt__value" value="' + esc(o.value) + '" maxlength="80"' +
+              (o.locked ? ' readonly title="' + lockTitle + '"' : "") + ">" +
+            (o.locked
+              ? '<span class="stf-opt__lock" title="' + lockTitle + '"><i class="fa-solid fa-lock"></i></span>'
+              : '<button type="button" class="stf-opt__del" data-hide title="Hide (rows keep the value)"><i class="fa-regular fa-eye-slash"></i></button>' +
+                '<button type="button" class="stf-opt__del is-danger" data-purge title="Delete (clears it from the rows)"><i class="fa-regular fa-trash-can"></i></button>') +
+            "</div>";
+        }).join("") + "</div>" +
+        '<div class="stf-opt stf-opt--new">' +
+          '<input type="text" class="stf-opt__value" data-add-value placeholder="New option…" maxlength="80">' +
+          '<button type="button" class="stf-pop__link" data-add>Add</button></div>' +
+        '<div class="stf-pop__msg" data-msg>' + esc(message || "") + "</div>" +
+        '<div class="stf-pop__hint">Renaming also updates the rows that use it. ' +
+        '<i class="fa-regular fa-eye-slash"></i> Hide keeps the value on those rows; ' +
+        '<i class="fa-regular fa-trash-can"></i> Delete clears it.</div>';
+      var panel = openPanel("stf-pop--form stf-pop--opts", spot, html, 300);
+      bind(panel, list);
+    }
+
+    // Los guardados son asíncronos: si mientras tanto se cerró el editor (click
+    // afuera, Esc), no se lo vuelve a abrir solo.
+    function redraw(message) {
+      if (pop && pop.classList.contains("stf-pop--opts")) draw(message);
+    }
+
+    function fail(err) { redraw(err.message); }
+
+    function bind(panel, list) {
+      if (!schema.ready) {
+        panel.querySelector("[data-msg]").textContent =
+          "Could not load the options from the server, so they cannot be edited right now.";
+        panel.querySelectorAll("input, button").forEach(function (el) { el.disabled = true; });
+        return;
+      }
+      panel.querySelectorAll(".stf-opt[data-id]").forEach(function (rowEl, i) {
+        var opt = list[i];
+        var input = rowEl.querySelector(".stf-opt__value");
+        function rename() {
+          var value = input.value.trim();
+          if (!value || value === opt.value || opt.locked) { input.value = opt.value; return; }
+          api("/staffing/options/" + opt.id, { method: "PATCH", body: JSON.stringify({ value: value }) })
+            .then(function (res) {
+              return refreshSchema(otab, res.renamed_rows > 0).then(function () {
+                redraw(res.renamed_rows ? res.renamed_rows + " rows updated." : "");
+              });
+            })
+            .catch(fail);
+        }
+        input.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+          if (e.key === "Escape") { e.stopPropagation(); input.value = opt.value; input.blur(); }
+        });
+        input.addEventListener("blur", rename);
+        rowEl.querySelector("[data-pick]").addEventListener("click", function () {
+          var open = rowEl.nextElementSibling && rowEl.nextElementSibling.classList.contains("stf-swatches");
+          panel.querySelectorAll(".stf-opts > .stf-swatches").forEach(function (el) { el.remove(); });
+          if (open) return;
+          rowEl.insertAdjacentHTML("afterend", swatches(opt.color));
+          rowEl.nextElementSibling.querySelectorAll("[data-color]").forEach(function (sw) {
+            sw.addEventListener("click", function () {
+              api("/staffing/options/" + opt.id, {
+                method: "PATCH", body: JSON.stringify({ color: sw.dataset.color })
+              }).then(function () { return refreshSchema(otab); }).then(function () { redraw(); }).catch(fail);
+            });
+          });
+        });
+        var hide = rowEl.querySelector("[data-hide]");
+        if (hide) {
+          hide.addEventListener("click", function () {
+            api("/staffing/options/" + opt.id, { method: "DELETE" })
+              .then(function () { return refreshSchema(otab); }).then(function () { redraw(); }).catch(fail);
+          });
+        }
+        var purge = rowEl.querySelector("[data-purge]");
+        if (purge) {
+          purge.addEventListener("click", function () {
+            var n = countRows(otab, function (r) {
+              var v = col.custom ? customValue(r, key) : r[cellField(col)];
+              return v != null && String(v).trim().toLowerCase() === opt.value.toLowerCase();
+            });
+            var lost = n === 0 ? "No row uses it. "
+              : (n === null ? "The rows that use it" : rowsPhrase(n)) + " will be left empty. ";
+            if (!confirm('Delete the option "' + opt.value + '" for good?\n\n' + lost +
+                         "This cannot be undone.")) return;
+            api("/staffing/options/" + opt.id + "?hard=1", { method: "DELETE" })
+              .then(function (res) {
+                return refreshSchema(otab, res.cleared_rows > 0).then(function () {
+                  redraw(res.cleared_rows ? rowsPhrase(res.cleared_rows) + " cleared." : "");
+                });
+              })
+              .catch(fail);
+          });
+        }
+      });
+      var addInput = panel.querySelector("[data-add-value]");
+      function add() {
+        var value = addInput.value.trim();
+        if (!value) { addInput.focus(); return; }
+        api("/staffing/options", {
+          method: "POST",
+          body: JSON.stringify({ tab: otab, col_key: key, value: value, color: nextColor(list) })
+        }).then(function () { return refreshSchema(otab); }).then(function () {
+          redraw();
+          var again = pop && pop.querySelector("[data-add-value]");
+          if (again) again.focus();
+        }).catch(fail);
+      }
+      panel.querySelector("[data-add]").addEventListener("click", add);
+      addInput.addEventListener("keydown", function (e) { if (e.key === "Enter") add(); });
+    }
+
+    draw();
+  }
+
+  /* ---------- Edición en la celda ---------- */
+  function isCellEditable(tab, col, row) {
+    if (!col.editable || row.orphan) return false;
+    if (tab === "bonos" && !row.bonus_id) return false;
+    return !col.canEdit || col.canEdit(row);
+  }
+
+  function cellField(col) { return col.field || col.key; }
+
+  function currentCell(row, col) {
+    return col.custom ? customValue(row, col.key) : row[cellField(col)];
+  }
+
+  function setCell(row, col, value) {
+    if (col.custom) {
+      row.custom = Object.assign({}, row.custom || {});
+      if (value === null || value === undefined || value === "") delete row.custom[col.key];
+      else row.custom[col.key] = value;
+    } else {
+      row[cellField(col)] = value === "" ? null : value;
+    }
+  }
+
+  // Optimista, como togglePayment(): se pinta enseguida y sólo se revierte si falla.
+  function saveCell(tab, row, col, value) {
+    if (col.custom && col.custom.type === "number" && value !== null && value !== "") {
+      value = Number(value);
+    }
+    var previous = currentCell(row, col);
+    setCell(row, col, value);
+    closePopover();
+    renderTab(tab);
+
+    var body = {};
+    if (col.custom) {
+      body.custom = {};
+      body.custom[col.key] = value === "" ? null : value;
+    } else {
+      body[cellField(col)] = value === "" ? null : value;
+    }
+    var req;
+    if (tab === "bonos") {
+      req = api("/staffing/bonuses/" + row.bonus_id, { method: "PATCH", body: JSON.stringify(body) });
+    } else {
+      body.candidate_id = row.candidate_id;
+      body.account_id = row.account_id;
+      req = api("/staffing/extra", { method: "PATCH", body: JSON.stringify(body) });
+    }
+    return req.then(function () {
+      // Exit type vacío vuelve al valor derivado del motivo de baja, que calcula el server.
+      if (col.key === "exit_type" && !value) {
+        state.loaded.churn = false;
+        loadTab("churn", true);
+      }
+    }).catch(function (err) {
+      setCell(row, col, previous);
+      renderTab(tab);
+      alert("Could not save " + col.label + ": " + err.message);
+    });
+  }
+
+  function openCellEditor(tab, row, col, td) {
+    if (!row || !col) return;
+    var wasOpen = pop && pop.dataset.cellFor === col.key + ":" + td.closest("tr").dataset.row;
+    closePopover();
+    if (wasOpen) return;
+
+    var kind = col.editable;
+    var current = currentCell(row, col);
+    var panel;
+
+    if (kind === "select") {
+      var otab = optionsTab(tab, col);
+      var list = optionsOf(otab, col.key);
+      var html = '<div class="stf-pop__list stf-pop__list--pick">' +
+        list.map(function (o) {
+          var active = current != null && String(current).toLowerCase() === o.value.toLowerCase();
+          return '<button type="button" class="stf-pick' + (active ? " is-active" : "") +
+            '" data-value="' + esc(o.value) + '">' + colorBadge(o.color, o.value) + "</button>";
+        }).join("") + "</div>" +
+        (current ? '<button type="button" class="stf-pick stf-pick--clear" data-value="">Clear</button>' : "") +
+        (schema.ready
+          ? '<div class="stf-opt stf-opt--new"><input type="text" class="stf-opt__value" data-add-value ' +
+            'placeholder="Add option…" maxlength="80"><button type="button" class="stf-pop__link" data-add>Add</button></div>'
+          : "") +
+        '<div class="stf-pop__msg" data-msg></div>';
+      panel = openPanel("stf-pop--cell", td, html, 220);
+      panel.querySelectorAll("[data-value]").forEach(function (btn) {
+        btn.addEventListener("click", function () { saveCell(tab, row, col, btn.dataset.value || null); });
+      });
+      var addInput = panel.querySelector("[data-add-value]");
+      if (addInput) {
+        var add = function () {
+          var value = addInput.value.trim();
+          if (!value) return;
+          var existing = findOption(otab, col.key, value);
+          if (existing) { saveCell(tab, row, col, existing.value); return; }
+          api("/staffing/options", {
+            method: "POST",
+            body: JSON.stringify({ tab: otab, col_key: col.key, value: value, color: nextColor(list) })
+          }).then(function (res) {
+            return loadSchema().then(function () { saveCell(tab, row, col, res.option.value); });
+          }).catch(function (err) { panel.querySelector("[data-msg]").textContent = err.message; });
+        };
+        panel.querySelector("[data-add]").addEventListener("click", add);
+        addInput.addEventListener("keydown", function (e) { if (e.key === "Enter") add(); });
+      }
+    } else {
+      var inputType = kind === "number" ? "number" : (kind === "date" ? "date" : "text");
+      var value = current == null ? "" : String(current).slice(0, inputType === "date" ? 10 : undefined);
+      panel = openPanel("stf-pop--cell", td,
+        '<input type="' + inputType + '" class="stf-pop__search" data-cell-input' +
+          (inputType === "number" ? ' step="any"' : "") + ' value="' + esc(value) + '">' +
+        '<div class="stf-pop__foot"><button type="button" data-clear>Clear</button>' +
+          '<button type="button" class="stf-pop__apply" data-save>Save</button></div>', 240);
+      var input = panel.querySelector("[data-cell-input]");
+      input.focus();
+      if (input.select && inputType !== "date") input.select();
+      var commit = function (v) {
+        if (String(v) === String(current == null ? "" : current)) { closePopover(); return; }
+        saveCell(tab, row, col, v === "" ? null : v);
+      };
+      panel.querySelector("[data-save]").addEventListener("click", function () { commit(input.value.trim()); });
+      panel.querySelector("[data-clear]").addEventListener("click", function () { commit(""); });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") commit(input.value.trim());
+      });
+    }
+    pop.dataset.cellFor = col.key + ":" + td.closest("tr").dataset.row;
   }
 
   document.addEventListener("click", closePopover);
@@ -724,24 +1352,6 @@
     if (status === "Active") return '<span class="stf-badge stf-badge--good">Active</span>';
     if (status === "Onboarding") return '<span class="stf-badge stf-badge--warn">Onboarding</span>';
     return '<span class="stf-badge stf-badge--bad">Inactive</span>';
-  }
-
-  function performanceBadge(value) {
-    if (!value) return "—";
-    var cls = PERFORMANCE_CLASS[String(value).trim().toLowerCase()] || "";
-    return '<span class="stf-badge ' + cls + '">' + esc(value) + "</span>";
-  }
-
-  function platformBadge(value) {
-    if (!value) return "—";
-    var cls = PLATFORM_CLASS[String(value).trim().toLowerCase()] || "stf-badge--info";
-    return '<span class="stf-badge ' + cls + '">' + esc(value) + "</span>";
-  }
-
-  function payBadge(value) {
-    if (!value) return "—";
-    var paid = String(value).toLowerCase() === "paid";
-    return '<span class="stf-badge ' + (paid ? "stf-badge--good" : "stf-badge--warn") + '">' + esc(value) + "</span>";
   }
 
   function kpi(label, value, hint, color) {
@@ -849,6 +1459,40 @@
     return field(label, html + "</select>");
   }
 
+  // Desplegable de una columna de lista con su catálogo. Siempre incluye el valor
+  // actual aunque esté fuera del catálogo (ver withCurrent).
+  function catalogField(tab, key, label, current) {
+    return selectField(label, key, [""].concat(withCurrent(optionValues(tab, key), current)), current);
+  }
+
+  // Un input por columna custom de la pestaña. Van con `data-custom` y no con
+  // `data-edit`: collectEdits() los junta aparte en `custom`.
+  function customFields(tab, row) {
+    var defs = customDefs(tab);
+    if (!defs.length) return "";
+    return '<div class="stf-section-label">Custom columns</div>' + defs.map(function (def) {
+      var v = customValue(row, def.key);
+      var attr = ' data-custom="' + esc(def.key) + '"';
+      if (def.type === "select") {
+        var values = [""].concat(withCurrent(optionValues(def.tab, def.key), v));
+        return field(def.label, '<select' + attr + ">" + values.map(function (o) {
+          return '<option value="' + esc(o) + '"' + (String(v == null ? "" : v) === o ? " selected" : "") +
+            ">" + esc(o || "—") + "</option>";
+        }).join("") + "</select>");
+      }
+      if (def.type === "checkbox") {
+        var cur = v === true ? "Yes" : (v === false ? "No" : "");
+        return field(def.label, '<select' + attr + ">" + ["", "Yes", "No"].map(function (o) {
+          return '<option value="' + o + '"' + (cur === o ? " selected" : "") + ">" + (o || "—") + "</option>";
+        }).join("") + "</select>");
+      }
+      var type = def.type === "number" ? "number" : (def.type === "date" ? "date" : "text");
+      var shown = v == null ? "" : String(v).slice(0, type === "date" ? 10 : undefined);
+      return field(def.label, '<input type="' + type + '"' + (type === "number" ? ' step="any"' : "") +
+        attr + ' value="' + esc(shown) + '">');
+    }).join("");
+  }
+
   function readonlyList(pairs, note) {
     var html = '<dl class="stf-readonly">';
     pairs.forEach(function (pair) {
@@ -886,12 +1530,13 @@
 
     drawer.body.innerHTML =
       '<div class="stf-section-label">Filled in by hand</div>' +
-      selectField("Platform", "platform", [""].concat(PLATFORM_VALUES), row.platform) +
-      selectField("Performance", "performance", [""].concat(PERFORMANCE_VALUES), row.performance) +
-      selectField("Provider", "provider", ["", "Quipteams", "Onbordea"], row.provider) +
+      catalogField("database", "platform", "Platform", row.platform) +
+      catalogField("database", "performance", "Performance", row.performance) +
+      catalogField("database", "provider", "Provider", row.provider) +
       field("Payments", '<label class="stf-pay-field"><input type="checkbox" data-edit-check="payment"' +
         (row.payment ? " checked" : "") + "> Paid</label>") +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
+      customFields("database", row) +
       '<div class="stf-section-label">From the Hub</div>' +
       readonlyList([
         ["Status", statusBadge(row.status), true],
@@ -923,14 +1568,14 @@
     var overrideRaw = row.churn_m3_override;
     drawer.body.innerHTML =
       '<div class="stf-section-label">Filled in by hand</div>' +
-      selectField("Exit type", "exit_type",
-        ["", "Resigned", "Terminated"], row.exit_type) +
+      catalogField("churn", "exit_type", "Exit type", row.exit_type) +
       selectField("Churn M3", "churn_m3_override", [
         { value: "", label: "Automatic" },
         { value: "si", label: "Yes" },
         { value: "no", label: "No" }
       ], overrideRaw === true ? "si" : (overrideRaw === false ? "no" : "")) +
       field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
+      customFields("churn", row) +
       '<div class="stf-section-label">From the Hub</div>' +
       readonlyList([
         ["Reason", row.inactive_reason || "No reason"],
@@ -987,15 +1632,15 @@
       ? readonlyList([["Candidate", row.candidate_name], ["Client", row.client_name]])
       : '<div id="stfBonusCandidate">' + bonusCandidateField() + "</div>";
 
-    var payOptions = ["", "Paid", "Sent, not paid"];
     drawer.body.innerHTML =
       candidateBlock +
       field("Amount (USD)", '<input type="number" step="0.01" data-edit="amount" value="' + esc(row.amount || "") + '">') +
       field("Date *", '<input type="date" required data-edit="payout_date" value="' + esc((row.payout_date || "").slice(0, 10)) + '">') +
       field("Concept", '<input type="text" data-edit="reason" value="' + esc(row.reason || "") + '">') +
-      selectField("Invoice (client)", "invoice_status", payOptions, row.invoice_status) +
-      selectField("Paid to candidate", "candidate_status", ["", "Paid", "Not Paid"], row.candidate_status) +
-      field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>");
+      catalogField("bonos", "invoice_status", "Invoice (client)", row.invoice_status) +
+      catalogField("bonos", "candidate_status", "Paid to candidate", row.candidate_status) +
+      field("Comments", '<textarea data-edit="notes">' + esc(row.notes || "") + "</textarea>") +
+      customFields("bonos", row);
 
     bindBonusCandidatePicker();
 
@@ -1064,6 +1709,12 @@
     drawer.body.querySelectorAll("[data-edit-check]").forEach(function (el) {
       out[el.dataset.editCheck] = el.checked;
     });
+    var custom = null;
+    drawer.body.querySelectorAll("[data-custom]").forEach(function (el) {
+      custom = custom || {};
+      custom[el.dataset.custom] = el.value.trim() || null;
+    });
+    if (custom) out.custom = custom;
     return out;
   }
 
@@ -1106,6 +1757,7 @@
         invoice_status: edits.invoice_status || null,
         candidate_status: edits.candidate_status || null
       };
+      if (edits.custom) payload.custom = edits.custom;
       if (row.bonus_id) {
         request = api("/staffing/bonuses/" + row.bonus_id,
           { method: "PATCH", body: JSON.stringify(payload) });
@@ -1144,6 +1796,7 @@
           notes: edits.notes || null
         };
       }
+      if (edits.custom) body.custom = edits.custom;
       request = api("/staffing/extra", { method: "PATCH", body: JSON.stringify(body) });
     }
 
@@ -1303,6 +1956,21 @@
     newBonus.addEventListener("click", function () { openBonoDrawer({}); });
     bonosFilters.appendChild(newBonus);
 
+    // El "+" del encabezado queda en la punta derecha de una tabla ancha: este
+    // botón hace lo mismo sin tener que scrollear hasta el final.
+    $$(".stf-filters").forEach(function (bar) {
+      var tab = bar.closest("[data-panel]").dataset.panel;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "stf-btn";
+      btn.innerHTML = '<i class="fa-solid fa-table-columns"></i> Add column';
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openAddColumn(tab, btn);
+      });
+      bar.insertBefore(btn, bar.querySelector(".stf-filters__spacer"));
+    });
+
     $("#stfExportCsv").addEventListener("click", function (e) {
       e.preventDefault();
       // La descarga necesita el header X-User-Email, así que se baja por fetch.
@@ -1323,7 +1991,8 @@
     });
 
     $("#stfExportCsv").style.display = "";
-    loadTab("database");
+    // El catálogo va primero: sin él las columnas custom no tendrían dónde dibujarse.
+    loadSchema().then(function () { loadTab("database"); });
   }
 
   if (document.readyState === "loading") {

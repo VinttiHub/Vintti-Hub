@@ -502,21 +502,19 @@ datalist { display: none; }
 .stf-badge--info  { background: rgba(75, 169, 255, .16); color: #12558f; }
 .stf-badge--ghost { background: transparent; color: var(--stf-ink-3); border: 1px dashed var(--stf-rule); }
 
-/* Performance: un color por opción del catálogo (staffing.js → PERFORMANCE_OPTIONS). */
-.stf-badge--perf-red     { background: rgba(239, 68, 68, .16);  color: #b3261e; }
-.stf-badge--perf-green   { background: rgba(193, 255, 114, .55); color: #3a6b00; }
-.stf-badge--perf-yellow  { background: rgba(250, 204, 21, .30);  color: #8a6600; }
-.stf-badge--perf-orange  { background: rgba(244, 140, 66, .26);  color: #a1500f; }
-.stf-badge--perf-blue    { background: rgba(75, 169, 255, .22);  color: #12558f; }
-.stf-badge--perf-purple  { background: rgba(108, 56, 255, .22); color: #4a1fb8; }
-.stf-badge--perf-magenta { background: rgba(255, 31, 219, .16); color: #a3007f; }
-.stf-badge--perf-teal    { background: rgba(45, 160, 145, .20); color: #1f6b5e; }
-
-/* Platform: un color por plataforma (staffing.js → PLATFORM_OPTIONS). */
-.stf-badge--plat-orange { background: rgba(244, 140, 66, .30); color: #a1500f; }
-.stf-badge--plat-lilac  { background: rgba(108, 56, 255, .12); color: #5b2ce6; }
-.stf-badge--plat-cyan   { background: rgba(75, 169, 255, .32); color: #0f4f88; }
-.stf-badge--plat-magenta { background: rgba(255, 31, 219, .16); color: #a3007f; }
+/* Paleta de las opciones de lista (staffing_options.color → stf-badge--c-<color>).
+   Cerrada a propósito: el backend sólo acepta estas claves (OPTION_COLORS). */
+.stf-badge--c-gray    { background: rgba(13, 18, 30, .07);   color: #4d5363; }
+.stf-badge--c-red     { background: rgba(239, 68, 68, .16);  color: #b3261e; }
+.stf-badge--c-orange  { background: rgba(244, 140, 66, .28); color: #a1500f; }
+.stf-badge--c-yellow  { background: rgba(250, 204, 21, .30); color: #8a6600; }
+.stf-badge--c-green   { background: rgba(193, 255, 114, .55); color: #3a6b00; }
+.stf-badge--c-teal    { background: rgba(45, 160, 145, .20); color: #1f6b5e; }
+.stf-badge--c-cyan    { background: rgba(75, 169, 255, .30); color: #0f4f88; }
+.stf-badge--c-blue    { background: rgba(0, 59, 255, .12);   color: #0030c7; }
+.stf-badge--c-lilac   { background: rgba(108, 56, 255, .12); color: #5b2ce6; }
+.stf-badge--c-purple  { background: rgba(108, 56, 255, .24); color: #4a1fb8; }
+.stf-badge--c-magenta { background: rgba(255, 31, 219, .16); color: #a3007f; }
 
 /* En el desplegable del filtro el valor viene como chip, no como texto pelado. */
 .stf-pop__opt .stf-badge { padding: 2px 8px; font-size: 11px; }
@@ -706,3 +704,184 @@ datalist { display: none; }
   cursor: pointer;
 }
 .stf-pay-field input { accent-color: #6c38ff; width: 16px; height: 16px; }
+
+/* ---------- Columnas y opciones editables ---------- */
+.stf-table th.stf-th-add { width: 44px; text-align: center; }
+.stf-th__add {
+  appearance: none;
+  border: 1px dashed rgba(108, 56, 255, .35);
+  background: transparent;
+  color: var(--stf-violet);
+  width: 28px; height: 28px;
+  margin: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.stf-th__add:hover { background: rgba(108, 56, 255, .08); }
+
+/* Celda editable: se ve igual que las demás hasta pasar el mouse. */
+.stf-table td.stf-td--edit { cursor: cell; }
+.stf-table tbody tr:hover td.stf-td--edit:hover {
+  box-shadow: inset 0 0 0 1.5px rgba(108, 56, 255, .45);
+  border-radius: 6px;
+}
+
+.stf-pop__manage {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px solid var(--stf-rule);
+}
+.stf-pop__manage button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 6px 6px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--stf-ink-2);
+  cursor: pointer;
+}
+.stf-pop__manage button:hover { background: rgba(108, 56, 255, .06); color: var(--stf-ink); }
+.stf-pop__manage i { width: 16px; color: var(--stf-ink-3); }
+
+.stf-pop__title { font-weight: 700; font-size: 13px; margin: 2px 2px 10px; }
+.stf-pop__title--sub {
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--stf-rule);
+}
+.stf-pop__lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--stf-ink-3);
+}
+.stf-pop__lbl em { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.stf-pop__lbl .stf-pop__search { margin-top: 4px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--stf-ink); }
+.stf-pop__textarea { min-height: 72px; resize: vertical; font-family: inherit; }
+.stf-pop__msg { font-size: 12px; color: #b3261e; min-height: 0; margin-top: 4px; }
+.stf-pop__msg:empty { display: none; }
+.stf-pop__hint { font-size: 11px; color: var(--stf-ink-3); margin-top: 8px; line-height: 1.4; }
+.stf-pop__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 12.5px;
+}
+.stf-pop__row em { font-style: normal; color: var(--stf-ink-3); font-size: 11px; }
+.stf-pop__link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--stf-violet);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.stf-pop__link:hover { background: rgba(108, 56, 255, .08); }
+.stf-pop__link:disabled { opacity: .5; cursor: default; }
+
+.stf-opts { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
+.stf-opt { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.stf-opt--new { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--stf-rule); }
+.stf-opt__color {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(13, 18, 30, .10);
+  cursor: pointer;
+  padding: 0;
+}
+.stf-opt__value {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--stf-ink);
+}
+.stf-opt__value:hover { border-color: var(--stf-rule); }
+.stf-opt__value:focus {
+  outline: none;
+  background: var(--stf-card-soft);
+  border-color: rgba(108, 56, 255, .55);
+}
+.stf-opt__value[readonly] { color: var(--stf-ink-2); cursor: default; }
+.stf-opt--new .stf-opt__value { border-color: var(--stf-rule); background: var(--stf-card-soft); }
+.stf-opt__del,
+.stf-opt__lock {
+  flex: 0 0 auto;
+  width: 26px;
+  text-align: center;
+  color: var(--stf-ink-3);
+  font-size: 12px;
+}
+.stf-opt__del {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.stf-opt__del:hover { color: #b3261e; background: rgba(239, 68, 68, .08); }
+.stf-opt__lock { font-size: 10px; }
+
+.stf-swatches { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 8px 24px; }
+.stf-swatch {
+  appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(13, 18, 30, .10);
+  cursor: pointer;
+  padding: 0;
+}
+.stf-swatch.is-active { box-shadow: 0 0 0 2px var(--stf-card), 0 0 0 4px var(--stf-violet); }
+
+.stf-pop__list--pick { display: flex; flex-direction: column; gap: 2px; }
+.stf-pick {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 5px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+.stf-pick:hover { background: rgba(108, 56, 255, .06); }
+.stf-pick.is-active { background: rgba(108, 56, 255, .10); }
+.stf-pick .stf-badge { padding: 3px 9px; font-size: 11.5px; }
+.stf-pick--clear { width: 100%; font-size: 12px; color: var(--stf-ink-3); margin-top: 2px; }
+
+/* Eliminar (no tiene vuelta atrás): en rojo, para no confundirlo con ocultar. */
+.stf-pop__manage button.is-danger,
+.stf-pop__manage button.is-danger i,
+.stf-pop__link.is-danger { color: #b3261e; }
+.stf-pop__manage button.is-danger:hover,
+.stf-pop__link.is-danger:hover { background: rgba(239, 68, 68, .08); }
+.stf-opt__del.is-danger:hover { color: #b3261e; }
+.stf-opt__del:not(.is-danger):hover { color: var(--stf-ink); background: rgba(13, 18, 30, .06); }
+.stf-opt__del + .stf-opt__del { margin-left: -4px; }
