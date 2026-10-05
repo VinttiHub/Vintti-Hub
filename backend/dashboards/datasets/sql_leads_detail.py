@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -75,23 +76,23 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = _window_bounds(filters, corte)
 
-    sql = """
+    sql = f"""
         SELECT
           COALESCE(a.client_name, '')                                       AS client_name,
           TRIM(CONCAT_WS(' ', NULLIF(a.name, ''), NULLIF(a.surname, '')))   AS contact,
           COALESCE(NULLIF(TRIM(a.mail), ''), '')                            AS email,
           COALESCE(NULLIF(TRIM(a.conversion_channel), ''), '')              AS channel,
           COALESCE(NULLIF(TRIM(a.account_manager), ''), '')                 AS account_manager,
-          TO_CHAR(a.sql_meeting_date, 'YYYY-MM-DD') AS creation_date
+          TO_CHAR({SQL_ANCHOR}, 'YYYY-MM-DD') AS creation_date
         FROM account a
         -- SQL SALES = solo Outbound + owner M+B; ancla = fecha real del meeting
         -- (sql_meeting_date), estricto: solo cuentas con reunión real. Mismo filtro que sql_leads_windows.
-        WHERE a.sql_meeting_date IS NOT NULL
+        WHERE {SQL_ANCHOR} IS NOT NULL
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
           AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN ('mariano@vintti.com', 'bahia@vintti.com')
-          AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-        ORDER BY a.sql_meeting_date DESC, a.client_name;
+          AND {SQL_ANCHOR} BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+        ORDER BY {SQL_ANCHOR} DESC, a.client_name;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}

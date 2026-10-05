@@ -4,6 +4,7 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -52,7 +53,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # DEDUPE per client: un cliente con Close Win Y Closed Lost cuenta como GANADO.
     # M+B por opp_sales_lead (ver _sales_scope: account_manager se reasigna al ganar).
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    sql = f"""
         WITH cur AS (
           SELECT
             o.account_id,
@@ -65,7 +66,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM opportunity o
           JOIN account a ON a.account_id = o.account_id
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
-            AND a.sql_meeting_date IS NOT NULL
+            AND {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
             AND NULLIF(o.opp_close_date::text, '')::date

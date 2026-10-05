@@ -4,6 +4,7 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import prev_window_bounds, window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -52,13 +53,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # a step1_den (SQLs) legitimamente, por eso todo se llama step1_*/step2_*.
     win_ini, win_fin = window_bounds(filters)
     prev_ini, prev_fin = prev_window_bounds(filters)
-    sql = """
+    sql = f"""
         WITH acc AS (
           -- PASO 1 — R1: ancla SQL = fecha real del meeting (sql_meeting_date),
           -- estricto: solo cuentas con reunion real.
           SELECT
             a.account_id,
-            a.sql_meeting_date AS sql_d,
+            {SQL_ANCHOR} AS sql_d,
             CASE
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
@@ -70,7 +71,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 AND NULLIF(o.deep_dive_date::text, '')::date IS NOT NULL
             ) AS reached_dd
           FROM account a
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             -- Solo clientes NUEVOS: el funnel mide adquisicion, no expansion. Una
             -- cuenta que ya era cliente antes de este evento (Elevate Clinics, 42 CW)
@@ -80,7 +81,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                   SELECT 1 FROM opportunity o3
                   WHERE o3.account_id = a.account_id
                     AND TRIM(o3.opp_stage) = 'Close Win'
-                    AND NULLIF(o3.opp_close_date::text,'')::date < a.sql_meeting_date
+                    AND NULLIF(o3.opp_close_date::text,'')::date < {SQL_ANCHOR}
               )
             AND (
                   TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
@@ -90,8 +91,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                          AND TRIM(LOWER(o2.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
                    )
             )
-            AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)
+            AND (%(desde)s::date IS NULL OR {SQL_ANCHOR} >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR {SQL_ANCHOR} <= %(hasta)s::date)
         ),
         opp AS (
           -- PASO 2 — ancla en deep_dive_date, per client (dedupe mas abajo).

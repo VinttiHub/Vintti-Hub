@@ -4,6 +4,7 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -37,7 +38,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Sin gate de NDA (entran los que se cayeron antes de firmar), pero SÍ exige
     # sql_meeting_date, igual que la card 1: las dos hablan del mismo universo.
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    sql = f"""
         SELECT
           TO_CHAR(MAX(NULLIF(o.opp_close_date::text, '')::date), 'YYYY-MM-DD') AS close_date,
           TO_CHAR(MIN(NULLIF(o.nda_signature_or_start_date::text, '')::date), 'YYYY-MM-DD') AS nda_date,
@@ -53,7 +54,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         JOIN account a ON a.account_id = o.account_id
         WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
-          AND a.sql_meeting_date IS NOT NULL
+          AND {SQL_ANCHOR} IS NOT NULL
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND NULLIF(o.opp_close_date::text, '')::date

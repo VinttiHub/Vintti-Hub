@@ -20,6 +20,7 @@ import re
 import time
 import unicodedata
 from difflib import SequenceMatcher
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 
@@ -138,6 +139,11 @@ PIPELINE_SALES_LEAD = {
 
 STAGE_ALIASES = {
     "intro_call": ["Intro Call", "Intro", "Llamada inicial", "Primera llamada"],
+    # "SQL" se agrego el 2026-10-05 entre Intro Call y Deep Dive, en los dos
+    # pipelines (ids 1451281949 y 1451281950). NO crea la opportunity: crea la
+    # CUENTA en el CRM. Sin alias sueltos: un "SQL" por tokens no tiene que comerse
+    # nada mas.
+    "sql": ["SQL"],
     "deep_dive": ["Deep Dive", "Deepdive"],
     "nda_sent": ["NDA Sent", "NDA enviado", "Envio NDA", "NDA Enviada"],
     "nda_signed": ["NDA Signed", "NDA firmado", "NDA Firmada", "Firma NDA"],
@@ -155,7 +161,7 @@ STAGE_ALIASES = {
 # {signed} es subconjunto de {nda, signed}, asi que el alias suelto se comeria
 # "NDA Signed". La pasada exacta corre primero y marca el stage como `claimed`,
 # pero el orden es el segundo cinturon de seguridad.
-STAGE_RESOLUTION_ORDER = ("nda_signed", "nda_sent", "deep_dive", "intro_call", "signed", "closed_won")
+STAGE_RESOLUTION_ORDER = ("nda_signed", "nda_sent", "deep_dive", "intro_call", "sql", "signed", "closed_won")
 
 OPPORTUNITY_FIELD_ALIASES = {
     "role_to_hire": [
@@ -194,8 +200,9 @@ OPPORTUNITY_FIELD_ALIASES = {
     "expected_fee": ["expected_fee", "Expected Fee"],
     "expected_revenue": ["expected_revenue", "Expected Revenue"],
     "expected_setup_fee": ["expected_set_up_fee", "Expected Set Up Fee"],
-    # Los links de grabacion. HubSpot los pide al pasar a Deep Dive (el de la
-    # intro call) y al pasar a NDA Sent (el del deep dive). Son texto libre.
+    # Los links de grabacion. HubSpot los pide al pasar a SQL (el de la intro call;
+    # hasta el 2026-10-05 era al pasar a Deep Dive) y al pasar a NDA Sent (el del
+    # deep dive). Son texto libre.
     "intro_call_recording": ["intro_call_recording", "Intro Call Recording"],
     "deep_dive_recording": ["deep_dive_recording", "Deep Dive Recording"],
     # Los que HubSpot pide al pasar a Signed, ademas de los 4 de plata/rol. Todos
@@ -212,6 +219,10 @@ OPPORTUNITY_FIELD_ALIASES = {
     # cerrada (con la fecha de HOY), asi que el push tiene que pisarla con la
     # `opp_close_date` del hub, que es cuando se cerro de verdad.
     "close_date": ["closedate", "Close Date", "Fecha de cierre"],
+    # "SQL Date (Deal)": la carga HubSpot al pasar a SQL. Va a `account.sql_date`
+    # y desde el 2026-10-05 es el ancla del SQL en el tab Sales. Si falta, se usa
+    # la fecha de entrada al stage SQL (ver sql_date_from_deal).
+    "sql_date": ["sql_date_deal", "SQL Date (Deal)", "SQL Date"],
 }
 
 # Campos de negocio que HubSpot carga en NDA Sent -> columna del hub.
@@ -257,6 +268,7 @@ HUB_TERMINAL_STAGES = {"closed lost", "stop"}
 
 STAGE_KEY_TO_HUB_STAGE = {
     "intro_call": None,   # todavia no es opportunity
+    "sql": None,          # tampoco: en SQL se crea solo la CUENTA
     "deep_dive": "Deep Dive",
     "nda_sent": "NDA Sent",
     "nda_signed": "Sourcing",
@@ -600,10 +612,42 @@ def stage_dates_from_deal(pipeline_map, pipeline_id, deal_props, parse_date):
     return result
 
 
+# Desde cuando `account.sql_date` es el ancla del SQL. Antes de este dia manda
+# `sql_meeting_date` (Meeting Date & Time del contacto), para que no cambie ningun
+# numero historico. Es el mismo corte que dashboards/datasets/_sql_anchor.py.
+SQL_DATE_CUTOVER = date(2026, 10, 5)
+
+
+def sql_date_from_deal(pipeline_map, pipeline_id, deal_props, opp_property_map, parse_date):
+    """Fecha en que el deal se califico como SQL, o None.
+
+    Gana "SQL Date (Deal)", que la carga una persona. Si esta vacia, la entrada al
+    stage SQL (`hs_v2_date_entered_<id>`). Ojo que esa guarda la ULTIMA entrada:
+    por eso el caller la escribe una sola vez y nunca la pisa.
+
+    Devuelve None si es anterior a SQL_DATE_CUTOVER: esos SQL siguen anclados en
+    el Meeting Date & Time y no tienen que moverse.
+    """
+    props = deal_props or {}
+    found = None
+    prop = (opp_property_map or {}).get("sql_date")
+    if prop:
+        found = parse_date(props.get(prop))
+    if found is None:
+        entry = pipeline_entry(pipeline_map, pipeline_id)
+        entered_prop = entry["date_property_by_key"].get("sql") if entry else None
+        if entered_prop:
+            found = parse_date(props.get(entered_prop))
+    if found is None or found < SQL_DATE_CUTOVER:
+        return None
+    return found
+
+
 # Orden de las etapas DE HUBSPOT. Distinto de HUB_STAGE_RANK, que ordena las del
 # hub (que tiene Interviewing y Negotiating, etapas que HubSpot no conoce).
 HUBSPOT_STAGE_RANK = {
     "intro_call": 0,
+    "sql": 5,
     "deep_dive": 10,
     "nda_sent": 20,
     "nda_signed": 30,

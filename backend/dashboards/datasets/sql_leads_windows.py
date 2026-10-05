@@ -16,6 +16,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -63,11 +64,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # SQL SALES = solo Outbound (los SQL generados por Sales, no inbound/marketing) y
     # owner ∈ {Mariano, Bahía} (regla del tab Sales). Ancla = fecha real del meeting
     # (sql_meeting_date), estricto: solo cuentas con reunión real.
-    sql = """
+    sql = f"""
         WITH sql_acc AS (
-          SELECT a.sql_meeting_date AS sql_d
+          SELECT {SQL_ANCHOR} AS sql_d
           FROM account a
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
             AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN ('mariano@vintti.com', 'bahia@vintti.com')

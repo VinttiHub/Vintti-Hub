@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from ._now import today_ar
+from ._sql_anchor import SQL_ANCHOR
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -34,7 +35,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     this_monday = corte - timedelta(days=corte.weekday())
     first_monday = this_monday - timedelta(days=7 * (WEEKS - 1))
 
-    sql = """
+    sql = f"""
         WITH params AS (
           SELECT %(first_monday)s::date AS first_mon,
                  %(this_monday)s::date  AS this_mon,
@@ -46,9 +47,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         sqls AS (
           -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
-          SELECT a.sql_meeting_date AS d
+          SELECT {SQL_ANCHOR} AS d
           FROM account a
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
             AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(ae_leads)s

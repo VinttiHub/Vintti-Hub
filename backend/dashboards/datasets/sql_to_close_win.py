@@ -25,6 +25,7 @@ from ._now import today_ar
 
 
 from ._sales_scope import sales_leads as _sales_leads
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value):
@@ -52,7 +53,7 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini = corte - timedelta(days=29)
 
-    sql = """
+    sql = f"""
         WITH ventana AS (
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
@@ -61,8 +62,8 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT a.account_id
           FROM account a
           CROSS JOIN ventana v
-          WHERE a.sql_meeting_date IS NOT NULL
-            AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
+          WHERE {SQL_ANCHOR} IS NOT NULL
+            AND {SQL_ANCHOR} BETWEEN v.win_ini AND v.win_fin
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
@@ -95,7 +96,7 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    sql = """
+    sql = f"""
         WITH accounts_with_cw AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
@@ -109,9 +110,9 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
           SELECT
             a.account_id,
-            DATE_TRUNC('month', a.sql_meeting_date)::date AS mes
+            DATE_TRUNC('month', {SQL_ANCHOR})::date AS mes
           FROM account a
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),

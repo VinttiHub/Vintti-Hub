@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from ._now import today_ar
+from ._sql_anchor import SQL_ANCHOR
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -39,16 +40,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     else:
         week_ini, week_fin = this_monday, corte
 
-    sql = """
+    sql = f"""
         SELECT
           COUNT(*)::int AS count,
           %(week_label)s::text AS week_label
         FROM account a
-        WHERE a.sql_meeting_date IS NOT NULL  -- R1: ancla = meeting real
+        WHERE {SQL_ANCHOR} IS NOT NULL  -- R1: ancla = meeting real
           AND COALESCE(a.vintti_internal, FALSE) = FALSE
           AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
           AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(ae_leads)s
-          AND a.sql_meeting_date BETWEEN %(week_ini)s::date AND %(week_fin)s::date;
+          AND {SQL_ANCHOR} BETWEEN %(week_ini)s::date AND %(week_fin)s::date;
     """
     return sql, {
         "ae_leads": AE_LEADS,

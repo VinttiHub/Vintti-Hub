@@ -186,6 +186,7 @@ _HUBSPOT_ACCOUNT_COLUMNS = (
     "conversion_channel",
     "credit_loop",
     "sql_meeting_date",
+    "sql_date",
 )
 _HUBSPOT_ACCOUNT_SCHEMA_READY = None
 
@@ -246,6 +247,11 @@ def _ensure_hubspot_account_columns(cursor):
     # SQL en esta fecha (COALESCE a creation_date para cuentas aún sin backfill), igual
     # que Marketing. Ver [[project_dashboard_audit]] R1.
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS sql_meeting_date DATE")
+    # "SQL Date (Deal)" de HubSpot, la escribe el sync de opportunities al pasar a
+    # SQL. Desde el 2026-10-05 es el ancla del SQL en Sales (_sql_anchor.py). Entra
+    # aca y no aparte porque este chequeo mira la tupla entera: una columna nueva
+    # en _HUBSPOT_ACCOUNT_COLUMNS hace que corran los ALTER.
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS sql_date DATE")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_account_hubspot_deal_id
@@ -2962,6 +2968,84 @@ def _insert_opportunity_from_deal(cursor, values):
     return None
 
 
+def _resolve_account_for_deal(client, cursor, deal_id, entry, ctx, item):
+    """Crea o vincula la cuenta del CRM de un deal. -> (account_id, account_action).
+
+    La usan las dos ramas que no tienen opp todavia: SQL (que crea SOLO la cuenta)
+    y la creacion de la opp. En dry run, si la cuenta no existe, devuelve
+    (None, "would_create") sin escribir nada.
+    """
+    property_maps = ctx["property_maps"]
+    dry_run = ctx["dry_run"]
+
+    full_deal = client.get_deal_with_associations(
+        deal_id, extra_properties=ctx["deal_extra_properties"]
+    )
+    company_ids = association_ids(full_deal, "companies")
+    contact_ids = association_ids(full_deal, "contacts")
+    company = (
+        client.get_company(company_ids[0], extra_properties=ctx["company_extra_properties"])
+        if company_ids else None
+    )
+    contact = (
+        client.get_contact(contact_ids[0], extra_properties=ctx["contact_extra_properties"])
+        if contact_ids else None
+    )
+    payload = build_account_payload(
+        full_deal, company=company, contact=contact, owner_email=entry["sales_lead"],
+    )
+    payload = _apply_account_field_overrides(
+        payload, contact=contact, company=company, deal=full_deal,
+        property_maps=property_maps,
+    )
+
+    item["account_name"] = payload.get("name") or None
+
+    existing_account = _preview_existing_account(cursor, payload)
+    if existing_account:
+        account_id = existing_account["account_id"]
+        account_action = "found"
+        if not dry_run:
+            _link_existing_account_to_hubspot(cursor, account_id, payload)
+            account_action = "linked"
+    elif dry_run:
+        item["account_action"] = "would_create"
+        return None, "would_create"
+    else:
+        result = _insert_or_update_account(cursor, payload)
+        account_id = result["account_id"]
+        account_action = result["action"]
+
+    item["account_id"] = account_id
+    item["account_action"] = account_action
+
+    marcada = _marcar_cuenta_vintti_ai(cursor, account_id, entry["key"], dry_run)
+    if marcada:
+        item["vintti_ai_marcada"] = marcada
+    return account_id, account_action
+
+
+def _write_account_sql_date(cursor, account_id, sql_date, dry_run, item):
+    """Sella `account.sql_date` UNA vez. Nunca la pisa.
+
+    `sql_date_from_deal` ya descarta las anteriores al corte del 2026-10-05, asi
+    que una cuenta que era SQL de antes no cambia de mes en ninguna card. Y como
+    `hs_v2_date_entered_*` guarda la ULTIMA entrada, pisarla movería el SQL cada
+    vez que el deal vuelve a pasar por la etapa.
+    """
+    if not sql_date:
+        return
+    item["sql_date"] = sql_date.isoformat()
+    if dry_run or not account_id:
+        return
+    cursor.execute(
+        "UPDATE account SET sql_date = %s WHERE account_id = %s AND sql_date IS NULL",
+        (sql_date, account_id),
+    )
+    if cursor.rowcount:
+        item["sql_date_written"] = True
+
+
 def _process_hubspot_deal(client, cursor, deal, ctx):
     """Procesa UN deal. No commitea: el caller commitea por deal."""
     pipeline_map = ctx["pipeline_map"]
@@ -2995,6 +3079,31 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         return _skip(deal, "not_yet_deep_dive", pipeline_key=entry["key"],
                      stage_key=stage_key,
                      **({"hubspot_retrocedio": retroceso} if retroceso else {}))
+
+    # "SQL Date (Deal)", o la entrada al stage SQL. None si es anterior al corte.
+    sql_date = hs_opps.sql_date_from_deal(
+        pipeline_map, pipeline_id, props, opp_property_map, _parse_hubspot_date
+    )
+
+    # SQL crea la CUENTA, no la opportunity (que sigue naciendo en Deep Dive). Sin
+    # Role to hire, sin adopcion y sin el freno de candidatas: todo eso es de la opp.
+    if stage_key == "sql":
+        item = {
+            "deal_id": deal_id,
+            "dealname": props.get("dealname"),
+            "pipeline_key": entry["key"],
+            "stage_key": stage_key,
+            "action": "account_only",
+            "reason": "account_only",
+        }
+        if retroceso:
+            item["hubspot_retrocedio"] = retroceso
+        account_id, account_action = _resolve_account_for_deal(
+            client, cursor, deal_id, entry, ctx, item
+        )
+        item["account_action"] = account_action
+        _write_account_sql_date(cursor, account_id, sql_date, dry_run, item)
+        return item
 
     stage_dates = hs_opps.stage_dates_from_deal(
         pipeline_map, pipeline_id, props, _parse_hubspot_date
@@ -3038,57 +3147,19 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             # opp_position_name es la llave de adopcion: no se inventa.
             return _skip(deal, "no_role_to_hire", **item)
 
-        full_deal = client.get_deal_with_associations(
-            deal_id, extra_properties=ctx["deal_extra_properties"]
+        account_id, account_action = _resolve_account_for_deal(
+            client, cursor, deal_id, entry, ctx, item
         )
-        company_ids = association_ids(full_deal, "companies")
-        contact_ids = association_ids(full_deal, "contacts")
-        company = (
-            client.get_company(company_ids[0], extra_properties=ctx["company_extra_properties"])
-            if company_ids else None
-        )
-        contact = (
-            client.get_contact(contact_ids[0], extra_properties=ctx["contact_extra_properties"])
-            if contact_ids else None
-        )
-        payload = build_account_payload(
-            full_deal, company=company, contact=contact, owner_email=entry["sales_lead"],
-        )
-        payload = _apply_account_field_overrides(
-            payload, contact=contact, company=company, deal=full_deal,
-            property_maps=property_maps,
-        )
-
-        item["account_name"] = payload.get("name") or None
-
-        existing_account = _preview_existing_account(cursor, payload)
-        if existing_account:
-            account_id = existing_account["account_id"]
-            account_action = "found"
-            if not dry_run:
-                _link_existing_account_to_hubspot(cursor, account_id, payload)
-                account_action = "linked"
-        elif dry_run:
-            # Sin cuenta no hay candidatas posibles: se corta antes de la adopcion.
-            # El panel lo explica aparte, si no parece que no se busco ninguna.
-            item["account_action"] = "would_create"
+        if account_id is None:
+            # Dry run sin cuenta: no hay candidatas posibles, se corta antes de la
+            # adopcion. El panel lo explica aparte, si no parece que no se busco ninguna.
             item["link_candidates"] = []
             item["would_action"] = "created"
             item["reason"] = "advanced"
             item["hub_stage_after"] = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
             item["dates_written"] = _iso_dates(stage_dates)
             return item
-        else:
-            result = _insert_or_update_account(cursor, payload)
-            account_id = result["account_id"]
-            account_action = result["action"]
-
-        item["account_id"] = account_id
-        item["account_action"] = account_action
-
-        marcada = _marcar_cuenta_vintti_ai(cursor, account_id, entry["key"], dry_run)
-        if marcada:
-            item["vintti_ai_marcada"] = marcada
+        _write_account_sql_date(cursor, account_id, sql_date, dry_run, item)
 
         adopted, ambiguous = _adopt_existing_opportunity(
             cursor, account_id, role, ctx["allow_ambiguous"], schema_ready=schema_ready
@@ -3232,6 +3303,12 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
     marcada = _marcar_cuenta_vintti_ai(cursor, opp.get("account_id"), entry["key"], dry_run)
     if marcada:
         item["vintti_ai_marcada"] = marcada
+        changed = True
+
+    # Un deal que salto SQL -> Deep Dive entre dos corridas no paso nunca por la
+    # rama de SQL: la fecha se sella aca.
+    _write_account_sql_date(cursor, opp.get("account_id"), sql_date, dry_run, item)
+    if item.get("sql_date_written"):
         changed = True
 
     target_stage = hs_opps.STAGE_KEY_TO_HUB_STAGE.get(stage_key)
@@ -3623,7 +3700,8 @@ def sync_hubspot_opportunities():
                 conn.commit()
             push_report = _push_pass(client, conn, cursor, dry_run)
 
-        counts = {"created": 0, "adopted": 0, "updated": 0, "skipped": 0}
+        # `account_only`: deals en SQL, que crean o vinculan la cuenta y nada mas.
+        counts = {"created": 0, "adopted": 0, "updated": 0, "skipped": 0, "account_only": 0}
         for item in items:
             action = item.get("action") or item.get("would_action") or "skipped"
             if action in counts:
@@ -4502,6 +4580,7 @@ def preview_hubspot_opportunities():
         setup_property = opp_property_map.get("setup_fee")
         final_property = opp_property_map.get("final_fee")
         intro_rec_property = opp_property_map.get("intro_call_recording")
+        sql_date_property = opp_property_map.get("sql_date")
         deep_rec_property = opp_property_map.get("deep_dive_recording")
 
         # 1) De donde sale cada columna del hub. Si algo dice resolved=false, ese
@@ -4537,6 +4616,12 @@ def preview_hubspot_opportunities():
                 "hubspot_label": labels_by_name.get(deep_rec_property or ""),
                 "resolved": bool(deep_rec_property),
             },
+            "account.sql_date": {
+                "hubspot_property": sql_date_property,
+                "hubspot_label": labels_by_name.get(sql_date_property or ""),
+                "resolved": bool(sql_date_property),
+                "nota": "si esta vacia se usa la entrada al stage SQL",
+            },
             "opp_sales_lead": {
                 "hubspot_property": "(el pipeline del deal)",
                 "hubspot_label": None,
@@ -4570,7 +4655,7 @@ def preview_hubspot_opportunities():
         extra = [
             p for p in (
                 role_property, model_property, setup_property, final_property,
-                intro_rec_property, deep_rec_property,
+                intro_rec_property, deep_rec_property, sql_date_property,
             ) if p
         ]
         extra.extend(pipeline_map["date_properties"])
@@ -4706,6 +4791,19 @@ def preview_hubspot_opportunities():
                     "nota": "solo si la columna del hub esta vacia (NULL o ''): nunca pisa",
                 })
 
+            sql_date = hs_opps.sql_date_from_deal(
+                pipeline_map, pipeline_id, props, opp_property_map, _parse_hubspot_date
+            )
+            sql_entered_prop = entry["date_property_by_key"].get("sql")
+            fields.append({
+                "hub_column": "account.sql_date",
+                "hubspot_property": sql_date_property,
+                "valor_en_hubspot": props.get(sql_date_property or ""),
+                "entrada_al_stage_sql": props.get(sql_entered_prop or ""),
+                "entraria_como": sql_date.isoformat() if sql_date else None,
+                "nota": "una sola vez y nunca pisa; si es anterior al 2026-10-05 no se escribe",
+            })
+
             for field in fields:
                 _track(field["hub_column"], field["entraria_como"])
 
@@ -4716,13 +4814,15 @@ def preview_hubspot_opportunities():
                     % (entry["stage_labels"].get(dealstage_id) or dealstage_id)
                 )
             elif stage_key == "intro_call":
-                avisos.append("todavia en Intro Call: la opp se crea recien en Deep Dive")
+                avisos.append("todavia en Intro Call: la cuenta se crea en SQL y la opp en Deep Dive")
+            elif stage_key == "sql":
+                avisos.append("en SQL: el sync crea o vincula la CUENTA; la opp se crea recien en Deep Dive")
             elif not role:
                 avisos.append(
                     "sin Role to hire: si la opp todavia no existe en el hub, el sync NO la "
                     "crea (ese campo es opp_position_name y la llave para adoptar la manual)"
                 )
-            if stage_key and stage_key != "intro_call" and not model:
+            if stage_key and stage_key not in ("intro_call", "sql") and not model:
                 avisos.append("sin Model: la opp se crearia con opp_model vacio")
 
             rows.append({

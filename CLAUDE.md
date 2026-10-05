@@ -231,7 +231,8 @@ de `docs/opportunities.html`.
 
 | HubSpot | Hub |
 |---|---|
-| Intro Call → **Deep Dive** | crea la opportunity (`Role to hire` → `opp_position_name`, `Model` → `opp_model`, `opp_type='New'`) |
+| Intro Call → **SQL** | crea o vincula **sólo la cuenta** del CRM y sella `account.sql_date`. No crea la opp (desde 2026-10-05) |
+| SQL → **Deep Dive** | crea la opportunity (`Role to hire` → `opp_position_name`, `Model` → `opp_model`, `opp_type='New'`) |
 | Deep Dive → **NDA Sent** | `opp_stage = 'NDA Sent'` + los 7 campos de negocio (abajo) |
 | NDA Sent → **NDA Signed** | `opp_stage = 'Sourcing'` |
 | **Closed Win** | sólo las 5 columnas espejo (abajo). **No mueve el stage** |
@@ -256,6 +257,29 @@ Tres cosas que no son obvias:
   Mirar `GET /hubspot/debug/deal-pipelines` antes de correr nada.
 - **Adopta en vez de duplicar.** Si ya hay una opp abierta de esa cuenta con el mismo
   `opp_position_name` normalizado y sin deal atado, le pega el `hubspot_deal_id`.
+
+### El stage SQL crea la cuenta, y su fecha es el ancla del SQL desde el 2026-10-05
+
+HubSpot sumó el 2026-10-05 un stage **SQL** entre Intro Call y Deep Dive, en los dos
+pipelines (ids `1451281949` Vintti AI y `1451281950` Proceso de contratación). Los datos
+que antes se pedían al pasar a Deep Dive (Role to hire, Model, grabación de la intro call)
+ahora se piden ahí, pero ninguno tiene dónde caer hasta que exista la opp: como nunca
+estuvieron gateados por stage, entran solos cuando la opp se crea en Deep Dive.
+
+- **SQL → `account_only`.** `_process_hubspot_deal` llama a `_resolve_account_for_deal()`,
+  el mismo bloque que usa la creación de opp, **sin exigir Role to hire** y sin adopción ni
+  freno de candidatas. En Deep Dive la cuenta ya existe y `_find_existing_account` la encuentra
+  primero por `account.hubspot_deal_id`, que se escribió en SQL.
+- **`account.sql_date`** sale de "SQL Date (Deal)" (`sql_date_deal`) o, si está vacía, de
+  `hs_v2_date_entered_<stage SQL>`. Se sella **una sola vez** (`WHERE sql_date IS NULL`)
+  porque la de entrada guarda la ÚLTIMA entrada, y **nunca con una fecha anterior al
+  2026-10-05** (`SQL_DATE_CUTOVER` en `utils/hubspot_opportunities.py`). También se sella en
+  la rama de opp existente, para un deal que saltó SQL → Deep Dive entre dos corridas.
+- **Las 16 cards de SQL del tab Sales anclan en `_sql_anchor.py`**: `sql_meeting_date` si es
+  anterior al corte (historia congelada), si no `sql_date`, si no `sql_meeting_date`. Pedido
+  de la owner: que no cambie ningún número de antes del corte (verificado: 0 diferencias en
+  los 16 datasets). Si cambiás el corte, cambialo en los dos archivos. **El tab Marketing NO
+  se tocó**: sigue leyendo Meeting Date & Time en vivo de los contactos.
 
 ### Vincular a mano: la adopción automática casi nunca alcanza
 
@@ -394,7 +418,7 @@ HubSpot los pide en otras dos transiciones, y son **texto libre**, no números:
 
 | HubSpot | Se pide al pasar a | Hub (input de Opportunity Detail) | Datasets |
 |---|---|---|---|
-| `intro_call_recording` ("Intro Call Recording") | Intro Call → **Deep Dive** | `first_meeting_recording` ("First Meeting Recording") | ninguno |
+| `intro_call_recording` ("Intro Call Recording") | Intro Call → **SQL** (antes del 2026-10-05, → Deep Dive) | `first_meeting_recording` ("First Meeting Recording") | ninguno |
 | `deep_dive_recording` ("Deep Dive Recording") | Deep Dive → **NDA Sent** | `deepdive_recording` ("Deep Dive Recording") | ninguno |
 
 Las columnas ya existían en `opportunity` (`varchar` sin límite) — no hubo migración.

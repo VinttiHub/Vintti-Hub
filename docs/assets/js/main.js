@@ -2112,6 +2112,8 @@ function resumenHubspotSync(payload) {
     motivo: i.reason || null,
     cuenta: i.account_name || null,
     cuenta_nueva: i.account_action === 'would_create',
+    cuenta_accion: i.account_action || null,
+    sql_date: i.sql_date || null,
     // Opps de esa cuenta sin deal atado: el backend las sugiere, vincula una persona.
     candidatas: Array.isArray(i.link_candidates) ? i.link_candidates : [],
   });
@@ -2122,6 +2124,7 @@ function resumenHubspotSync(payload) {
     adopted: Number(payload.adopted || 0),
     updated: Number(payload.updated || 0),
     skipped: Number(payload.skipped || 0),
+    account_only: Number(payload.account_only || 0),
     errores: (payload.errors || []).map(e => ({ deal: e.deal_id, error: e.error })),
     retrocesos: (payload.retrocesos || []).map(r => ({
       deal: r.dealname,
@@ -2131,6 +2134,8 @@ function resumenHubspotSync(payload) {
     creadas:  items.filter(i => (i.action || i.would_action) === 'created').map(liviano),
     adoptadas: items.filter(i => (i.action || i.would_action) === 'adopted').map(liviano),
     actualizadas: items.filter(i => (i.action || i.would_action) === 'updated').map(liviano),
+    // Deals en el stage SQL: crean o vinculan la CUENTA, la opp nace en Deep Dive.
+    cuentas_sql: items.filter(i => i.action === 'account_only').map(liviano),
     // Frenadas a proposito: el sync NO las crea hasta que una persona decide.
     esperando: items.filter(i => i.reason === 'waiting_for_decision').map(liviano),
     salteadas: items.filter(i => i.action === 'skipped' && i.reason !== 'waiting_for_decision').map(liviano),
@@ -2144,6 +2149,7 @@ const HS_MOTIVOS = {
   hub_ahead_or_equal: 'el hub ya está más adelante',
   no_target_stage: 'Closed Win no mueve el stage',
   not_yet_deep_dive: 'todavía en Intro Call',
+  account_only: 'en SQL: sólo la cuenta, la opp se crea en Deep Dive',
   unmapped_stage: 'etapa que no sincronizamos',
   pipeline_not_tracked: 'pipeline que no sincronizamos',
   no_role_to_hire: 'sin Role to hire cargado',
@@ -2177,6 +2183,20 @@ function renderHubspotSyncReport(r) {
     [r.dry_run ? 'Se actualizarían' : 'Actualizadas', r.actualizadas, 'ok'],
     ['Sin cambios', r.salteadas, 'muted'],
   ].filter(([, filas]) => filas.length);
+
+  // Deals en SQL: van aparte porque no son opps y no llevan el picker de vincular.
+  const CUENTA_ACCION = r.dry_run
+    ? { would_create: 'se crearía la cuenta', found: 'la cuenta ya existe', linked: 'la cuenta ya existe' }
+    : { created: 'cuenta creada', updated: 'cuenta actualizada', linked: 'cuenta vinculada' };
+  const filaCuenta = i => `<li><b>${escapeHtml(i.deal || '—')}</b>`
+    + `${i.cuenta ? ` · ${escapeHtml(i.cuenta)}` : ''}`
+    + `${i.sql_date ? ` · SQL ${escapeHtml(i.sql_date)}` : ''}`
+    + ` <span class="hs-report-why">${escapeHtml(CUENTA_ACCION[i.cuenta_accion] || i.cuenta_accion || '')}</span></li>`;
+  const grupoCuentas = (r.cuentas_sql || []).length ? `
+      <details class="hs-report-group ok" open>
+        <summary>En SQL: ${r.dry_run ? 'cuentas que se crearían o vincularían' : 'cuentas creadas o vinculadas'} (${r.cuentas_sql.length})</summary>
+        <ul>${r.cuentas_sql.map(filaCuenta).join('')}</ul>
+      </details>` : '';
 
   const fila = i => `<li${i.deal_id ? ` data-deal-id="${escapeHtml(i.deal_id)}"` : ''}>`
     + `<b>${escapeHtml(i.deal || '—')}</b>${i.posicion ? ` · ${escapeHtml(i.posicion)}` : ''}`
@@ -2250,6 +2270,7 @@ function renderHubspotSyncReport(r) {
       ${r.esVistaFrenados ? `${r.deals} deal(s) frenados por el sync. No se creó nada.` : `${r.deals} deal(s) mirados · <b>${r.created}</b> ${r.dry_run ? 'se crearían' : 'creadas'}
       · <b>${r.adopted}</b> ${r.dry_run ? 'se vincularían' : 'vinculadas'}
       · <b>${r.updated}</b> ${r.dry_run ? 'se actualizarían' : 'actualizadas'}
+      ${r.account_only ? `· <b>${r.account_only}</b> en SQL (sólo cuenta)` : ''}
       · ${r.skipped} sin cambios · ${r.errores.length} error(es)`}
     </p>
     ${(r.esperando || []).length ? `<p class="hs-report-note">El sync <b>no crea</b> estas ${r.esperando.length}: la cuenta ya tiene opportunities sin deal atado y podría ser la misma búsqueda escrita distinto. Elegí cuál es, o marcala como nueva. Hasta entonces no se toca nada.<br>Las <b>cerradas</b> (Closed Lost / Stop) también aparecen en la lista: vincular una la deja cerrada, solo evita la duplicada. Si dice <b>misma fecha</b> de Deep Dive, casi seguro es esa.</p>` : ''}
@@ -2261,6 +2282,7 @@ function renderHubspotSyncReport(r) {
         <summary>${t} (${filas.length})</summary>
         <ul>${filas.map(fila).join('')}</ul>
       </details>`).join('')}
+    ${grupoCuentas}
   `;
   panel.querySelector('.hs-report-close').addEventListener('click', () => panel.remove());
   wireHubspotLinkButtons(panel);

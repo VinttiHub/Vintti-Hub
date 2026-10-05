@@ -4,6 +4,7 @@ from datetime import date, datetime
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -38,24 +39,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     #
     # Misma ventana que la card: window_bounds(filters), no una rodante propia.
     win_ini, win_fin = window_bounds(filters)
-    sql = """
+    sql = f"""
         WITH acc AS (
           SELECT
             a.account_id,
-            a.sql_meeting_date AS sql_d,
+            {SQL_ANCHOR} AS sql_d,
             EXISTS (
               SELECT 1 FROM opportunity o
               WHERE o.account_id = a.account_id
                 AND NULLIF(o.deep_dive_date::text, '')::date IS NOT NULL
             ) AS reached_dd
           FROM account a
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
             AND NOT EXISTS (
                   SELECT 1 FROM opportunity o3
                   WHERE o3.account_id = a.account_id
                     AND TRIM(o3.opp_stage) = 'Close Win'
-                    AND NULLIF(o3.opp_close_date::text,'')::date < a.sql_meeting_date
+                    AND NULLIF(o3.opp_close_date::text,'')::date < {SQL_ANCHOR}
               )
             AND (
                   TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
@@ -65,9 +66,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                          AND TRIM(LOWER(o2.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
                    )
             )
-            AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-            AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)
+            AND {SQL_ANCHOR} BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+            AND (%(desde)s::date IS NULL OR {SQL_ANCHOR} >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR {SQL_ANCHOR} <= %(hasta)s::date)
         ),
         opp AS (
           SELECT

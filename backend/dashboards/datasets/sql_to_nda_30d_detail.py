@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from ._now import today_ar
 
 from ._periods import window_bounds
+from ._sql_anchor import SQL_ANCHOR
 
 
 def _parse_date(value):
@@ -38,19 +39,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = window_bounds(filters)
 
-    sql = """
+    sql = f"""
         WITH ventana AS (
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
         sql_accounts AS (
           -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
           SELECT a.account_id, a.client_name,
-                 a.sql_meeting_date AS creation_d
+                 {SQL_ANCHOR} AS creation_d
           FROM account a
           CROSS JOIN ventana v
-          WHERE a.sql_meeting_date IS NOT NULL
+          WHERE {SQL_ANCHOR} IS NOT NULL
             AND COALESCE(a.vintti_internal, FALSE) = FALSE
-            AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
+            AND {SQL_ANCHOR} BETWEEN v.win_ini AND v.win_fin
         ),
         nda_per_account AS (
           SELECT
