@@ -92,6 +92,21 @@ valida contra una semántica que ya no existe. `runner.py` deduplica a ~316 quer
 las corre **secuencialmente sobre una conexión** (RDS tiene `max_connections=81` y
 prod ya usa ~60 en pico).
 
+**Libro de hechos (cruce entre cards distintas)**: las reglas de arriba comparan cada
+card con SU drawer, y por eso no vieron que Restor (baja 30-sep) era churn de septiembre
+en Client churn y de octubre en el CRR (2026-10-02). `ledger.py` corre cada detalle
+etiquetado mes por mes (6 meses) y lo compara contra los hechos que `canon.py` calcula
+directo de las tablas base: `hecho_mes_distinto` / `hecho_faltante` / `hecho_sobrante`.
+Cada detalle declara una etiqueta `"audit"` en su `DATASET` (hecho, columna del cliente,
+qué filas, y qué flags de `canon.FLAGS` **excluye por criterio decidido**: replacement
+vivo, buyout, alta y baja en el mismo mes…). Sumar una card al cruce = ponerle la
+etiqueta; una familia nueva = una función en `canon.CANON`. Hoy cubre
+`cliente_baja` (Client churn + CRR) y `contractor_baja` (churn de contractors, NRR
+global/AM, motivos de baja, Churn → Replacement, inactivos de Growth); el resto de los
+detalles sale como "sin etiqueta". Los hallazgos se agrupan: uno por card y regla, con
+los casos adentro.
+`python -m dashboards.audit --ledger-only` corre sólo esto en segundos.
+
 Para el triage: `GET /dashboards/audit/last` devuelve cada hallazgo con
 `source_file` (el módulo del dataset) y `html_line`, así se va directo al archivo.
 Un hallazgo aceptado se silencia con `POST /dashboards/audit/waivers`; se sigue

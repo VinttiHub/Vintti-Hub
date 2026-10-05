@@ -142,5 +142,13 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py). El CRR no puede
+    # perder a un cliente que no estaba en su base (arranco en el mes) ni a uno que
+    # volvio antes del cierre.
+    "audit": [{
+        "fact": "cliente_baja", "entity": "client_name",
+        "match": {"tipo": "^churn_inicio$"},
+        "excluye": ["nuevo_en_mes", "volvio_en_mes"],
+    }],
     "query": query,
 }

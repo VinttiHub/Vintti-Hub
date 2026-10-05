@@ -173,5 +173,11 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    "audit": [{
+        "fact": "cliente_baja", "entity": "client_name",
+        "match": {"estado_cliente_mes": "^Churn"}, "month_col": "mes", "date_col": "fecha_baja",
+        "excluye": ["replacement_vivo"],
+    }],
     "query": query,
 }

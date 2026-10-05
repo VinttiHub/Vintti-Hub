@@ -54,5 +54,12 @@ DATASET = {
     "dimensions": DIMENSIONS,
     "measures": MEASURES,
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    # Sólo la cartera del AM (sin M3): se le chequea el mes, no lo que le falta.
+    "audit": [{
+        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "match": {"componente": "^(churn_no_recorte|downgrades_recorte)$"}, "date_col": "end_d",
+        "excluye": ["nuevo_en_mes", "sigue_en_cuenta"], "scope": "subset",
+    }],
     "query": query,
 }

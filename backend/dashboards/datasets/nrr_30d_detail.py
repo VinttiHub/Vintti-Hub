@@ -107,5 +107,13 @@ DATASET = {
     "dimensions": DIMENSIONS,
     "measures": MEASURES,
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    # El NRR mide unidades (candidato, cuenta) que estaban en la base: no puede perder a
+    # quien arrancó en el mes ni a quien sigue en la cuenta con otro hire.
+    "audit": [{
+        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "match": {"componente": "^(churn_no_recorte|downgrades_recorte)$"}, "date_col": "end_d",
+        "excluye": ["nuevo_en_mes", "sigue_en_cuenta"],
+    }],
     "query": query,
 }

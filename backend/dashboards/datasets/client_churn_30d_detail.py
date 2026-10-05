@@ -198,5 +198,12 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    "audit": [{
+        "fact": "cliente_baja", "entity": "client_name",
+        "match": {"estado_cliente_ventana": "^Churn"}, "date_col": "fecha_baja",
+        # La card es churn REAL: los buyouts van aparte (bajas_buyout).
+        "excluye": ["replacement_vivo", "buyout"],
+    }],
     "query": query,
 }

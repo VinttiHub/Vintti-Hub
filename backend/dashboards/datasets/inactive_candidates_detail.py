@@ -142,5 +142,10 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {"model": ""},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    "audit": [{
+        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "match": {"model": "^Staffing$"}, "month_col": "month", "date_col": "end_date",
+    }],
     "query": query,
 }

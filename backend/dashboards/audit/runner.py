@@ -24,6 +24,7 @@ import time
 from dashboards.datasets import get as get_dataset
 from dashboards.executor import _jsonable
 
+from . import ledger
 from . import rules as R
 from .topology import build as build_topology
 
@@ -39,6 +40,8 @@ log = logging.getLogger(__name__)
 
 ROW_LIMIT = 5000
 STATEMENT_TIMEOUT = os.environ.get("DASHBOARD_AUDIT_STMT_TIMEOUT", "25s")
+# Meses que el libro de hechos recorre hacia atras (incluido el actual).
+LEDGER_MONTHS = int(os.environ.get("DASHBOARD_AUDIT_LEDGER_MONTHS", "6"))
 
 
 def load_charts(conn) -> dict:
@@ -154,15 +157,39 @@ def run(topo=None, tab=None, progress=None) -> tuple:
         # Se mide con la conexion todavia abierta: pregunta por la TABLA, no por los
         # datasets, que es la unica forma de ver una ingesta muerta (ver R26).
         ingest_probe = ingest_freshness(conn)
+
+        # Libro de hechos: cruza los detalles entre si, mes por mes (ver ledger.py).
+        book = ledger.collect(conn, ledger.months_back(LEDGER_MONTHS), _execute,
+                              progress=progress)
     finally:
         conn.close()
 
     ctx = R.Context(topo=topo, execs=execs, charts=charts)
+    ledger_findings = ledger.compare(ctx, book)
     ctx.window_probe = window_contrast(execs, topo, charts, progress=progress)
     ctx.ingest_probe = ingest_probe
     findings = R.run_all(ctx)
     findings.extend(_row_limit_findings(ctx, execs))
+    findings.extend(ledger_findings)
     return findings, execs, topo
+
+
+def run_ledger(months: int = None, progress=None) -> tuple:
+    """Solo el libro de hechos: (hallazgos, libro, detalles sin etiqueta).
+
+    Es la corrida rapida para calibrar una familia nueva sin esperar los ~6 min
+    de la auditoria completa.
+    """
+    topo = build_topology()
+    conn = _open_connection()
+    try:
+        charts = load_charts(conn)
+        book = ledger.collect(conn, ledger.months_back(months or LEDGER_MONTHS),
+                              _execute, progress=progress)
+    finally:
+        conn.close()
+    ctx = R.Context(topo=topo, execs={}, charts=charts)
+    return ledger.compare(ctx, book), book, ledger.coverage(ctx)
 
 
 def ingest_freshness(conn) -> dict:

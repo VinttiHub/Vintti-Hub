@@ -95,5 +95,12 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    "audit": [{
+        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "date_col": "inactive_date",
+        # Motivos de baja: un buyout no es una baja con motivo.
+        "excluye": ["buyout"],
+    }],
     "query": query,
 }

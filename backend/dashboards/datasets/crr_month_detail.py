@@ -141,5 +141,11 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py), igual que crr_30d_detail.
+    "audit": [{
+        "fact": "cliente_baja", "entity": "client_name",
+        "match": {"tipo": "^churn_inicio$"}, "month_col": "mes",
+        "excluye": ["nuevo_en_mes", "volvio_en_mes"],
+    }],
     "query": query,
 }

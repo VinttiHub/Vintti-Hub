@@ -190,5 +190,12 @@ DATASET = {
     ],
     "measures": [],
     "default_filters": {},
+    # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
+    # Es una cohorte (los que arrancaron en la ventana): sólo se le chequea el mes.
+    "audit": [{
+        "fact": "contractor_baja", "entity": ["candidate_name", "account_name"],
+        "match": {"baja_tipo": "^Baja"}, "date_col": "end_d",
+        "month_from_date": True, "scope": "subset",
+    }],
     "query": query,
 }
