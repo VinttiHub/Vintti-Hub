@@ -92,6 +92,11 @@ _HIRES_CTE = """
             END AS end_d,
             COALESCE(ho.salary, 0)::numeric AS salary,
             COALESCE(ho.fee, 0)::numeric    AS fee,
+            -- Mes del buyout (Staffing -> Recruiting). El NRR lo usa para netearlo: misma
+            -- expresion que `dashboards/audit/canon.py`.
+            CASE WHEN NULLIF(TRIM(ho.buyout_daterange::text), '') IS NOT NULL
+                 THEN TO_DATE(TRIM(ho.buyout_daterange::text) || '-01', 'YYYY-MM-DD')
+            END AS buyout_d,
             TRIM(COALESCE(ho.inactive_reason::text, '')) AS inactive_reason
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id

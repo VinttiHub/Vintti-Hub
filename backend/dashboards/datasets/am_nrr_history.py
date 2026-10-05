@@ -87,6 +87,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           a.contraccion,
           a.downgrades_recorte,
           a.churn_no_recorte,
+          a.buyouts,
           a.entradas_m3,
           a.nrr_pct
         FROM agregado a

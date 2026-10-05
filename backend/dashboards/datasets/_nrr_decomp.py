@@ -25,6 +25,15 @@ Salida: el CTE `nrr_rows(componente, candidate_id, account_id, opportunity_id, m
 
 `entradas_m3` queda FUERA del cociente a proposito (decision de la owner): lo que entra
 al libro del AM porque vencio el M3 del AE no es expansion del AM, es un traspaso.
+
+`buyouts` tambien va FUERA, y ademas sale de la base (decision de la owner, 2026-10-05):
+una unidad que se va dentro de la ventana por buyout (el cliente compro al contractor y
+pago el fee del buyout) se trata como si nunca hubiera estado en `mrr_inicial`, asi que no
+cuenta como churn ni infla la base. Antes penalizaba el NRR del AM —del que salen sus
+comisiones— por plata que no se perdio: Eduardo Salazar (AMPL, buyout 2026-09) era $5K
+de churn en septiembre. Mismo criterio de buyout que Client churn y el auditor
+(`buyout_d >= mes de la baja`). Consecuencia: `mrr_inicial` del mes M ya no es el GMRR
+del cierre de M-1; le faltan exactamente los `buyouts` del mes.
 """
 from __future__ import annotations
 
@@ -105,6 +114,14 @@ def decomp_cte(
     j_ui = f" AND u.{key} = i.{key}" if key else ""
     coh_k = f"i.{key}, " if key else ""
     coh_j = f"c.{key} = u.{key} AND " if key else ""
+    j_bi = f" AND b.{key} = i.{key}" if key else ""
+
+    # Unidad que se fue por buyout en la ventana: sale de la base y del churn.
+    no_buyout_i = (
+        "\n            AND NOT EXISTS (SELECT 1 FROM nrr_buyouts b"
+        f" WHERE {'b.' + key + ' = i.' + key + ' AND ' if key else ''}"
+        "b.candidate_id = i.candidate_id AND b.account_id = i.account_id)"
+    )
 
     entradas_m3 = ""
     if owned:
@@ -137,8 +154,28 @@ def decomp_cte(
             WHERE {coh_j}c.account_id = u.account_id
           ){owned_ups}
         ),
+        nrr_buyouts AS (
+          -- Estaban al inicio, ya no al cierre, y la baja que cae en la ventana es un
+          -- buyout (mes del buyout >= mes de la baja, el criterio de Client churn).
+          SELECT {k_i}i.candidate_id, i.account_id
+          FROM {ini} i
+          WHERE NOT EXISTS (
+            SELECT 1 FROM {fin} f
+            WHERE f.candidate_id = i.candidate_id
+              AND f.account_id = i.account_id{j_fi}
+          ){owned_ini}
+            AND EXISTS (
+              SELECT 1
+              FROM {hires} h{reason_join}
+              WHERE h.candidate_id = i.candidate_id
+                AND h.account_id = i.account_id
+                AND h.end_d IS NOT NULL
+                AND h.end_d > {win_ini} AND h.end_d <= {win_fin}
+                AND h.buyout_d >= DATE_TRUNC('month', h.end_d)::date
+            )
+        ),
         nrr_rows AS (
-          -- 1. Base: el MRR de la cohorte al inicio de la ventana.
+          -- 1. Base: el MRR de la cohorte al inicio de la ventana, sin los buyouts.
           SELECT
             'mrr_inicial'::text AS componente,
             {k_i}i.candidate_id, i.account_id, i.opportunity_id,
@@ -146,7 +183,7 @@ def decomp_cte(
             NULL::numeric       AS monto_ini,
             NULL::numeric       AS monto_fin
           FROM {ini} i
-          WHERE TRUE{owned_ini}
+          WHERE TRUE{owned_ini}{no_buyout_i}
 
           UNION ALL
           -- 2. Upsells: vacantes cerradas en la ventana sobre cuentas de la cohorte.
@@ -211,7 +248,17 @@ def decomp_cte(
             SELECT 1 FROM {fin} f
             WHERE f.candidate_id = i.candidate_id
               AND f.account_id = i.account_id{j_fi}
-          ){owned_ini}{entradas_m3}
+          ){owned_ini}{no_buyout_i}
+
+          UNION ALL
+          -- 7. Buyouts: lo que se saco de la base y del churn, a su MRR del inicio.
+          -- Va FUERA del cociente; esta para que el drawer muestre que se neteo.
+          SELECT
+            'buyouts'::text, {k_i}i.candidate_id, i.account_id, i.opportunity_id,
+            {vi}::numeric, NULL::numeric, NULL::numeric
+          FROM {ini} i
+          JOIN nrr_buyouts b
+            ON b.candidate_id = i.candidate_id AND b.account_id = i.account_id{j_bi}{entradas_m3}
         )
     """
 
@@ -237,6 +284,10 @@ def summary_columns(group: str = "", owned: bool = False) -> str:
         "(COALESCE(SUM(monto) FILTER (WHERE componente = 'expansion_precio'), 0)"
         " - COALESCE(SUM(monto) FILTER (WHERE componente = 'contraccion'), 0)"
         ")::float AS salary_updates"
+    )
+    # Fuera del cociente: lo que se neteo por buyout (ya no esta en la base ni en churn).
+    cols.append(
+        "COALESCE(SUM(monto) FILTER (WHERE componente = 'buyouts'), 0)::float AS buyouts"
     )
     if owned:
         cols.append(
@@ -264,6 +315,7 @@ MEASURES = [
     {"key": "contraccion", "label": "Bajó el precio", "type": "currency"},
     {"key": "downgrades_recorte", "label": "Downgrades", "type": "currency"},
     {"key": "churn_no_recorte", "label": "Churn", "type": "currency"},
+    {"key": "buyouts", "label": "Buyouts (neteados)", "type": "currency"},
     {"key": "nrr_pct", "label": "NRR %", "type": "percent"},
 ]
 

@@ -86,6 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           a.contraccion,
           a.downgrades_recorte,
           a.churn_no_recorte,
+          a.buyouts,
           a.nrr_pct
         FROM agregado a
         WHERE a.mrr_inicial IS NOT NULL AND a.mrr_inicial > 0

@@ -1610,7 +1610,7 @@
           <svg data-chart="am_line_nrr_am" data-bind="area" data-axis="xy"
                data-x="mes" data-y="nrr_pct" data-color="cyan"
                data-labels="NRR del AM" data-fmt-y="percent"
-               data-tooltip-extras="mrr_inicial|Base|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k,entradas_m3|Entró del AE|currency-k"
+               data-tooltip-extras="mrr_inicial|Base|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k,buyouts|Buyouts (neteados)|currency-k,entradas_m3|Entró del AE|currency-k"
                viewBox="0 0 540 220" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="20" y1="40" x2="540" y2="40"/>
@@ -1845,7 +1845,7 @@
           <svg data-chart="am_line_nrr" data-bind="area" data-axis="xy"
                data-x="mes" data-y="nrr_pct" data-color="lime"
                data-labels="NRR %" data-fmt-y="percent"
-               data-tooltip-extras="mrr_inicial|MRR inicial|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k"
+               data-tooltip-extras="mrr_inicial|MRR inicial|currency-k,upsells|Upsells|currency-k,salary_updates|Salary updates|delta-currency-k,downgrades_recorte|Downgrades|currency-k,churn_no_recorte|Churn|currency-k,buyouts|Buyouts (neteados)|currency-k"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -9995,6 +9995,26 @@
                 </div>
               </div>
             </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Buyouts · fuera del NRR</h4>
+              <div class="kpi-drawer__stats" style="grid-template-columns:1fr">
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Buyouts neteados <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="buyouts">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="buyouts" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">el cliente compró al contractor en este período · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="buyouts"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,monto|MRR neteado|currency"
+                         data-empty-text="No hubo buyouts en este período."></div>
+                  </div>
+                </div>
+              </div>
+              <p class="kpi-drawer__note">Un buyout <b>no</b> cuenta como churn y tampoco entra en la base: el NRR arranca como si ese contractor no hubiera estado. El cliente pagó el buyout, así que no es plata que se haya perdido en la cuenta.</p>
+            </section>
           </div>
         </div>
 
@@ -10138,6 +10158,26 @@
                   </div>
                 </div>
               </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Buyouts · fuera del NRR</h4>
+              <div class="kpi-drawer__stats" style="grid-template-columns:1fr">
+                <div class="expander" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="kpi-drawer__stat" data-expand-toggle role="button" tabindex="0" style="cursor:pointer" title="Ver quiénes">
+                    <span class="kpi-drawer__stat__label">Buyouts neteados <span class="count" data-chart="am_table_nrr_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="componente" data-where-value="buyouts">—</span></span>
+                    <span class="kpi-drawer__stat__value" data-chart="am_kpi_nrr_am_30d" data-bind="text" data-field="buyouts" data-reduce="first" data-fmt="currency-k">—</span>
+                    <span class="kpi-drawer__stat__sub">el cliente compró al contractor en este período · <b>ver quiénes ▾</b></span>
+                  </div>
+                  <div class="expander__panel">
+                    <div class="dtable-wrap"
+                         data-chart="am_table_nrr_am_30d_detail" data-bind="dtable"
+                         data-where-field="componente" data-where-value="buyouts"
+                         data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,end_d|Baja|raw,monto|MRR neteado|currency"
+                         data-empty-text="No hubo buyouts en este período."></div>
+                  </div>
+                </div>
+              </div>
+              <p class="kpi-drawer__note">Un buyout <b>no</b> cuenta como churn y tampoco entra en la base: el NRR arranca como si ese contractor no hubiera estado. El cliente pagó el buyout, así que no es plata que se haya perdido en la cuenta.</p>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Entró del AE · fuera del NRR</h4>

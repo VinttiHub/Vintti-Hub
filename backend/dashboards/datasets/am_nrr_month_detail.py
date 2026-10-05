@@ -85,7 +85,7 @@ DATASET = {
         "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
         "match": {"componente": "^(churn_no_recorte|downgrades_recorte)$"},
         "month_col": "mes", "date_col": "end_d",
-        "excluye": ["nuevo_en_mes", "sigue_en_cuenta"], "scope": "subset",
+        "excluye": ["nuevo_en_mes", "sigue_en_cuenta", "buyout"], "scope": "subset",
     }],
     "query": query,
 }

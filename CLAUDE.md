@@ -201,6 +201,15 @@ Cinco cosas que no son obvias:
   octubre en el CRR — la AM lo leyó como contarlo dos veces, y tenía razón en el mes.
   Ahora la baja cae en su propio mes, como en Client churn. El default `False` de los
   snapshots queda para GMRR/MRR: no lo cambies ahí.
+- **Los buyouts se netean, no son churn** (2026-10-05, en los dos NRR). Si una unidad se
+  va dentro de la ventana por buyout (`buyout_d >= mes de la baja`, el criterio de Client
+  churn y de `canon.py`), sale **de la base y del churn a la vez**: el NRR arranca como si
+  no hubiera estado. El cliente pagó el buyout, y de este NRR salen las comisiones del AM —
+  Eduardo Salazar (AMPL, buyout 2026-09) le restaba $5K. Va aparte en el componente
+  `buyouts`, **fuera del cociente** (CTE `nrr_buyouts` en `_nrr_decomp.py`), con su
+  tarjeta en los dos drawers. Consecuencia: `mrr_inicial` del mes M **ya no** es el GMRR
+  del cierre de M−1, le faltan justo los `buyouts`. El CRR sigue contando el buyout como
+  churn: no se cambió ahí. Las etiquetas `audit` de los 4 detalles excluyen el flag `buyout`.
 - **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Sin ella se
   lee como si fuera el GMRR de hoy y no cuadra con el tile de al lado: con corte
   22-sep, GMRR · AM da $237,4K y la base del NRR $208,1K, que es el GMRR · AM del
