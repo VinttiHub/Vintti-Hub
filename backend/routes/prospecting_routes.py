@@ -19,8 +19,9 @@ from psycopg2.extras import RealDictCursor
 
 from db import get_connection
 from prospecting import store
-from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS
-from prospecting.workflows import list_workflows, run_workflows
+from prospecting import workflows as wf_engine
+from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, WORKFLOW_EDITORS
+from prospecting.rules import InvalidWorkflow
 
 bp = Blueprint("prospecting", __name__, url_prefix="/prospecting")
 
@@ -31,6 +32,15 @@ def _current_email() -> str:
 
 def _is_admin(email: str) -> bool:
     return email in ADMIN_EMAILS
+
+
+def _is_wf_editor(email: str) -> bool:
+    return email in WORKFLOW_EDITORS
+
+
+def _sees_dummies(email: str) -> bool:
+    # Quien arma workflows necesita ver las dummies para probarlos.
+    return _is_admin(email) or _is_wf_editor(email)
 
 
 def _token_ok(env_name: str, header: str) -> bool:
@@ -93,6 +103,8 @@ def me():
             "email": email,
             "has_access": store.has_access(cur, email),
             "is_admin": _is_admin(email),
+            "can_edit_workflows": _is_wf_editor(email),
+            "sees_dummies": _sees_dummies(email),
         })
 
 
@@ -103,7 +115,6 @@ def options():
         if denied:
             return denied
         data = store.options(cur)
-    data["workflows"] = list_workflows()
     return jsonify(data)
 
 
@@ -114,7 +125,7 @@ def companies():
         if denied:
             return denied
         filters = request.args.to_dict()
-        if filters.get("dummy") in ("include", "only") and not _is_admin(_current_email()):
+        if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
             filters["dummy"] = "exclude"
         data = store.list_companies(cur, filters)
     return jsonify(_json_safe(data))
@@ -145,9 +156,17 @@ def patch_company(company_id: int):
         if denied:
             return denied
         row = store.update_company(cur, company_id, patch, actor=_current_email())
+        applied = []
+        if row is not None:
+            # Al instante: los workflows activos sobre la empresa recién editada.
+            applied = wf_engine.run_for_company(cur, company_id, actor=_current_email())
+            if applied:
+                cur.execute("SELECT * FROM prospect_companies WHERE id = %s", (company_id,))
+                row = dict(cur.fetchone())
     if row is None:
         return jsonify({"error": "not_found"}), 404
     row.pop("raw_payload", None)
+    row["workflows_applied"] = applied
     return jsonify(_json_safe(row))
 
 
@@ -172,7 +191,11 @@ def clay_webhook():
         for item in items:
             try:
                 cur.execute("SAVEPOINT clay_item")
-                results.append(store.upsert_from_clay(cur, item))
+                result = store.upsert_from_clay(cur, item)
+                result["workflows_applied"] = [
+                    a["name"] for a in wf_engine.run_for_company(cur, result["id"], actor="clay")
+                ]
+                results.append(result)
                 cur.execute("RELEASE SAVEPOINT clay_item")
             except ValueError as exc:
                 cur.execute("ROLLBACK TO SAVEPOINT clay_item")
@@ -184,35 +207,148 @@ def clay_webhook():
 # --------------------------------------------------------------------------- #
 # Workflows
 # --------------------------------------------------------------------------- #
+def _as_of(body: dict):
+    if not body.get("as_of"):
+        return None
+    return date.fromisoformat(str(body["as_of"])[:10])
+
+
+def _invalid(exc: InvalidWorkflow):
+    return jsonify({"error": "The workflow has errors.", "errors": exc.errors}), 400
+
+
+@bp.get("/workflows")
+def workflows_list():
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        rows = wf_engine.list_workflows(cur)
+    return jsonify(_json_safe({"workflows": rows, "can_edit": _is_wf_editor(_current_email())}))
+
+
+@bp.get("/workflows/<int:wf_id>")
+def workflow_get(wf_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        row = wf_engine.get_workflow(cur, wf_id)
+    if row is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(row))
+
+
+def _editor_only():
+    if not _is_wf_editor(_current_email()):
+        return jsonify({"error": "Only pgonzales, manuela and mia can edit workflows."}), 403
+    return None
+
+
+@bp.post("/workflows")
+def workflow_create():
+    denied = _editor_only()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            row = wf_engine.create_workflow(cur, body, _current_email())
+    except InvalidWorkflow as exc:
+        return _invalid(exc)
+    return jsonify(_json_safe(row)), 201
+
+
+@bp.put("/workflows/<int:wf_id>")
+def workflow_update(wf_id: int):
+    denied = _editor_only()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            row = wf_engine.update_workflow(cur, wf_id, body, _current_email())
+    except InvalidWorkflow as exc:
+        return _invalid(exc)
+    if row is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(row))
+
+
+@bp.post("/workflows/<int:wf_id>/toggle")
+def workflow_toggle(wf_id: int):
+    denied = _editor_only()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            row = wf_engine.set_enabled(cur, wf_id, bool(body.get("enabled")), _current_email())
+    except InvalidWorkflow as exc:
+        return _invalid(exc)
+    if row is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(row))
+
+
+@bp.delete("/workflows/<int:wf_id>")
+def workflow_delete(wf_id: int):
+    denied = _editor_only()
+    if denied:
+        return denied
+    with _Db() as cur:
+        ok = wf_engine.delete_workflow(cur, wf_id)
+    return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
+
+
+@bp.post("/workflows/preview")
+def workflow_preview():
+    """Dry run de lo que está en el editor (guardado o no). No escribe nada."""
+    denied = _editor_only()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    try:
+        as_of = _as_of(body)
+        with _Db() as cur:
+            result = wf_engine.preview_definition(cur, body, as_of=as_of,
+                                                  only_dummy=bool(body.get("only_dummy")))
+    except ValueError as exc:
+        if isinstance(exc, InvalidWorkflow):
+            return _invalid(exc)
+        return jsonify({"error": "as_of tiene que ser YYYY-MM-DD"}), 400
+    return jsonify(_json_safe(result))
+
+
 @bp.post("/workflows/run")
 def workflows_run():
     """Corre los workflows. Dry run por defecto: hay que mandar `dry_run: false`.
 
-    Body: {dry_run, as_of: "YYYY-MM-DD", only_dummy, keys: [...]}
-    Lo llama el cron (X-Audit-Token) o la owner desde el panel de pruebas.
+    Body: {dry_run, as_of: "YYYY-MM-DD", only_dummy, workflow_ids: [...]}
+    Sin `workflow_ids` corre los activos. Lo llama el cron (X-Audit-Token, y ahí
+    cuenta como automático: con AUTOMATION_REAL_DATA apagado sólo toca dummies) o
+    una editora desde la página.
     """
     by_cron = _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token")
     email = _current_email()
-    if not by_cron and not _is_admin(email):
+    if not by_cron and not _is_wf_editor(email):
         return jsonify({"error": "forbidden"}), 403
     body = request.get_json(silent=True) or {}
-    dry_run = body.get("dry_run", True) is not False
-    as_of = None
-    if body.get("as_of"):
-        try:
-            as_of = date.fromisoformat(str(body["as_of"])[:10])
-        except ValueError:
-            return jsonify({"error": "as_of tiene que ser YYYY-MM-DD"}), 400
+    try:
+        as_of = _as_of(body)
+    except ValueError:
+        return jsonify({"error": "as_of tiene que ser YYYY-MM-DD"}), 400
     with _Db() as cur:
-        result = run_workflows(
+        result = wf_engine.run_workflows(
             cur,
             as_of=as_of,
-            dry_run=dry_run,
+            dry_run=body.get("dry_run", True) is not False,
             only_dummy=bool(body.get("only_dummy")),
-            keys=body.get("keys"),
+            workflow_ids=body.get("workflow_ids"),
             actor=email or ("cron" if by_cron else None),
+            automatic=by_cron,
         )
-    return jsonify(result)
+    return jsonify(_json_safe(result))
 
 
 # --------------------------------------------------------------------------- #

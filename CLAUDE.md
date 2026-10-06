@@ -1051,10 +1051,19 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
   **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
   semana): esos sólo se rellenan si están vacíos.
-- **Workflows**: una entrada por workflow en `WORKFLOWS` (`workflows.py`). Hoy sólo
-  `recycle_60d` (In Progress con start date de hace más de 60 días → borra owner, owner
-  Apollo y start date, status Recycled). `as_of` simula la fecha. Cron
-  `.github/workflows/prospecting-workflows.yml` con el **schedule comentado** hasta validar.
+- **Workflows: se arman desde la página** (pestaña *Workflows*, editor tipo HubSpot), no en
+  código. Son filas de `prospect_workflows` (JSON: grupos de condiciones unidos por O, reglas por
+  Y, y acciones Set / Clear / Set to today). `rules.py` valida y traduce a SQL **sólo con la lista
+  blanca** `FIELDS` / `OPERATORS` de `constants.py`; los valores van siempre como parámetro.
+  Editan **pgonzales, manuela y mia** (`WORKFLOW_EDITORS`, también tienen acceso a la página y
+  ven las dummies); los BDRs, sólo lectura. El Recycle de HubSpot se siembra como primera fila
+  (sólo si la tabla nunca tuvo filas, mirando la secuencia).
+- **Cuándo corren**: los activos, **al instante** sobre la empresa que se edita o llega de Clay
+  (`run_for_company()`, tope de 3 pasadas contra loops entre workflows) **+ el cron diario**
+  (`.github/workflows/prospecting-workflows.yml`, con el schedule comentado). Freno de la fase
+  de prueba: con `AUTOMATION_REAL_DATA = False` lo automático **sólo toca dummies**; sobre datos
+  reales corren únicamente con *Apply now*. Reinscripción apagada = una sola vez por empresa
+  (`prospect_workflow_enrollments`). Una empresa sólo cuenta si la acción le cambia algo.
 - **Pruebas**: botón *Test panel* (sólo admin) siembra empresas `is_dummy`, que los BDRs no
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.

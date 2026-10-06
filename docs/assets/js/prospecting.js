@@ -48,6 +48,7 @@
           if (!res.ok) {
             var err = new Error(data.error || ("HTTP " + res.status));
             err.status = res.status;
+            err.errors = data.errors || null;  // detalle de validación de un workflow
             throw err;
           }
           return data;
@@ -138,7 +139,7 @@
       start_from: $("prFStartFrom").value,
       start_to: $("prFStartTo").value,
       q: $("prFQ").value.trim(),
-      dummy: ME.is_admin ? $("prFDummy").value : "exclude",
+      dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
       sort: state.sort,
       page: state.page,
       page_size: state.pageSize,
@@ -303,6 +304,24 @@
     return api("/prospecting/companies/" + id, { method: "PATCH", body: JSON.stringify(patch) });
   }
 
+  /* Si al guardar corrió un workflow (al instante), se avisa y se refresca la tabla:
+     la fila puede haber cambiado en campos que la persona no tocó. */
+  var toastTimer = null;
+  function toast(html) {
+    var el = $("prToast");
+    el.innerHTML = html;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 6000);
+  }
+  function announceWorkflows(row) {
+    var applied = (row && row.workflows_applied) || [];
+    if (!applied.length) return;
+    var names = applied.map(function (a) { return "<strong>" + esc(a.name) + "</strong>"; });
+    toast('<i class="fa-solid fa-diagram-project"></i> Workflow ' + names.join(", ") + " updated this company.");
+    load();
+  }
+
   function onCellChange(e) {
     var sel = e.target.closest(".pr-cell-select");
     if (!sel) return;
@@ -316,6 +335,7 @@
     patchCompany(id, patch).then(function (row) {
       Object.assign(rowsById[id], row);
       if (field === "prospecting_status") sel.setAttribute("data-status", row.prospecting_status || "");
+      announceWorkflows(row);
     }).catch(function (err) {
       sel.classList.add("is-error");
       alert("Could not save: " + err.message);
@@ -425,8 +445,9 @@
         });
         if (!Object.keys(patch).length) { $("prDrawerStatus").textContent = "No changes."; return; }
         $("prDrawerStatus").textContent = "Saving…";
-        patchCompany(c.id, patch).then(function () {
+        patchCompany(c.id, patch).then(function (row) {
           $("prDrawerStatus").textContent = "Saved.";
+          announceWorkflows(row);
           load();
           showCompany(c.id);
         }).catch(function (err) { $("prDrawerStatus").textContent = "Error: " + err.message; });
@@ -531,6 +552,13 @@
       tab.addEventListener("click", function () {
         document.querySelectorAll(".pr-tab").forEach(function (t) { t.classList.toggle("is-active", t === tab); });
         state.view = tab.getAttribute("data-view");
+        var isWf = state.view === "workflows";
+        $("prTableCard").hidden = isWf;
+        $("prWorkflows").hidden = !isWf;
+        if (isWf) {
+          if (window.ProspectingWorkflows) window.ProspectingWorkflows.show();
+          return;
+        }
         state.page = 1;
         load();
       });
@@ -612,10 +640,8 @@
       }
       ME = me;
       $("prApp").hidden = false;
-      if (me.is_admin) {
-        $("prTestBtn").hidden = false;
-        $("prFDummyWrap").hidden = false;
-      }
+      if (me.is_admin) $("prTestBtn").hidden = false;
+      if (me.sees_dummies) $("prFDummyWrap").hidden = false;
       renderHead();
       renderColsMenu();
       bind();
@@ -625,6 +651,20 @@
       $("prDenied").querySelector("p").textContent = "Could not load Prospecting: " + err.message;
     });
   }
+
+  // Lo que usa prospecting-workflows.js (mismo API base, mismas opciones, mismo formato).
+  window.Prospecting = {
+    api: api,
+    esc: esc,
+    fmtDate: fmtDate,
+    fmtDateTime: fmtDateTime,
+    todayIso: todayIso,
+    toast: toast,
+    ownerName: ownerName,
+    options: function () { return OPTS; },
+    me: function () { return ME; },
+    reloadTable: function () { return load(); },
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

@@ -24,7 +24,15 @@ from datetime import date, datetime, timedelta
 from psycopg2.extras import Json
 
 from prospecting.constants import (
+    ACTIONS,
     ADMIN_EMAILS,
+    AUTOMATION_REAL_DATA,
+    DEFAULT_WORKFLOWS,
+    EDITABLE_FIELDS,
+    FIELDS,
+    OPERATORS,
+    OPERATORS_BY_TYPE,
+    WORKFLOW_EDITORS,
     BDR_FIELDS,
     BDR_ROLE_PATTERN,
     CLAY_FIELDS,
@@ -139,7 +147,60 @@ def ensure_schema(cur) -> None:
     # "Id de la empresa" de la planilla es el id de HubSpot: se guarda para la
     # migración (cruzar lo importado con HubSpot), no es la clave del Hub.
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
+
+    # Workflows editables desde la página (ver prospecting/rules.py).
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_workflows (
+            id           BIGSERIAL PRIMARY KEY,
+            name         TEXT NOT NULL,
+            description  TEXT,
+            enabled      BOOLEAN NOT NULL DEFAULT FALSE,
+            reenroll     BOOLEAN NOT NULL DEFAULT TRUE,
+            conditions   JSONB NOT NULL,
+            actions      JSONB NOT NULL,
+            created_by   TEXT,
+            updated_by   TEXT,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    # Reinscripción apagada = una empresa entra una sola vez: acá queda anotada.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_workflow_enrollments (
+            workflow_id  BIGINT NOT NULL REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            company_id   BIGINT NOT NULL REFERENCES prospect_companies(id) ON DELETE CASCADE,
+            enrolled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (workflow_id, company_id)
+        )
+        """
+    )
+    cur.execute("ALTER TABLE prospect_workflow_runs ADD COLUMN IF NOT EXISTS workflow_id BIGINT")
+    _seed_default_workflows(cur)
     _SCHEMA_READY = True
+
+
+def _seed_default_workflows(cur) -> None:
+    """Siembra el workflow que vino de HubSpot sólo si la tabla NUNCA tuvo filas.
+
+    Se mira la secuencia y no sólo si está vacía: si alguien borra todos los
+    workflows a propósito, no tienen que reaparecer en el próximo arranque.
+    """
+    cur.execute("SELECT is_called FROM prospect_workflows_id_seq")
+    if cur.fetchone()["is_called"]:
+        return
+    for wf in DEFAULT_WORKFLOWS:
+        cur.execute(
+            """
+            INSERT INTO prospect_workflows
+                (name, description, enabled, reenroll, conditions, actions, created_by, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s, 'system', 'system')
+            """,
+            (wf["name"], wf["description"], wf["enabled"], wf["reenroll"],
+             Json(wf["conditions"]), Json(wf["actions"])),
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -167,7 +228,7 @@ def has_access(cur, email: str) -> bool:
     email = (email or "").strip().lower()
     if not email:
         return False
-    if email in ADMIN_EMAILS:
+    if email in ADMIN_EMAILS or email in WORKFLOW_EDITORS:
         return True
     return any(b["email"] == email for b in list_bdrs(cur))
 
@@ -598,11 +659,24 @@ def delete_dummies(cur) -> int:
 
 
 def options(cur) -> dict:
+    bdrs = list_bdrs(cur)
     return {
         "statuses": STATUSES,
         "not_icp_reasons": NOT_ICP_REASONS,
         "sizes": SIZES,
-        "bdrs": list_bdrs(cur),
+        "bdrs": bdrs,
         "weeks": list_weeks(cur),
+        # Lo que necesita el constructor de workflows de la página.
+        "workflow_schema": {
+            "fields": [
+                {**f, "editable": f["key"] in EDITABLE_FIELDS}
+                for f in FIELDS
+            ],
+            "operators": OPERATORS,
+            "operators_by_type": OPERATORS_BY_TYPE,
+            "actions": ACTIONS,
+            # Fase de prueba: lo automático sólo toca dummies (ver constants.py).
+            "automation_real_data": AUTOMATION_REAL_DATA,
+        },
     }
 
