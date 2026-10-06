@@ -51,7 +51,9 @@ bp = Blueprint("cv_review", __name__)
 OVERSIGHT_EMAILS = ("pgonzales@vintti.com", "agostina@vintti.com")
 
 # Quien puede decidir además de los sales leads con rol. Corta a propósito.
-REVIEW_OVERRIDE_EMAILS = set(OVERSIGHT_EMAILS)
+# pilar (AM, sin rol sales_lead) entra acá y NO en OVERSIGHT_EMAILS: revisa y decide,
+# pero los mails le llegan sólo de las vacantes donde es opp_sales_lead (2026-10-06).
+REVIEW_OVERRIDE_EMAILS = set(OVERSIGHT_EMAILS) | {"pilar@vintti.com"}
 
 # Quién decide una habilitación de client process. Es una lista APARTE de OVERSIGHT_EMAILS
 # a propósito: Lara decide habilitaciones, pero no es supervisión del CV review. Sumarla a

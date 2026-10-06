@@ -24,6 +24,7 @@
     'lara@vintti.com',
     'mariano@vintti.com',
     'mia@vintti.com',
+    'pilar@vintti.com',
   ]);
 
   const me = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')

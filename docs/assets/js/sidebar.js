@@ -144,7 +144,7 @@
     const cvReviewOk = new Set([
       'pgonzales@vintti.com','agostina@vintti.com',
       'agustin@vintti.com','bahia@vintti.com','lara@vintti.com',
-      'mariano@vintti.com','mia@vintti.com'
+      'mariano@vintti.com','mia@vintti.com','pilar@vintti.com'
     ]).has(email);
     setDisplay('cvReviewLink', cvReviewOk);
     if (cvReviewOk) paintCvReviewBadge(email);
