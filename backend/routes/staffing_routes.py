@@ -45,6 +45,7 @@ STAFFING_ALLOWED = {
     "jazmin@vintti.com",
     "agustin@vintti.com",
     "lara@vintti.com",
+    "pilar@vintti.com",  # AM, agregada 2026-10-07 (pedido de la owner)
 }
 
 

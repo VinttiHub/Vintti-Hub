@@ -120,7 +120,7 @@
 
     setDisplay('salesLink', new Set([
       'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com', 'camila@vintti.com',
-      'justo@vintti.com','ana@vintti.com'
+      'justo@vintti.com','ana@vintti.com','pilar@vintti.com'
     ]).has(email));
 
     const dashOk = new Set([
@@ -154,14 +154,16 @@
     if (cvReviewOk) paintCvReviewBadge(email, JDR_BADGE);
 
     setDisplay('equipmentsLink', new Set([
-      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com',
+      'pilar@vintti.com'
     ]).has(email));
 
     // Staffing (reemplazo del Sheet "Candidate Success VINTTI"). Esto es sólo
     // cosmético: el gate real es STAFFING_ALLOWED en backend/routes/staffing_routes.py,
     // y las dos listas se mantienen en sincronía a mano.
     setDisplay('staffingLink', new Set([
-      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com',
+      'pilar@vintti.com'
     ]).has(email));
 
     // Comisiones AE. Cosmetico: el gate real es AE_COMMISSIONS_ALLOWED en
@@ -177,7 +179,7 @@
     const allowedEmails = new Set([
       'agustin@vintti.com','bahia@vintti.com','manuela@vintti.com','pgonzales@vintti.com','lara@vintti.com',
       'agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com', 'camila@vintti.com',
-      'justo@vintti.com','ana@vintti.com'
+      'justo@vintti.com','ana@vintti.com','pilar@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
   }

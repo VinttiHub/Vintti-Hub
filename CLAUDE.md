@@ -1100,7 +1100,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 
 ## Staffing: columnas y opciones desde la vista
 
-En `docs/staffing.html` (las 3 pestañas) las 4 personas de `STAFFING_ALLOWED` crean
+En `docs/staffing.html` (las 3 pestañas) las 5 personas de `STAFFING_ALLOWED` crean
 columnas (lista, texto, número, fecha, Sí/No) y editan las opciones de cualquier
 desplegable sin tocar código; los valores se cargan en la celda, tipo Excel. Desde el
 2026-10-05 los catálogos ya **no** están en `staffing.js` (quedan sólo como fallback si
