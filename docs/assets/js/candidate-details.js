@@ -4683,7 +4683,18 @@ function wireVideoLinkDedupe() {
   const metaEl = document.getElementById('cv-checklist-meta');
   let loaded = false;
 
-  const labelOf = (input) => input.closest('label')?.querySelector('span')?.textContent.trim() || input.dataset.key;
+  // El checklist es sticky debajo del .header-row, que también es sticky y cambia de
+  // alto según el ancho: se mide en vivo para que nunca lo tape.
+  const header = document.querySelector('.header-row');
+  if (header) {
+    const setHeaderH = () => document.documentElement.style
+      .setProperty('--cd-header-h', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    setHeaderH();
+    if (window.ResizeObserver) new ResizeObserver(setHeaderH).observe(header);
+    else window.addEventListener('resize', setHeaderH);
+  }
+
+  const labelOf =(input) => input.closest('label')?.querySelector('span')?.textContent.trim() || input.dataset.key;
 
   function paint(meta){
     const done = inputs.filter(i => i.checked).length;

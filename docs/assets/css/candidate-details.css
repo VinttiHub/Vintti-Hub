@@ -7521,7 +7521,13 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 
 .cv-checklist {
   position: sticky;
-  top: 16px;
+  /* Debajo del .header-row (Go Back + tabs), que también es sticky. Su alto cambia con
+     el ancho de la ventana, así que lo mide wireCvChecklist() y lo deja en
+     --cd-header-h; el 130px es sólo el fallback si el JS no corrió. */
+  top: calc(var(--cd-header-h, 130px) + 16px);
+  /* Que entre siempre entera, aunque la ventana sea baja. */
+  max-height: calc(100vh - var(--cd-header-h, 130px) - 32px);
+  overflow-y: auto;
   background: #ffffff;
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(15,23,42,0.06);
