@@ -3652,4 +3652,114 @@ def candidate_linkedin_paste(candidate_id):
         conn.close()
 
 
+# ── Checklist del CV (pestaña Resume de candidate-details) ───────────────────────
+# Lo que todo CV tiene que llevar antes de mandarlo. Lo marca la recruiter a mano; el
+# envío a Sales Review (de a uno y por batch) avisa si falta algo pero no frena.
+# Tabla aparte y no columnas en candidates: CREATE TABLE no pide lock sobre candidates.
+# Si sumás una clave, sumala también en candidate-details.html y opportunity-detail.js.
+CV_CHECKLIST_KEYS = ("job_hopping", "linkedin_match", "tools_in_experience", "recorder_link", "dates_ok")
+_CV_CHECKLIST_READY = False
+
+
+def ensure_cv_checklist_table(cursor):
+    global _CV_CHECKLIST_READY
+    if _CV_CHECKLIST_READY:
+        return
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS candidate_cv_checklist (
+            candidate_id INTEGER PRIMARY KEY,
+            items        JSONB NOT NULL DEFAULT '{}'::jsonb,
+            updated_by   TEXT,
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    _CV_CHECKLIST_READY = True
+
+
+def _cv_checklist_items(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    return {k: raw.get(k) is True for k in CV_CHECKLIST_KEYS}
+
+
+@bp.route('/candidates/cv_checklist', methods=['GET'])
+def candidates_cv_checklist_bulk():
+    """?ids=1,2,3 → {"keys": [...], "candidates": {"1": {"items": {...}}, ...}}. Lo usa el
+    envío por batch; un candidato sin fila vuelve con todo en false."""
+    ids = []
+    for raw in (request.args.get('ids') or '').split(','):
+        raw = raw.strip()
+        if raw.isdigit():
+            ids.append(int(raw))
+    ids = ids[:100]
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        ensure_cv_checklist_table(cursor)
+        found = {}
+        if ids:
+            cursor.execute(
+                "SELECT candidate_id, items FROM candidate_cv_checklist WHERE candidate_id = ANY(%s)",
+                (ids,),
+            )
+            found = {r['candidate_id']: r['items'] for r in cursor.fetchall()}
+        conn.commit()
+        out = {str(i): {'items': _cv_checklist_items(found.get(i))} for i in ids}
+        return jsonify({'keys': list(CV_CHECKLIST_KEYS), 'candidates': out})
+    except Exception as exc:
+        conn.rollback()
+        logging.exception("cv_checklist bulk failed")
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@bp.route('/candidates/<int:candidate_id>/cv_checklist', methods=['GET', 'PATCH', 'OPTIONS'])
+def candidate_cv_checklist(candidate_id):
+    if request.method == 'OPTIONS':
+        return ('', 204)
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        ensure_cv_checklist_table(cursor)
+        if request.method == 'PATCH':
+            data = request.get_json(silent=True) or {}
+            updated_by = str(data.pop('updated_by', '') or '').strip() or None
+            changes = {}
+            for key, val in data.items():
+                if key not in CV_CHECKLIST_KEYS:
+                    return jsonify({'error': f'Unknown checklist item: {key}'}), 400
+                changes[key] = to_bool(val)
+            if not changes:
+                return jsonify({'error': 'No checklist items provided'}), 400
+            cursor.execute("""
+                INSERT INTO candidate_cv_checklist (candidate_id, items, updated_by, updated_at)
+                VALUES (%s, %s::jsonb, %s, NOW())
+                ON CONFLICT (candidate_id) DO UPDATE
+                   SET items = candidate_cv_checklist.items || EXCLUDED.items,
+                       updated_by = EXCLUDED.updated_by,
+                       updated_at = NOW()
+            """, (candidate_id, json.dumps(changes), updated_by))
+        cursor.execute(
+            "SELECT items, updated_by, updated_at FROM candidate_cv_checklist WHERE candidate_id = %s",
+            (candidate_id,),
+        )
+        row = cursor.fetchone() or {}
+        conn.commit()
+        updated_at = row.get('updated_at')
+        return jsonify({
+            'keys': list(CV_CHECKLIST_KEYS),
+            'items': _cv_checklist_items(row.get('items')),
+            'updated_by': row.get('updated_by'),
+            'updated_at': updated_at.isoformat() if updated_at else None,
+        })
+    except Exception as exc:
+        conn.rollback()
+        logging.exception("cv_checklist failed for candidate %s", candidate_id)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 __all__ = ['bp']

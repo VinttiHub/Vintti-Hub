@@ -2447,6 +2447,12 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
     if (!ok) return;
   }
 
+  // CV checklist de cada candidato (pestaña Resume): avisa lo que falta, no frena.
+  btn.disabled = true;
+  const checklistOk = await approvalCvChecklistOk(ctx.candidates || []).catch(() => true);
+  btn.disabled = false;
+  if (!checklistOk) return;
+
   // Antes el botón no se deshabilitaba y sólo usaba alert(): doble click = doble envío.
   btn.disabled = true;
   const label = btn.textContent;
@@ -4615,6 +4621,35 @@ async function loadApprovalLinkedin(candidates) {
 }
 
 // true = se puede mandar. Guarda lo pegado; si quedan viejos sin pegar, avisa una vez.
+// Etiquetas del CV checklist de candidate-details (mismas claves que CV_CHECKLIST_KEYS
+// de candidates_routes.py). Si alguno no lo tiene completo, confirm() con lo que falta.
+// Si el GET falla no frena: es un recordatorio, no un gate.
+const CV_CHECKLIST_LABELS = {
+  job_hopping: 'Job hopping',
+  linkedin_match: 'CV matches LinkedIn',
+  tools_in_experience: 'Tools in experiences',
+  recorder_link: 'Recorder link',
+  dates_ok: 'Dates',
+};
+
+async function approvalCvChecklistOk(candidates) {
+  if (!candidates.length) return true;
+  const ids = candidates.map(c => c.id).join(',');
+  const r = await fetch(`${API_BASE}/candidates/cv_checklist?ids=${encodeURIComponent(ids)}`);
+  if (!r.ok) return true;
+  const data = await r.json();
+  const lines = [];
+  for (const c of candidates) {
+    const items = data.candidates?.[String(c.id)]?.items || {};
+    const missing = Object.keys(CV_CHECKLIST_LABELS).filter(k => items[k] !== true);
+    if (missing.length) {
+      lines.push(`• ${c.name || `Candidate #${c.id}`}: ${missing.map(k => CV_CHECKLIST_LABELS[k]).join(', ')}`);
+    }
+  }
+  if (!lines.length) return true;
+  return confirm(`Some CVs don't have the checklist complete:\n\n${lines.join('\n')}\n\nSend anyway?`);
+}
+
 async function approvalLinkedinGate() {
   const block = document.getElementById('approval-li-block');
   const msg = document.getElementById('approval-li-msg');
@@ -4853,6 +4888,8 @@ await loadApprovalReviewers();
     opportunityId,
     batchNumber: batchInfo.batch_number,
     candidateCount: batchCandidates.length,
+    // Para el aviso del CV checklist al mandar (approvalCvChecklistOk).
+    candidates: batchCandidates.map(c => ({ id: c.candidate_id, name: c.name })),
     salesLead,
     // La cuenta de la opp es la que decide la marca de los CVs y la firma del mail.
     // Viene de GET /opportunities/<id>; el backend lo devuelve como booleano, pero se

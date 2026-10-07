@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261001-li-reapply" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261007-cv-checklist2" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -737,6 +737,40 @@
       </div>
     </div>
     <div id="resume" class="tab-content" role="tabpanel" aria-labelledby="resume">
+      <!-- CV checklist: lo que todo CV tiene que llevar. Se guarda por candidato
+           (GET/PATCH /candidates/<id>/cv_checklist) y lo maneja wireCvChecklist() en
+           candidate-details.js. Send to Sales Review (acá y por batch en
+           opportunity-detail) avisa si falta algo, pero no frena. Las claves data-key
+           tienen que coincidir con CV_CHECKLIST_KEYS de candidates_routes.py. -->
+      <div class="resume-layout">
+      <aside id="cv-checklist" class="cv-checklist" aria-labelledby="cv-checklist-title">
+        <div class="cv-checklist-head">
+          <h3 id="cv-checklist-title">CV checklist</h3>
+          <span id="cv-checklist-count" class="cv-checklist-count">0/5</span>
+        </div>
+        <p class="cv-checklist-sub">Every CV needs all of these before it goes out.</p>
+        <label class="cv-checklist-item">
+          <input type="checkbox" data-key="job_hopping" />
+          <span>Job hopping checked</span>
+        </label>
+        <label class="cv-checklist-item">
+          <input type="checkbox" data-key="linkedin_match" />
+          <span>CV matches LinkedIn (all work experiences)</span>
+        </label>
+        <label class="cv-checklist-item">
+          <input type="checkbox" data-key="tools_in_experience" />
+          <span>Tools in each experience</span>
+        </label>
+        <label class="cv-checklist-item">
+          <input type="checkbox" data-key="recorder_link" />
+          <span>Recorder link added</span>
+        </label>
+        <label class="cv-checklist-item">
+          <input type="checkbox" data-key="dates_ok" />
+          <span>Dates are correct</span>
+        </label>
+        <p id="cv-checklist-meta" class="cv-checklist-meta"></p>
+      </aside>
       <div class="cv-container">
         <!-- About -->
         <section class="cv-section">
@@ -841,6 +875,7 @@
             <div id="videoLinkInput" class="rich-input" contenteditable="true" placeholder="Paste video link or notes..."></div>
           </div>
         </section>
+      </div>
       </div>
     </div>
 
@@ -1402,7 +1437,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260928-cvonly"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20261001-li-reapply"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20261007-cv-checklist2"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

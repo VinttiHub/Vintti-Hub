@@ -4670,6 +4670,73 @@ function wireVideoLinkDedupe() {
   });
 })();
 
+// === CV checklist (pestaña Resume): lo que todo CV tiene que llevar ===========
+// Se guarda por candidato en GET/PATCH /candidates/<id>/cv_checklist. wireCvReview()
+// lee window.cvChecklistMissing() para avisar antes de mandar a Sales Review.
+(function wireCvChecklist(){
+  const box = document.getElementById('cv-checklist');
+  if (!box) return;
+  const API = candidatesApiBase();
+  const cid = new URLSearchParams(window.location.search).get('id');
+  const inputs = [...box.querySelectorAll('input[data-key]')];
+  const countEl = document.getElementById('cv-checklist-count');
+  const metaEl = document.getElementById('cv-checklist-meta');
+  let loaded = false;
+
+  const labelOf = (input) => input.closest('label')?.querySelector('span')?.textContent.trim() || input.dataset.key;
+
+  function paint(meta){
+    const done = inputs.filter(i => i.checked).length;
+    if (countEl) countEl.textContent = `${done}/${inputs.length}`;
+    box.classList.toggle('is-complete', done === inputs.length);
+    if (metaEl && meta) {
+      const who = (meta.updated_by || '').split('@')[0];
+      const when = meta.updated_at ? new Date(meta.updated_at).toLocaleDateString() : '';
+      metaEl.textContent = who || when ? `Last checked by ${who || '—'}${when ? ' · ' + when : ''}` : '';
+    }
+  }
+
+  // Si el GET falló no sabemos qué está marcado: no avisar de más.
+  window.cvChecklistMissing = () => loaded ? inputs.filter(i => !i.checked).map(labelOf) : [];
+
+  if (!cid) return;
+
+  fetch(`${API}/candidates/${cid}/cv_checklist`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+    .then(data => {
+      inputs.forEach(i => { i.checked = data.items?.[i.dataset.key] === true; });
+      loaded = true;
+      paint(data);
+    })
+    .catch(e => console.warn('Could not load the CV checklist', e));
+
+  inputs.forEach(input => {
+    input.addEventListener('change', async () => {
+      const val = input.checked;
+      paint();
+      try {
+        const me = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').trim();
+        const r = await fetch(`${API}/candidates/${cid}/cv_checklist`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [input.dataset.key]: val, updated_by: me }),
+        });
+        if (!r.ok) throw new Error(await r.text().catch(() => 'PATCH failed'));
+        const data = await r.json();
+        // La respuesta trae el estado entero: sirve también si el GET inicial falló.
+        inputs.forEach(i => { i.checked = data.items?.[i.dataset.key] === true; });
+        loaded = true;
+        paint(data);
+      } catch (e) {
+        console.error('❌ Saving the CV checklist failed', e);
+        input.checked = !val; // revertir si falló
+        paint();
+        alert('We could not save this change. Please try again.');
+      }
+    });
+  });
+})();
+
 (function wireBlacklistToggle(){
   const checkbox = document.getElementById('blacklist-toggle');
   const card = document.getElementById('blacklist-card');
@@ -6254,6 +6321,11 @@ function _replaceDateText(node){
       liText?.focus();
       return;
     }
+    // CV checklist de la pestaña Resume: avisa lo que falta, pero no frena.
+    const missing = window.cvChecklistMissing ? window.cvChecklistMissing() : [];
+    if (missing.length && !confirm(
+      `The CV checklist isn't complete. Missing:\n\n• ${missing.join('\n• ')}\n\nSend anyway?`
+    )) return;
     sendBtn.disabled = true;
     const label = sendBtn.textContent;
     sendBtn.textContent = 'Sending…';
