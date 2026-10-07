@@ -93,6 +93,10 @@
     if (isNaN(d)) return esc(iso);
     return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   }
+  function nowHHMM() {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
   function todayIso() {
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -162,7 +166,7 @@
   var loadSeq = 0;
   function load() {
     var seq = ++loadSeq;
-    $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + activeColumns().length + '">Loading…</td></tr>';
+    $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">Loading…</td></tr>';
     return api("/prospecting/companies?" + qs(currentFilters())).then(function (data) {
       if (seq !== loadSeq) return;
       state.total = data.total;
@@ -174,7 +178,7 @@
       $("prBody").closest(".pr-table-wrap").scrollTop = 0;
     }).catch(function (err) {
       if (seq !== loadSeq) return;
-      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + activeColumns().length + '">' + esc(err.message) + "</td></tr>";
+      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">' + esc(err.message) + "</td></tr>";
     });
   }
 
@@ -245,8 +249,15 @@
     return COLUMNS.filter(function (c) { return c.fixed || visibleCols.indexOf(c.key) !== -1; });
   }
 
+  /* Selección para «Inscribir en workflow» (sólo quien edita workflows). */
+  var selected = {};
+  function canEnroll() { return !!ME.can_edit_workflows; }
+  function colspan() { return activeColumns().length + (canEnroll() ? 1 : 0); }
+
   function renderHead() {
-    $("prHead").innerHTML = activeColumns().map(function (c) {
+    $("prHead").innerHTML = (canEnroll()
+      ? '<th class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" id="prSelAll" title="Seleccionar la página"></label></th>' : "") +
+      activeColumns().map(function (c) {
       var cls = [c.num ? "pr-num" : "", c.sort && c.sort === state.sort ? "is-sorted" : ""].filter(Boolean).join(" ");
       return "<th" + (c.sort ? ' data-sort="' + c.sort + '"' : "") + (cls ? ' class="' + cls + '"' : "") + ">" + esc(c.label) + "</th>";
     }).join("");
@@ -275,14 +286,48 @@
   function renderRows(rows) {
     var cols = activeColumns();
     if (!rows.length) {
-      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + cols.length + '">No companies match these filters.</td></tr>';
+      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">No companies match these filters.</td></tr>';
+      renderBulk();
       return;
     }
     $("prBody").innerHTML = rows.map(function (r) {
-      return '<tr data-id="' + r.id + '">' + cols.map(function (c) {
+      return '<tr data-id="' + r.id + '"' + (selected[r.id] ? ' class="is-selected"' : "") + ">" +
+        (canEnroll() ? '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-sel="' + r.id + '"' + (selected[r.id] ? " checked" : "") + "></label></td>" : "") +
+        cols.map(function (c) {
         return "<td" + (c.num ? ' class="pr-num"' : "") + ">" + c.render(r) + "</td>";
       }).join("") + "</tr>";
     }).join("");
+    renderBulk();
+  }
+
+  /* Barra de «N seleccionadas → Inscribir en workflow». */
+  var wfChoices = null;
+  function renderBulk() {
+    var bar = $("prBulk");
+    var ids = Object.keys(selected);
+    if (!canEnroll() || !ids.length) { bar.hidden = true; return; }
+    var opts = (wfChoices || []).map(function (w) {
+      return '<option value="' + w.id + '">' + esc(w.name) + (w.enabled ? "" : " (inactivo)") + "</option>";
+    }).join("");
+    bar.hidden = false;
+    bar.innerHTML = "<strong>" + ids.length + "</strong> seleccionada" + (ids.length === 1 ? "" : "s") +
+      '<select class="pr-filter__input" id="prBulkWf">' + (wfChoices ? '<option value="">Elegir workflow…</option>' + opts : "<option>Cargando…</option>") + "</select>" +
+      '<button type="button" class="pr-btn pr-btn--primary" id="prBulkGo"><i class="fa-solid fa-diagram-project"></i> Inscribir en workflow</button>' +
+      '<button type="button" class="pr-btn" id="prBulkClear">Deseleccionar</button>';
+    if (!wfChoices && window.ProspectingWorkflows) {
+      window.ProspectingWorkflows.workflows().then(function (r) { wfChoices = r.workflows; renderBulk(); });
+    }
+  }
+  function bulkEnroll() {
+    var wfId = $("prBulkWf").value;
+    if (!wfId) { alert("Elegí un workflow."); return; }
+    var ids = Object.keys(selected).map(Number);
+    window.ProspectingWorkflows.enrollCompanies(wfId, ids).then(function (r) {
+      toast('<i class="fa-solid fa-diagram-project"></i> Se inscribieron <strong>' + r.enrolled + "</strong> de " + ids.length +
+        (r.enrolled < ids.length ? " (las demás ya estaban adentro o el workflow no reinscribe)" : "") + ".");
+      selected = {};
+      load();
+    }).catch(function (err) { alert(err.errors ? err.errors.join("\n") : err.message); });
   }
 
   // Si la fila tiene un valor que ya no está en la lista (dato viejo), igual se muestra.
@@ -318,7 +363,7 @@
     var applied = (row && row.workflows_applied) || [];
     if (!applied.length) return;
     var names = applied.map(function (a) { return "<strong>" + esc(a.name) + "</strong>"; });
-    toast('<i class="fa-solid fa-diagram-project"></i> Workflow ' + names.join(", ") + " updated this company.");
+    toast('<i class="fa-solid fa-diagram-project"></i> El workflow ' + names.join(", ") + " actualizó esta empresa.");
     load();
   }
 
@@ -379,12 +424,26 @@
       var who = isWf ? "Workflow " + ev.source.slice(9)
         : ev.source === "clay" ? "Clay"
         : (ownerName(ev.actor) || ev.actor || ev.source);
-      var what = ev.field
+      var what = ev.field === "__note__" ? '<span class="pr-events__note">Nota: ' + esc(ev.new_value || "") + "</span>"
+        : ev.field
         ? esc(FIELD_LABELS[ev.field] || ev.field) + ": " + esc(ev.old_value || "—") + " → " + esc(ev.new_value || "—")
         : esc(ev.new_value === "created" ? "created the company" : (ev.new_value || ""));
       return '<li><span class="pr-events__when">' + fmtDateTime(ev.at) + "</span>" +
         '<span class="pr-events__src' + (isWf ? " pr-events__src--wf" : "") + '">' + esc(who) + "</span> · " + what + "</li>";
     }).join("") + "</ul>";
+  }
+
+  var ENR_LABEL = { active: "En curso", waiting: "Esperando", completed: "Terminó", unenrolled: "Desinscripta",
+                    goal_met: "Cumplió la meta", failed: "Con error" };
+  function enrollmentsHtml(list) {
+    if (!list || !list.length) return "";
+    return '<section class="pr-section"><h3 class="pr-section__title">Workflows</h3><ul class="pr-events">' + list.map(function (e) {
+      return '<li><span class="pr-events__when">' + fmtDateTime(e.enrolled_at) +
+        (e.status === "waiting" && e.wake_at ? " · sigue " + fmtDateTime(e.wake_at) : "") + "</span>" +
+        '<span class="pr-events__src pr-events__src--wf">' + esc(e.workflow_name) + "</span> · " +
+        '<span class="pr-wf-stat pr-wf-stat--' + esc(e.status) + '">' + esc(ENR_LABEL[e.status] || e.status) + "</span>" +
+        (e.last_step ? '<div class="pr-note">' + esc(e.last_step) + "</div>" : "") + "</li>";
+    }).join("") + "</ul></section>";
   }
 
   function showCompany(id) {
@@ -434,6 +493,7 @@
           kv("Hub ID", c.id) +
           kv("Clay record", c.clay_record_id) +
         "</dl></section>" +
+        enrollmentsHtml(c.enrollments) +
         '<section class="pr-section"><h3 class="pr-section__title">History</h3>' + eventsHtml(c.events) + "</section>";
 
       drawerSave = function () {
@@ -462,7 +522,7 @@
   function showTestPanel() {
     drawerSave = null;
     $("prDrawerEyebrow").textContent = "Test panel";
-    $("prDrawerTitle").textContent = "Dummy data & workflows";
+    $("prDrawerTitle").textContent = "Dummies y reloj de prueba";
     $("prDrawerSub").textContent = "Only you see this. Dummy companies are hidden from the BDRs.";
     $("prDrawerFoot").hidden = true;
     $("prDrawerBody").innerHTML =
@@ -475,16 +535,17 @@
           '<button type="button" class="pr-btn pr-btn--primary" id="prSeed"><i class="fa-solid fa-seedling"></i> Create</button>' +
           '<button type="button" class="pr-btn pr-btn--danger" id="prWipe"><i class="fa-solid fa-trash"></i> Delete all dummies</button>' +
         "</div><div id=\"prSeedOut\"></div></section>" +
-      '<section class="pr-section"><h3 class="pr-section__title">2 · Run workflows</h3>' +
-        '<p class="pr-note">Pick the date to simulate "today". Preview only lists what would change; Apply writes it and leaves it in each company\'s history.</p>' +
+      '<section class="pr-section"><h3 class="pr-section__title">2 · Avanzar el reloj</h3>' +
+        '<p class="pr-note">Corre los workflows ACTIVOS como si fuera la fecha y hora que elijas: inscribe, cierra por meta o desinscripción ' +
+        'y despierta las esperas que ya vencieron. Sólo toca empresas dummy. Sirve para probar «esperar 3 días» sin esperar 3 días.</p>' +
         '<div class="pr-row">' +
-          '<label class="pr-filter" style="min-width:160px"><span class="pr-filter__label">As of</span>' +
-            '<input type="date" class="pr-filter__input" id="prAsOf" value="' + todayIso() + '"></label>' +
-          '<label class="pr-check"><input type="checkbox" id="prOnlyDummy" checked> Only dummies</label>' +
+          '<label class="pr-filter" style="min-width:220px"><span class="pr-filter__label">Fecha y hora (Argentina)</span>' +
+            '<input type="datetime-local" class="pr-filter__input" id="prClock" value="' + todayIso() + 'T' + nowHHMM() + '"></label>' +
+          '<button type="button" class="pr-btn" data-clock="1"><i class="fa-solid fa-forward"></i> +1 día</button>' +
+          '<button type="button" class="pr-btn" data-clock="7"><i class="fa-solid fa-forward-fast"></i> +7 días</button>' +
         "</div>" +
         '<div class="pr-row" style="margin-top:10px">' +
-          '<button type="button" class="pr-btn" id="prWfPreview"><i class="fa-solid fa-eye"></i> Preview</button>' +
-          '<button type="button" class="pr-btn pr-btn--primary" id="prWfApply"><i class="fa-solid fa-play"></i> Apply</button>' +
+          '<button type="button" class="pr-btn pr-btn--primary" id="prTick"><i class="fa-solid fa-play"></i> Correr workflows a esa hora</button>' +
         "</div><div id=\"prWfOut\"></div></section>";
     openDrawer();
 
@@ -504,30 +565,25 @@
         refreshOptions().then(load);
       }).catch(function (err) { $("prSeedOut").innerHTML = '<div class="pr-result">Error: ' + esc(err.message) + "</div>"; });
     };
-    var run = function (dry) {
-      var onlyDummy = $("prOnlyDummy").checked;
-      if (!dry && !onlyDummy && !confirm("Apply the workflows to REAL companies too?")) return;
-      $("prWfOut").innerHTML = '<p class="pr-note">' + (dry ? "Previewing…" : "Applying…") + "</p>";
-      api("/prospecting/workflows/run", {
-        method: "POST",
-        body: JSON.stringify({ dry_run: dry, as_of: $("prAsOf").value, only_dummy: onlyDummy }),
-      }).then(function (r) {
-        $("prWfOut").innerHTML = r.workflows.map(function (w) {
-          var items = w.items.slice(0, 200).map(function (it) {
-            var ch = Object.keys(it.changes).map(function (k) {
-              return esc(FIELD_LABELS[k] || k) + ": " + esc(it.changes[k].from || "—") + " → " + esc(it.changes[k].to || "—");
-            }).join("; ");
-            return "<li><strong>" + esc(it.name) + "</strong><br>" + ch + "</li>";
-          }).join("");
-          return '<div class="pr-result"><h4>' + esc(w.name) + " — " + w.affected + " compan" + (w.affected === 1 ? "y" : "ies") +
-            (r.dry_run ? " would change" : " changed") + " (as of " + fmtDate(r.as_of) + ")</h4>" +
-            (items ? "<ul>" + items + "</ul>" : '<p class="pr-note" style="margin:0">Nothing to do.</p>') + "</div>";
-        }).join("");
-        if (!r.dry_run) load();
+    Array.prototype.forEach.call($("prDrawerBody").querySelectorAll("[data-clock]"), function (b) {
+      b.onclick = function () {
+        var el = $("prClock"), d = new Date(el.value || Date.now());
+        d.setDate(d.getDate() + Number(b.getAttribute("data-clock")));
+        el.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") +
+          "T" + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+      };
+    });
+    $("prTick").onclick = function () {
+      $("prWfOut").innerHTML = '<p class="pr-note">Corriendo…</p>';
+      api("/prospecting/workflows/tick", { method: "POST", body: JSON.stringify({ now: $("prClock").value }) }).then(function (r) {
+        $("prWfOut").innerHTML = '<div class="pr-result"><h4>Listo (' + esc(fmtDateTime(r.now)) + ")</h4><ul>" +
+          "<li>Inscriptas: <strong>" + r.enrolled + "</strong></li>" +
+          "<li>Cerradas por meta o desinscripción: <strong>" + r.closed + "</strong></li>" +
+          "<li>Avanzaron: <strong>" + r.advanced + "</strong> (terminaron " + r.completed + ", con error " + r.failed + ")</li>" +
+          '</ul><p class="pr-note" style="margin:6px 0 0">El detalle de cada empresa está en Workflows → el workflow → Historial.</p></div>';
+        load();
       }).catch(function (err) { $("prWfOut").innerHTML = '<div class="pr-result">Error: ' + esc(err.message) + "</div>"; });
     };
-    $("prWfPreview").onclick = function () { run(true); };
-    $("prWfApply").onclick = function () { run(false); };
   }
 
   function setDummyFilter(v) {
@@ -619,7 +675,27 @@
         return mode.getAttribute("data-cols") === "all" || c.def;
       }).map(function (c) { return c.key; }));
     });
-    $("prBody").addEventListener("change", onCellChange);
+    $("prBody").addEventListener("change", function (e) {
+      var sel = e.target.getAttribute && e.target.getAttribute("data-sel");
+      if (sel) {
+        if (e.target.checked) selected[sel] = true; else delete selected[sel];
+        e.target.closest("tr").classList.toggle("is-selected", e.target.checked);
+        renderBulk();
+        return;
+      }
+      onCellChange(e);
+    });
+    $("prHead").addEventListener("change", function (e) {
+      if (e.target.id !== "prSelAll") return;
+      lastRows.forEach(function (r) { if (e.target.checked) selected[r.id] = true; else delete selected[r.id]; });
+      renderRows(lastRows);
+    });
+    $("prBulk").addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (!b) return;
+      if (b.id === "prBulkGo") bulkEnroll();
+      if (b.id === "prBulkClear") { selected = {}; renderRows(lastRows); }
+    });
     $("prBody").addEventListener("click", function (e) {
       var btn = e.target.closest("[data-open]");
       if (btn) showCompany(Number(btn.getAttribute("data-open")));

@@ -1051,19 +1051,28 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
   **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
   semana): esos sólo se rellenan si están vacíos.
-- **Workflows: se arman desde la página** (pestaña *Workflows*, editor tipo HubSpot), no en
-  código. Son filas de `prospect_workflows` (JSON: grupos de condiciones unidos por O, reglas por
-  Y, y acciones Set / Clear / Set to today). `rules.py` valida y traduce a SQL **sólo con la lista
-  blanca** `FIELDS` / `OPERATORS` de `constants.py`; los valores van siempre como parámetro.
-  Editan **pgonzales, manuela y mia** (`WORKFLOW_EDITORS`, también tienen acceso a la página y
-  ven las dummies); los BDRs, sólo lectura. El Recycle de HubSpot se siembra como primera fila
-  (sólo si la tabla nunca tuvo filas, mirando la secuencia).
-- **Cuándo corren**: los activos, **al instante** sobre la empresa que se edita o llega de Clay
-  (`run_for_company()`, tope de 3 pasadas contra loops entre workflows) **+ el cron diario**
-  (`.github/workflows/prospecting-workflows.yml`, con el schedule comentado). Freno de la fase
-  de prueba: con `AUTOMATION_REAL_DATA = False` lo automático **sólo toca dummies**; sobre datos
-  reales corren únicamente con *Apply now*. Reinscripción apagada = una sola vez por empresa
-  (`prospect_workflow_enrollments`). Una empresa sólo cuenta si la acción le cambia algo.
+- **Workflows al nivel de HubSpot, armados desde la página** (pestaña *Workflows*). Son filas
+  de `prospect_workflows` con un **disparador** (condiciones / evento "se crea" o "cambia una
+  propiedad" / horario / manual), un **grafo de pasos** (acciones, esperas, ramas si-no / Y-O /
+  % al azar, "ir a" = un `next` que apunta a un paso existente), **desinscripción**, **meta** y
+  **días hábiles / franja horaria** (hora AR). `rules.py` valida y traduce las condiciones a SQL
+  **sólo con la lista blanca** `FIELDS` / `OPERATORS` de `constants.py`, y además las evalúa en
+  Python para ramas y pruebas: **las dos tienen que dar lo mismo** (hay test de paridad; si tocás
+  un operador, tocá los dos). Editan **pgonzales, manuela y mia** (`WORKFLOW_EDITORS`).
+- **Motor con estado** (`engine.py`): cada empresa inscripta es una fila de
+  `prospect_wf_enrollments` con su paso actual y `wake_at`; el log de cada paso va a
+  `prospect_wf_step_log` (pestaña Historial). El disparador por condiciones inscribe sólo en la
+  **transición no cumple → cumple** (`prospect_wf_match_state`), que es como reinscribe HubSpot.
+  `tick()` corre al instante (PATCH de una empresa y webhook de Clay, acotado a esa empresa), en
+  el cron horario `.github/workflows/prospecting-workflows.yml` (**schedule comentado**) y en
+  "Avanzar el reloj" del Test panel (hora simulada, sólo dummies). Tope de 50 pasos por corrida
+  contra loops de "ir a".
+- **Dos frenos de la fase de prueba**: con `AUTOMATION_REAL_DATA = False`, todo lo automático
+  sólo toca dummies (sobre reales, únicamente "Inscribir" a mano). Y SIEMPRE, sobre una dummy,
+  mail / To-Do van a `TEST_EMAIL` y Slack a `TEST_SLACK_CHANNEL` con `[TEST]`, y el webhook se
+  registra sin mandarse: una dummy nunca le escribe a una persona real.
+- Los workflows de la primera versión (`conditions` + `actions`) los convierte
+  `workflows.normalize()` al leerlos. `prospect_workflow_enrollments` quedó sin uso.
 - **Pruebas**: botón *Test panel* (sólo admin) siembra empresas `is_dummy`, que los BDRs no
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.

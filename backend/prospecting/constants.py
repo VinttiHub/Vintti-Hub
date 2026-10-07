@@ -5,7 +5,9 @@ por `GET /prospecting/options`, así que no hay una segunda copia en el JS."""
 STATUS_IN_PROGRESS = "In Progress"
 STATUS_DQL = "DQL"
 STATUS_RECYCLED = "Recycled"
-STATUSES = [STATUS_IN_PROGRESS, STATUS_DQL, STATUS_RECYCLED]
+STATUS_QUALIFIED = "Qualified"
+STATUS_SQL = "SQL"
+STATUSES = [STATUS_IN_PROGRESS, STATUS_DQL, STATUS_RECYCLED, STATUS_QUALIFIED, STATUS_SQL]
 
 # Not ICP Reason. Las dos primeras salen de HubSpot; el resto se completa
 # cuando pasen la lista entera.
@@ -114,63 +116,147 @@ FIELDS = [
     {"key": "state", "label": "Estado", "type": "text"},
     {"key": "country", "label": "Pais", "type": "text"},
     {"key": "hubspot_company_id", "label": "Id de la empresa (HubSpot)", "type": "text"},
-    {"key": "created_at", "label": "Create date", "type": "date"},
+    {"key": "created_at", "label": "Fecha de creación", "type": "date"},
 ]
 FIELDS_BY_KEY = {f["key"]: f for f in FIELDS}
 
 # Operadores por tipo. `value`: qué pide el operador —
 #   None = nada, "list" = varios valores de la lista, "text", "number",
-#   "days" = cantidad de días, "date" = una fecha.
+#   "days" = cantidad de días, "date" = una fecha,
+#   "number_range" / "date_range" = [desde, hasta].
+# `history`: se responde con el historial (prospect_company_events), no con el
+# valor actual. Ojo: sólo hay historial de los campos que se editan en el Hub.
 OPERATORS = {
-    "is_any":           {"label": "is any of",            "value": "list"},
-    "is_none_of":       {"label": "is none of",           "value": "list"},
-    "contains":         {"label": "contains",             "value": "text"},
-    "not_contains":     {"label": "doesn't contain",      "value": "text"},
-    "equals":           {"label": "is equal to",          "value": "text"},
-    "eq":               {"label": "is equal to",          "value": "number"},
-    "gt":               {"label": "is greater than",      "value": "number"},
-    "lt":               {"label": "is less than",         "value": "number"},
-    "older_than_days":  {"label": "is more than",         "value": "days"},
-    "within_last_days": {"label": "is within the last",   "value": "days"},
-    "before":           {"label": "is before",            "value": "date"},
-    "after":            {"label": "is after",             "value": "date"},
-    "known":            {"label": "is known",             "value": None},
-    "unknown":          {"label": "is unknown",           "value": None},
+    "is_any":               {"label": "es cualquiera de",              "value": "list"},
+    "is_none_of":           {"label": "no es ninguno de",              "value": "list"},
+    "ever_was":             {"label": "alguna vez fue",                "value": "list", "history": True},
+    "never_was":            {"label": "nunca fue",                     "value": "list", "history": True},
+    "equals":               {"label": "es igual a",                    "value": "text"},
+    "contains":             {"label": "contiene",                      "value": "text"},
+    "not_contains":         {"label": "no contiene",                   "value": "text"},
+    "starts_with":          {"label": "empieza con",                   "value": "text"},
+    "ends_with":            {"label": "termina con",                   "value": "text"},
+    "eq":                   {"label": "es igual a",                    "value": "number"},
+    "gt":                   {"label": "es mayor que",                  "value": "number"},
+    "gte":                  {"label": "es mayor o igual que",          "value": "number"},
+    "lt":                   {"label": "es menor que",                  "value": "number"},
+    "lte":                  {"label": "es menor o igual que",          "value": "number"},
+    "between":              {"label": "está entre",                    "value": "number_range"},
+    "is_today":             {"label": "es hoy",                        "value": None},
+    "is_on":                {"label": "es el día",                     "value": "date"},
+    "before":               {"label": "es antes del",                  "value": "date"},
+    "after":                {"label": "es después del",                "value": "date"},
+    "between_dates":        {"label": "está entre las fechas",         "value": "date_range"},
+    "older_than_days":      {"label": "es de hace más de",             "value": "days"},
+    "within_last_days":     {"label": "es de los últimos",             "value": "days"},
+    "in_next_days":         {"label": "es en los próximos",            "value": "days"},
+    "changed_in_last_days": {"label": "cambió en los últimos",         "value": "days", "history": True},
+    "not_changed_in_days":  {"label": "no cambió en los últimos",      "value": "days", "history": True},
+    "known":                {"label": "tiene un valor",                "value": None},
+    "unknown":              {"label": "está vacío",                    "value": None},
 }
+_CHANGED = ["changed_in_last_days", "not_changed_in_days"]
 OPERATORS_BY_TYPE = {
-    "enum":     ["is_any", "is_none_of", "known", "unknown"],
-    "owner":    ["is_any", "is_none_of", "known", "unknown"],
-    "text":     ["equals", "contains", "not_contains", "known", "unknown"],
+    "enum":     ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
+    "owner":    ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
+    "text":     ["equals", "contains", "not_contains", "starts_with", "ends_with", "known", "unknown"] + _CHANGED,
     "longtext": ["contains", "not_contains", "known", "unknown"],
-    "url":      ["contains", "not_contains", "known", "unknown"],
-    "number":   ["eq", "gt", "lt", "known", "unknown"],
-    "date":     ["older_than_days", "within_last_days", "before", "after", "known", "unknown"],
+    "url":      ["contains", "not_contains", "starts_with", "ends_with", "known", "unknown"],
+    "number":   ["eq", "gt", "gte", "lt", "lte", "between", "known", "unknown"] + _CHANGED,
+    "date":     ["is_today", "is_on", "before", "after", "between_dates", "older_than_days",
+                 "within_last_days", "in_next_days", "known", "unknown"] + _CHANGED,
 }
 
-# Acciones ("Editar registro"). Sólo sobre campos editables desde la página.
+# --------------------------------------------------------------------------- #
+# Acciones. `group` las ordena en el menú del editor; `field` dice si piden una
+# propiedad editable (y de qué tipos). Los parámetros de cada una los valida
+# rules._check_action().
+# --------------------------------------------------------------------------- #
 ACTIONS = {
-    "set":       {"label": "Set",          "needs_value": True},
-    "clear":     {"label": "Clear",        "needs_value": False},
-    "set_today": {"label": "Set to today", "needs_value": False, "types": ["date"]},
+    # Editar registro
+    "set":            {"label": "Definir",                      "group": "Editar registro", "field": True},
+    "clear":          {"label": "Borrar",                       "group": "Editar registro", "field": True},
+    "set_today":      {"label": "Poner la fecha de hoy",        "group": "Editar registro", "field": True, "types": ["date"]},
+    "set_date_offset": {"label": "Poner hoy ± N días",          "group": "Editar registro", "field": True, "types": ["date"]},
+    "copy":           {"label": "Copiar el valor de otra propiedad", "group": "Editar registro", "field": True},
+    "increment":      {"label": "Sumar o restar",               "group": "Editar registro", "field": True, "types": ["number"]},
+    # Asignación
+    "rotate_owner":   {"label": "Repartir entre BDRs (por turnos)", "group": "Asignación"},
+    # Comunicación interna
+    "create_todo":    {"label": "Crear To-Do",                  "group": "Comunicación"},
+    "send_email":     {"label": "Mandar mail interno",          "group": "Comunicación"},
+    "send_slack":     {"label": "Avisar por Slack",             "group": "Comunicación"},
+    "add_note":       {"label": "Agregar nota",                 "group": "Comunicación"},
+    # Otros
+    "webhook":        {"label": "Mandar webhook",               "group": "Otros"},
+    "enroll_workflow":   {"label": "Inscribir en otro workflow", "group": "Otros"},
+    "unenroll_workflow": {"label": "Sacar de otro workflow",     "group": "Otros"},
 }
+
+# Disparadores (tarjeta de inscripción).
+TRIGGERS = {
+    "filter":   {"label": "Cuando la empresa cumple condiciones"},
+    "event":    {"label": "Cuando pasa algo"},
+    "schedule": {"label": "En un horario"},
+    "manual":   {"label": "Sólo inscripción manual"},
+}
+EVENTS = {
+    "created":          {"label": "Se crea la empresa (llega de Clay)"},
+    "property_changed": {"label": "Cambia una propiedad"},
+}
+SCHEDULES = {
+    "daily":  {"label": "Todos los días"},
+    "weekly": {"label": "Ciertos días de la semana"},
+    "date":   {"label": "Una fecha"},
+}
+DELAYS = {
+    "duration":       {"label": "Un tiempo"},
+    "until_date":     {"label": "Hasta una fecha"},
+    "until_property": {"label": "Hasta la fecha de una propiedad"},
+    "until_weekday":  {"label": "Hasta ciertos días de la semana"},
+    "until_time":     {"label": "Hasta una hora del día"},
+    "until_condition": {"label": "Hasta que se cumpla algo"},
+}
+BRANCHES = {
+    "value":      {"label": "Según el valor de una propiedad"},
+    "conditions": {"label": "Según condiciones (Y/O)"},
+    "random":     {"label": "Reparto al azar por %"},
+}
+WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+# Zona horaria de los horarios, días hábiles y esperas "hasta las 9".
+TIMEZONE = "America/Argentina/Buenos_Aires"
+
+# Tope de pasos por corrida de una inscripción: corta los loops de "ir a".
+MAX_STEPS_PER_RUN = 50
+
+# Destinos de prueba: un workflow que corre sobre una empresa DUMMY nunca le
+# escribe a una persona real. Mails y To-Dos van a la owner, Slack al canal de
+# prueba (el que usó stale_opps_slack antes de pasar a Sales & Opps), y los
+# webhooks se registran sin mandarse.
+TEST_EMAIL = "pgonzales@vintti.com"
+TEST_SLACK_CHANNEL = "C0C0UQ7SYBW"
+
+# Mails internos: sólo a direcciones de la empresa.
+INTERNAL_EMAIL_DOMAIN = "@vintti.com"
 
 # El workflow que vino de HubSpot. Se siembra como primera fila de
 # prospect_workflows la primera vez que se crea la tabla.
 DEFAULT_WORKFLOWS = [
     {
-        "name": "Recycle: In Progress for more than 60 days",
-        "description": "Copy of the HubSpot workflow: frees the company so another BDR can take it.",
+        "name": "Recycle: In Progress hace más de 60 días",
+        "description": "Copia del workflow de HubSpot: libera la empresa para que otro BDR la tome.",
         "enabled": False,
         "reenroll": True,
-        "conditions": {"groups": [{"rules": [
+        "trigger": {"type": "filter", "conditions": {"groups": [{"rules": [
             {"field": "prospecting_start_date", "op": "older_than_days", "value": 60},
             {"field": "prospecting_status", "op": "is_any", "value": [STATUS_IN_PROGRESS]},
-        ]}]},
-        "actions": [
-            {"type": "clear", "field": "prospecting_owner_email"},
-            {"type": "clear", "field": "prospecting_owner_apollo"},
-            {"type": "clear", "field": "prospecting_start_date"},
-            {"type": "set", "field": "prospecting_status", "value": STATUS_RECYCLED},
-        ],
+        ]}]}},
+        "steps": {"start": "n1", "nodes": {
+            "n1": {"type": "action", "action": {"type": "clear", "field": "prospecting_owner_email"}, "next": "n2"},
+            "n2": {"type": "action", "action": {"type": "clear", "field": "prospecting_owner_apollo"}, "next": "n3"},
+            "n3": {"type": "action", "action": {"type": "clear", "field": "prospecting_start_date"}, "next": "n4"},
+            "n4": {"type": "action", "action": {"type": "set", "field": "prospecting_status", "value": STATUS_RECYCLED}, "next": None},
+        }},
     },
 ]

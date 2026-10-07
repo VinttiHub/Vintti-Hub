@@ -25,6 +25,12 @@ from psycopg2.extras import Json
 
 from prospecting.constants import (
     ACTIONS,
+    BRANCHES,
+    DELAYS,
+    EVENTS,
+    SCHEDULES,
+    TRIGGERS,
+    WEEKDAYS,
     ADMIN_EMAILS,
     AUTOMATION_REAL_DATA,
     DEFAULT_WORKFLOWS,
@@ -178,6 +184,97 @@ def ensure_schema(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE prospect_workflow_runs ADD COLUMN IF NOT EXISTS workflow_id BIGINT")
+    # La tabla de arriba (prospect_workflow_enrollments) era de la primera versión
+    # (sin estado). Queda sin uso: el motor con esperas y ramas usa las de abajo.
+
+    # Motor con estado (prospecting/engine.py). Un workflow pasa a ser
+    # disparador + grafo de pasos; `conditions` / `actions` quedan para los
+    # workflows de la versión anterior, que workflows.normalize() convierte.
+    for col in ("trigger", "steps", "unenroll", "goal", "settings"):
+        cur.execute(f"ALTER TABLE prospect_workflows ADD COLUMN IF NOT EXISTS {col} JSONB")
+    cur.execute("ALTER TABLE prospect_workflows ALTER COLUMN conditions DROP NOT NULL")
+    cur.execute("ALTER TABLE prospect_workflows ALTER COLUMN actions DROP NOT NULL")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_enrollments (
+            id             BIGSERIAL PRIMARY KEY,
+            workflow_id    BIGINT NOT NULL REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            company_id     BIGINT NOT NULL REFERENCES prospect_companies(id) ON DELETE CASCADE,
+            status         TEXT NOT NULL,          -- active | waiting | completed | unenrolled | goal_met | failed
+            current_node   TEXT,
+            wake_at        TIMESTAMPTZ,
+            wait_deadline  TIMESTAMPTZ,            -- espera "hasta que se cumpla algo"
+            source         TEXT,                   -- trigger | manual | workflow:<id> | event | schedule
+            enrolled_by    TEXT,
+            enrolled_at    TIMESTAMPTZ NOT NULL,
+            finished_at    TIMESTAMPTZ,
+            last_error     TEXT
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS ix_prospect_wf_enrollments_due
+          ON prospect_wf_enrollments (wake_at)
+          WHERE status IN ('active', 'waiting')
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS ix_prospect_wf_enrollments_wf_company
+          ON prospect_wf_enrollments (workflow_id, company_id)
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_step_log (
+            id             BIGSERIAL PRIMARY KEY,
+            enrollment_id  BIGINT NOT NULL REFERENCES prospect_wf_enrollments(id) ON DELETE CASCADE,
+            node_id        TEXT,
+            kind           TEXT NOT NULL,           -- enrolled | action | delay | branch | wake | finished | error ...
+            summary        TEXT,
+            detail         JSONB,
+            ok             BOOLEAN NOT NULL DEFAULT TRUE,
+            at             TIMESTAMPTZ NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_wf_step_log_enr ON prospect_wf_step_log (enrollment_id, id)"
+    )
+    # Memoria de "ya cumplía": se inscribe sólo en la transición no cumple -> cumple,
+    # que es como reinscribe HubSpot.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_match_state (
+            workflow_id  BIGINT NOT NULL REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            company_id   BIGINT NOT NULL REFERENCES prospect_companies(id) ON DELETE CASCADE,
+            matching     BOOLEAN NOT NULL,
+            changed_at   TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (workflow_id, company_id)
+        )
+        """
+    )
+    # Turno del reparto entre BDRs, por workflow y paso.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_rotation (
+            workflow_id  BIGINT NOT NULL REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            node_id      TEXT NOT NULL,
+            last_index   INTEGER NOT NULL,
+            PRIMARY KEY (workflow_id, node_id)
+        )
+        """
+    )
+    # Última vez que disparó un workflow por horario.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_schedule_state (
+            workflow_id  BIGINT PRIMARY KEY REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            last_fired   TIMESTAMPTZ NOT NULL
+        )
+        """
+    )
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -195,11 +292,11 @@ def _seed_default_workflows(cur) -> None:
         cur.execute(
             """
             INSERT INTO prospect_workflows
-                (name, description, enabled, reenroll, conditions, actions, created_by, updated_by)
-            VALUES (%s, %s, %s, %s, %s, %s, 'system', 'system')
+                (name, description, enabled, reenroll, trigger, steps, settings, created_by, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'system', 'system')
             """,
             (wf["name"], wf["description"], wf["enabled"], wf["reenroll"],
-             Json(wf["conditions"]), Json(wf["actions"])),
+             Json(wf["trigger"]), Json(wf["steps"]), Json({})),
         )
 
 
@@ -434,11 +531,15 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
     )
     for field, old, new in changes:
         log_event(cur, existing["id"], "clay", None, field, old, new)
-    return {"id": existing["id"], "action": "updated", "changed": [c[0] for c in changes]}
+    return {"id": existing["id"], "action": "updated", "changed": [c[0] for c in changes],
+            "changes_detail": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
 
 
 def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user") -> dict | None:
-    """Aplica `patch` (ya filtrado a columnas editables) y deja un evento por campo."""
+    """Aplica `patch` (ya filtrado a columnas editables) y deja un evento por campo.
+
+    La fila devuelta trae `_changes` ([{field, old, new}]): con eso se disparan los
+    workflows "cuando cambia una propiedad" (engine.emit_event)."""
     cur.execute("SELECT * FROM prospect_companies WHERE id = %s FOR UPDATE", (company_id,))
     row = cur.fetchone()
     if row is None:
@@ -451,7 +552,7 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
             vals.append(v)
             changes.append((col, row.get(col), v))
     if not sets:
-        return dict(row)
+        return {**dict(row), "_changes": []}
     sets.append("updated_at = NOW()")
     cur.execute(
         f"UPDATE prospect_companies SET {', '.join(sets)} WHERE id = %s RETURNING *",
@@ -460,7 +561,7 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
     updated = cur.fetchone()
     for col, old, new in changes:
         log_event(cur, company_id, source, actor, col, old, new)
-    return dict(updated)
+    return {**dict(updated), "_changes": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
 
 
 # --------------------------------------------------------------------------- #
@@ -595,7 +696,7 @@ _PLACES = [("Austin", "TX"), ("Miami", "FL"), ("Chicago", "IL"), ("Denver", "CO"
            ("New York", "NY"), ("Seattle", "WA"), ("Atlanta", "GA"), ("Boston", "MA")]
 
 
-def seed_dummies(cur, n: int, owners: list[str], today: date) -> int:
+def seed_dummies(cur, n: int, owners: list[str], today: date) -> list[int]:
     """Crea `n` empresas `is_dummy` con la forma exacta de un payload de Clay.
 
     Las In Progress tienen start date entre 10 y 90 días atrás, así que el
@@ -605,7 +706,7 @@ def seed_dummies(cur, n: int, owners: list[str], today: date) -> int:
     owners = owners or sorted(ADMIN_EMAILS)
     iso_week = today.isocalendar()[1]
     weeks = [f"Semana {w}" for w in range(max(1, iso_week - 4), iso_week + 1)]
-    created = 0
+    ids = []
     for i in range(n):
         name = f"{rnd.choice(_W1)} {rnd.choice(_W2)} (dummy)"
         slug = re.sub(r"[^a-z0-9]+", "", name.lower().replace("(dummy)", ""))
@@ -648,9 +749,8 @@ def seed_dummies(cur, n: int, owners: list[str], today: date) -> int:
             "prospecting_start_date": start.isoformat() if start else None,
             "not_icp_reason": reason,
         }
-        upsert_from_clay(cur, payload, is_dummy=True)
-        created += 1
-    return created
+        ids.append(upsert_from_clay(cur, payload, is_dummy=True)["id"])
+    return ids
 
 
 def delete_dummies(cur) -> int:
@@ -675,6 +775,18 @@ def options(cur) -> dict:
             "operators": OPERATORS,
             "operators_by_type": OPERATORS_BY_TYPE,
             "actions": ACTIONS,
+            "triggers": TRIGGERS,
+            "events": EVENTS,
+            "schedules": SCHEDULES,
+            "delays": DELAYS,
+            "branches": BRANCHES,
+            "weekdays": WEEKDAYS,
+            "history_fields": sorted(set(EDITABLE_FIELDS) | set(CLAY_FIELDS)),
+            # jsonify ordena las claves alfabéticamente: el orden de los menús va aparte.
+            "order": {
+                "actions": list(ACTIONS), "triggers": list(TRIGGERS), "events": list(EVENTS),
+                "schedules": list(SCHEDULES), "delays": list(DELAYS), "branches": list(BRANCHES),
+            },
             # Fase de prueba: lo automático sólo toca dummies (ver constants.py).
             "automation_real_data": AUTOMATION_REAL_DATA,
         },
