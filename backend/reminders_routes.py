@@ -635,7 +635,9 @@ def _is_stage_closed_lost(value) -> bool:
     return str(value or "").strip().lower() in {"closed lost", "close lost"}
 
 
-def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None, source_lead=None) -> str:
+def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None, source_lead=None, mkt_collab=None) -> str:
+    # opportunity.mkt_collab guarda las opciones del popup unidas con ';'.
+    mkt = ", ".join(p.strip() for p in str(mkt_collab or "").split(";") if p.strip()) or "—"
     return f"""
 <div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
   <p>Hey team — new <b>Close Win</b> 🎉</p>
@@ -645,7 +647,8 @@ def _close_win_email_html(client_name: str, candidate_name: str, start_date, pri
     <b>Candidate:</b> {html.escape(str(candidate_name or 'the candidate'))}<br>
     <b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
     <b>Price type:</b> {html.escape(_format_price_type(price_type))}<br>
-    <b>Computer:</b> {html.escape(_format_computer_need(computer))}
+    <b>Computer:</b> {html.escape(_format_computer_need(computer))}<br>
+    <b>MKT Collab:</b> {html.escape(mkt)}
   </p>
   <p style="margin-top:16px">— Vintti HUB</p>
 </div>
@@ -689,6 +692,7 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
             o.opp_stage,
             o.opp_position_name,
             o.opp_close_date::date AS opp_close_date,
+            o.mkt_collab,
             COALESCE(o.candidato_contratado, ho.candidate_id) AS candidate_id,
             a.client_name,
             a.where_come_from,
@@ -770,6 +774,7 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
             price_type=price_type,
             computer=computer,
             source_lead=ctx.get("where_come_from"),
+            mkt_collab=ctx.get("mkt_collab"),
         ),
         to=to_list,
     )
