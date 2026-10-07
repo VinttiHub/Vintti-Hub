@@ -753,6 +753,26 @@ entrante lo lee como `closed_won` y `STAGE_KEY_TO_HUB_STAGE["closed_won"] = None
 mueve el stage del hub**. Sí vuelve a copiar los 5 espejos con los valores que acabamos de
 mandar — circular, pero inofensivo: ningún dataset lee esas columnas.
 
+### Closed Lost también viaja (desde 2026-10-07)
+
+Pasar una opp a Closed Lost en el hub cierra el deal como perdido en HubSpot, con lo que pide
+el popup del hub: `opp_close_date` → `closedate`, `motive_close_lost` → **SQL (AE) Lost
+Reason** (`sql_ae_lost_reason`; el de MQL no, porque en el hub la opp existe recién desde Deep
+Dive), `details_close_lost` → **Lost Reason Detail (Deal)**. Va por `build_closed_lost_payload()`
+y `_push_closed_lost()`, aparte del camino de Signed/CW (no hay hire ni montos).
+
+- **Timing se manda como `Bad Timing`**: es el *value* interno del select; HubSpot rechaza el
+  label. Internal Competition no existe en HubSpot: va como `Other` y el detalle arranca con
+  "Internal Competition: …" (decisión de la owner). External Competition → `Competitor`.
+- Motivo y detalle **sólo si HubSpot los tiene vacíos**; `closedate` se pisa.
+- Sólo mueve desde un stage abierto conocido. Deal en Closed Won o en uno que no seguimos (DQL)
+  → no toca nada. Ya en Closed Lost → sólo rellena motivo/detalle.
+- **`closed_lost` NO es un stage_key** (no está en `STAGE_ALIASES`): si lo fuera, el sync
+  entrante dejaría de saltear esos deals como `unmapped_stage`. El id sale de
+  `entry["closed_lost_stage_id"]`, por la marca `isClosed` + probabilidad 0 del stage.
+- Viaja **una sola vez, al mover el stage**: el cron `_push_pass()` no lo mira. Las opps que ya
+  estaban en Closed Lost antes de esto no se empujan solas (`POST /hubspot/push/opportunity/<id>`).
+
 ## Apriora: las 6 preguntas obligatorias de screening
 
 El botón **Create Job in Apriora** de `docs/opportunity-detail.html` (pestaña Job Description)

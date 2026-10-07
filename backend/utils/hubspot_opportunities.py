@@ -465,6 +465,22 @@ def _match_stages(stages):
     return by_key, unresolved
 
 
+def _closed_lost_stage_id(stages):
+    """El stage cerrado-perdido del pipeline, por su marca y no por el label.
+
+    HubSpot marca los dos stages terminales con `isClosed`; el perdido es el de
+    probabilidad 0. Si no hay exactamente uno, None: nunca se adivina.
+    """
+    candidatos = []
+    for stage in stages or []:
+        metadata = stage.get("metadata") or {}
+        is_closed = str(metadata.get("isClosed", "")).strip().lower() == "true"
+        probability = str(metadata.get("probability", "")).strip()
+        if stage.get("id") and is_closed and probability in ("0", "0.0"):
+            candidatos.append(str(stage["id"]))
+    return candidatos[0] if len(candidatos) == 1 else None
+
+
 def stage_date_property(stage_id):
     return "hs_v2_date_entered_%s" % stage_id
 
@@ -548,6 +564,10 @@ def resolve_pipeline_stage_map(client, force_refresh=False):
             "date_property_by_key": date_property_by_key,
             "stage_labels": {str(s.get("id")): s.get("label") for s in stages},
             "unresolved": unresolved,
+            # Solo lo usa el push de Closed Lost (hubspot_push.py). Va APARTE de
+            # stage_id_by_key a proposito: si fuera un stage_key mas, el sync
+            # entrante dejaria de saltear esos deals como `unmapped_stage`.
+            "closed_lost_stage_id": _closed_lost_stage_id(stages),
         }
 
     for pipeline_id, key in pipeline_id_overrides.items():

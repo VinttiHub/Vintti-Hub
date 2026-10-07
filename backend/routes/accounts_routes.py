@@ -96,7 +96,7 @@ def _maybe_push_stage_to_hubspot(opportunity_id, new_stage):
     """
     try:
         from utils import hubspot_push as hs_push
-        if not hs_push.hub_stage_to_stage_key(new_stage):
+        if not (hs_push.hub_stage_to_stage_key(new_stage) or hs_push.is_closed_lost(new_stage)):
             return None      # cualquier otro stage no viaja: no es noticia
         from routes.hubspot_routes import _push_enabled, push_opportunity_to_hubspot
         if not _push_enabled():

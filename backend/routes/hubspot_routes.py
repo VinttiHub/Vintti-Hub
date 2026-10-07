@@ -4993,9 +4993,14 @@ def _push_one(client, cursor, opportunity_id, dry_run, pipeline_map=None, proper
         item["accion"] = "omitida"
         item["motivo"] = "la opp no tiene hubspot_deal_id (se cargo a mano o nunca se ato)"
         return item
+    if hs_push.is_closed_lost(valores.get("opp_stage")):
+        return _push_closed_lost(client, cursor, opportunity_id, dry_run, item, pipeline_map)
     if not hs_push.hub_stage_to_stage_key(valores.get("opp_stage")):
         item["accion"] = "omitida"
-        item["motivo"] = "el stage '%s' no se empuja (solo Signed y Close Win)" % valores.get("opp_stage")
+        item["motivo"] = (
+            "el stage '%s' no se empuja (solo Signed, Close Win y Closed Lost)"
+            % valores.get("opp_stage")
+        )
         return item
 
     pipeline_map = pipeline_map or hs_opps.resolve_pipeline_stage_map(client)
@@ -5036,6 +5041,61 @@ def _push_one(client, cursor, opportunity_id, dry_run, pipeline_map=None, proper
         return item
 
     client.update_deal(valores["deal_id"], payload["properties"])
+    _sellar_push(cursor, opportunity_id, huella, escribio=True)
+    item["accion"] = "escrito"
+    return item
+
+
+def _push_closed_lost(client, cursor, opportunity_id, dry_run, item, pipeline_map=None):
+    """Cierra el deal como perdido con el motivo del popup del hub.
+
+    Sin hire ni montos: lee fecha / motivo / detalle de la opp y los manda con
+    build_closed_lost_payload(). El cron (_push_pass) no pasa por aca: solo mira
+    Signed/Close Win, asi que el Closed Lost viaja una vez, al mover el stage.
+    """
+    cursor.execute(
+        """
+        SELECT opp_close_date, motive_close_lost, details_close_lost,
+               NULLIF(hubspot_deal_id, '')      AS deal_id,
+               NULLIF(hubspot_pipeline_id, '')  AS pipeline_id,
+               NULLIF(hubspot_dealstage_id, '') AS dealstage_id
+          FROM opportunity
+         WHERE opportunity_id = %s
+        """,
+        (opportunity_id,),
+    )
+    opp = dict(cursor.fetchone() or {})
+    item["valores_del_hub"] = {
+        k: str(opp.get(k) or "") for k in ("opp_close_date", "motive_close_lost", "details_close_lost")
+    }
+
+    pipeline_map = pipeline_map or hs_opps.resolve_pipeline_stage_map(client)
+    deal = client.get_deal_with_associations(
+        opp["deal_id"], extra_properties=hs_push.closed_lost_properties_to_fetch()
+    )
+    deal_props = (deal or {}).get("properties") or {}
+    item["dealname"] = deal_props.get("dealname")
+    opp["pipeline_id"] = str(deal_props.get("pipeline") or "") or opp.get("pipeline_id")
+    opp["dealstage_id"] = str(deal_props.get("dealstage") or "") or opp.get("dealstage_id")
+
+    payload = hs_push.build_closed_lost_payload(opp, deal_props, pipeline_map)
+    item["properties"] = payload["properties"]
+    item["omitidos"] = payload["omitidos"]
+    item["stage"] = payload["stage"]
+    huella = hs_push.closed_lost_fingerprint(opp)
+    item["huella"] = huella
+
+    if not payload["properties"]:
+        item["accion"] = "sin_cambios"
+        item["motivo"] = payload["stage"].get("motivo") or "HubSpot ya esta igual que el hub"
+        if not dry_run:
+            _sellar_push(cursor, opportunity_id, huella, escribio=False)
+        return item
+    if dry_run:
+        item["accion"] = "se_escribiria"
+        return item
+
+    client.update_deal(opp["deal_id"], payload["properties"])
     _sellar_push(cursor, opportunity_id, huella, escribio=True)
     item["accion"] = "escrito"
     return item

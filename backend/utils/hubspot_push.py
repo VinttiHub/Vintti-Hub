@@ -130,6 +130,129 @@ def decide_push_stage(current_stage_key, target_stage_key):
     return target_stage_key, "avanza"
 
 
+# --- Closed Lost --------------------------------------------------------------
+# Va por un camino propio y no por HUB_STAGE_TO_STAGE_KEY: no hay hire ni montos,
+# los campos son otros, y "closed_lost" no puede ser un stage_key (ver
+# _closed_lost_stage_id en hubspot_opportunities.py).
+HUB_CLOSED_LOST = "closed lost"
+
+# Popup del hub (`#closeLostReason` en opportunities.html) -> VALUE interno del
+# select `sql_ae_lost_reason`. Ojo con Timing: el label es "Timing" pero el value
+# es "Bad Timing", y HubSpot rechaza el label. "Internal Competition" no existe en
+# HubSpot: va como Other y la distincion viaja en el detalle (decision de la owner,
+# 2026-10-07). Se usa el de SQL y no el de MQL porque en el hub una opp existe
+# recien desde Deep Dive: el deal ya paso por SQL.
+CLOSED_LOST_REASON_PROPERTY = "sql_ae_lost_reason"
+CLOSED_LOST_DETAIL_PROPERTY = "lost_reason_detail_deal"
+CLOSED_LOST_REASON_MAP = {
+    "ghosting": "Ghosting",
+    "pricing": "Pricing",
+    "shopping": "Shopping",
+    "timing": "Bad Timing",
+    "vinttis fault": "Vintti's Fault",
+    "vintti's fault": "Vintti's Fault",
+    "other": "Other",
+    "external competition": "Competitor",
+    "internal competition": "Other",
+}
+_REASON_PREFIX_IN_DETAIL = {"internal competition": "Internal Competition"}
+
+
+def is_closed_lost(opp_stage):
+    return str(opp_stage or "").strip().lower() == HUB_CLOSED_LOST
+
+
+def closed_lost_properties_to_fetch():
+    return ["dealstage", "pipeline", "dealname", "closedate",
+            CLOSED_LOST_REASON_PROPERTY, CLOSED_LOST_DETAIL_PROPERTY]
+
+
+def build_closed_lost_payload(opp, deal_props, pipeline_map):
+    """El PATCH para cerrar el deal como perdido. Puro, como build_push_payload.
+
+    `opp` trae opp_close_date / motive_close_lost / details_close_lost /
+    pipeline_id / dealstage_id. Politica:
+
+    - Stage: solo desde un stage abierto que conocemos. Si HubSpot ya esta en
+      Closed Won, o en uno que no seguimos (DQL...), no se toca NADA: lo que diga
+      el hub no alcanza para pisar un cierre ni resucitar un descarte.
+    - Motivo y detalle: solo si HubSpot los tiene vacios. Si el AE ya los cargo,
+      gana lo suyo.
+    - closedate: se pisa, es la fecha de la perdida (igual que en Closed Win).
+    """
+    props, omitidos = {}, {}
+    deal_props = deal_props or {}
+    entry = pipeline_entry(pipeline_map, opp.get("pipeline_id"))
+    actual_id = str(opp.get("dealstage_id") or "")
+    lost_id = entry.get("closed_lost_stage_id") if entry else None
+    current_key = entry["stage_key_by_id"].get(actual_id) if entry else None
+
+    stage = {"pipeline": entry["label"] if entry else None, "desde": current_key,
+             "hacia": "closed_lost", "stage_id": None}
+    if not entry:
+        stage["motivo"] = "sin pipeline resuelto"
+    elif not lost_id:
+        stage["motivo"] = "el pipeline %s no tiene un unico stage Closed Lost" % entry["label"]
+    elif actual_id == lost_id:
+        stage["motivo"] = "HubSpot ya esta en Closed Lost"
+    elif current_key is None or current_key == "closed_won":
+        stage["motivo"] = (
+            "el deal esta en '%s': no se cierra como perdido desde el hub"
+            % (entry["stage_labels"].get(actual_id) or actual_id or "?")
+        )
+        return {"properties": {}, "omitidos": {"_": stage["motivo"]}, "stage": stage}
+    else:
+        stage["stage_id"] = lost_id
+        stage["motivo"] = "se cierra como perdido"
+        props["dealstage"] = lost_id
+
+    close_date = opp.get("opp_close_date")
+    if close_date:
+        serializado = "%sT12:00:00Z" % str(close_date).strip()[:10]
+        if str(deal_props.get("closedate") or "") != serializado:
+            props["closedate"] = serializado
+        else:
+            omitidos["closedate"] = "HubSpot ya tiene exactamente ese valor"
+    else:
+        omitidos["closedate"] = "la opp no tiene opp_close_date"
+
+    motivo_hub = str(opp.get("motive_close_lost") or "").strip()
+    motivo_key = motivo_hub.lower()
+    detalle = str(opp.get("details_close_lost") or "").strip()
+    prefijo = _REASON_PREFIX_IN_DETAIL.get(motivo_key)
+    if prefijo:
+        detalle = "%s: %s" % (prefijo, detalle) if detalle else prefijo
+
+    valor = CLOSED_LOST_REASON_MAP.get(motivo_key)
+    if not motivo_hub:
+        omitidos[CLOSED_LOST_REASON_PROPERTY] = "la opp no tiene motivo cargado"
+    elif not valor:
+        omitidos[CLOSED_LOST_REASON_PROPERTY] = "el motivo %r no tiene equivalente en HubSpot" % motivo_hub
+    elif deal_props.get(CLOSED_LOST_REASON_PROPERTY) not in (None, ""):
+        omitidos[CLOSED_LOST_REASON_PROPERTY] = (
+            "HubSpot ya tiene %r cargado y no se pisa" % deal_props.get(CLOSED_LOST_REASON_PROPERTY)
+        )
+    else:
+        props[CLOSED_LOST_REASON_PROPERTY] = valor
+
+    if not detalle:
+        omitidos[CLOSED_LOST_DETAIL_PROPERTY] = "la opp no tiene detalle cargado"
+    elif deal_props.get(CLOSED_LOST_DETAIL_PROPERTY) not in (None, ""):
+        omitidos[CLOSED_LOST_DETAIL_PROPERTY] = "HubSpot ya tiene un detalle cargado y no se pisa"
+    else:
+        props[CLOSED_LOST_DETAIL_PROPERTY] = detalle
+
+    return {"properties": props, "omitidos": omitidos, "stage": stage}
+
+
+def closed_lost_fingerprint(opp):
+    partes = ["stage=closed lost"] + [
+        "%s=%s" % (k, str(opp.get(k) or "").strip())
+        for k in ("opp_close_date", "motive_close_lost", "details_close_lost")
+    ]
+    return hashlib.sha1("|".join(partes).encode("utf-8")).hexdigest()
+
+
 def _as_hubspot_number(valor):
     """HubSpot acepta el numero como string. Las 3 columnas del hub son integer."""
     try:
