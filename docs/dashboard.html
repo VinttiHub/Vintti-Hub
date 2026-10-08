@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=127">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=129">
 </head>
 <body>
 
@@ -2903,8 +2903,9 @@
       <div class="funnel-row s-12">
       <!-- ============================================================
            MQL → SQL · Sales (live HubSpot) — primer paso del funnel.
-           Sales = Origin Outbound O Conversion Channel Outbound (regla de la owner);
-           NO filtra por mql_source (los Outbound tienen 'Outbound MQL').
+           Arriba el TOTAL (todos los MQLs); abajo Outbound e Inbound, que suman el total.
+           Outbound = Origin Outbound O Conversion Channel Outbound (regla de la owner);
+           Inbound = el resto. NO filtra por mql_source (los Outbound tienen 'Outbound MQL').
            Cohorte: MQLs agendados en la ventana (date_of_meeting_scheduled) → cuántos
            llegaron a SQL (AE)+. Dataset sales_mql_to_sql_30d.
            ============================================================ -->
@@ -2934,39 +2935,40 @@
                     data-field="total_sql" data-reduce="first" data-fmt="int">—</span> /
               <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
                     data-field="total_mql" data-reduce="first" data-fmt="int">—</span>
+              · Outbound + Inbound
             </span>
           </div>
 
-          <!-- Desglose: Sales = origin Outbound; Mkt = origin de marketing convertido por Sales (channel Outbound) -->
-          <div class="wrchan-bars">
+          <!-- Desglose: Outbound = Origin o Channel Outbound; Inbound = el resto. Suman el total. -->
+          <div class="wrchan-bars wrchan-bars--wide">
             <div class="wrchan-bar">
               <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Origin = Outbound">Sales</span>
+              <span class="wrchan-bar__label" title="Origin o Conversion Channel = Outbound">Outbound</span>
               <span class="wrchan-bar__track">
                 <span class="wrchan-bar__fill wrchan-bar__fill--sales"
                       data-chart="sa_kpi_mql_to_sql_30d" data-bind="progress-fill"
-                      data-field="ob_pct" data-reduce="first"></span>
+                      data-field="out_pct" data-reduce="first"></span>
               </span>
               <span class="wrchan-bar__val">
                 <span class="wrchan-bar__pct"
                       data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
-                      data-field="ob_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ob_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ob_mql" data-reduce="first" data-fmt="int">—</span></span>
+                      data-field="out_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="out_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="out_mql" data-reduce="first" data-fmt="int">—</span></span>
               </span>
             </div>
             <div class="wrchan-bar">
               <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Origin de marketing, convertido por Sales (Conversion Channel = Outbound)">Mkt</span>
+              <span class="wrchan-bar__label" title="Ni Origin ni Conversion Channel = Outbound">Inbound</span>
               <span class="wrchan-bar__track">
                 <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
                       data-chart="sa_kpi_mql_to_sql_30d" data-bind="progress-fill"
-                      data-field="ch_pct" data-reduce="first"></span>
+                      data-field="in_pct" data-reduce="first"></span>
               </span>
               <span class="wrchan-bar__val">
                 <span class="wrchan-bar__pct"
                       data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
-                      data-field="ch_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ch_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="ch_mql" data-reduce="first" data-fmt="int">—</span></span>
+                      data-field="in_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="in_sql" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text" data-field="in_mql" data-reduce="first" data-fmt="int">—</span></span>
               </span>
             </div>
           </div>
@@ -9530,7 +9532,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
             <h3 class="kpi-drawer__title">MQL → SQL · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">MQLs de Sales (Origin <strong>o</strong> Conversion Channel = Outbound) que agendaron reunión en la ventana, y cuántos llegaron a SQL.</p>
+            <p class="kpi-drawer__sub">Todos los MQLs que agendaron reunión en la ventana, y cuántos llegaron a SQL. <strong>Outbound</strong> = Origin <strong>o</strong> Conversion Channel = Outbound; <strong>Inbound</strong> = el resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -9545,13 +9547,29 @@
                 <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
                       data-field="total_mql" data-reduce="first" data-fmt="int">—</span> MQLs
               </span>
+              <span class="kpi-drawer__hero__delta">
+                Outbound
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="out_pct" data-reduce="first" data-fmt="percent">—</span>
+                (<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="out_sql" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="out_mql" data-reduce="first" data-fmt="int">—</span>)
+                · Inbound
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="in_pct" data-reduce="first" data-fmt="percent">—</span>
+                (<span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="in_sql" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_mql_to_sql_30d" data-bind="text"
+                      data-field="in_mql" data-reduce="first" data-fmt="int">—</span>)
+              </span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Detalle de MQLs</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_mql_to_sql_30d_detail" data-bind="dtable"
-                   data-cols="mql_date|MQL date|raw,client_name|Cliente|raw,origin|Origin|raw,channel|Channel|raw,status|Estado|raw"
-                   data-empty-text="Sin MQLs de Sales en la ventana."></div>
+                   data-cols="mql_date|MQL date|raw,client_name|Cliente|raw,tipo|Tipo|raw,origin|Origin|raw,channel|Channel|raw,status|Estado|raw"
+                   data-empty-text="Sin MQLs en la ventana."></div>
             </section>
           </div>
         </div>

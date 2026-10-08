@@ -4346,6 +4346,19 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
    (Deep Dive → NDA Signed), que quedaba distinta de las otras cuatro. */
 .funnel-row .skpi-tile__detail-btn { white-space: nowrap; }
 
+/* MQL → SQL: "Outbound"/"Inbound" no entran en los 42px del label (se pisaban con la
+   barra), y ensanchar la columna dejaría la barra en ~55px. Label arriba y barra abajo,
+   a todo el ancho; el % y el x/y ocupan los dos renglones a la derecha. */
+.funnel-row .wrchan-bars--wide .wrchan-bar {
+  grid-template-columns: 10px 1fr 54px;
+  grid-template-rows: auto auto;
+  row-gap: 6px;
+}
+.wrchan-bars--wide .wrchan-bar__dot   { grid-column: 1; grid-row: 1; }
+.wrchan-bars--wide .wrchan-bar__label { grid-column: 2; grid-row: 1; }
+.wrchan-bars--wide .wrchan-bar__track { grid-column: 1 / 3; grid-row: 2; }
+.wrchan-bars--wide .wrchan-bar__val   { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+
 /* Card compuesta (SQL → NDA Signed): la línea de valor es "A%×B%", no "x/y". El peor
    caso, "100%×100%", mide 71px, de ahí los 72 (medido en Chrome, no estimado). */
 .funnel-row .wrchan-card--compound .wrchan-bar { grid-template-columns: 10px 36px 1fr 72px; gap: 8px; }

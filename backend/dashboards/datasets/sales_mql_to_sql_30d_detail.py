@@ -1,4 +1,4 @@
-"""Sales · MQL → SQL — detalle (una fila por MQL de la cohorte).
+"""Sales · MQL → SQL — detalle (una fila por MQL de la cohorte, Outbound e Inbound).
 
 Lee el mismo `cohort_rows()` que la card (`sales_mql_to_sql_30d`), así que la cantidad
 de filas es `total_mql` y las "Llegó a SQL" son `total_sql` por construcción.
@@ -13,6 +13,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     out = [{
         "mql_date": r["mql_date"],
         "client_name": r["client_name"],
+        "tipo": "Outbound" if r["bucket"] == "out" else "Inbound",
         "origin": r["origin"],
         "channel": r["channel"],
         "lead_life": r["lead_life"],
@@ -29,6 +30,7 @@ DATASET = {
     "dimensions": [
         {"key": "mql_date", "label": "MQL date", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
+        {"key": "tipo", "label": "Tipo", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},
         {"key": "channel", "label": "Conversion channel", "type": "string"},
         {"key": "lead_life", "label": "Etapa actual", "type": "string"},

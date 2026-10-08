@@ -1,14 +1,17 @@
 """Sales · MQL → SQL (ventana de 30d / filtro global, live HubSpot).
 
 Es el primer paso del funnel de Marketing (`mkt_funnel_mql_sql_cw`), pero para Sales.
+Cuenta TODOS los MQLs y los parte en dos (pedido de la owner, 2026-10-08):
+
+    Outbound = Origin = Outbound  O  Conversion Channel = Outbound
+    Inbound  = el resto
+    total    = Outbound + Inbound (exacto, por construcción)
+
 El universo NO sale de `mql_source` —los Outbound tienen `mql_source='Outbound MQL'`,
-que el filtro de marketing deja afuera—, sino de la regla que pasó la owner:
-
-    Sales = Origin = Outbound  O  Conversion Channel = Outbound
-
-La segunda parte trae contactos que entraron por marketing (Paid Media, Website
-Organic…) y que Sales terminó convirtiendo con outreach. El valor interno del channel
-es `Outbound - Linkedin` (label "Outbound"), por eso se compara con `in`.
+que el filtro de marketing deja afuera—. La parte del channel trae contactos que
+entraron por marketing (Paid Media, Website Organic…) y que Sales terminó convirtiendo
+con outreach: cuentan como Outbound. El valor interno del channel es
+`Outbound - Linkedin` (label "Outbound"), por eso se compara con `in`.
 
 COHORTE (decisión de la owner, 2026-09-28): MQL = agendó reunión en la ventana
 (`date_of_meeting_scheduled`); de ESOS, cuántos llegaron a SQL. Mismos tiers que el
@@ -32,7 +35,7 @@ def _is_outbound(value) -> bool:
 
 
 def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
-    """Una fila por MQL de Sales agendado en la ventana."""
+    """Una fila por MQL (Outbound o Inbound) agendado en la ventana."""
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
@@ -66,8 +69,7 @@ def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
         channel = _first_mapped_value(pm, "conversion_channel", contact=c) or props.get(channel_prop)
         origin_ob = _is_outbound(origin)
-        if not (origin_ob or _is_outbound(channel)):
-            continue
+        is_out = origin_ob or _is_outbound(channel)
         name = (
             _first_mapped_value(pm, "client_name", contact=c)
             or " ".join(p for p in [props.get("firstname") or "", props.get("lastname") or ""] if p).strip()
@@ -79,8 +81,10 @@ def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
             "client_name": str(name),
             "origin": (str(origin or "").strip()) or "(Sin origen)",
             "channel": (str(channel or "").strip()) or "(Sin channel)",
-            # "ob" = origin Outbound; "ch" = otro origin, convertido por Sales (channel).
-            "bucket": "ob" if origin_ob else "ch",
+            # "out" = Origin o Channel Outbound; "in" = el resto.
+            "bucket": "out" if is_out else "in",
+            # Dentro de "out": True = origin Outbound; False = otro origin, convertido por Sales.
+            "origin_ob": origin_ob,
             "lead_life": props.get(lead_life_property) or "—",
             "reached_sql": ll in _REACHED_SQL,
         })
@@ -96,8 +100,8 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     out = {"ventana_desde": ini.isoformat(), "ventana_hasta": fin.isoformat()}
     for prefix, subset in (
         ("total", rows),
-        ("ob", [r for r in rows if r["bucket"] == "ob"]),
-        ("ch", [r for r in rows if r["bucket"] == "ch"]),
+        ("out", [r for r in rows if r["bucket"] == "out"]),
+        ("in", [r for r in rows if r["bucket"] == "in"]),
     ):
         mql = len(subset)
         sql = sum(1 for r in subset if r["reached_sql"])
@@ -109,7 +113,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
 DATASET = {
     "key": "sales_mql_to_sql_30d",
-    "label": "Sales · MQL → SQL (Outbound por origin o channel, cohorte, live HubSpot)",
+    "label": "Sales · MQL → SQL · Outbound / Inbound / total (cohorte, live HubSpot)",
     "dimensions": [
         {"key": "ventana_desde", "label": "Desde", "type": "date"},
         {"key": "ventana_hasta", "label": "Hasta", "type": "date"},
@@ -118,12 +122,12 @@ DATASET = {
         {"key": "total_mql", "label": "MQLs", "type": "number"},
         {"key": "total_sql", "label": "SQLs", "type": "number"},
         {"key": "total_pct", "label": "MQL → SQL %", "type": "percent"},
-        {"key": "ob_mql", "label": "MQLs · origin Outbound", "type": "number"},
-        {"key": "ob_sql", "label": "SQLs · origin Outbound", "type": "number"},
-        {"key": "ob_pct", "label": "MQL → SQL % · origin Outbound", "type": "percent"},
-        {"key": "ch_mql", "label": "MQLs · channel Outbound", "type": "number"},
-        {"key": "ch_sql", "label": "SQLs · channel Outbound", "type": "number"},
-        {"key": "ch_pct", "label": "MQL → SQL % · channel Outbound", "type": "percent"},
+        {"key": "out_mql", "label": "MQLs · Outbound", "type": "number"},
+        {"key": "out_sql", "label": "SQLs · Outbound", "type": "number"},
+        {"key": "out_pct", "label": "MQL → SQL % · Outbound", "type": "percent"},
+        {"key": "in_mql", "label": "MQLs · Inbound", "type": "number"},
+        {"key": "in_sql", "label": "SQLs · Inbound", "type": "number"},
+        {"key": "in_pct", "label": "MQL → SQL % · Inbound", "type": "percent"},
     ],
     "default_filters": {},
     "compute": compute,

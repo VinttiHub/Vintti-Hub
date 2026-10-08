@@ -1877,7 +1877,7 @@ MAIN_CHARTS = [
     {
         "chart_key": "sa_kpi_mql_to_sql_30d",
         "tab_key": "sales",
-        "title": "MQL → SQL (Outbound) - 30d",
+        "title": "MQL → SQL (Outbound / Inbound / total) - 30d",
         "type": "kpi",
         "dataset_key": "sales_mql_to_sql_30d",
         "config": {"mapping": {"value": "total_pct", "formatter": "percent"}},
@@ -1892,7 +1892,7 @@ MAIN_CHARTS = [
         "dataset_key": "sales_mql_to_sql_30d_detail",
         "config": {
             "mapping": {
-                "columns": ["mql_date", "client_name", "origin", "channel", "lead_life", "status"],
+                "columns": ["mql_date", "client_name", "tipo", "origin", "channel", "lead_life", "status"],
             },
         },
         "position": {"x": 0, "y": 31, "w": 12, "h": 5},
