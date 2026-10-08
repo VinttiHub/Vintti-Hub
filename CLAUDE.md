@@ -741,7 +741,7 @@ y el branch por modelo de `candidate-details.js:524-526` (Staffing → `fee`; Re
 una, hay que tocar la otra.
 
 **El stage "Signed" de HubSpot no estaba mapeado.** Existe en los dos pipelines (ids
-`1437034145` y `1436968304`) y hasta el 2026-09-16 no estaba en `STAGE_ALIASES`, así que un deal
+`1437034145` y `1452559430`; desde el 2026-10-08 se llama **"Candidate Signed"** y en Proceso de Contratación el id cambió, era `1436968304`) y hasta el 2026-09-16 no estaba en `STAGE_ALIASES`, así que un deal
 parado ahí caía en `unmapped_stage` y el sync entrante lo salteaba entero. No molestaba porque
 no lo usaba nadie. Ahora está mapeado; `"signed"` va **después** de `"nda_signed"` en
 `STAGE_RESOLUTION_ORDER` porque en la pasada por tokens `{signed} ⊆ {nda, signed}` y el alias

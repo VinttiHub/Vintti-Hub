@@ -147,11 +147,13 @@ STAGE_ALIASES = {
     "deep_dive": ["Deep Dive", "Deepdive"],
     "nda_sent": ["NDA Sent", "NDA enviado", "Envio NDA", "NDA Enviada"],
     "nda_signed": ["NDA Signed", "NDA firmado", "NDA Firmada", "Firma NDA"],
-    # "Signed" a secas es un stage PROPIO de HubSpot (ids 1437034145 y 1436968304),
-    # distinto de "NDA Signed". Hasta el 2026-09-16 no estaba mapeado, asi que un
-    # deal parado ahi caia en `unmapped_stage` y el sync lo salteaba entero. No
-    # molestaba porque no lo usaba nadie; el sync inverso lo va a empezar a usar.
-    "signed": ["Signed", "Firmado", "Firmada"],
+    # "Signed" a secas es un stage PROPIO de HubSpot, distinto de "NDA Signed". Hasta
+    # el 2026-09-16 no estaba mapeado, asi que un deal parado ahi caia en
+    # `unmapped_stage` y el sync lo salteaba entero. El 2026-10-08 se renombro a
+    # "Candidate Signed": en Vintti AI conserva el id (1437034145) pero en Proceso de
+    # Contratacion es un stage NUEVO (1452559430; el viejo era 1436968304). Por eso
+    # se resuelve por label y nunca por id.
+    "signed": ["Candidate Signed", "Signed", "Firmado", "Firmada"],
     "closed_won": ["Closed Won", "Cerrado ganado", "Ganado", "Won", "Close Win"],
 }
 
