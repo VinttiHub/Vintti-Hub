@@ -114,6 +114,7 @@ SELECT
     o.opp_stage,
     o.opp_position_name,
     o.opp_close_date,
+    {signed_date} AS signed_date,
     o.mkt_collab,
     o.account_id,
     NULLIF(o.hubspot_deal_id, '')     AS deal_id,
@@ -193,6 +194,28 @@ def _pick(row, campo):
     return None, None
 
 
+_SIGNED_DATE_EXISTS = False
+
+
+def _signed_date_expr(cursor):
+    """`o.signed_date` si la columna existe, si no NULL.
+
+    La crean update_opportunity_stage / el sync / _ensure_push_columns, pero el
+    preview corre en dry run sin DDL: en un entorno donde todavia no se creo, leerla
+    a ciegas reventaria con UndefinedColumn.
+    """
+    global _SIGNED_DATE_EXISTS
+    if not _SIGNED_DATE_EXISTS:
+        cursor.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'opportunity' AND column_name = 'signed_date'
+            """
+        )
+        _SIGNED_DATE_EXISTS = cursor.fetchone() is not None
+    return "o.signed_date" if _SIGNED_DATE_EXISTS else "NULL::date"
+
+
 def hire_values_for_opportunity(cursor, opportunity_id):
     """Los 4 valores que HubSpot pide al cerrar, mas de donde salio cada uno.
 
@@ -201,7 +224,7 @@ def hire_values_for_opportunity(cursor, opportunity_id):
     de stage. `motivos` es lo que explica cada hueco; sin eso un campo ausente no
     se distingue de un campo en cero.
     """
-    cursor.execute(_SQL, (opportunity_id,))
+    cursor.execute(_SQL.format(signed_date=_signed_date_expr(cursor)), (opportunity_id,))
     row = cursor.fetchone()
     if not row:
         return {"opportunity_id": opportunity_id, "existe": False,
@@ -284,6 +307,17 @@ def hire_values_for_opportunity(cursor, opportunity_id):
     # Esta cargada en las 358 opps de Close Win del hub.
     if not poner("close_date", _norm_date(row.get("opp_close_date")), "opportunity.opp_close_date"):
         motivos["close_date"] = "la opp no tiene opp_close_date cargada"
+
+    # "Closed Win Date (Deal)": la que HubSpot exige al pasar a Closed Won (desde
+    # 2026-10-08). Es la misma fecha de cierre del popup de Close Win.
+    if not poner("closed_win_date", _norm_date(row.get("opp_close_date")), "opportunity.opp_close_date"):
+        motivos["closed_win_date"] = "la opp no tiene opp_close_date cargada"
+
+    # "Candidate Signed Date (Deal)": el popup de Signed no pide fecha, asi que es el
+    # dia en que la opp paso a Signed en el hub (lo sella update_opportunity_stage).
+    # Las que pasaron a Signed antes del 2026-10-08 no la tienen.
+    if not poner("candidate_signed_date", _norm_date(row.get("signed_date")), "opportunity.signed_date"):
+        motivos["candidate_signed_date"] = "la opp no tiene signed_date (paso a Signed antes de que se sellara)"
 
     # OJO: "Role Hired" es el PUESTO, no la persona. Verificado contra los 26 deals
     # de Closed Win que lo tienen cargado: dicen "Accounts Payable", "Fund

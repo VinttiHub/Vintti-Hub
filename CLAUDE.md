@@ -500,7 +500,37 @@ siempre y dispara `createSalaryUpdateFromInputs()` / `updateHireField()` — el 
 que resuelve el branch por modelo, el revenue derivado y el dedupe de `salary_updates`.
 `POST /opportunities/<id>/hubspot-hire-applied` sella que ya se aplicó.
 
-Fechas: `hs_v2_date_entered_<stage>` → `deep_dive_date` / `nda_sent_date` /
+### Fechas de stage: las de negocio mandan (desde 2026-10-08)
+
+HubSpot exige al pasar de stage una propiedad de fecha (tipo `date`) que tipea una persona.
+Reemplazan a `hs_v2_date_entered_*`, que es cuándo se hizo click:
+
+| HubSpot | Dirección | Hub |
+|---|---|---|
+| `nda_sent_date_deal` | HubSpot → hub | `nda_sent_date` |
+| `nda_signed_date_deal` | HubSpot → hub | `nda_signature_or_start_date` (arranque de Sourcing) |
+| `candidate_signed_date_deal` | hub → HubSpot (push) | `opportunity.signed_date` |
+| `closed_win_date_deal` | hub → HubSpot (push, sólo al cerrar) | `opp_close_date` |
+| `closed_lost_date_deal` | hub → HubSpot (push de Closed Lost) | `opp_close_date` |
+
+- **Entrante** (`_apply_stage_dates()` en `hubspot_routes.py`, alias en
+  `BUSINESS_DATE_FIELD_TO_COLUMN`): precedencia **negocio > entrada al stage > inferida**. La de
+  negocio pisa el hub **sólo cuando cambia en HubSpot** (foto en `opportunity.hubspot_dates_seen`
+  JSONB, mismo patrón que `hubspot_model_seen`; la primera vez cuenta como cambio). Si la
+  recruiter la corrige en el hub después, gana el hub y sale `fecha_distinta` en el reporte. En
+  una opp cerrada sólo rellena NULL. Un deal sin la propiedad (los anteriores) sigue la regla de
+  abajo. `deep_dive_date` no tiene propiedad de negocio. `unlink-deal` borra la foto.
+- **`signed_date`** no la pide ningún popup: la sella `update_opportunity_stage` (y el sync si
+  mueve a Signed) con `today_ar()` al pasar a Signed. Las opps firmadas antes no la tienen y el
+  push lo dice en `omitidos`. Columnas autocreadas en `_ensure_dates_seen_columns()` /
+  `_ensure_push_columns()` / `_ensure_opportunity_stage_date_columns()`, aparte por el
+  cortocircuito de `_ensure_hubspot_opportunity_columns()`.
+- Las 3 que empuja el hub **se pisan siempre** (`PUSH_OVERWRITE`). Al deployar, la huella de las
+  opps atadas cambia y el cron las re-empuja una vez: completa `closed_win_date_deal` en las
+  Close Win (alguien ya había cargado muchas a mano en HubSpot). Las Closed Lost viejas no se
+  re-empujan solas.
+
+Sin fecha de negocio: `hs_v2_date_entered_<stage>` → `deep_dive_date` / `nda_sent_date` /
 `nda_signature_or_start_date`. En una opp abierta **gana la más temprana** (`LEAST`): HubSpot
 rellena o adelanta la fecha del hub, **nunca la atrasa**. En una cerrada sólo rellena los NULL.
 Ojo que `nda_signature_or_start_date` es ancla de ~10 datasets.
@@ -524,7 +554,7 @@ Una carga tardía, un retroceso o una prueba en HubSpot siempre producen fechas 
 detecta el cambio — misma semántica que el `CURRENT_DATE` del hub al mover el stage a
 mano — y lo marca como `fechas_inferidas` en el reporte para no hacerlo pasar por dato
 de HubSpot. Sólo aplica a la etapa donde el deal está parado: si saltó de Deep Dive a
-NDA Signed no se inventa un `nda_sent_date`.
+NDA Signed no se inventa un `nda_sent_date`. Desde el 2026-10-08 no corre si el deal trae `nda_sent_date_deal`.
 
 Efectos que el sync SÍ dispara: `create_stage_todos` y, sólo al crear, el mail interno de
 Credit Loop (`HUBSPOT_OPP_SYNC_SEND_EMAILS=false` lo apaga). Los que **nunca** dispara:

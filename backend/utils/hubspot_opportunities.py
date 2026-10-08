@@ -225,6 +225,22 @@ OPPORTUNITY_FIELD_ALIASES = {
     # y desde el 2026-10-05 es el ancla del SQL en el tab Sales. Si falta, se usa
     # la fecha de entrada al stage SQL (ver sql_date_from_deal).
     "sql_date": ["sql_date_deal", "SQL Date (Deal)", "SQL Date"],
+    # Fechas de negocio que HubSpot exige al pasar a cada stage (desde 2026-10-08).
+    # Las carga una persona, asi que reemplazan a `hs_v2_date_entered_*` (que es
+    # cuando se hizo click). Las dos primeras van HubSpot -> hub; las otras tres
+    # las escribe el sync INVERSO desde el hub (Signed / Close Win / Closed Lost).
+    "nda_sent_date_biz": ["nda_sent_date_deal", "NDA Sent Date (Deal)"],
+    "nda_signed_date_biz": ["nda_signed_date_deal", "NDA Signed Date (Deal)"],
+    "candidate_signed_date": ["candidate_signed_date_deal", "Candidate Signed Date (Deal)"],
+    "closed_win_date": ["closed_win_date_deal", "Closed Win Date (Deal)"],
+    "closed_lost_date": ["closed_lost_date_deal", "Closed Lost Date (Deal)"],
+}
+
+# Fecha de negocio de HubSpot -> columna de fecha del hub. Gana sobre la fecha de
+# entrada al stage (ver business_dates_from_deal y _apply_stage_dates en la ruta).
+BUSINESS_DATE_FIELD_TO_COLUMN = {
+    "nda_sent_date_biz": "nda_sent_date",
+    "nda_signed_date_biz": "nda_signature_or_start_date",
 }
 
 # Campos de negocio que HubSpot carga en NDA Sent -> columna del hub.
@@ -733,6 +749,26 @@ def fill_missing_entry_date(stage_dates, stage_key, today):
         return None
     stage_dates[column] = today
     return column
+
+
+def business_dates_from_deal(deal_props, property_map, parse_date):
+    """{columna del hub: date} con las fechas de negocio que el deal tenga cargadas.
+
+    Desde el 2026-10-08 HubSpot exige "NDA Sent Date (Deal)" y "NDA Signed Date
+    (Deal)" al pasar a esos stages. Las tipea una persona, asi que dicen CUANDO
+    paso, no cuando alguien hizo click: ganan sobre `hs_v2_date_entered_*` y sobre
+    la fecha inferida. Los deals anteriores no las tienen y siguen como antes.
+    """
+    values = {}
+    props = deal_props or {}
+    for field, column in BUSINESS_DATE_FIELD_TO_COLUMN.items():
+        prop = (property_map or {}).get(field)
+        if not prop:
+            continue
+        parsed = parse_date(props.get(prop))
+        if parsed is not None:
+            values[column] = parsed
+    return values
 
 
 def resolve_opportunity_property_map(client, force_refresh=False):

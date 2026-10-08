@@ -36,8 +36,10 @@ PUSH_FIELDS = (
     # la ficha del candidato.
     "price_type", "computer", "candidate_start_date", "candidate_end_date",
     "candidate_address", "candidate_dni", "candidate_location",
+    # Fecha de negocio que HubSpot exige al pasar a Signed (desde 2026-10-08).
+    "candidate_signed_date",
     # Solo viajan al cerrar. Ver PUSH_SOLO_AL_CERRAR.
-    "close_date", "mkt_collab",
+    "close_date", "mkt_collab", "closed_win_date",
 )
 
 # `closedate` es la unica propiedad con doble sentido segun el stage: en un deal
@@ -50,7 +52,9 @@ PUSH_FIELDS = (
 # corrio el sync en vez de cuando se cerro de verdad.
 # `mkt_collab` tambien: HubSpot lo exige recien en Closed Win, y antes de eso la
 # recruiter no lo cargo todavia.
-PUSH_SOLO_AL_CERRAR = {"close_date", "mkt_collab"}
+# `closed_win_date` ("Closed Win Date (Deal)") por lo mismo que mkt_collab: HubSpot
+# la exige recien en Closed Won.
+PUSH_SOLO_AL_CERRAR = {"close_date", "mkt_collab", "closed_win_date"}
 
 # Todo lo que el hub pisa. Medido contra los 33 deals de Closed Win: estos 10
 # campos estan cargados en **0** de 33, o sea que nadie los completa del lado de
@@ -162,9 +166,15 @@ def is_closed_lost(opp_stage):
     return str(opp_stage or "").strip().lower() == HUB_CLOSED_LOST
 
 
+# "Closed Lost Date (Deal)": la fecha de negocio que HubSpot exige al pasar a
+# Closed Lost (desde 2026-10-08). Sale de la misma opp_close_date del popup.
+CLOSED_LOST_DATE_PROPERTY = "closed_lost_date_deal"
+
+
 def closed_lost_properties_to_fetch():
     return ["dealstage", "pipeline", "dealname", "closedate",
-            CLOSED_LOST_REASON_PROPERTY, CLOSED_LOST_DETAIL_PROPERTY]
+            CLOSED_LOST_REASON_PROPERTY, CLOSED_LOST_DETAIL_PROPERTY,
+            CLOSED_LOST_DATE_PROPERTY]
 
 
 def build_closed_lost_payload(opp, deal_props, pipeline_map):
@@ -215,6 +225,17 @@ def build_closed_lost_payload(opp, deal_props, pipeline_map):
             omitidos["closedate"] = "HubSpot ya tiene exactamente ese valor"
     else:
         omitidos["closedate"] = "la opp no tiene opp_close_date"
+
+    # Tipo `date` (no datetime como closedate): va "YYYY-MM-DD" pelado. Se pisa,
+    # igual que closedate: es la fecha de la perdida que cargo la recruiter.
+    if close_date:
+        fecha = str(close_date).strip()[:10]
+        if str(deal_props.get(CLOSED_LOST_DATE_PROPERTY) or "") != fecha:
+            props[CLOSED_LOST_DATE_PROPERTY] = fecha
+        else:
+            omitidos[CLOSED_LOST_DATE_PROPERTY] = "HubSpot ya tiene exactamente ese valor"
+    else:
+        omitidos[CLOSED_LOST_DATE_PROPERTY] = "la opp no tiene opp_close_date"
 
     motivo_hub = str(opp.get("motive_close_lost") or "").strip()
     motivo_key = motivo_hub.lower()

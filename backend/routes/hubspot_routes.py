@@ -2748,6 +2748,157 @@ def _ensure_model_seen_column(cursor):
     _MODEL_SEEN_READY = True
 
 
+# ---------------------------------------------------------------------------
+# Fechas de stage: las de NEGOCIO ganan cuando cambian en HubSpot.
+#
+# Desde el 2026-10-08 HubSpot exige "NDA Sent Date (Deal)" y "NDA Signed Date
+# (Deal)" al pasar a esos stages. Las tipea Mariano, asi que dicen cuando paso y
+# no cuando alguien hizo click (`hs_v2_date_entered_*`). Mismo patron que el Model:
+# `hubspot_dates_seen` guarda la ULTIMA fecha de negocio vista por columna, y solo
+# se pisa el hub cuando esa cambia. Si la recruiter la corrige en el hub despues,
+# el cron no se la deshace cada 30 min. En una opp cerrada solo rellena NULL.
+# Sin fecha de negocio (deals anteriores) sigue la regla vieja: LEAST / COALESCE.
+# ---------------------------------------------------------------------------
+
+_DATES_SEEN_READY = False
+
+STAGE_DATE_COLUMNS = ("deep_dive_date", "nda_sent_date", "nda_signature_or_start_date")
+
+
+def _dates_seen_column_exists(cursor):
+    cursor.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'opportunity' AND column_name = 'hubspot_dates_seen'
+        """
+    )
+    return cursor.fetchone() is not None
+
+
+def _ensure_dates_seen_columns(cursor):
+    """Crea `hubspot_dates_seen` y `signed_date`. APARTE de
+    _ensure_hubspot_opportunity_columns() por el cortocircuito de aquella (ver
+    _ensure_model_seen_column)."""
+    global _DATES_SEEN_READY
+    if _DATES_SEEN_READY:
+        return
+    if not _dates_seen_column_exists(cursor):
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS hubspot_dates_seen JSONB")
+    cursor.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'opportunity' AND column_name = 'signed_date'
+        """
+    )
+    if cursor.fetchone() is None:
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS signed_date DATE")
+    _DATES_SEEN_READY = True
+
+
+def _apply_stage_dates(cursor, opp, stage_dates, business_dates, dry_run, column_ready):
+    """Escribe las fechas de stage de una opp que ya existe. Devuelve lo que reportar.
+
+    Por columna:
+    - Con fecha de negocio: cerrada -> solo rellena NULL. Abierta -> pisa si la
+      fecha de negocio es distinta de la ultima vista (incluida la primera vez);
+      si es la misma y el hub difiere, gana el hub y se reporta `fecha_distinta`.
+    - Sin fecha de negocio: la regla de antes. En abierta gana la MAS TEMPRANA
+      (`hs_v2_date_entered_*` es cuando el AE hizo click, una carga tardia o un
+      retroceso dan fechas MAS NUEVAS); en cerrada solo rellena NULL.
+    """
+    opportunity_id = opp["opportunity_id"]
+    opp_cerrada = _opp_esta_cerrada(opp.get("opp_stage"))
+
+    seen = {}
+    if column_ready:
+        cursor.execute(
+            "SELECT hubspot_dates_seen FROM opportunity WHERE opportunity_id = %s",
+            (opportunity_id,),
+        )
+        row = cursor.fetchone()
+        raw = row["hubspot_dates_seen"] if row else None
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except ValueError:
+                raw = None
+        seen = raw if isinstance(raw, dict) else {}
+
+    asignaciones = []   # (sql, valor)
+    escritas = {}
+    de_negocio = {}
+    distintas = {}
+    nuevo_seen = {}
+
+    for col in STAGE_DATE_COLUMNS:
+        actual = opp.get(col)
+        actual_iso = _fecha_iso(actual)
+        biz = business_dates.get(col)
+        if biz is not None:
+            biz_iso = _fecha_iso(biz)
+            if seen.get(col) != biz_iso:
+                nuevo_seen[col] = biz_iso
+            if actual is None:
+                asignaciones.append(("{col} = COALESCE({col}, %s)".format(col=col), biz))
+                escritas[col] = biz
+            elif actual_iso == biz_iso:
+                pass
+            elif opp_cerrada:
+                distintas[col] = {"hub": actual_iso, "hubspot": biz_iso, "motivo": "opp_cerrada"}
+            elif seen.get(col) != biz_iso:
+                asignaciones.append(("{col} = %s".format(col=col), biz))
+                escritas[col] = biz
+                de_negocio[col] = {"antes": actual_iso, "despues": biz_iso}
+            else:
+                # HubSpot no cambio desde la ultima vez: la correccion del hub manda.
+                distintas[col] = {"hub": actual_iso, "hubspot": biz_iso}
+            continue
+
+        entrada = stage_dates.get(col)
+        if entrada is None:
+            continue
+        if actual is None:
+            asignaciones.append(("{col} = COALESCE({col}, %s)".format(col=col), entrada))
+            escritas[col] = entrada
+        elif not opp_cerrada and entrada < actual:
+            # LEAST ignora los NULL y nunca atrasa, aunque otra corrida la haya movido.
+            asignaciones.append(("{col} = LEAST({col}, %s)".format(col=col), entrada))
+            escritas[col] = entrada
+
+    reporte = {}
+    if escritas:
+        # Se reporta lo que se va a escribir de verdad: si el dry run anunciara un
+        # pisado que no va a ocurrir, el reporte y el mail estarian mintiendo.
+        reporte["dates_written"] = _iso_dates(escritas)
+        if opp_cerrada:
+            reporte["fechas_solo_rellenadas"] = True
+    if de_negocio:
+        reporte["fechas_de_negocio"] = de_negocio
+    if distintas:
+        reporte["fecha_distinta"] = distintas
+
+    if dry_run:
+        return reporte
+
+    if column_ready and nuevo_seen:
+        asignaciones.append((
+            "hubspot_dates_seen = COALESCE(hubspot_dates_seen, '{}'::jsonb) || %s::jsonb",
+            json.dumps(nuevo_seen),
+        ))
+    if asignaciones:
+        cursor.execute(
+            """
+            UPDATE opportunity
+               SET %s,
+                   hubspot_synced_at = NOW()
+             WHERE opportunity_id = %%s
+               AND NULLIF(hubspot_deal_id, '') IS NOT NULL
+            """ % ",\n                   ".join(sql for sql, _ in asignaciones),
+            tuple(v for _, v in asignaciones) + (opportunity_id,),
+        )
+    return reporte
+
+
 def _apply_model_from_hubspot(cursor, opp, model, dry_run, column_ready):
     """Aplica el Model de HubSpot a una opp que ya existe. Devuelve lo que reportar.
 
@@ -3108,10 +3259,20 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
     stage_dates = hs_opps.stage_dates_from_deal(
         pipeline_map, pipeline_id, props, _parse_hubspot_date
     )
-    # HubSpot no tiene propiedad de fecha para las dos etapas "NDA Sent": si falta
-    # la del stage donde esta el deal, se usa la fecha en que el sync lo detecta
-    # (misma semantica que el CURRENT_DATE del hub al mover el stage a mano).
-    inferida = hs_opps.fill_missing_entry_date(stage_dates, stage_key, today_ar())
+    # "NDA Sent Date (Deal)" / "NDA Signed Date (Deal)": las tipea una persona al
+    # pasar de stage (desde 2026-10-08) y ganan sobre la fecha de entrada.
+    business_dates = hs_opps.business_dates_from_deal(
+        props, opp_property_map, _parse_hubspot_date
+    )
+    # HubSpot no tiene propiedad de entrada para las dos etapas "NDA Sent": si falta
+    # la del stage donde esta el deal (y tampoco hay fecha de negocio), se usa la
+    # fecha en que el sync lo detecta (misma semantica que el CURRENT_DATE del hub
+    # al mover el stage a mano).
+    inferida = None
+    if hs_opps.STAGE_KEY_TO_DATE_COLUMN.get(stage_key) not in business_dates:
+        inferida = hs_opps.fill_missing_entry_date(stage_dates, stage_key, today_ar())
+    # Lo que se usa para CREAR una opp: la de negocio gana donde exista.
+    creation_dates = dict(stage_dates, **business_dates)
     role = str(props.get(opp_property_map.get("role_to_hire") or "") or "").strip()
     model = _first_mapped_value(property_maps, "contract", deal=deal) or None
     # Budget, salario, experiencia y fees esperados: HubSpot los pide al pasar a
@@ -3156,8 +3317,8 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             item["link_candidates"] = []
             item["would_action"] = "created"
             item["reason"] = "advanced"
-            item["hub_stage_after"] = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
-            item["dates_written"] = _iso_dates(stage_dates)
+            item["hub_stage_after"] = hs_opps.initial_stage_for_new_opportunity(stage_key, creation_dates)
+            item["dates_written"] = _iso_dates(creation_dates)
             return item
         _write_account_sql_date(cursor, account_id, sql_date, dry_run, item)
 
@@ -3226,13 +3387,13 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                     )
                 return _skip(deal, "waiting_for_decision", **item)
 
-            initial_stage = hs_opps.initial_stage_for_new_opportunity(stage_key, stage_dates)
+            initial_stage = hs_opps.initial_stage_for_new_opportunity(stage_key, creation_dates)
             if dry_run:
                 item["link_candidates"] = candidatas
                 item["would_action"] = "created"
                 item["reason"] = "advanced"
                 item["hub_stage_after"] = initial_stage
-                item["dates_written"] = _iso_dates(stage_dates)
+                item["dates_written"] = _iso_dates(creation_dates)
                 return item
             new_id = _insert_opportunity_from_deal(cursor, {
                 "account_id": account_id,
@@ -3240,9 +3401,9 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                 "position": role,
                 "sales_lead": entry["sales_lead"],
                 "opp_stage": initial_stage,
-                "deep_dive_date": stage_dates["deep_dive_date"],
-                "nda_sent_date": stage_dates["nda_sent_date"],
-                "nda_signed_date": stage_dates["nda_signature_or_start_date"],
+                "deep_dive_date": creation_dates["deep_dive_date"],
+                "nda_sent_date": creation_dates["nda_sent_date"],
+                "nda_signed_date": creation_dates["nda_signature_or_start_date"],
                 "deal_id": deal_id,
                 "pipeline_id": pipeline_id,
                 "dealstage_id": dealstage_id,
@@ -3252,7 +3413,14 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
             item["reason"] = "advanced"
             item["opportunity_id"] = new_id
             item["hub_stage_after"] = initial_stage
-            item["dates_written"] = _iso_dates(stage_dates)
+            item["dates_written"] = _iso_dates(creation_dates)
+            # Foto de las fechas de negocio con las que nacio: sin ella, la proxima
+            # corrida la leeria como "primera vez" y pisaria una correccion del hub.
+            if business_dates and ctx.get("dates_seen_ready", False):
+                cursor.execute(
+                    "UPDATE opportunity SET hubspot_dates_seen = %s::jsonb WHERE opportunity_id = %s",
+                    (json.dumps(_iso_dates(business_dates)), new_id),
+                )
             # La opp recien nacida tiene todo en NULL, asi que entra todo lo que
             # HubSpot tenga cargado.
             completados = _apply_business_fields(cursor, new_id, business, None, dry_run)
@@ -3316,8 +3484,21 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
     item["reason"] = reason
 
     if new_stage and not dry_run:
+        # Mismo sello que update_opportunity_stage al pasar a Signed: el push lo
+        # manda a "Candidate Signed Date (Deal)".
+        sella_signed = new_stage == "Signed" and ctx.get("dates_seen_ready", False)
         cursor.execute(
             """
+            UPDATE opportunity
+               SET opp_stage = %s,
+                   hubspot_dealstage_id = %s,
+                   hubspot_pipeline_id = %s,
+                   signed_date = CASE WHEN %s THEN COALESCE(signed_date, %s)
+                                      ELSE signed_date END,
+                   hubspot_synced_at = NOW()
+             WHERE opportunity_id = %s
+               AND COALESCE(opp_stage, '') = %s
+            """ if sella_signed else """
             UPDATE opportunity
                SET opp_stage = %s,
                    hubspot_dealstage_id = %s,
@@ -3326,7 +3507,9 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
              WHERE opportunity_id = %s
                AND COALESCE(opp_stage, '') = %s
             """,
-            (new_stage, dealstage_id, pipeline_id, opportunity_id, opp.get("opp_stage") or ""),
+            (new_stage, dealstage_id, pipeline_id)
+            + ((True, today_ar()) if sella_signed else ())
+            + (opportunity_id, opp.get("opp_stage") or ""),
         )
         if cursor.rowcount == 0:
             return _skip(deal, "stage_changed_concurrently", **item)
@@ -3340,61 +3523,21 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
         item["hub_stage_after"] = new_stage
         changed = True
 
-    # Fechas: en una opp ABIERTA gana la MAS TEMPRANA. HubSpot puede rellenar o
-    # adelantar una fecha del hub, nunca atrasarla: `hs_v2_date_entered_*` es cuando
-    # el AE hizo click, no cuando paso. Hasta el 2026-09-23 HubSpot pisaba siempre, y
-    # el 11-sep una puesta al dia en HubSpot llevo la NDA Signed de la 782 del 26-ago
-    # al 11-sep; el 17-sep, deshacer un push de prueba re-entro 8 deals a NDA Signed y
-    # la 780 quedo "firmada" un dia antes del cierre. Una carga tardia, un retroceso o
-    # una prueba siempre dan fechas MAS NUEVAS, asi que con esta regla no rompen nada.
-    # En una CERRADA solo se rellenan los NULL: Flamingo cerro el 16-jun con el deal
-    # en NDA Signed de mayo, y nda_signature_or_start_date es ancla de ~10 datasets.
-    opp_cerrada = _opp_esta_cerrada(opp.get("opp_stage"))
-
-    def _hubspot_gana(actual, nueva):
-        if actual is None:
-            return True
-        if opp_cerrada:
-            return False
-        return nueva < actual
-
-    dates_written = {
-        column: value
-        for column, value in stage_dates.items()
-        if value is not None and _hubspot_gana(opp.get(column), value)
-    }
-    if dates_written:
-        # Se reporta lo que se va a escribir de verdad: si el dry run anunciara un
-        # pisado que no va a ocurrir, el reporte y el mail estarian mintiendo.
-        item["dates_written"] = _iso_dates(dates_written)
-        if opp_cerrada:
-            item["fechas_solo_rellenadas"] = True
-        changed = True
-        if not dry_run:
-            # LEAST ignora los NULL: rellena un NULL del hub y un NULL del parametro
-            # (fecha que HubSpot no manda) no borra nada.
-            asignacion = ("{col} = COALESCE({col}, %s)" if opp_cerrada
-                          else "{col} = LEAST({col}, %s)")
-            sets = ",\n                       ".join(
-                asignacion.format(col=col)
-                for col in ("deep_dive_date", "nda_sent_date",
-                            "nda_signature_or_start_date")
-            )
-            cursor.execute(
-                """
-                UPDATE opportunity
-                   SET %s,
-                       hubspot_synced_at = NOW()
-                 WHERE opportunity_id = %%s
-                   AND NULLIF(hubspot_deal_id, '') IS NOT NULL
-                """ % sets,
-                (
-                    dates_written.get("deep_dive_date"),
-                    dates_written.get("nda_sent_date"),
-                    dates_written.get("nda_signature_or_start_date"),
-                    opportunity_id,
-                ),
-            )
+    # Fechas: la de NEGOCIO de HubSpot gana cuando cambia; sin ella, en una opp
+    # ABIERTA gana la MAS TEMPRANA. Hasta el 2026-09-23 HubSpot pisaba siempre, y el
+    # 11-sep una puesta al dia en HubSpot llevo la NDA Signed de la 782 del 26-ago al
+    # 11-sep; el 17-sep, deshacer un push de prueba re-entro 8 deals a NDA Signed y la
+    # 780 quedo "firmada" un dia antes del cierre. En una CERRADA solo se rellenan los
+    # NULL: Flamingo cerro el 16-jun con el deal en NDA Signed de mayo, y
+    # nda_signature_or_start_date es ancla de ~10 datasets. Ver _apply_stage_dates.
+    fechas = _apply_stage_dates(
+        cursor, opp, stage_dates, business_dates, dry_run,
+        ctx.get("dates_seen_ready", False),
+    )
+    if fechas:
+        item.update(fechas)
+        if "dates_written" in fechas:
+            changed = True
 
     completados = _apply_business_fields(cursor, opportunity_id, business, opp, dry_run)
     grabaciones = _apply_recording_fields(cursor, opportunity_id, recordings, opp, dry_run)
@@ -3597,9 +3740,13 @@ def sync_hubspot_opportunities():
             _ensure_hubspot_deal_decisions_table(cursor)
             _ensure_hubspot_deals_waiting_table(cursor)
             _ensure_model_seen_column(cursor)
+            _ensure_dates_seen_columns(cursor)
             schema_ready = True
         model_seen_ready = (
             _model_seen_column_exists(cursor) if dry_run else True
+        )
+        dates_seen_ready = (
+            _dates_seen_column_exists(cursor) if dry_run else True
         )
         conn.commit()   # soltar el ACCESS EXCLUSIVE antes del loop
 
@@ -3649,6 +3796,7 @@ def sync_hubspot_opportunities():
             "dry_run": dry_run,
             "schema_ready": schema_ready,
             "model_seen_ready": model_seen_ready,
+            "dates_seen_ready": dates_seen_ready,
             "allow_ambiguous": allow_ambiguous,
             "send_emails": send_emails,
             "deal_extra_properties": deal_extra_properties,
@@ -4506,6 +4654,8 @@ def unlink_opportunity_from_hubspot_deal(opportunity_id):
             # La foto del Model es del deal viejo: sin limpiarla, al atar otro deal
             # la opp no cae en "recien vinculada" y no toma el Model del nuevo.
             _ensure_model_seen_column(cursor)
+            # Idem con la foto de las fechas de negocio.
+            _ensure_dates_seen_columns(cursor)
             conn.commit()
             cursor.execute(
                 """
@@ -4515,7 +4665,8 @@ def unlink_opportunity_from_hubspot_deal(opportunity_id):
                        hubspot_dealstage_id = NULL,
                        hubspot_push_hash = NULL,
                        hubspot_pushed_at = NULL,
-                       hubspot_model_seen = NULL
+                       hubspot_model_seen = NULL,
+                       hubspot_dates_seen = NULL
                  WHERE opportunity_id = %s
                 RETURNING opportunity_id
                 """,
@@ -4622,6 +4773,15 @@ def preview_hubspot_opportunities():
                 "resolved": bool(sql_date_property),
                 "nota": "si esta vacia se usa la entrada al stage SQL",
             },
+            **{
+                column: {
+                    "hubspot_property": opp_property_map.get(field),
+                    "hubspot_label": labels_by_name.get(opp_property_map.get(field) or ""),
+                    "resolved": bool(opp_property_map.get(field)),
+                    "nota": "gana cuando cambia en HubSpot; si esta vacia se usa la entrada al stage",
+                }
+                for field, column in hs_opps.BUSINESS_DATE_FIELD_TO_COLUMN.items()
+            },
             "opp_sales_lead": {
                 "hubspot_property": "(el pipeline del deal)",
                 "hubspot_label": None,
@@ -4658,6 +4818,12 @@ def preview_hubspot_opportunities():
                 intro_rec_property, deep_rec_property, sql_date_property,
             ) if p
         ]
+        # Las fechas de negocio (NDA Sent / NDA Signed Date (Deal)).
+        biz_date_property = {
+            column: opp_property_map.get(field)
+            for field, column in hs_opps.BUSINESS_DATE_FIELD_TO_COLUMN.items()
+        }
+        extra.extend(p for p in biz_date_property.values() if p)
         extra.extend(pipeline_map["date_properties"])
         if only_deal_id:
             deals = [client.get_deal_with_associations(only_deal_id, extra_properties=extra)]
@@ -4699,6 +4865,9 @@ def preview_hubspot_opportunities():
 
             stage_dates = hs_opps.stage_dates_from_deal(
                 pipeline_map, pipeline_id, props, _parse_hubspot_date
+            )
+            business_dates = hs_opps.business_dates_from_deal(
+                props, opp_property_map, _parse_hubspot_date
             )
             role = str(props.get(role_property or "") or "").strip()
             model = _first_mapped_value(property_maps, "contract", deal=deal) or None
@@ -4754,12 +4923,27 @@ def preview_hubspot_opportunities():
                 ("nda_signed", "nda_signature_or_start_date"),
             ):
                 prop = entry["date_property_by_key"].get(stage_key_date)
+                biz_prop = biz_date_property.get(column)
+                if business_dates.get(column):
+                    # La fecha de negocio gana sobre la de entrada al stage.
+                    value = business_dates[column]
+                    fields.append({
+                        "hub_column": column,
+                        "hubspot_property": biz_prop,
+                        "valor_en_hubspot": props.get(biz_prop or ""),
+                        "entraria_como": value.isoformat(),
+                        "nota": "fecha de negocio; la de entrada (%s) era %s"
+                                % (prop, props.get(prop or "") or "vacia"),
+                    })
+                    continue
                 value = stage_dates.get(column)
                 fields.append({
                     "hub_column": column,
                     "hubspot_property": prop,
                     "valor_en_hubspot": props.get(prop or ""),
                     "entraria_como": value.isoformat() if value else None,
+                    **({"nota": "%s vacia: se usa la fecha de entrada al stage" % biz_prop}
+                       if biz_prop else {}),
                 })
             fields.append({
                 "hub_column": "hubspot_setup_fee",
@@ -4891,7 +5075,8 @@ def _ensure_push_columns(cursor):
         """
         SELECT column_name FROM information_schema.columns
          WHERE table_name = 'opportunity'
-           AND column_name IN ('hubspot_pushed_at', 'hubspot_push_hash', 'mkt_collab')
+           AND column_name IN ('hubspot_pushed_at', 'hubspot_push_hash', 'mkt_collab',
+                               'signed_date')
         """
     )
     presentes = {r["column_name"] if isinstance(r, dict) else r[0] for r in cursor.fetchall()}
@@ -4905,6 +5090,10 @@ def _ensure_push_columns(cursor):
         # HubSpot tenga (direccion entrante); esta es el dato del hub, que es el
         # que viaja hacia HubSpot.
         cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS mkt_collab TEXT")
+    if "signed_date" not in presentes:
+        # Dia en que la opp paso a Signed (lo sella update_opportunity_stage); el
+        # push la manda a "Candidate Signed Date (Deal)".
+        cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS signed_date DATE")
     _PUSH_SCHEMA_READY = True
 
 

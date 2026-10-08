@@ -10,6 +10,7 @@ from datetime import date, datetime
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, execute_values
 
+from dashboards.datasets._now import today_ar
 from db import get_connection
 from utils import services
 from utils.account_status import derive_account_status
@@ -55,6 +56,9 @@ def _ensure_opportunity_stage_date_columns(cursor):
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS stage_before_closed_lost TEXT")
+    # Dia en que la opp paso a Signed. El popup de Signed no pide fecha, asi que se
+    # sella al mover el stage; el push la manda a "Candidate Signed Date (Deal)".
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS signed_date DATE")
 
 
 def _is_deep_dive_stage(stage):
@@ -1274,6 +1278,10 @@ def update_opportunity_stage(opportunity_id):
                             WHEN %s THEN COALESCE(nda_sent_date, CURRENT_DATE)
                             ELSE nda_sent_date
                         END,
+                        signed_date = CASE
+                            WHEN %s THEN COALESCE(signed_date, %s)
+                            ELSE signed_date
+                        END,
                         stage_before_closed_lost = CASE
                             WHEN %s THEN %s
                             ELSE stage_before_closed_lost
@@ -1284,6 +1292,8 @@ def update_opportunity_stage(opportunity_id):
                         new_stage,
                         stage_changed and _is_deep_dive_stage(new_stage),
                         stage_changed and _is_nda_sent_stage(new_stage),
+                        stage_changed and _is_signed_stage(new_stage),
+                        today_ar(),
                         stage_changed and _is_closed_lost_stage(new_stage),
                         previous_stage,
                         opportunity_id,
