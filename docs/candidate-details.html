@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261007-cv-checklist4" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261008-am-reminder" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -1095,6 +1095,17 @@
                 <div class="rem-msg" id="msg-jaz"></div>
               </li>
 
+              <!-- El AM de hoy (Pilar): solo en opps de Account Management (am_applies). -->
+              <li id="rem-am-row" style="display:none">
+                <label class="rem-chk">
+                  <input type="checkbox" id="rem-am" />
+                  <span class="rem-box"></span>
+                  <span class="rem-name">Pilar · Account Management</span>
+                </label>
+                <div class="rem-countdown" id="cd-am">—</div>
+                <div class="rem-msg" id="msg-am"></div>
+              </li>
+
               <!-- Lucia desactivada: hire reminders queda solo con Lara y Jazmin.
               <li>
                 <label class="rem-chk">
@@ -1437,7 +1448,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20260928-cvonly"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20261007-cv-checklist4"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20261008-am-reminder"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

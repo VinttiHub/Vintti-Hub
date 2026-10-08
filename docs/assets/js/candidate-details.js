@@ -5663,15 +5663,19 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   const btn   = document.getElementById('btn-send-reminders');
   const cbLar = document.getElementById('rem-lara');
   const cbJaz = document.getElementById('rem-jazmin');
+  const cbAm  = document.getElementById('rem-am');
+  const rowAm = document.getElementById('rem-am-row');
   // Lucia desactivada: hire reminders queda solo con Lara y Jazmin.
   // const cbAgs = document.getElementById('rem-agustin');
 
   const cdLar = document.getElementById('cd-lar');
   const cdJaz = document.getElementById('cd-jaz');
+  const cdAm  = document.getElementById('cd-am');
   // const cdAgs = document.getElementById('cd-agus');
 
   const msgLar = document.getElementById('msg-lar');
   const msgJaz = document.getElementById('msg-jaz');
+  const msgAm  = document.getElementById('msg-am');
   // const msgAgs = document.getElementById('msg-agus');
 
   let currentReminder = null;
@@ -5718,6 +5722,12 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
 
     if (cdLar) cdLar.textContent = currentReminder.lar ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueLar - now)}`;
     if (cdJaz) cdJaz.textContent = currentReminder.jaz ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueJaz - now)}`;
+    // El checkbox del AM solo existe en opps de Account Management (am_applies lo decide el backend).
+    if (rowAm) rowAm.style.display = currentReminder.am_applies ? '' : 'none';
+    if (cdAm && currentReminder.am_applies){
+      const dueAm = nextDue(press, currentReminder.last_am_sent_at);
+      cdAm.textContent = currentReminder.am ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueAm - now)}`;
+    }
     // if (cdAgs) cdAgs.textContent = currentReminder.agus ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueAgs - now)}`;
   }
 
@@ -5744,16 +5754,19 @@ async function loadReminder(){
 
   // 3) pinta UI
   if (!currentReminder){
-    [cbLar, cbJaz].forEach(cb=> cb && (cb.checked = false));
-    [cdLar, cdJaz].forEach(c=> c && (c.textContent = '—'));
+    [cbLar, cbJaz, cbAm].forEach(cb=> cb && (cb.checked = false));
+    [cdLar, cdJaz, cdAm].forEach(c=> c && (c.textContent = '—'));
+    if (rowAm) rowAm.style.display = 'none';
     return;
   }
   cbLar && (cbLar.checked = !!currentReminder.lar);
   cbJaz && (cbJaz.checked = !!currentReminder.jaz);
+  cbAm && (cbAm.checked = !!currentReminder.am);
   // cbAgs && (cbAgs.checked = !!currentReminder.agus);
 
   msgLar.textContent = currentReminder.lar ? "Congrats — no more reminders 😎" : "";
   msgJaz.textContent = currentReminder.jaz ? "Congrats — no more reminders 😎" : "";
+  if (msgAm) msgAm.textContent = currentReminder.am ? "Congrats — no more reminders 😎" : "";
   // msgAgs.textContent = currentReminder.agus ? "Congrats — no more reminders 😎" : "";
 
   startTicker();
@@ -5778,7 +5791,7 @@ async function createAndSend(){
 
     currentReminder = out.row;
     // Al “press”, los checks siguen como estén (no los reseteamos)
-    [msgLar, msgJaz].forEach(m=> m && (m.textContent = '')); // limpio mensajes
+    [msgLar, msgJaz, msgAm].forEach(m=> m && (m.textContent = '')); // limpio mensajes
     startTicker();
     showFireworks("Kickoff sent — Vintti Hub on it! 🎉"); // feedback UX
   }catch(e){
@@ -5800,8 +5813,8 @@ async function createAndSend(){
     currentReminder = row;
     // mensaje + fueguitos si quedó en true
     if (value){
-      const who = field === 'lar' ? 'Lara' : 'Jazmin';
-      const el = field === 'lar' ? msgLar : msgJaz;
+      const who = field === 'lar' ? 'Lara' : field === 'am' ? 'Pilar' : 'Jazmin';
+      const el = field === 'lar' ? msgLar : field === 'am' ? msgAm : msgJaz;
       if (el) el.textContent = "Congrats — no more reminders 😎";
       showFireworks(`Thanks ${who}! Vintti Hub loves completed checkboxes ✨`);
     }
@@ -5812,6 +5825,7 @@ async function createAndSend(){
   btn && btn.addEventListener('click', createAndSend);
   cbLar && cbLar.addEventListener('change', ()=> patchCheck('lar', cbLar.checked));
   cbJaz && cbJaz.addEventListener('change', ()=> patchCheck('jaz', cbJaz.checked));
+  cbAm && cbAm.addEventListener('change', ()=> patchCheck('am', cbAm.checked));
   // cbAgs && cbAgs.addEventListener('change', ()=> patchCheck('agus', cbAgs.checked));
 
   // primera carga

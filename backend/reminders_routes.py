@@ -11,6 +11,7 @@ from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
 from utils.second_interview_refs import run_due_second_interview_refs_reminders
 from utils.profile_completion_reminder import run_due_profile_reminders
 from utils.birthday_calendar import run_weekly_birthday_report
+from utils.am_roster import am_history, current_ams
 from utils.stale_opps_slack import run_stale_opps_alert
 import requests
 import html
@@ -27,7 +28,9 @@ AGOSTINA_EMAIL = "agostina@vintti.com"
 MIA_EMAIL = "mia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 PGONZALES_EMAIL = "pgonzales@vintti.com"
-CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL]
+# M1-M6 van a Jazmin + el AM de hoy (Pilar desde 2026-10-08; antes Lara). El AM sale
+# de users.role via current_ams(), no de un email escrito a mano.
+CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS = [JAZ_EMAIL]
 CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS = [JAZ_EMAIL]
 
 
@@ -340,6 +343,7 @@ def press_and_send(candidate_id):
     data = request.get_json(silent=True) or {}
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_hire_reminders_am_columns(cur)
         # igual que antes ...
         cur.execute("""
             SELECT * FROM hire_reminders
@@ -365,7 +369,7 @@ def press_and_send(candidate_id):
         hire = _fetch_hire_core(candidate_id, cur)
         if not hire:
             conn.commit()
-            return jsonify({"row": _serialize_reminder(row), "email_sent": False, "warning":"hire not found for candidate"}), 404
+            return jsonify({"row": _serialize_reminder_with_am(cur, row), "email_sent": False, "warning":"hire not found for candidate"}), 404
 
         opportunity_id = hire["opportunity_id"]
         ctx = _fetch_email_context(candidate_id, opportunity_id, cur)
@@ -422,7 +426,10 @@ def press_and_send(candidate_id):
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]  # hire reminders activos
+        # Pilar (el AM de hoy) se suma solo si la opp es de Account Management.
+        to_list = _dedupe_emails(
+            [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL] + _am_recipients_for_opp(cur, opportunity_id)
+        )
         # Lucia desactivada para hire reminders.
         # to_list = [JAZ_EMAIL, LAR_EMAIL, LUCIA_EMAIL, PGONZALES_EMAIL]
 
@@ -442,9 +449,10 @@ def press_and_send(candidate_id):
             to=to_list
         )
 
+        row = _serialize_reminder_with_am(cur, row)
         conn.commit()
         return jsonify({
-            "row": _serialize_reminder(row),
+            "row": row,
             "email_sent": bool(ok),
             "opp_model": opp_type  # útil para debug en el front
         })
@@ -452,7 +460,7 @@ def press_and_send(candidate_id):
 def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
-    for k in ("press_date", "last_jaz_sent_at", "last_lar_sent_at", "last_agus_sent_at"):
+    for k in ("press_date", "last_jaz_sent_at", "last_lar_sent_at", "last_agus_sent_at", "last_am_sent_at"):
 
         v = row.get(k)
         if v is not None:
@@ -461,6 +469,15 @@ def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any
             except Exception:
                 row[k] = str(v)
     return row
+
+
+def _serialize_reminder_with_am(cur, row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Igual que _serialize_reminder + `am_applies`: el front muestra el checkbox del AM
+    solo si la opp es de Account Management (es a quien le llega el recordatorio)."""
+    out = _serialize_reminder(row)
+    if out is not None:
+        out["am_applies"] = bool(_am_recipients_for_opp(cur, out.get("opportunity_id")))
+    return out
 
 def _anchor(text, url):
     return f'<a href="{html.escape(url)}" target="_blank" rel="noopener">{html.escape(text)}</a>'
@@ -693,6 +710,7 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
             o.opp_position_name,
             o.opp_close_date::date AS opp_close_date,
             o.mkt_collab,
+            o.opp_sales_lead,
             COALESCE(o.candidato_contratado, ho.candidate_id) AS candidate_id,
             a.client_name,
             a.where_come_from,
@@ -764,7 +782,9 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
     computer = (hire_for_opp or {}).get("computer")
 
     # Bahía salió de los Close Win el 2026-09-22 (pedido de la owner).
-    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL])
+    # Pilar (el AM de hoy) se suma solo si la opp es de Account Management.
+    am_to = list(current_ams()) if _is_am_sales_lead(ctx.get("opp_sales_lead")) else []
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL] + am_to)
     ok = _send_email(
         subject=f"🎉 Close Win: {ctx.get('candidate_name') or f'Candidate #{candidate_id}'} — Start {start_date or '—'}",
         html_body=_close_win_email_html(
@@ -907,6 +927,45 @@ def _dedupe_emails(values: List[str]) -> List[str]:
         seen.add(e)
         out.append(e)
     return out
+
+
+def _is_am_sales_lead(sales_lead) -> bool:
+    """Una opp es "de Account Management" si la vendio un AM (opp_sales_lead), el mismo
+    criterio que las cards del tab AM. am_history() incluye a los ex-AM (Lara) para que sus
+    opps sigan contando."""
+    return str(sales_lead or "").strip().lower() in am_history()
+
+
+def _am_recipients_for_opp(cur, opportunity_id) -> List[str]:
+    """El AM de hoy si la opp es de Account Management; si no, nadie."""
+    if not opportunity_id:
+        return []
+    cur.execute(
+        "SELECT opp_sales_lead FROM opportunity WHERE opportunity_id = %s",
+        (opportunity_id,),
+    )
+    row = cur.fetchone()
+    if not row or not _is_am_sales_lead(row.get("opp_sales_lead")):
+        return []
+    return list(current_ams())
+
+
+_HIRE_REMINDERS_AM_READY = False
+
+
+def _ensure_hire_reminders_am_columns(cur):
+    """Checkbox del AM en el recordatorio de Signed. Columna generica (`am`, no el
+    nombre de la persona): el destinatario sale de current_ams(), asi un cambio de AM no
+    pide otra columna."""
+    global _HIRE_REMINDERS_AM_READY
+    if _HIRE_REMINDERS_AM_READY:
+        return
+    cur.execute("""
+        ALTER TABLE hire_reminders
+            ADD COLUMN IF NOT EXISTS am BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS last_am_sent_at TIMESTAMPTZ
+    """)
+    _HIRE_REMINDERS_AM_READY = True
 
 
 def _ensure_client_check_reminders_table(cur):
@@ -1163,7 +1222,7 @@ def _client_check_recipients(row: Dict[str, Any]) -> List[str]:
     except Exception:
         check_month = 0
     if 1 <= check_month <= 6:
-        return _dedupe_emails(CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS)
+        return _dedupe_emails(CLIENT_CHECK_FIRST_SIX_EMAIL_RECIPIENTS + list(current_ams()))
     return _dedupe_emails(CLIENT_CHECK_ONGOING_EMAIL_RECIPIENTS)
 
 
@@ -1589,6 +1648,7 @@ def ensure_reminder_row(candidate_id):
     """Crea una fila en hire_reminders si no existe todavía (por candidato).
        No envía correos. Deja press_date = NULL hasta que el usuario presione el botón."""
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_hire_reminders_am_columns(cur)
         # ¿Ya existe alguna fila para este candidato?
         cur.execute("""
             SELECT * FROM hire_reminders
@@ -1598,8 +1658,9 @@ def ensure_reminder_row(candidate_id):
         """, (candidate_id,))
         row = cur.fetchone()
         if row:
+            row = _serialize_reminder_with_am(cur, row)
             conn.commit()
-            return jsonify({"row": _serialize_reminder(row), "created": False})
+            return jsonify({"row": row, "created": False})
 
         # Necesitamos el opportunity_id en el que fue contratado
         cur.execute("""
@@ -1621,28 +1682,30 @@ def ensure_reminder_row(candidate_id):
             VALUES (%s, %s, NULL, FALSE, FALSE, FALSE)
             RETURNING *
         """, (candidate_id, opportunity_id))
-        row = cur.fetchone()
+        row = _serialize_reminder_with_am(cur, cur.fetchone())
         conn.commit()
-        return jsonify({"row": _serialize_reminder(row), "created": True})
+        return jsonify({"row": row, "created": True})
 
 @bp.route("/candidates/<int:candidate_id>/hire_reminders", methods=["GET"])
 def get_latest_reminder(candidate_id):
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_hire_reminders_am_columns(cur)
         cur.execute("""
             SELECT * FROM hire_reminders
              WHERE candidate_id = %s
              ORDER BY press_date DESC
              LIMIT 1
         """, (candidate_id,))
-        row = cur.fetchone()
-        return jsonify(_serialize_reminder(row) or {})
+        row = _serialize_reminder_with_am(cur, cur.fetchone())
+        conn.commit()
+        return jsonify(row or {})
 
 @bp.route("/hire_reminders/<int:reminder_id>", methods=["PATCH"])
 def update_checks(reminder_id):
     data = request.get_json() or {}
     fields = []
     vals = []
-    for k in ("jaz","lar","agus"):
+    for k in ("jaz","lar","agus","am"):
         if k in data:
             fields.append(f"{k} = %s")
             vals.append(bool(data[k]))
@@ -1650,10 +1713,11 @@ def update_checks(reminder_id):
         return jsonify({"error":"no fields to update"}), 400
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_hire_reminders_am_columns(cur)
         sql = f"UPDATE hire_reminders SET {', '.join(fields)} WHERE reminder_id = %s RETURNING *"
         vals.append(reminder_id)
         cur.execute(sql, tuple(vals))
-        row = cur.fetchone()
+        row = _serialize_reminder_with_am(cur, cur.fetchone())
         conn.commit()
         return jsonify(row or {})
 
@@ -1686,11 +1750,12 @@ def send_due_reminders():
     now = datetime.now(tz=BOGOTA_TZ)
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_hire_reminders_am_columns(cur)
         cur.execute("""
-          SELECT hr.*
+          SELECT hr.*, o.opp_sales_lead
             FROM hire_reminders hr
             JOIN opportunity o ON o.opportunity_id = hr.opportunity_id
-           WHERE (NOT hr.jaz OR NOT hr.lar)
+           WHERE (NOT hr.jaz OR NOT hr.lar OR NOT hr.am)
              AND hr.candidate_id = o.candidato_contratado
         """)
         rows = cur.fetchall() or []
@@ -1712,6 +1777,11 @@ def send_due_reminders():
             plan = []
             if not r["jaz"] and _should_send(now, press, r["last_jaz_sent_at"]): plan.append(("jaz", JAZ_EMAIL))
             if not r["lar"] and _should_send(now, press, r["last_lar_sent_at"]): plan.append(("lar", LAR_EMAIL))
+            # El AM de hoy (Pilar) solo en las opps de Account Management; tilda su propio checkbox.
+            if (not r["am"] and _is_am_sales_lead(r.get("opp_sales_lead"))
+                    and _should_send(now, press, r["last_am_sent_at"])):
+                for am_email in current_ams():
+                    plan.append(("am", am_email))
             # Lucia desactivada para hire reminders.
             # if not r["agus"] and _should_send(now, press, r["last_agus_sent_at"]): plan.append(("agus", LUCIA_EMAIL))
             
