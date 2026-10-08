@@ -142,10 +142,11 @@ HUB_CLOSED_LOST = "closed lost"
 
 # Popup del hub (`#closeLostReason` en opportunities.html) -> VALUE interno del
 # select `sql_ae_lost_reason`. Ojo con Timing: el label es "Timing" pero el value
-# es "Bad Timing", y HubSpot rechaza el label. "Internal Competition" no existe en
-# HubSpot: va como Other y la distincion viaja en el detalle (decision de la owner,
-# 2026-10-07). Se usa el de SQL y no el de MQL porque en el hub una opp existe
-# recien desde Deep Dive: el deal ya paso por SQL.
+# es "Bad Timing", y HubSpot rechaza el label. Lo mismo con la competencia: desde
+# 2026-10-08 HubSpot tiene las dos opciones, pero el value viejo "Competitor" quedo
+# con el label "Internal Competition" y External tiene value propio. Mandar
+# "Competitor" por External la mostraria como Internal. Se usa el de SQL y no el de
+# MQL porque en el hub una opp existe recien desde Deep Dive: el deal ya paso por SQL.
 CLOSED_LOST_REASON_PROPERTY = "sql_ae_lost_reason"
 CLOSED_LOST_DETAIL_PROPERTY = "lost_reason_detail_deal"
 CLOSED_LOST_REASON_MAP = {
@@ -156,10 +157,9 @@ CLOSED_LOST_REASON_MAP = {
     "vinttis fault": "Vintti's Fault",
     "vintti's fault": "Vintti's Fault",
     "other": "Other",
-    "external competition": "Competitor",
-    "internal competition": "Other",
+    "external competition": "External Competition",
+    "internal competition": "Competitor",
 }
-_REASON_PREFIX_IN_DETAIL = {"internal competition": "Internal Competition"}
 
 
 def is_closed_lost(opp_stage):
@@ -240,9 +240,6 @@ def build_closed_lost_payload(opp, deal_props, pipeline_map):
     motivo_hub = str(opp.get("motive_close_lost") or "").strip()
     motivo_key = motivo_hub.lower()
     detalle = str(opp.get("details_close_lost") or "").strip()
-    prefijo = _REASON_PREFIX_IN_DETAIL.get(motivo_key)
-    if prefijo:
-        detalle = "%s: %s" % (prefijo, detalle) if detalle else prefijo
 
     valor = CLOSED_LOST_REASON_MAP.get(motivo_key)
     if not motivo_hub:

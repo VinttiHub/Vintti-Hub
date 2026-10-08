@@ -792,8 +792,9 @@ Dive), `details_close_lost` → **Lost Reason Detail (Deal)**. Va por `build_clo
 y `_push_closed_lost()`, aparte del camino de Signed/CW (no hay hire ni montos).
 
 - **Timing se manda como `Bad Timing`**: es el *value* interno del select; HubSpot rechaza el
-  label. Internal Competition no existe en HubSpot: va como `Other` y el detalle arranca con
-  "Internal Competition: …" (decisión de la owner). External Competition → `Competitor`.
+  label. Lo mismo con la competencia (desde 2026-10-08 HubSpot tiene las dos): Internal
+  Competition → value `Competitor` (el value viejo quedó con ese label), External
+  Competition → `External Competition`. El detalle viaja tal cual, sin prefijo.
 - Motivo y detalle **sólo si HubSpot los tiene vacíos**; `closedate` se pisa.
 - Sólo mueve desde un stage abierto conocido. Deal en Closed Won o en uno que no seguimos (DQL)
   → no toca nada. Ya en Closed Lost → sólo rellena motivo/detalle.
