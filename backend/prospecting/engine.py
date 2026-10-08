@@ -30,7 +30,10 @@ import html
 import logging
 import random
 from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # Python 3.8 fallback (App Runner)
+    from backports.zoneinfo import ZoneInfo
 
 import requests
 

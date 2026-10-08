@@ -31,7 +31,10 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime, time, timedelta
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # Python 3.8 fallback (App Runner)
+    from backports.zoneinfo import ZoneInfo
 
 from prospecting.constants import (
     ACTIONS,
