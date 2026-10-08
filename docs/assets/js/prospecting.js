@@ -144,6 +144,7 @@
       start_to: $("prFStartTo").value,
       q: $("prFQ").value.trim(),
       dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
+      contact_incomplete: $("prFIncomplete").checked ? "1" : "",
       sort: state.sort,
       page: state.page,
       page_size: state.pageSize,
@@ -205,7 +206,10 @@
           ? '<a class="pr-company__domain" href="' + esc(r.website || ("https://" + r.domain)) + '" target="_blank" rel="noopener">' + esc(r.domain) + "</a>"
           : "";
         var dummy = r.is_dummy ? '<span class="pr-dummy-tag">DUMMY</span>' : "";
-        return '<div class="pr-company"><button type="button" class="pr-company__name" data-open="' + r.id + '">' + esc(r.name) + dummy + "</button>" + domain + "</div>";
+        return '<div class="pr-company"><div class="pr-company__line">' +
+          '<a class="pr-company__name" href="prospecting-company.html?id=' + r.id + '">' + esc(r.name) + "</a>" + dummy +
+          '<button type="button" class="pr-company__peek" data-open="' + r.id + '" title="Vista rápida"><i class="fa-regular fa-eye"></i></button>' +
+          "</div>" + domain + "</div>";
       } },
     { key: "week_label", label: "Semana", sort: "week_desc", def: true, render: function (r) { return cellText(r.week_label); } },
     { key: "lead_source", label: "Lead Source", def: true, render: function (r) { return cellText(r.lead_source); } },
@@ -218,8 +222,11 @@
         return cellSelect("not_icp_reason", OPTS.not_icp_reasons, r.not_icp_reason);
       } },
     { key: "prospecting_status", label: "Prospecting Status", def: true, render: function (r) {
-        return cellSelect("prospecting_status", OPTS.statuses, r.prospecting_status, " pr-status");
+        return cellSelect("prospecting_status", OPTS.statuses, r.prospecting_status, " pr-status") +
+          (r.contact_incomplete ? '<button type="button" class="pr-incomplete" data-complete="' + r.id + '" title="Le falta un contacto con los datos obligatorios">' +
+            '<i class="fa-solid fa-circle-exclamation"></i> Contacto incompleto</button>' : "");
       } },
+    { key: "contacts_count", label: "Contactos", num: true, render: function (r) { return cellText(r.contacts_count); } },
     { key: "keywords", label: "Keywords of the company", render: function (r) { return cellLong(r.keywords); } },
     { key: "technologies", label: "Technologies", render: function (r) { return cellLong(r.technologies); } },
     { key: "job_types", label: "Tipo de vacantes", render: function (r) { return cellLong(r.job_types); } },
@@ -315,7 +322,10 @@
       '<button type="button" class="pr-btn pr-btn--primary" id="prBulkGo"><i class="fa-solid fa-diagram-project"></i> Inscribir en workflow</button>' +
       '<button type="button" class="pr-btn" id="prBulkClear">Deseleccionar</button>';
     if (!wfChoices && window.ProspectingWorkflows) {
-      window.ProspectingWorkflows.workflows().then(function (r) { wfChoices = r.workflows; renderBulk(); });
+      window.ProspectingWorkflows.workflows().then(function (r) {
+        wfChoices = r.workflows.filter(function (w) { return (w.object || "company") === "company"; });
+        renderBulk();
+      });
     }
   }
   function bulkEnroll() {
@@ -367,6 +377,12 @@
     load();
   }
 
+  /* Pasó a Qualified / SQL sin un contacto completo: formulario «Completá el contacto». */
+  function askContact(row) {
+    if (!row || !row.needs_contact || !window.ProspectingContacts) return;
+    window.ProspectingContacts.completeFlow(row, row.contacts || [], function () { load(); });
+  }
+
   function onCellChange(e) {
     var sel = e.target.closest(".pr-cell-select");
     if (!sel) return;
@@ -381,10 +397,59 @@
       Object.assign(rowsById[id], row);
       if (field === "prospecting_status") sel.setAttribute("data-status", row.prospecting_status || "");
       announceWorkflows(row);
+      askContact(row);
     }).catch(function (err) {
       sel.classList.add("is-error");
       alert("Could not save: " + err.message);
     }).then(function () { sel.classList.remove("is-saving"); });
+  }
+
+  /* ---------- Pestaña Contacts ---------- */
+  var ctState = { page: 1, total: 0 };
+  function loadContacts() {
+    var q = {
+      q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
+      dummy: ME.sees_dummies ? $("prFDummy").value : "exclude", page: ctState.page, page_size: 25,
+    };
+    $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="7">Loading…</td></tr>';
+    api("/prospecting/contacts?" + qs(q)).then(function (r) {
+      ctState.total = r.total;
+      $("prCtBody").innerHTML = r.rows.length ? r.rows.map(function (c) {
+        return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '">' +
+          '<td><button type="button" class="pr-company__name" data-ct-open="' + c.id + '">' + esc(c.name) + "</button>" +
+            (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") + "</td>" +
+          '<td><a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.company_name) + "</a></td>" +
+          "<td>" + cellText(c.email) + "</td>" +
+          "<td>" + cellText(c.position) + "</td>" +
+          "<td>" + (c.lead_life ? '<span class="pr-wf-stat">' + esc(c.lead_life) + "</span>" : "—") + "</td>" +
+          "<td>" + cellText(ownerName(c.owner_email)) + "</td>" +
+          "<td>" + (c.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(c.meeting_datetime)) : "—") + "</td></tr>";
+      }).join("") : '<tr><td class="pr-empty" colspan="7">No contacts match these filters.</td></tr>';
+      var pages = Math.max(1, Math.ceil(r.total / 25));
+      $("prCtCount").textContent = r.total.toLocaleString() + " contact" + (r.total === 1 ? "" : "s");
+      $("prCtPage").textContent = ctState.page + " / " + pages;
+      $("prCtPrev").disabled = ctState.page <= 1;
+      $("prCtNext").disabled = ctState.page >= pages;
+    }).catch(function (err) {
+      $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="7">' + esc(err.message) + "</td></tr>";
+    });
+  }
+  function bindContacts() {
+    var LEAD = (((OPTS.objects || {}).contact || {}).fields || []).filter(function (f) { return f.key === "lead_life"; })[0];
+    $("prCtLead").innerHTML = optionsHtml((LEAD && LEAD.options) || [], "", "All");
+    $("prCtOwner").innerHTML = optionsHtml([{ value: "__none__", label: "No owner" }].concat(ownerOptions()), "", "All");
+    ["prCtLead", "prCtOwner"].forEach(function (id) { $(id).addEventListener("change", function () { ctState.page = 1; loadContacts(); }); });
+    var t = null;
+    $("prCtQ").addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { ctState.page = 1; loadContacts(); }, 300); });
+    $("prCtPrev").addEventListener("click", function () { if (ctState.page > 1) { ctState.page--; loadContacts(); } });
+    $("prCtNext").addEventListener("click", function () { ctState.page++; loadContacts(); });
+    $("prCtBody").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-ct-open]");
+      if (!b) return;
+      var tr = b.closest("tr");
+      window.ProspectingContacts.open({ contactId: Number(b.getAttribute("data-ct-open")), companyId: Number(tr.getAttribute("data-co")),
+        onSaved: function () { loadContacts(); } });
+    });
   }
 
   /* ---------- Drawer ---------- */
@@ -427,9 +492,10 @@
       var what = ev.field === "__note__" ? '<span class="pr-events__note">Nota: ' + esc(ev.new_value || "") + "</span>"
         : ev.field
         ? esc(FIELD_LABELS[ev.field] || ev.field) + ": " + esc(ev.old_value || "—") + " → " + esc(ev.new_value || "—")
-        : esc(ev.new_value === "created" ? "created the company" : (ev.new_value || ""));
+        : esc(ev.new_value === "created" ? "created the company" : ev.new_value === "contact_created" ? "added the contact" : (ev.new_value || ""));
+      var subject = ev.contact_id ? '<span class="pr-co-ev__contact"><i class="fa-regular fa-user"></i> ' + esc(ev.contact_name || "Contacto") + "</span> · " : "";
       return '<li><span class="pr-events__when">' + fmtDateTime(ev.at) + "</span>" +
-        '<span class="pr-events__src' + (isWf ? " pr-events__src--wf" : "") + '">' + esc(who) + "</span> · " + what + "</li>";
+        '<span class="pr-events__src' + (isWf ? " pr-events__src--wf" : "") + '">' + esc(who) + "</span> · " + subject + what + "</li>";
     }).join("") + "</ul>";
   }
 
@@ -455,7 +521,8 @@
     $("prDrawerFoot").hidden = false;
     openDrawer();
     api("/prospecting/companies/" + id).then(function (c) {
-      $("prDrawerTitle").textContent = c.name;
+      $("prDrawerTitle").innerHTML = esc(c.name) +
+        ' <a class="pr-btn pr-drawer__full" href="prospecting-company.html?id=' + c.id + '"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Abrir ficha</a>';
       $("prDrawerSub").textContent = [c.domain, c.industry, [c.city, c.state, c.country].filter(Boolean).join(", ")]
         .filter(Boolean).join(" · ");
       var f = function (field, label, inner) {
@@ -508,6 +575,7 @@
         patchCompany(c.id, patch).then(function (row) {
           $("prDrawerStatus").textContent = "Saved.";
           announceWorkflows(row);
+          askContact(row);
           load();
           showCompany(c.id);
         }).catch(function (err) { $("prDrawerStatus").textContent = "Error: " + err.message; });
@@ -608,18 +676,20 @@
       tab.addEventListener("click", function () {
         document.querySelectorAll(".pr-tab").forEach(function (t) { t.classList.toggle("is-active", t === tab); });
         state.view = tab.getAttribute("data-view");
-        var isWf = state.view === "workflows";
-        $("prTableCard").hidden = isWf;
+        var isWf = state.view === "workflows", isCt = state.view === "contacts";
+        $("prTableCard").hidden = isWf || isCt;
         $("prWorkflows").hidden = !isWf;
+        $("prContactsView").hidden = !isCt;
         if (isWf) {
           if (window.ProspectingWorkflows) window.ProspectingWorkflows.show();
           return;
         }
+        if (isCt) { loadContacts(); return; }
         state.page = 1;
         load();
       });
     });
-    ["prFOwner", "prFWeek", "prFStatus", "prFStartFrom", "prFStartTo", "prFDummy"].forEach(function (id) {
+    ["prFOwner", "prFWeek", "prFStatus", "prFStartFrom", "prFStartTo", "prFDummy", "prFIncomplete"].forEach(function (id) {
       $(id).addEventListener("change", function () { state.page = 1; load(); });
     });
     var t = null;
@@ -629,6 +699,7 @@
     });
     $("prClear").addEventListener("click", function () {
       ["prFOwner", "prFWeek", "prFStatus", "prFStartFrom", "prFStartTo", "prFQ"].forEach(function (id) { $(id).value = ""; });
+      $("prFIncomplete").checked = false;
       state.page = 1;
       load();
     });
@@ -697,6 +768,14 @@
       if (b.id === "prBulkClear") { selected = {}; renderRows(lastRows); }
     });
     $("prBody").addEventListener("click", function (e) {
+      var inc = e.target.closest("[data-complete]");
+      if (inc) {
+        var cid = Number(inc.getAttribute("data-complete"));
+        api("/prospecting/companies/" + cid).then(function (c) {
+          window.ProspectingContacts.completeFlow(c, c.contacts || [], function () { load(); });
+        });
+        return;
+      }
       var btn = e.target.closest("[data-open]");
       if (btn) showCompany(Number(btn.getAttribute("data-open")));
     });
@@ -721,6 +800,7 @@
       renderHead();
       renderColsMenu();
       bind();
+      bindContacts();
       return refreshOptions().then(load);
     }).catch(function (err) {
       $("prDenied").hidden = false;

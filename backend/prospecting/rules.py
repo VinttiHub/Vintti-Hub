@@ -1,6 +1,7 @@
 """Workflows como dato: validación, traducción a SQL y evaluador en Python.
 
-Un workflow (lo arma la página, se guarda en `prospect_workflows`):
+Un workflow (lo arma la página, se guarda en `prospect_workflows`) corre sobre un
+OBJETO — empresas o contactos (ver objects.py):
 
     trigger  = {"type": "filter" | "event" | "schedule" | "manual", ...}
     steps    = {"start": "<id>", "nodes": {"<id>": {"type": "action"|"delay"|"branch", ..., "next"}}}
@@ -10,15 +11,17 @@ Un workflow (lo arma la página, se guarda en `prospect_workflows`):
                 "unenroll_if_not_matching": bool}
 
 Condiciones, igual que HubSpot: grupos unidos por O, reglas de un grupo por Y.
+Un campo `company.<key>` (en un workflow de contacto) es de la empresa asociada;
+`contact.<key>` (en uno de empresa) es "tiene algún contacto que…".
 
 Dos formas de evaluar una condición, que TIENEN que dar lo mismo:
-  * `compile_conditions()` -> SQL, para la inscripción por lote (miles de empresas).
+  * `compile_conditions()` -> SQL, para la inscripción por lote.
   * `matches()`            -> Python sobre una fila, para las ramas y "Probar con
-                              una empresa". El test de paridad las compara operador
-                              por operador.
+                              una empresa". El test de paridad las compara campo
+                              por campo y operador por operador, en los dos objetos.
 
-El JSON NUNCA llega como SQL: sólo se arma SQL con nombres de columna de `FIELDS`
-y operadores de `OPERATORS` (lista blanca), y todo valor viaja como parámetro.
+El JSON NUNCA llega como SQL: sólo se arma SQL con campos de los catálogos y
+operadores de `OPERATORS` (lista blanca), y todo valor viaja como parámetro.
 Por eso validate_*() corre siempre antes de guardar, previsualizar o probar.
 
 Ojo: un `%` literal en el SQL rompe psycopg2; los comodines de LIKE van dentro
@@ -33,17 +36,23 @@ from zoneinfo import ZoneInfo
 from prospecting.constants import (
     ACTIONS,
     BRANCHES,
-    CLAY_FIELDS,
     DELAYS,
-    EDITABLE_FIELDS,
     EVENTS,
-    FIELDS_BY_KEY,
     INTERNAL_EMAIL_DOMAIN,
     OPERATORS,
     OPERATORS_BY_TYPE,
     SCHEDULES,
     TIMEZONE,
     TRIGGERS,
+)
+from prospecting.objects import (
+    OBJECTS,
+    TEXTUAL,
+    cross_wrap,
+    history_filter,
+    resolve,
+    sql_date,
+    sql_expr,
 )
 
 _TZ = ZoneInfo(TIMEZONE)
@@ -53,11 +62,9 @@ MAX_RULES = 20
 MAX_NODES = 100
 MAX_PATHS = 10
 
-# Campos con historial: los que se editan en el Hub o actualiza Clay (todo lo que
-# pasa por store.update_company / upsert_from_clay deja un evento).
-HISTORY_FIELDS = set(EDITABLE_FIELDS) | set(CLAY_FIELDS)
+# Compatibilidad: los campos de empresa con historial (los usa engine.load_history).
+HISTORY_FIELDS = OBJECTS["company"]["history"]
 
-TEXTUAL = ("enum", "owner", "text", "longtext", "url")
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _NODE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -75,6 +82,8 @@ class InvalidWorkflow(ValueError):
 # --------------------------------------------------------------------------- #
 def parse_date(v):
     if isinstance(v, datetime):
+        # Un timestamptz que viene de la base ya está en la zona de la sesión, igual
+        # que `col::date` en SQL: tomar su fecha tal cual mantiene la paridad.
         return v.date()
     if isinstance(v, date):
         return v
@@ -82,6 +91,19 @@ def parse_date(v):
         return datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
+
+
+def parse_datetime(v):
+    """Datetime con zona. Sin zona se toma como hora Argentina."""
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=_TZ)
+    if not v:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(v).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=_TZ)
 
 
 def parse_number(v):
@@ -102,36 +124,46 @@ def is_time(v) -> bool:
     return isinstance(v, str) and bool(_TIME_RE.match(v))
 
 
+def changed_since(as_of: date, days: int) -> datetime:
+    """"Cambió en los últimos N días" va por días de calendario, como HubSpot:
+    0 = hoy (desde las 00:00 hora Argentina), 1 = desde ayer, etc."""
+    return datetime.combine(as_of - timedelta(days=days), time(0, 0), tzinfo=_TZ)
+
+
 # --------------------------------------------------------------------------- #
 # Validación de condiciones
 # --------------------------------------------------------------------------- #
 class Ctx:
     """Lo que la validación necesita saber de afuera."""
 
-    def __init__(self, owners=None, workflow_ids=None, self_id=None):
-        self.owners = owners          # emails de BDRs válidos (None = no chequear)
+    def __init__(self, owners=None, workflow_ids=None, self_id=None, obj="company", users=None):
+        self.owners = owners          # emails de BDRs (None = no chequear)
+        self.users = users            # emails de usuarios activos (None = no chequear)
         self.workflow_ids = workflow_ids or set()
         self.self_id = self_id
+        self.obj = obj
 
 
 def _allowed_values(field: dict, ctx: Ctx):
-    if field["type"] == "enum":
+    if field["type"] == "enum" or (field["type"] == "multi" and field.get("options")):
         return field.get("options") or []
     if field["type"] == "owner":
         return ctx.owners
+    if field["type"] == "user":
+        return ctx.users
     return None
 
 
-def _check_rule(rule: dict, where: str, ctx: Ctx) -> list[str]:
+def _check_rule(rule: dict, where: str, ctx: Ctx, obj: str) -> list[str]:
     if not isinstance(rule, dict):
         return [f"{where}: condición inválida."]
-    field = FIELDS_BY_KEY.get(rule.get("field"))
+    owner_obj, field, _cross = resolve(obj, rule.get("field"))
     if not field:
         return [f"{where}: elegí una propiedad."]
     op = rule.get("op")
     if op not in OPERATORS_BY_TYPE[field["type"]]:
         return [f"{where}: «{field['label']}» no admite esa condición."]
-    if OPERATORS[op].get("history") and field["key"] not in HISTORY_FIELDS:
+    if OPERATORS[op].get("history") and field["key"] not in OBJECTS[owner_obj]["history"]:
         return [f"{where}: «{field['label']}» no guarda historial."]
     kind = OPERATORS[op]["value"]
     v = rule.get("value")
@@ -167,7 +199,8 @@ def _check_rule(rule: dict, where: str, ctx: Ctx) -> list[str]:
     return [f"{label}: condición desconocida."]
 
 
-def validate_conditions(conditions, where: str, ctx: Ctx, required: bool = True) -> list[str]:
+def validate_conditions(conditions, where: str, ctx: Ctx, required: bool = True, obj: str | None = None) -> list[str]:
+    obj = obj or ctx.obj
     groups = conditions.get("groups") if isinstance(conditions, dict) else None
     if not groups:
         return [f"{where}: agregá al menos una condición."] if required else []
@@ -184,7 +217,7 @@ def validate_conditions(conditions, where: str, ctx: Ctx, required: bool = True)
         if len(rules) > MAX_RULES:
             errors.append(f"{where}, grupo {gi}: máximo {MAX_RULES} condiciones.")
         for ri, r in enumerate(rules[:MAX_RULES], start=1):
-            errors += _check_rule(r, f"{where}, grupo {gi}, condición {ri}", ctx)
+            errors += _check_rule(r, f"{where}, grupo {gi}, condición {ri}", ctx, obj)
     return errors
 
 
@@ -197,7 +230,7 @@ def has_conditions(conditions) -> bool:
 # --------------------------------------------------------------------------- #
 def validate_trigger(trigger, ctx: Ctx) -> list[str]:
     if not isinstance(trigger, dict) or trigger.get("type") not in TRIGGERS:
-        return ["Disparador: elegí cómo se inscriben las empresas."]
+        return ["Disparador: elegí cómo se inscriben."]
     t = trigger["type"]
     if t == "filter":
         return validate_conditions(trigger.get("conditions"), "Disparador", ctx)
@@ -209,8 +242,8 @@ def validate_trigger(trigger, ctx: Ctx) -> list[str]:
         if ev not in EVENTS:
             return errors + ["Disparador: elegí el evento."]
         if ev == "property_changed":
-            field = FIELDS_BY_KEY.get(trigger.get("field"))
-            if not field or field["key"] not in HISTORY_FIELDS:
+            field = OBJECTS[ctx.obj]["fields"].get(trigger.get("field"))
+            if not field or field["key"] not in OBJECTS[ctx.obj]["history"]:
                 errors.append("Disparador: elegí qué propiedad tiene que cambiar.")
             else:
                 to = trigger.get("to_values") or []
@@ -241,29 +274,48 @@ def validate_trigger(trigger, ctx: Ctx) -> list[str]:
 # --------------------------------------------------------------------------- #
 # Validación de acciones
 # --------------------------------------------------------------------------- #
-def _check_value_for_field(field: dict, v, label: str, ctx: Ctx) -> list[str]:
+def check_value_for_field(field: dict, v, label: str, ctx: Ctx) -> list[str]:
+    ty = field["type"]
+    if ty == "bool":
+        return [] if isinstance(v, bool) or str(v).lower() in ("true", "false") else [f"{label}: elegí sí o no."]
+    if ty == "multi":
+        if not isinstance(v, list) or not v:
+            return [f"{label}: elegí al menos un valor."]
+        allowed = _allowed_values(field, ctx)
+        return [] if allowed is None or all(x in allowed for x in v) else [f"{label}: hay un valor que no está en la lista."]
     if v is None or (isinstance(v, str) and not v.strip()):
         return [f"{label}: falta el valor (para dejarlo vacío usá «Borrar»)."]
     allowed = _allowed_values(field, ctx)
     if allowed is not None and v not in allowed:
         return [f"{label}: «{v}» no está en la lista."]
-    if field["type"] == "date" and not parse_date(v):
+    if ty == "date" and not parse_date(v):
         return [f"{label}: elegí una fecha."]
-    if field["type"] == "number" and parse_number(v) is None:
+    if ty == "datetime" and not parse_datetime(v):
+        return [f"{label}: elegí fecha y hora."]
+    if ty == "number" and parse_number(v) is None:
         return [f"{label}: tiene que ser un número."]
+    if ty == "email" and not _EMAIL_RE.match(str(v).strip()):
+        return [f"{label}: no es un mail válido."]
     return []
 
 
 # Tipos que se pueden copiar a cada tipo de destino.
 COPY_COMPATIBLE = {
-    "text": TEXTUAL + ("number", "date"),
-    "longtext": TEXTUAL + ("number", "date"),
+    "text": TEXTUAL + ("number", "date", "datetime"),
+    "longtext": TEXTUAL + ("number", "date", "datetime"),
     "url": ("url", "text"),
+    "email": ("email", "text"),
+    "phone": ("phone", "text", "number"),
     "enum": ("enum",),
-    "owner": ("owner",),
+    "owner": ("owner", "user"),
+    "user": ("user", "owner"),
     "number": ("number",),
-    "date": ("date",),
+    "date": ("date", "datetime"),
+    "datetime": ("datetime", "date"),
+    "bool": ("bool",),
+    "multi": ("multi",),
 }
+DATE_TYPES = ("date", "datetime")
 
 
 def _email_list_errors(values, label: str, allow_owner: bool) -> list[str]:
@@ -283,27 +335,35 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
     t = a["type"]
     meta = ACTIONS[t]
     if meta.get("field"):
-        field = FIELDS_BY_KEY.get(a.get("field"))
-        if not field or field["key"] not in EDITABLE_FIELDS:
+        # En un workflow de contacto, `company.<key>` = editar la empresa asociada.
+        target, field, cross = resolve(ctx.obj, a.get("field"))
+        if cross and target != "company":
+            field = None  # desde una empresa no se editan "sus contactos"
+        if not field or field["key"] not in OBJECTS[target]["editable"]:
             return [f"{where}: elegí una propiedad que se pueda editar."]
-        if meta.get("types") and field["type"] not in meta["types"]:
+        types = meta.get("types")
+        if types and field["type"] not in types and not (t in ("set_today", "set_date_offset") and field["type"] in DATE_TYPES):
             return [f"{where}: «{meta['label']}» no sirve para «{field['label']}»."]
         label = f"{where} ({field['label']})"
         if t == "set":
-            return _check_value_for_field(field, a.get("value"), label, ctx)
+            return check_value_for_field(field, a.get("value"), label, ctx)
         if t == "set_date_offset":
             return [] if parse_int(a.get("days")) is not None else [f"{label}: cantidad de días inválida."]
         if t == "increment":
             n = parse_number(a.get("amount"))
             return [] if n not in (None, 0) else [f"{label}: poné cuánto sumar o restar."]
         if t == "copy":
-            src = FIELDS_BY_KEY.get(a.get("from_field"))
+            _sobj, src, _ = resolve(ctx.obj, a.get("from_field"))
             if not src:
                 return [f"{label}: elegí de qué propiedad copiar."]
-            if src["key"] == field["key"]:
+            if a.get("from_field") == a.get("field"):
                 return [f"{label}: no se puede copiar sobre sí misma."]
             if src["type"] not in COPY_COMPATIBLE.get(field["type"], ()):
                 return [f"{label}: no se puede copiar «{src['label']}» acá (tipos distintos)."]
+        return []
+    if meta.get("objects") and ctx.obj not in meta["objects"]:
+        return [f"{where}: «{meta['label']}» sólo sirve en workflows de contactos."]
+    if t == "associate_company":
         return []
     if t == "rotate_owner":
         owners = a.get("owners")
@@ -369,8 +429,8 @@ def _check_delay(d: dict, where: str, ctx: Ctx) -> list[str]:
             errs.append(f"{where}: hora inválida.")
         return errs
     if k == "until_property":
-        f = FIELDS_BY_KEY.get(d.get("field"))
-        if not f or f["type"] != "date":
+        _o, f, _c = resolve(ctx.obj, d.get("field"))
+        if not f or f["type"] not in DATE_TYPES:
             return [f"{where}: elegí una propiedad de fecha."]
         return [] if parse_int(d.get("offset_days") or 0) is not None else [f"{where}: días inválidos."]
     if k == "until_weekday":
@@ -407,9 +467,9 @@ def _check_branch(b: dict, where: str, ctx: Ctx) -> list[str]:
     k = b["kind"]
     errs = []
     if k == "value":
-        field = FIELDS_BY_KEY.get(b.get("field"))
-        if not field or field["type"] not in ("enum", "owner"):
-            return [f"{where}: elegí una propiedad de lista (status, owner, Not ICP…)."]
+        _o, field, _c = resolve(ctx.obj, b.get("field"))
+        if not field or field["type"] not in ("enum", "owner", "user"):
+            return [f"{where}: elegí una propiedad de lista (status, owner, Lead Life…)."]
         seen = set()
         for i, p in enumerate(paths, start=1):
             vals = p.get("values") if isinstance(p, dict) else None
@@ -509,41 +569,44 @@ def validate_definition(defn: dict, ctx: Ctx) -> list[str]:
 # --------------------------------------------------------------------------- #
 # SQL (sólo después de validar)
 # --------------------------------------------------------------------------- #
-def changed_since(as_of: date, days: int) -> datetime:
-    """"Cambió en los últimos N días" va por días de calendario, como HubSpot:
-    0 = hoy (desde las 00:00 hora Argentina), 1 = desde ayer, etc. Con "ahora − N días",
-    0 no matcheaba nunca: el cambio siempre es un instante anterior."""
-    return datetime.combine(as_of - timedelta(days=days), time(0, 0), tzinfo=_TZ)
-
-
 def _like(v) -> str:
     return str(v).strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _rule_sql(rule: dict, as_of: date, now: datetime) -> tuple[str, list]:
-    field = FIELDS_BY_KEY[rule["field"]]
-    col = field["key"]  # de la lista blanca, nunca del JSON
-    textual = field["type"] in TEXTUAL
+def _rule_sql_on(obj: str, field: dict, rule: dict, as_of: date, now: datetime) -> tuple[str, list]:
+    col = sql_expr(obj, field)  # de la lista blanca, nunca del JSON
+    ty = field["type"]
+    textual = ty in TEXTUAL
     op = rule["op"]
     v = rule.get("value")
     if op == "known":
+        if ty == "multi":
+            return f"COALESCE(jsonb_array_length({col}) > 0, FALSE)", []
         return (f"NULLIF({col}::text, '') IS NOT NULL" if textual else f"{col} IS NOT NULL"), []
     if op == "unknown":
+        if ty == "multi":
+            return f"NOT COALESCE(jsonb_array_length({col}) > 0, FALSE)", []
         return (f"NULLIF({col}::text, '') IS NULL" if textual else f"{col} IS NULL"), []
+    if op == "is_true":
+        return f"COALESCE({col}, FALSE)", []
+    if op == "is_false":
+        return f"NOT COALESCE({col}, FALSE)", []
+    if op in ("has_any", "has_none"):
+        sql = f"COALESCE({col} ?| %s::text[], FALSE)"
+        return (sql if op == "has_any" else f"NOT {sql}"), [[str(x) for x in v]]
     if op == "is_any":
         return f"COALESCE({col} = ANY(%s), FALSE)", [list(v)]
     if op == "is_none_of":
         # Como en HubSpot: "no es ninguno de" incluye a las que no tienen valor.
         return f"({col} IS NULL OR NOT ({col} = ANY(%s)))", [list(v)]
+    hist = f"FROM prospect_company_events e WHERE {history_filter(obj)} AND e.field = %s"
     if op in ("ever_was", "never_was"):
-        sql = (f"(COALESCE({col} = ANY(%s), FALSE) OR EXISTS (SELECT 1 FROM prospect_company_events e "
-               f"WHERE e.company_id = prospect_companies.id AND e.field = %s AND e.new_value = ANY(%s)))")
-        params = [list(v), col, [str(x) for x in v]]
+        sql = f"(COALESCE({col} = ANY(%s), FALSE) OR EXISTS (SELECT 1 {hist} AND e.new_value = ANY(%s)))"
+        params = [list(v), field["key"], [str(x) for x in v]]
         return (sql if op == "ever_was" else f"NOT {sql}"), params
     if op in ("changed_in_last_days", "not_changed_in_days"):
-        sql = ("EXISTS (SELECT 1 FROM prospect_company_events e WHERE e.company_id = prospect_companies.id "
-               "AND e.field = %s AND e.at >= %s)")
-        params = [col, changed_since(as_of, parse_int(v))]
+        sql = f"EXISTS (SELECT 1 {hist} AND e.at >= %s)"
+        params = [field["key"], changed_since(as_of, parse_int(v))]
         return (sql if op == "changed_in_last_days" else f"NOT {sql}"), params
     if op == "equals":
         return f"COALESCE(LOWER(TRIM({col})) = LOWER(TRIM(%s)), FALSE)", [str(v)]
@@ -560,7 +623,7 @@ def _rule_sql(rule: dict, as_of: date, now: datetime) -> tuple[str, list]:
         return f"COALESCE({col} {sym} %s, FALSE)", [parse_number(v)]
     if op == "between":
         return f"COALESCE({col} BETWEEN %s AND %s, FALSE)", [parse_number(v[0]), parse_number(v[1])]
-    d = f"{col}::date"
+    d = sql_date(obj, field)
     if op == "is_today":
         return f"COALESCE({d} = %s::date, FALSE)", [as_of]
     if op == "is_on":
@@ -580,14 +643,20 @@ def _rule_sql(rule: dict, as_of: date, now: datetime) -> tuple[str, list]:
     raise InvalidWorkflow([f"Operador desconocido: {op}"])
 
 
-def compile_conditions(conditions: dict, as_of: date, now: datetime) -> tuple[str, list]:
-    """WHERE para `FROM prospect_companies`. Cada regla ya devuelve TRUE/FALSE (nunca NULL),
+def _rule_sql(rule: dict, as_of: date, now: datetime, obj: str) -> tuple[str, list]:
+    target, field, cross = resolve(obj, rule["field"])
+    sql, params = _rule_sql_on(target, field, rule, as_of, now)
+    return (cross_wrap(obj, target, sql) if cross else sql), params
+
+
+def compile_conditions(conditions: dict, as_of: date, now: datetime, obj: str = "company") -> tuple[str, list]:
+    """WHERE para `FROM <tabla del objeto>`. Cada regla devuelve TRUE/FALSE (nunca NULL),
     así el resultado coincide con el evaluador de Python también al negarlo."""
     group_sql, params = [], []
     for g in conditions["groups"]:
         parts = []
         for r in g["rules"]:
-            sql, p = _rule_sql(r, as_of, now)
+            sql, p = _rule_sql(r, as_of, now, obj)
             parts.append(sql)
             params += p
         group_sql.append("(" + " AND ".join(parts) + ")")
@@ -597,13 +666,55 @@ def compile_conditions(conditions: dict, as_of: date, now: datetime) -> tuple[st
 # --------------------------------------------------------------------------- #
 # Python (mismo resultado que el SQL; lo verifica el test de paridad)
 # --------------------------------------------------------------------------- #
-def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict) -> bool:
-    field = FIELDS_BY_KEY[rule["field"]]
-    col = field["key"]
-    textual = field["type"] in TEXTUAL
+def _num(v):
+    n = parse_number(v)
+    return n
+
+
+def _bool(v):
+    if isinstance(v, bool):
+        return v
+    if v is None or v == "":
+        return None
+    return str(v).lower() == "true"
+
+
+def _as_date(field: dict, v):
+    if field["type"] == "datetime":
+        dt = parse_datetime(v)
+        return dt.astimezone(_TZ).date() if dt else None
+    return parse_date(v)
+
+
+def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, history: dict) -> bool:
+    key = field["key"]
+    ty = field["type"]
+    textual = ty in TEXTUAL
     op = rule["op"]
     v = rule.get("value")
-    cur = row.get(col)
+    cur = row.get(key)
+    if ty == "multi":
+        lst = cur if isinstance(cur, list) else []
+        if op == "known":
+            return len(lst) > 0
+        if op == "unknown":
+            return len(lst) == 0
+        if op in ("has_any", "has_none"):
+            hit = any(str(x) in {str(y) for y in lst} for x in v)
+            return hit if op == "has_any" else not hit
+    if ty == "bool":
+        b = _bool(cur)
+        if op == "is_true":
+            return b is True
+        if op == "is_false":
+            return b is not True
+        if op == "known":
+            return b is not None
+        if op == "unknown":
+            return b is None
+    if ty in ("number", "date", "datetime") and op in ("known", "unknown"):
+        val = _num(cur) if ty == "number" else _as_date(field, cur)
+        return (val is not None) if op == "known" else (val is None)
     has = (cur is not None and str(cur) != "") if textual else cur is not None
     if op == "known":
         return has
@@ -615,11 +726,11 @@ def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict) -
         return cur is None or cur not in v
     if op in ("ever_was", "never_was"):
         vals = {str(x) for x in v}
-        hit = (cur is not None and cur in v) or any(e["new"] in vals for e in history.get(col, []))
+        hit = (cur is not None and cur in v) or any(e["new"] in vals for e in history.get(key, []))
         return hit if op == "ever_was" else not hit
     if op in ("changed_in_last_days", "not_changed_in_days"):
         since = changed_since(as_of, parse_int(v))
-        hit = any(e["at"] >= since for e in history.get(col, []))
+        hit = any(e["at"] >= since for e in history.get(key, []))
         return hit if op == "changed_in_last_days" else not hit
     if op in ("equals", "contains", "not_contains", "starts_with", "ends_with"):
         s = None if cur is None else str(cur)
@@ -636,14 +747,14 @@ def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict) -
             return needle in low
         return low.startswith(needle) if op == "starts_with" else low.endswith(needle)
     if op in ("eq", "gt", "gte", "lt", "lte", "between"):
-        if cur is None:
+        n = _num(cur)
+        if n is None:
             return False
-        n = float(cur)
         if op == "between":
             return parse_number(v[0]) <= n <= parse_number(v[1])
         t = parse_number(v)
         return {"eq": n == t, "gt": n > t, "gte": n >= t, "lt": n < t, "lte": n <= t}[op]
-    d = parse_date(cur)
+    d = _as_date(field, cur)
     if d is None:
         return False
     if op == "is_today":
@@ -666,12 +777,36 @@ def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict) -
     raise InvalidWorkflow([f"Operador desconocido: {op}"])
 
 
-def matches(conditions, row: dict, as_of: date, now: datetime, history: dict | None = None) -> bool:
-    """¿La fila cumple? Sin condiciones = sí (para filtros opcionales)."""
+def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict, obj: str, related: dict) -> bool:
+    target, field, cross = resolve(obj, rule["field"])
+    if not cross:
+        return _rule_py_on(field, rule, row, as_of, now, history)
+    if target == "company":
+        comp = related.get("company")
+        return bool(comp) and _rule_py_on(field, rule, comp["row"], as_of, now, comp["history"])
+    return any(_rule_py_on(field, rule, c["row"], as_of, now, c["history"]) for c in related.get("contacts") or [])
+
+
+def matches(conditions, row: dict, as_of: date, now: datetime, history: dict | None = None,
+            obj: str = "company", related: dict | None = None) -> bool:
+    """¿La fila cumple? Sin condiciones = sí (para filtros opcionales).
+    `related`: {"company": {"row", "history"}} en un contacto,
+               {"contacts": [{"row", "history"}, ...]} en una empresa."""
     if not has_conditions(conditions):
         return True
     history = history or {}
+    related = related or {}
     return any(
-        all(_rule_py(r, row, as_of, now, history) for r in g["rules"])
+        all(_rule_py(r, row, as_of, now, history, obj, related) for r in g["rules"])
         for g in conditions["groups"]
+    )
+
+
+def uses_cross(conditions) -> bool:
+    return has_conditions(conditions) and any("." in str(r.get("field")) for g in conditions["groups"] for r in g["rules"])
+
+
+def uses_history(conditions) -> bool:
+    return has_conditions(conditions) and any(
+        OPERATORS.get(r.get("op"), {}).get("history") for g in conditions["groups"] for r in g["rules"]
     )

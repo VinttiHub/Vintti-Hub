@@ -1091,6 +1091,23 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   sólo toca dummies (sobre reales, únicamente "Inscribir" a mano). Y SIEMPRE, sobre una dummy,
   mail / To-Do van a `TEST_EMAIL` y Slack a `TEST_SLACK_CHANNEL` con `[TEST]`, y el webhook se
   registra sin mandarse: una dummy nunca le escribe a una persona real.
+- **Contactos (2026-10-07)**: `prospect_contacts`, N por empresa, los carga el BDR desde la ficha
+  (`docs/prospecting-company.html?id=`, layout tipo HubSpot) o la pestaña *Contacts*. Las ~90
+  propiedades salen de **`backend/prospecting/contact_fields.py`** (única definición). Sólo las
+  que se filtran seguido son columna propia; el resto vive en **`props` JSONB**, así sumar una no
+  requiere ALTER. Su historial va a `prospect_company_events` con `contact_id`, y por eso aparece
+  también en la actividad de la empresa.
+- **Qualified / SQL exigen contacto**: si la empresa queda en esos status sin un contacto con
+  `REQUIRED_ON_QUALIFIED` completos, `contact_incomplete = TRUE`. El PATCH responde
+  `needs_contact` y la página abre «Completá el contacto». Se recalcula en cada cambio de
+  contacto o de status (`recompute_contact_incomplete`).
+- **Workflows de empresa o de contacto** (`prospect_workflows.object`, fijo al crear).
+  `objects.py` le dice a rules/engine qué tabla y cómo leer cada campo (columna o
+  `props->>'key'` con cast). Un campo `company.<key>` en un workflow de contacto es la
+  **empresa asociada**: se puede poner en condiciones y **editar** (el «Editar la empresa
+  asociada» de HubSpot). `contact.<key>` en uno de empresa = «tiene algún contacto que…». La
+  paridad SQL↔Python se prueba en los dos objetos y en las cruzadas. La memoria «ya cumplía»
+  pasó a `prospect_wf_match (workflow_id, record_id)`.
 - Los workflows de la primera versión (`conditions` + `actions`) los convierte
   `workflows.normalize()` al leerlos. `prospect_workflow_enrollments` quedó sin uso.
 - **Pruebas**: botón *Test panel* (sólo admin) siembra empresas `is_dummy`, que los BDRs no

@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/prospecting.css?v=11" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=13" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -41,6 +41,7 @@
         <button type="button" class="pr-tab" data-view="mine" role="tab">My companies</button>
         <button type="button" class="pr-tab" data-view="unassigned" role="tab">Unassigned</button>
         <button type="button" class="pr-tab" data-view="recycled" role="tab">Recycled</button>
+        <button type="button" class="pr-tab" data-view="contacts" role="tab"><i class="fa-regular fa-user"></i> Contacts</button>
         <button type="button" class="pr-tab pr-tab--wf" data-view="workflows" role="tab">
           <i class="fa-solid fa-diagram-project"></i> Workflows</button>
       </div>
@@ -71,6 +72,7 @@
             <span class="pr-filter__label">Search</span>
             <input type="text" class="pr-filter__input pr-filter__input--search" id="prFQ" placeholder="Company or domain…" autocomplete="off">
           </label>
+          <label class="pr-check pr-filter-check"><input type="checkbox" id="prFIncomplete"> Contacto incompleto</label>
           <label class="pr-filter" id="prFDummyWrap" hidden>
             <span class="pr-filter__label">Dummy data</span>
             <select class="pr-filter__input" id="prFDummy">
@@ -113,6 +115,31 @@
       </div>
 
       <!-- Pestaña Workflows: lista + editor (prospecting-workflows.js) -->
+      <!-- Pestaña Contacts -->
+      <div class="pr-card" id="prContactsView" hidden>
+        <div class="pr-filters">
+          <label class="pr-filter pr-filter--wide">
+            <span class="pr-filter__label">Search</span>
+            <input type="text" class="pr-filter__input pr-filter__input--search" id="prCtQ" placeholder="Name, email or company…" autocomplete="off">
+          </label>
+          <label class="pr-filter"><span class="pr-filter__label">Lead Life</span><select class="pr-filter__input" id="prCtLead"></select></label>
+          <label class="pr-filter"><span class="pr-filter__label">Contact Owner</span><select class="pr-filter__input" id="prCtOwner"></select></label>
+        </div>
+        <div class="pr-table-wrap">
+          <table class="pr-table">
+            <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Position</th><th>Lead Life</th><th>Owner</th><th>Meeting</th></tr></thead>
+            <tbody id="prCtBody"></tbody>
+          </table>
+        </div>
+        <div class="pr-pager">
+          <span class="pr-count" id="prCtCount"></span>
+          <span class="pr-pager__spacer"></span>
+          <button type="button" class="pr-btn" id="prCtPrev"><i class="fa-solid fa-chevron-left"></i></button>
+          <span class="pr-pager__page" id="prCtPage"></span>
+          <button type="button" class="pr-btn" id="prCtNext"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+
       <section class="pr-wf" id="prWorkflows" hidden></section>
     </div>
   </main>
@@ -139,7 +166,8 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20261007-pilar-staffing" defer></script>
-  <script src="./assets/js/prospecting.js?v=8" defer></script>
-  <script src="./assets/js/prospecting-workflows.js?v=8" defer></script>
+  <script src="./assets/js/prospecting.js?v=10" defer></script>
+  <script src="./assets/js/prospecting-workflows.js?v=14" defer></script>
+  <script src="./assets/js/prospecting-contacts.js?v=2" defer></script>
 </body>
 </html>

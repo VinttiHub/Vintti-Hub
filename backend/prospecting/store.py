@@ -46,7 +46,9 @@ from prospecting.constants import (
     SIZES,
     STATUS_DQL,
     STATUS_IN_PROGRESS,
+    STATUS_QUALIFIED,
     STATUS_RECYCLED,
+    STATUS_SQL,
     STATUSES,
 )
 
@@ -275,6 +277,65 @@ def ensure_schema(cur) -> None:
         )
         """
     )
+    # ---- Contactos (2026-10-07) ------------------------------------------ #
+    # Columnas propias sólo las que se filtran / ordenan seguido; el resto de las
+    # ~90 propiedades (prospecting/contact_fields.py) vive en `props`, así sumar
+    # una no requiere ALTER.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_contacts (
+            id           BIGSERIAL PRIMARY KEY,
+            company_id   BIGINT NOT NULL REFERENCES prospect_companies(id) ON DELETE CASCADE,
+            email        TEXT,
+            first_name   TEXT,
+            last_name    TEXT,
+            owner_email  TEXT,
+            lead_life    TEXT,
+            is_primary   BOOLEAN NOT NULL DEFAULT FALSE,
+            is_dummy     BOOLEAN NOT NULL DEFAULT FALSE,
+            props        JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_by   TEXT,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_contacts_company ON prospect_contacts (company_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_contacts_email ON prospect_contacts (LOWER(email))")
+    # El historial de un contacto va a la misma tabla de eventos: así aparece
+    # también en la actividad de su empresa, como en HubSpot.
+    cur.execute("ALTER TABLE prospect_company_events ADD COLUMN IF NOT EXISTS contact_id BIGINT")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_company_events_contact ON prospect_company_events (contact_id) "
+        "WHERE contact_id IS NOT NULL"
+    )
+    # Empresa en Qualified / SQL sin un contacto con los obligatorios completos.
+    cur.execute(
+        "ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS contact_incomplete BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    # Workflows sobre contactos.
+    cur.execute("ALTER TABLE prospect_workflows ADD COLUMN IF NOT EXISTS object TEXT NOT NULL DEFAULT 'company'")
+    cur.execute("ALTER TABLE prospect_wf_enrollments ADD COLUMN IF NOT EXISTS contact_id BIGINT")
+    # Memoria "ya cumplía" por registro (empresa o contacto, según el workflow).
+    # Reemplaza a prospect_wf_match_state, que sólo sabía de empresas.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_match (
+            workflow_id  BIGINT NOT NULL REFERENCES prospect_workflows(id) ON DELETE CASCADE,
+            record_id    BIGINT NOT NULL,
+            matching     BOOLEAN NOT NULL,
+            changed_at   TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (workflow_id, record_id)
+        )
+        """
+    )
+    cur.execute(
+        """
+        INSERT INTO prospect_wf_match (workflow_id, record_id, matching, changed_at)
+        SELECT workflow_id, company_id, matching, changed_at FROM prospect_wf_match_state
+        ON CONFLICT DO NOTHING
+        """
+    )
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -442,19 +503,23 @@ def map_clay_payload(payload: dict) -> dict:
 def _fmt(v) -> str | None:
     if v is None:
         return None
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (list, tuple)):
+        return ", ".join(str(x) for x in v)
     if isinstance(v, (date, datetime)):
         return v.isoformat()
     return str(v)
 
 
 def log_event(cur, company_id: int, source: str, actor: str | None,
-              field: str | None = None, old=None, new=None) -> None:
+              field: str | None = None, old=None, new=None, contact_id: int | None = None) -> None:
     cur.execute(
         """
-        INSERT INTO prospect_company_events (company_id, actor, source, field, old_value, new_value)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO prospect_company_events (company_id, actor, source, field, old_value, new_value, contact_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-        (company_id, actor, source, field, _fmt(old), _fmt(new)),
+        (company_id, actor, source, field, _fmt(old), _fmt(new), contact_id),
     )
 
 
@@ -561,7 +626,10 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
     updated = cur.fetchone()
     for col, old, new in changes:
         log_event(cur, company_id, source, actor, col, old, new)
-    return {**dict(updated), "_changes": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
+    out = dict(updated)
+    if "prospecting_status" in patch:
+        out["contact_incomplete"] = recompute_contact_incomplete(cur, company_id)
+    return {**out, "_changes": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
 
 
 # --------------------------------------------------------------------------- #
@@ -572,7 +640,8 @@ LIST_COLUMNS = """
     keywords, technologies, job_types, size, city, state, country,
     open_jobs, founded_year, lead_source, week_label, prospecting_status,
     prospecting_owner_email, prospecting_owner_apollo, prospecting_start_date,
-    not_icp_reason, is_dummy, created_at, updated_at
+    not_icp_reason, is_dummy, created_at, updated_at, contact_incomplete,
+    (SELECT COUNT(*) FROM prospect_contacts ct WHERE ct.company_id = prospect_companies.id) AS contacts_count
 """
 
 SORTS = {
@@ -622,6 +691,8 @@ def list_companies(cur, f: dict) -> dict:
         where.append("prospecting_start_date <= %s")
         params.append(_to_date(f["start_to"]))
 
+    if f.get("contact_incomplete") in ("1", "true"):
+        where.append("contact_incomplete")
     q = (f.get("q") or "").strip()
     if q:
         where.append("(name ILIKE %s OR domain ILIKE %s OR hubspot_company_id = %s)")
@@ -651,15 +722,18 @@ def get_company(cur, company_id: int) -> dict | None:
     row = dict(row)
     cur.execute(
         """
-        SELECT actor, source, field, old_value, new_value, at
-          FROM prospect_company_events
-         WHERE company_id = %s
-         ORDER BY at DESC, id DESC
-         LIMIT 200
+        SELECT e.actor, e.source, e.field, e.old_value, e.new_value, e.at, e.contact_id,
+               NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name
+          FROM prospect_company_events e
+          LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
+         WHERE e.company_id = %s
+         ORDER BY e.at DESC, e.id DESC
+         LIMIT 300
         """,
         (company_id,),
     )
     row["events"] = [dict(r) for r in cur.fetchall()]
+    row["contacts"] = [{**c, "missing_required": contact_missing(c)} for c in company_contacts(cur, company_id)]
     return row
 
 
@@ -758,9 +832,30 @@ def delete_dummies(cur) -> int:
     return cur.rowcount
 
 
+def _object_schema() -> dict:
+    """Campos de cada objeto para el editor de workflows y las fichas. Una lista
+    (no un dict) para que jsonify no les cambie el orden."""
+    from prospecting.contact_fields import CONTACT_FIELDS, CONTACT_GROUPS, REQUIRED_ON_QUALIFIED
+    from prospecting.objects import OBJECTS
+
+    def fields(obj, src):
+        meta = OBJECTS[obj]
+        return [{**f, "editable": f["key"] in meta["editable"], "history": f["key"] in meta["history"]} for f in src]
+
+    return {
+        "company": {"label": OBJECTS["company"]["label"], "fields": fields("company", FIELDS),
+                    "owner_field": OBJECTS["company"]["owner_field"]},
+        "contact": {"label": OBJECTS["contact"]["label"], "fields": fields("contact", CONTACT_FIELDS),
+                    "owner_field": OBJECTS["contact"]["owner_field"], "groups": CONTACT_GROUPS,
+                    "required_on_qualified": REQUIRED_ON_QUALIFIED},
+    }
+
+
 def options(cur) -> dict:
     bdrs = list_bdrs(cur)
     return {
+        "users": list_users(cur),
+        "objects": _object_schema(),
         "statuses": STATUSES,
         "not_icp_reasons": NOT_ICP_REASONS,
         "sizes": SIZES,
@@ -782,6 +877,7 @@ def options(cur) -> dict:
             "branches": BRANCHES,
             "weekdays": WEEKDAYS,
             "history_fields": sorted(set(EDITABLE_FIELDS) | set(CLAY_FIELDS)),
+            "objects": _object_schema(),
             # jsonify ordena las claves alfabéticamente: el orden de los menús va aparte.
             "order": {
                 "actions": list(ACTIONS), "triggers": list(TRIGGERS), "events": list(EVENTS),
@@ -792,3 +888,319 @@ def options(cur) -> dict:
         },
     }
 
+
+
+# --------------------------------------------------------------------------- #
+# Contactos
+# --------------------------------------------------------------------------- #
+_EMAIL_OK = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def clean_contact_value(field: dict, v):
+    """Valor tipado de una propiedad de contacto. Levanta ValueError si no sirve."""
+    from prospecting.rules import parse_datetime, parse_number  # evita import circular
+
+    ty = field["type"]
+    label = field["label"]
+    if v is None or (isinstance(v, str) and not v.strip()) or (isinstance(v, list) and not v):
+        return None
+    if ty == "bool":
+        if isinstance(v, bool):
+            return v
+        s = str(v).strip().lower()
+        if s in ("true", "1", "sí", "si", "yes"):
+            return True
+        if s in ("false", "0", "no"):
+            return False
+        raise ValueError(f"{label}: tiene que ser sí o no.")
+    if ty == "multi":
+        vals = v if isinstance(v, list) else [x.strip() for x in str(v).split(",")]
+        vals = [str(x) for x in vals if str(x).strip()]
+        opts = field.get("options")
+        if opts and any(x not in opts for x in vals):
+            raise ValueError(f"{label}: hay un valor que no está en la lista.")
+        return vals or None
+    if ty == "number":
+        n = parse_number(v)
+        if n is None:
+            raise ValueError(f"{label}: tiene que ser un número.")
+        return int(n) if n == int(n) else n
+    if ty == "date":
+        d = _to_date(v)
+        if d is None:
+            raise ValueError(f"{label}: fecha inválida.")
+        return d.isoformat()
+    if ty == "datetime":
+        dt = parse_datetime(v)
+        if dt is None:
+            raise ValueError(f"{label}: fecha y hora inválidas.")
+        return dt.isoformat()
+    s = str(v).strip()
+    if ty in ("email", "owner", "user"):
+        s = s.lower()
+        if not _EMAIL_OK.match(s):
+            raise ValueError(f"{label}: mail inválido.")
+        return s
+    if ty == "enum" and s not in (field.get("options") or []):
+        raise ValueError(f"{label}: «{s}» no está en la lista.")
+    return s
+
+
+def _flatten_contact(row) -> dict:
+    """Columnas + props en un solo dict (así lo leen la página y el motor)."""
+    from prospecting.contact_fields import CONTACT_COLUMNS
+
+    r = dict(row)
+    props = r.pop("props", None) or {}
+    out = {**props, **r}
+    for k in CONTACT_COLUMNS:
+        out.setdefault(k, None)
+    out["name"] = " ".join(x for x in (r.get("first_name"), r.get("last_name")) if x) or (r.get("email") or "Sin nombre")
+    return out
+
+
+def contact_missing(contact: dict) -> list[str]:
+    from prospecting.contact_fields import REQUIRED_ON_QUALIFIED
+
+    return [k for k in REQUIRED_ON_QUALIFIED if contact.get(k) in (None, "", [])]
+
+
+def recompute_contact_incomplete(cur, company_id: int) -> bool:
+    """Empresa en Qualified / SQL sin ningún contacto con los obligatorios completos."""
+    cur.execute("SELECT prospecting_status FROM prospect_companies WHERE id = %s", (company_id,))
+    r = cur.fetchone()
+    if r is None:
+        return False
+    needs = r["prospecting_status"] in (STATUS_QUALIFIED, STATUS_SQL)
+    incomplete = needs and not any(not contact_missing(c) for c in company_contacts(cur, company_id))
+    cur.execute("UPDATE prospect_companies SET contact_incomplete = %s WHERE id = %s", (incomplete, company_id))
+    return incomplete
+
+
+def company_contacts(cur, company_id: int) -> list[dict]:
+    cur.execute(
+        "SELECT * FROM prospect_contacts WHERE company_id = %s ORDER BY is_primary DESC, created_at, id",
+        (company_id,),
+    )
+    return [_flatten_contact(r) for r in cur.fetchall()]
+
+
+def _check_duplicate_email(cur, email: str | None, exclude_id: int | None = None) -> None:
+    if not email:
+        return
+    cur.execute(
+        """
+        SELECT ct.id, c.name AS company FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+         WHERE LOWER(ct.email) = LOWER(%s) AND (%s::bigint IS NULL OR ct.id <> %s)
+         LIMIT 1
+        """,
+        (email, exclude_id, exclude_id),
+    )
+    dup = cur.fetchone()
+    if dup:
+        raise ValueError(f"Ya existe un contacto con el mail {email} (en {dup['company']}).")
+
+
+def _split_contact_data(data: dict) -> tuple[dict, dict]:
+    """(columnas, props) ya validados. Ignora claves que no son del catálogo."""
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+
+    cols, props = {}, {}
+    for k, v in (data or {}).items():
+        f = CONTACT_FIELDS_BY_KEY.get(k)
+        if not f:
+            continue
+        val = clean_contact_value(f, v)
+        (cols if f["storage"] == "col" else props)[k] = val
+    return cols, props
+
+
+def create_contact(cur, company_id: int, data: dict, actor: str | None, source: str = "user") -> dict:
+    cur.execute("SELECT id, is_dummy FROM prospect_companies WHERE id = %s", (company_id,))
+    comp = cur.fetchone()
+    if comp is None:
+        raise LookupError("company")
+    cols, props = _split_contact_data(data)
+    _check_duplicate_email(cur, cols.get("email"))
+    cur.execute("SELECT COUNT(*) AS n FROM prospect_contacts WHERE company_id = %s", (company_id,))
+    first = cur.fetchone()["n"] == 0
+    names = list(cols)
+    cur.execute(
+        f"""
+        INSERT INTO prospect_contacts (company_id, is_dummy, is_primary, props, created_by
+                                       {''.join(', ' + c for c in names)})
+        VALUES (%s, %s, %s, %s, %s {''.join(', %s' for _ in names)})
+        RETURNING *
+        """,
+        [company_id, comp["is_dummy"], bool(data.get("is_primary")) or first,
+         Json({k: v for k, v in props.items() if v is not None}), actor] + [cols[c] for c in names],
+    )
+    row = _flatten_contact(cur.fetchone())
+    log_event(cur, company_id, source, actor, None, None, "contact_created", contact_id=row["id"])
+    changes = [{"field": k, "old": None, "new": v} for k, v in {**cols, **props}.items() if v is not None]
+    for ch in changes:
+        log_event(cur, company_id, source, actor, ch["field"], None, ch["new"], contact_id=row["id"])
+    recompute_contact_incomplete(cur, company_id)
+    return {**row, "_changes": changes}
+
+
+def update_contact(cur, contact_id: int, patch: dict, actor: str | None, source: str = "user") -> dict | None:
+    cur.execute("SELECT * FROM prospect_contacts WHERE id = %s FOR UPDATE", (contact_id,))
+    raw = cur.fetchone()
+    if raw is None:
+        return None
+    before = _flatten_contact(raw)
+    cols, props = _split_contact_data(patch)
+    if "email" in cols:
+        _check_duplicate_email(cur, cols["email"], exclude_id=contact_id)
+    changes = []
+    for k, v in {**cols, **props}.items():
+        if before.get(k) != v:
+            changes.append({"field": k, "old": before.get(k), "new": v})
+    if "is_primary" in patch and bool(patch["is_primary"]) != raw["is_primary"]:
+        if patch["is_primary"]:
+            cur.execute("UPDATE prospect_contacts SET is_primary = FALSE WHERE company_id = %s", (raw["company_id"],))
+        cur.execute("UPDATE prospect_contacts SET is_primary = %s WHERE id = %s", (bool(patch["is_primary"]), contact_id))
+    if changes:
+        new_props = dict(raw["props"] or {})
+        for k, v in props.items():
+            if v is None:
+                new_props.pop(k, None)
+            else:
+                new_props[k] = v
+        sets = [f"{c} = %s" for c in cols] + ["props = %s", "updated_at = NOW()"]
+        cur.execute(
+            f"UPDATE prospect_contacts SET {', '.join(sets)} WHERE id = %s",
+            [cols[c] for c in cols] + [Json(new_props), contact_id],
+        )
+        for ch in changes:
+            log_event(cur, raw["company_id"], source, actor, ch["field"], ch["old"], ch["new"], contact_id=contact_id)
+        recompute_contact_incomplete(cur, raw["company_id"])
+    cur.execute("SELECT * FROM prospect_contacts WHERE id = %s", (contact_id,))
+    return {**_flatten_contact(cur.fetchone()), "_changes": changes}
+
+
+def delete_contact(cur, contact_id: int, actor: str | None) -> bool:
+    cur.execute("DELETE FROM prospect_contacts WHERE id = %s RETURNING company_id, first_name, last_name, email", (contact_id,))
+    r = cur.fetchone()
+    if r is None:
+        return False
+    name = " ".join(x for x in (r["first_name"], r["last_name"]) if x) or r["email"] or f"#{contact_id}"
+    log_event(cur, r["company_id"], "user", actor, None, None, f"contact_deleted:{name}", contact_id=contact_id)
+    recompute_contact_incomplete(cur, r["company_id"])
+    return True
+
+
+def get_contact(cur, contact_id: int) -> dict | None:
+    cur.execute(
+        """
+        SELECT ct.*, c.name AS company_name, c.prospecting_status AS company_status
+          FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+         WHERE ct.id = %s
+        """,
+        (contact_id,),
+    )
+    raw = cur.fetchone()
+    if raw is None:
+        return None
+    out = _flatten_contact(raw)
+    out["missing_required"] = contact_missing(out)
+    cur.execute(
+        """
+        SELECT actor, source, field, old_value, new_value, at FROM prospect_company_events
+         WHERE contact_id = %s ORDER BY at DESC, id DESC LIMIT 200
+        """,
+        (contact_id,),
+    )
+    out["events"] = [dict(r) for r in cur.fetchall()]
+    return out
+
+
+def list_contacts(cur, f: dict) -> dict:
+    where, params = [], []
+    dummy = f.get("dummy") or "exclude"
+    if dummy == "only":
+        where.append("ct.is_dummy")
+    elif dummy != "include":
+        where.append("NOT ct.is_dummy")
+    if f.get("lead_life"):
+        where.append("ct.lead_life = %s")
+        params.append(f["lead_life"])
+    if f.get("owner") == "__none__":
+        where.append("NULLIF(ct.owner_email, '') IS NULL")
+    elif f.get("owner"):
+        where.append("ct.owner_email = %s")
+        params.append(f["owner"].lower())
+    if f.get("company_id"):
+        where.append("ct.company_id = %s")
+        params.append(_to_int(f["company_id"]))
+    q = (f.get("q") or "").strip()
+    if q:
+        where.append("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s OR c.name ILIKE %s)")
+        params += [f"%{q}%"] * 3
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    page = max(1, _to_int(f.get("page")) or 1)
+    size = min(200, max(10, _to_int(f.get("page_size")) or 25))
+    base = f"FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql}"
+    cur.execute(f"SELECT COUNT(*) AS n {base}", params)
+    total = cur.fetchone()["n"]
+    cur.execute(
+        f"""
+        SELECT ct.*, c.name AS company_name, c.prospecting_status AS company_status {base}
+         ORDER BY ct.created_at DESC, ct.id DESC LIMIT %s OFFSET %s
+        """,
+        params + [size, (page - 1) * size],
+    )
+    return {"total": total, "page": page, "page_size": size, "rows": [_flatten_contact(r) for r in cur.fetchall()]}
+
+
+def list_users(cur) -> list[dict]:
+    """Usuarios activos del Hub (para propiedades tipo `user`, p. ej. Scheduled By)."""
+    cur.execute(
+        """
+        SELECT LOWER(TRIM(u.email_vintti)) AS email, u.user_name AS name
+          FROM users u LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+         WHERE COALESCE(aua.is_active, TRUE) AND NULLIF(TRIM(u.email_vintti), '') IS NOT NULL
+         ORDER BY LOWER(u.user_name)
+        """
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+_FIRST = ["Adam", "Laura", "Diego", "Sofía", "Mark", "Julia", "Tom", "Ana", "Kevin", "Emma", "Luis", "Grace"]
+_LAST = ["Spence", "Miller", "García", "Brown", "Rossi", "Smith", "Kim", "López", "Walsh", "Nguyen"]
+
+
+def seed_dummy_contacts(cur, company_ids: list[int], owners: list[str], today: date) -> int:
+    """1 a 3 contactos dummy por empresa, con Lead Life variado y algunas reuniones,
+    para probar los workflows de contacto (p. ej. el de Qualified)."""
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY, LEAD_LIFE
+
+    rnd = random.Random()
+    owners = owners or sorted(ADMIN_EMAILS)
+    n = 0
+    for cid in company_ids:
+        cur.execute("SELECT domain, name FROM prospect_companies WHERE id = %s", (cid,))
+        comp = cur.fetchone()
+        dom = (comp and comp["domain"]) or f"dummy{cid}.example.com"
+        for i in range(rnd.randint(1, 3)):
+            first, last = rnd.choice(_FIRST), rnd.choice(_LAST)
+            lead_life = rnd.choice(LEAD_LIFE[:7])
+            data = {
+                "first_name": first,
+                "last_name": last,
+                "email": f"{first.lower()}.{last.lower()}.{cid}.{i}@{dom}".replace("í", "i").replace("ó", "o"),
+                "position": rnd.choice(CONTACT_FIELDS_BY_KEY["position"]["options"][:10]),
+                "lead_life": lead_life,
+                "owner_email": rnd.choice(owners),
+                "linkedin_url": f"https://www.linkedin.com/in/{first.lower()}-{last.lower()}-{cid}{i}",
+                "origin": rnd.choice(CONTACT_FIELDS_BY_KEY["origin"]["options"][:6]),
+                "total_calls": rnd.randint(0, 8),
+                "first_intro_call_completed": rnd.random() < 0.4,
+            }
+            if lead_life in ("MQL (AE)", "SQL (AE)", "MQL (BDRs)") and rnd.random() < 0.7:
+                when = datetime.combine(today + timedelta(days=rnd.randint(-10, 14)), datetime.min.time()).replace(hour=rnd.choice([10, 12, 15]))
+                data["meeting_datetime"] = when.isoformat()
+            create_contact(cur, cid, data, actor="seed", source="seed")
+            n += 1
+    return n

@@ -162,8 +162,12 @@ def patch_company(company_id: int):
         applied = []
         if row is not None:
             applied = _run_instant(cur, company_id, "updated", row.pop("_changes"), _current_email())
-            if applied:
-                row = engine.load_company(cur, company_id)
+            row = engine.load_company(cur, company_id)
+            # Pasó a Qualified / SQL sin un contacto completo: la página abre el formulario.
+            if "prospecting_status" in patch and row.get("contact_incomplete"):
+                contacts = store.company_contacts(cur, company_id)
+                row["needs_contact"] = True
+                row["contacts"] = [{**c, "missing_required": store.contact_missing(c)} for c in contacts]
     if row is None:
         return jsonify({"error": "not_found"}), 404
     row.pop("raw_payload", None)
@@ -171,13 +175,15 @@ def patch_company(company_id: int):
     return jsonify(_json_safe(row))
 
 
-def _run_instant(cur, company_id: int, kind: str, changes: list, actor: str | None) -> list[dict]:
-    """"Al instante": disparadores por evento + tick acotado a esta empresa.
+def _run_instant(cur, company_id: int, kind: str, changes: list, actor: str | None,
+                 obj: str = "company", record_id: int | None = None) -> list[dict]:
+    """"Al instante": disparadores por evento del registro + tick acotado a su empresa
+    (los workflows de empresa miran la empresa; los de contacto, sus contactos).
     Devuelve qué workflows le hicieron algo (para el aviso de la página)."""
     cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM prospect_wf_step_log")
     mark = cur.fetchone()["m"]
     now = engine.utcnow()
-    engine.emit_event(cur, company_id, kind, changes, now, actor)
+    engine.emit_event(cur, obj, record_id or company_id, kind, changes, now, actor)
     engine.tick(cur, now, automatic=True, company_id=company_id, actor=actor)
     cur.execute(
         """
@@ -189,6 +195,102 @@ def _run_instant(cur, company_id: int, kind: str, changes: list, actor: str | No
         (mark, company_id),
     )
     return [dict(r) for r in cur.fetchall()]
+
+
+# --------------------------------------------------------------------------- #
+# Contactos (los carga el BDR desde la ficha de la empresa)
+# --------------------------------------------------------------------------- #
+def _contact_response(cur, contact_id: int, applied: list) -> dict:
+    out = store.get_contact(cur, contact_id) or {}
+    out["workflows_applied"] = applied
+    comp = engine.load_company(cur, out["company_id"]) if out else None
+    out["company_contact_incomplete"] = bool(comp and comp.get("contact_incomplete"))
+    return out
+
+
+@bp.get("/contacts")
+def contacts_list():
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        filters = request.args.to_dict()
+        if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
+            filters["dummy"] = "exclude"
+        data = store.list_contacts(cur, filters)
+    return jsonify(_json_safe(data))
+
+
+@bp.get("/contacts/<int:contact_id>")
+def contact_get(contact_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        row = store.get_contact(cur, contact_id)
+        if row is not None:
+            cur.execute(
+                """
+                SELECT e.id, w.name AS workflow_name, e.status, e.wake_at, e.enrolled_at,
+                       (SELECT summary FROM prospect_wf_step_log l WHERE l.enrollment_id = e.id
+                         ORDER BY l.id DESC LIMIT 1) AS last_step
+                  FROM prospect_wf_enrollments e JOIN prospect_workflows w ON w.id = e.workflow_id
+                 WHERE e.contact_id = %s ORDER BY e.enrolled_at DESC LIMIT 50
+                """,
+                (contact_id,),
+            )
+            row["enrollments"] = [dict(r) for r in cur.fetchall()]
+    if row is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(row))
+
+
+@bp.post("/companies/<int:company_id>/contacts")
+def contact_create(company_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            row = store.create_contact(cur, company_id, body, _current_email())
+            applied = _run_instant(cur, company_id, "created", row.pop("_changes"), _current_email(),
+                                   obj="contact", record_id=row["id"])
+            out = _contact_response(cur, row["id"], applied)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out)), 201
+
+
+@bp.patch("/contacts/<int:contact_id>")
+def contact_patch(contact_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            row = store.update_contact(cur, contact_id, body, _current_email())
+            if row is None:
+                return jsonify({"error": "not_found"}), 404
+            applied = _run_instant(cur, row["company_id"], "updated", row.pop("_changes"), _current_email(),
+                                   obj="contact", record_id=contact_id)
+            out = _contact_response(cur, contact_id, applied)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out))
+
+
+@bp.delete("/contacts/<int:contact_id>")
+def contact_delete(contact_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        ok = store.delete_contact(cur, contact_id, _current_email())
+    return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
 
 
 # --------------------------------------------------------------------------- #
@@ -352,9 +454,22 @@ def workflow_preview():
             if d["trigger"]["type"] == "manual" or not (conds and conds.get("groups")):
                 return jsonify({"affected": None, "items": [],
                                 "note": "Este disparador no depende de condiciones: usá «Probar con una empresa»."})
-            ids = engine.matching_ids(cur, conds, now, bool(body.get("only_dummy")))
+            ids = engine.matching_ids(cur, conds, now, bool(body.get("only_dummy")), None, d["object"])
             items = []
-            if ids:
+            if ids and d["object"] == "contact":
+                cur.execute(
+                    """
+                    SELECT ct.id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
+                           || ' · ' || c.name AS name, ct.is_dummy, ct.lead_life AS prospecting_status,
+                           EXISTS (SELECT 1 FROM prospect_wf_enrollments e WHERE e.contact_id = ct.id
+                                    AND e.workflow_id = %s AND e.status IN ('active','waiting')) AS already_in
+                      FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+                     WHERE ct.id = ANY(%s) ORDER BY 2 LIMIT 200
+                    """,
+                    (body.get("id") or 0, ids),
+                )
+                items = [dict(r) for r in cur.fetchall()]
+            elif ids:
                 cur.execute(
                     """
                     SELECT c.id, c.name, c.is_dummy, c.prospecting_status, c.prospecting_owner_email,
@@ -385,11 +500,12 @@ def workflow_test():
             d = wf_store.clean_definition(cur, body, self_id=body.get("id"), require_name=False)
             d["id"], d["name"] = body.get("id"), body.get("name") or "(sin guardar)"
             # simulate() corre todo en seco (Ctx dry=True): no escribe nada.
-            result = engine.simulate(cur, d, int(body.get("company_id") or 0), now)
+            rid = int(body.get("record_id") or body.get("company_id") or 0)
+            result = engine.simulate(cur, d, rid, now)
     except InvalidWorkflow as exc:
         return _invalid(exc)
     except LookupError:
-        return jsonify({"error": "Esa empresa no existe."}), 404
+        return jsonify({"error": "Ese registro no existe."}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(_json_safe(result))
@@ -404,14 +520,14 @@ def workflow_enroll(wf_id: int):
     if denied:
         return denied
     body = request.get_json(silent=True) or {}
-    ids = body.get("company_ids")
+    ids = body.get("record_ids", body.get("company_ids"))
     with _Db() as cur:
         wf = wf_store.get_workflow(cur, wf_id)
         if wf is None:
             return jsonify({"error": "not_found"}), 404
         result = engine.enroll_now(cur, wf, engine.utcnow(), _current_email(),
                                    bool(body.get("only_dummy")),
-                                   company_ids=[int(x) for x in ids] if isinstance(ids, list) else None)
+                                   record_ids=[int(x) for x in ids] if isinstance(ids, list) else None)
     return jsonify(_json_safe(result))
 
 
@@ -422,9 +538,12 @@ def workflow_unenroll(wf_id: int):
         return denied
     body = request.get_json(silent=True) or {}
     with _Db() as cur:
+        wf = wf_store.get_workflow(cur, wf_id)
+        if wf is None:
+            return jsonify({"error": "not_found"}), 404
         n = sum(
-            engine.unenroll_company(cur, wf_id, int(c), engine.utcnow(), f"Sacada a mano por {_current_email()}")
-            for c in body.get("company_ids") or []
+            engine.unenroll_record(cur, wf, int(c), engine.utcnow(), f"Sacado a mano por {_current_email()}")
+            for c in (body.get("record_ids") or body.get("company_ids") or [])
         )
     return jsonify({"unenrolled": n})
 
@@ -487,10 +606,16 @@ def dummy_seed():
             return denied
         owners = [b["email"] for b in store.list_bdrs(cur)]
         ids = store.seed_dummies(cur, n, owners, date.today())
-        # Disparadores "se crea la empresa": las dummies cuentan como recién llegadas.
+        n_contacts = store.seed_dummy_contacts(cur, ids, owners, date.today())
+        # Disparadores "se crea": las dummies (y sus contactos) cuentan como recién llegados.
+        now = engine.utcnow()
         for cid in ids:
+            for c in store.company_contacts(cur, cid):
+                engine.emit_event(cur, "contact", c["id"], "created",
+                                  [{"field": k, "old": None, "new": v} for k, v in c.items() if v not in (None, "", [])],
+                                  now, _current_email())
             _run_instant(cur, cid, "created", [], _current_email())
-    return jsonify({"created": len(ids)})
+    return jsonify({"created": len(ids), "contacts": n_contacts})
 
 
 @bp.delete("/dummy")

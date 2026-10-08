@@ -17,7 +17,7 @@ from prospecting.store import list_bdrs
 
 WF_COLUMNS = """
     w.id, w.name, w.description, w.enabled, w.reenroll, w.conditions, w.actions,
-    w.trigger, w.steps, w.unenroll, w.goal, w.settings,
+    w.trigger, w.steps, w.unenroll, w.goal, w.settings, w.object,
     w.created_by, w.updated_by, w.created_at, w.updated_at
 """
 
@@ -37,6 +37,7 @@ def normalize(row: dict) -> dict:
             },
         }
     wf["settings"] = wf.get("settings") or {}
+    wf["object"] = wf.get("object") or "company"
     wf.pop("conditions", None)
     wf.pop("actions", None)
     return wf
@@ -78,14 +79,23 @@ def list_workflows(cur) -> list[dict]:
     return out
 
 
-def _ctx(cur, self_id=None) -> Ctx:
+def _ctx(cur, self_id=None, obj: str = "company") -> Ctx:
+    from prospecting.store import list_users
+
     cur.execute("SELECT id FROM prospect_workflows")
     ids = {r["id"] for r in cur.fetchall()}
-    return Ctx(owners=[b["email"] for b in list_bdrs(cur)], workflow_ids=ids, self_id=self_id)
+    return Ctx(owners=[b["email"] for b in list_bdrs(cur)], workflow_ids=ids, self_id=self_id, obj=obj,
+               users=[u["email"] for u in list_users(cur)])
 
 
-def clean_definition(cur, body: dict, self_id=None, require_name: bool = True) -> dict:
-    """Valida lo que manda el editor. Levanta InvalidWorkflow con todos los errores."""
+def clean_definition(cur, body: dict, self_id=None, require_name: bool = True, obj: str | None = None) -> dict:
+    """Valida lo que manda el editor. Levanta InvalidWorkflow con todos los errores.
+    `obj` (empresas / contactos) no se puede cambiar una vez creado: lo fija quien llama."""
+    from prospecting.objects import OBJECTS
+
+    obj = obj or body.get("object") or "company"
+    if obj not in OBJECTS:
+        raise InvalidWorkflow(["Elegí si el workflow es de empresas o de contactos."])
     name = (body.get("name") or "").strip()
     errors = [] if name or not require_name else ["Ponele un nombre al workflow."]
     steps = prune_steps(body.get("steps") or {})
@@ -96,10 +106,11 @@ def clean_definition(cur, body: dict, self_id=None, require_name: bool = True) -
         "goal": body.get("goal") or None,
         "settings": body.get("settings") or {},
     }
-    errors += validate_definition(defn, _ctx(cur, self_id))
+    errors += validate_definition(defn, _ctx(cur, self_id, obj))
     if errors:
         raise InvalidWorkflow(errors)
     return {
+        "object": obj,
         "name": name[:200],
         "description": (body.get("description") or "").strip()[:1000] or None,
         "reenroll": body.get("reenroll", True) is not False,
@@ -113,20 +124,21 @@ def create_workflow(cur, body: dict, actor: str) -> dict:
         """
         INSERT INTO prospect_workflows
             (name, description, enabled, reenroll, trigger, steps, unenroll, goal, settings,
-             created_by, updated_by)
-        VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s)
+             created_by, updated_by, object)
+        VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (d["name"], d["description"], d["reenroll"], Json(d["trigger"]), Json(d["steps"]),
-         Json(d["unenroll"]), Json(d["goal"]), Json(d["settings"]), actor, actor),
+         Json(d["unenroll"]), Json(d["goal"]), Json(d["settings"]), actor, actor, d["object"]),
     )
     return get_workflow(cur, cur.fetchone()["id"])
 
 
 def update_workflow(cur, wf_id: int, body: dict, actor: str) -> dict | None:
-    if get_workflow(cur, wf_id) is None:
+    current = get_workflow(cur, wf_id)
+    if current is None:
         return None
-    d = clean_definition(cur, body, self_id=wf_id)
+    d = clean_definition(cur, body, self_id=wf_id, obj=current["object"])
     cur.execute(
         """
         UPDATE prospect_workflows
@@ -151,7 +163,7 @@ def set_enabled(cur, wf_id: int, enabled: bool, actor: str, include_existing: bo
     if wf is None:
         return None
     if enabled:
-        errors = validate_definition(wf, _ctx(cur, wf_id))
+        errors = validate_definition(wf, _ctx(cur, wf_id, wf["object"]))
         if errors:
             raise InvalidWorkflow(errors)
     cur.execute(
@@ -164,11 +176,11 @@ def set_enabled(cur, wf_id: int, enabled: bool, actor: str, include_existing: bo
         t = wf["trigger"]["type"]
         if t == "filter":
             dummy_only = engine._dummy_only(True, False)
-            ids = engine.matching_ids(cur, wf["trigger"]["conditions"], now, dummy_only)
+            ids = engine.matching_ids(cur, wf["trigger"]["conditions"], now, dummy_only, None, wf["object"])
             if include_existing:
                 result["activation"] = engine.enroll_now(cur, result, now, actor, dummy_only)
             else:
-                engine.snapshot_matches(cur, result, now, dummy_only, ids)
+                engine.snapshot_matches(cur, result, now, ids)
                 result["activation"] = {"enrolled": 0, "skipped_existing": len(ids)}
         elif t == "schedule":
             # Sólo los horarios de acá en adelante (no el de hoy temprano que ya pasó).
@@ -198,12 +210,17 @@ def list_enrollments(cur, wf_id: int, status: str | None = None, limit: int = 30
         params.append(status)
     cur.execute(
         f"""
-        SELECT e.id, e.company_id, c.name AS company_name, c.is_dummy, e.status, e.current_node,
+        SELECT e.id, e.company_id, e.contact_id,
+               CASE WHEN e.contact_id IS NULL THEN c.name
+                    ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
+                         || ' · ' || c.name END AS company_name,
+               c.is_dummy, e.status, e.current_node,
                e.wake_at, e.source, e.enrolled_by, e.enrolled_at, e.finished_at, e.last_error,
                (SELECT summary FROM prospect_wf_step_log l WHERE l.enrollment_id = e.id
                  ORDER BY l.id DESC LIMIT 1) AS last_step
           FROM prospect_wf_enrollments e
           JOIN prospect_companies c ON c.id = e.company_id
+          LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
          WHERE e.workflow_id = %s {extra}
          ORDER BY e.enrolled_at DESC, e.id DESC
          LIMIT %s
@@ -216,10 +233,14 @@ def list_enrollments(cur, wf_id: int, status: str | None = None, limit: int = 30
 def enrollment_detail(cur, enrollment_id: int) -> dict | None:
     cur.execute(
         """
-        SELECT e.*, c.name AS company_name, c.is_dummy, w.name AS workflow_name
+        SELECT e.*, c.is_dummy, w.name AS workflow_name,
+               CASE WHEN e.contact_id IS NULL THEN c.name
+                    ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
+                         || ' · ' || c.name END AS company_name
           FROM prospect_wf_enrollments e
           JOIN prospect_companies c ON c.id = e.company_id
           JOIN prospect_workflows w ON w.id = e.workflow_id
+          LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
          WHERE e.id = %s
         """,
         (enrollment_id,),
@@ -239,12 +260,14 @@ def enrollment_detail(cur, enrollment_id: int) -> dict | None:
 def company_enrollments(cur, company_id: int) -> list[dict]:
     cur.execute(
         """
-        SELECT e.id, e.workflow_id, w.name AS workflow_name, e.status, e.wake_at, e.enrolled_at,
-               e.finished_at,
+        SELECT e.id, e.workflow_id, w.name AS workflow_name, w.object, e.contact_id, e.status, e.wake_at,
+               e.enrolled_at, e.finished_at,
+               NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name,
                (SELECT summary FROM prospect_wf_step_log l WHERE l.enrollment_id = e.id
                  ORDER BY l.id DESC LIMIT 1) AS last_step
           FROM prospect_wf_enrollments e
           JOIN prospect_workflows w ON w.id = e.workflow_id
+          LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
          WHERE e.company_id = %s
          ORDER BY e.enrolled_at DESC, e.id DESC
          LIMIT 50

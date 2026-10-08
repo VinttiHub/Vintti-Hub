@@ -29,11 +29,31 @@
   var openMenu = null;   // "+" con el menú abierto
   var historyState = { status: "", rows: [], detail: null };
   var testState = { q: "", results: [], company: null, result: null };
+  /* Objeto del workflow que se está mirando: "company" | "contact". Decide qué
+     propiedades se ofrecen y qué significa `company.<key>` / `contact.<key>`. */
+  var curObj = "company";
+  var CROSS = { company: "contact", contact: "company" };
+  var CROSS_PREFIX_LABEL = { company: "Empresa · ", contact: "Algún contacto · " };
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return P.esc(v); }
   function S() { return P.options().workflow_schema || {}; }
-  function field(key) { return (S().fields || []).filter(function (f) { return f.key === key; })[0]; }
+  function objFields(obj) {
+    var o = (S().objects || {})[obj];
+    return o ? o.fields : (obj === "company" ? (S().fields || []) : []);
+  }
+  /* Campo por clave, en el objeto actual. `company.x` / `contact.x` = objeto asociado. */
+  function field(key) {
+    if (!key) return null;
+    var i = String(key).indexOf(".");
+    if (i !== -1) {
+      var pre = key.slice(0, i), k = key.slice(i + 1);
+      if (pre !== CROSS[curObj]) return null;
+      var f = objFields(pre).filter(function (x) { return x.key === k; })[0];
+      return f ? Object.assign({}, f, { key: key, label: CROSS_PREFIX_LABEL[pre] + f.label, cross: pre }) : null;
+    }
+    return objFields(curObj).filter(function (f) { return f.key === key; })[0] || null;
+  }
   function opDef(op) { return (S().operators || {})[op] || { label: op, value: null }; }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   /* Claves de un catálogo en el orden del backend (el JSON llega ordenado alfabéticamente). */
@@ -44,6 +64,7 @@
   function actionGroups() {
     var acts = S().actions || {}, groups = {}, order = [];
     keysOf("actions").forEach(function (k) {
+      if (acts[k].objects && acts[k].objects.indexOf(curObj) === -1) return;
       var g = acts[k].group;
       if (!groups[g]) { groups[g] = []; order.push(g); }
       groups[g].push(k);
@@ -73,6 +94,7 @@
   function choices(f) {
     if (!f) return [];
     if (f.type === "owner") return bdrChoices();
+    if (f.type === "user") return (P.options().users || []).map(function (u) { return { value: u.email, label: u.name || u.email }; });
     return (f.options || []).map(function (o) { return { value: o, label: o }; });
   }
   function choiceLabel(f, v) {
@@ -84,10 +106,20 @@
       return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(selected) ? " selected" : "") + ">" + esc(o.label) + "</option>";
     }).join("");
   }
-  function fieldOptions(selected, filterFn) {
-    return optionTags((S().fields || []).filter(filterFn || function () { return true; })
-      .map(function (f) { return { value: f.key, label: f.label }; }), selected);
+  /* Opciones de propiedad: las del objeto y, con `cross`, las del objeto asociado
+     (en un <optgroup> aparte). En un workflow de contacto, "Empresa · X" es la
+     empresa del contacto; en uno de empresa, "Algún contacto · X". */
+  function fieldOptions(selected, filterFn, cross) {
+    var ok = filterFn || function () { return true; };
+    var own = objFields(curObj).filter(ok).map(function (f) { return { value: f.key, label: f.label }; });
+    var objs = S().objects || {};
+    if (!cross || !objs[curObj]) return optionTags(own, selected);
+    var other = CROSS[curObj];
+    var theirs = objFields(other).filter(ok).map(function (f) { return { value: other + "." + f.key, label: CROSS_PREFIX_LABEL[other] + f.label }; });
+    return '<optgroup label="' + esc(curObj === "contact" ? "Contacto" : "Empresa") + '">' + optionTags(own, selected) + "</optgroup>" +
+      (theirs.length ? '<optgroup label="' + esc(curObj === "contact" ? "Empresa asociada" : "Algún contacto de la empresa") + '">' + optionTags(theirs, selected) + "</optgroup>" : "");
   }
+  function defaultField() { return curObj === "contact" ? "lead_life" : "prospecting_status"; }
   function dis() { return canEdit ? "" : " disabled"; }
 
   /* =================================================================
@@ -143,6 +175,7 @@
         var v = f && (f.type === "enum" || f.type === "owner") ? choiceLabel(f, a.value) : f && f.type === "date" ? fmtFecha(a.value) : a.value;
         return "Define <strong>" + esc(label) + "</strong> como <em>" + esc(v || "—") + "</em>";
       case "rotate_owner": return "Reparte entre " + (a.owners || []).length + " BDRs por turnos";
+      case "associate_company": return "Asocia el contacto con la empresa de su dominio de email";
       case "create_todo": return "Crea un To-Do: <em>" + esc(a.text || "—") + "</em>";
       case "send_email": return "Manda un mail: <em>" + esc(a.subject || "—") + "</em>";
       case "send_slack": return "Avisa por Slack: <em>" + esc(a.text || "—") + "</em>";
@@ -203,9 +236,12 @@
   function renderList() {
     var cards = list.map(function (w) {
       var tt = (S().triggers || {})[w.trigger.type] || {};
+      curObj = w.object || "company";
       return '<article class="pr-wf-card' + (w.enabled ? " is-on" : "") + '" data-wf="' + w.id + '" tabindex="0">' +
         '<header class="pr-wf-card__head">' +
-          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3>" +
+          '<h3 class="pr-wf-card__name"><span class="pr-wf-obj pr-wf-obj--' + curObj + '">' +
+            (curObj === "contact" ? '<i class="fa-regular fa-user"></i> Contactos' : '<i class="fa-regular fa-building"></i> Empresas') +
+            "</span>" + esc(w.name) + "</h3>" +
           (canEdit
             ? '<label class="pr-switch" title="' + (w.enabled ? "Activo" : "Inactivo") + '"><input type="checkbox" data-toggle="' + w.id + '"' + (w.enabled ? " checked" : "") + '><span></span></label>'
             : '<span class="pr-wf-pill' + (w.enabled ? " is-on" : "") + '">' + (w.enabled ? "Activo" : "Inactivo") + "</span>") +
@@ -229,7 +265,7 @@
         : '<div class="pr-wf-empty">Todavía no hay workflows.' + (canEdit ? " Creá el primero." : "") + "</div>");
 
     var nb = $("prWfNew");
-    if (nb) nb.onclick = function () { openEditor(null); };
+    if (nb) nb.onclick = function () { askObject().then(function (obj) { if (obj) openEditor(null, obj); }); };
     root.querySelectorAll("[data-toggle]").forEach(function (cb) {
       cb.addEventListener("click", function (e) { e.stopPropagation(); });
       cb.addEventListener("change", function () {
@@ -272,6 +308,29 @@
     }).catch(function (err) { alert(errorText(err)); return false; });
   }
 
+  function askObject() {
+    return new Promise(function (resolve) {
+      var box = document.createElement("div");
+      box.className = "pr-modal";
+      box.innerHTML = '<div class="pr-modal__card" role="dialog" aria-modal="true">' +
+        "<h3>Nuevo workflow</h3><p>¿Sobre qué corre? No se puede cambiar después.</p>" +
+        '<div class="pr-objpick">' +
+          '<button type="button" data-o="company"><i class="fa-regular fa-building"></i><strong>Empresas</strong>' +
+            '<span>Se inscriben empresas; las condiciones pueden mirar también sus contactos.</span></button>' +
+          '<button type="button" data-o="contact"><i class="fa-regular fa-user"></i><strong>Contactos</strong>' +
+            '<span>Se inscriben contactos; pueden mirar y editar su empresa asociada.</span></button>' +
+        "</div>" +
+        '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-o="">Cancelar</button></div></div>';
+      document.body.appendChild(box);
+      box.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-o]");
+        if (!b && e.target !== box) return;
+        box.remove();
+        resolve(b ? b.getAttribute("data-o") || null : null);
+      });
+    });
+  }
+
   function askActivate(n) {
     return new Promise(function (resolve) {
       var box = document.createElement("div");
@@ -305,16 +364,17 @@
     return {
       name: w.name, description: w.description || "", reenroll: w.reenroll !== false,
       trigger: w.trigger, steps: w.steps, unenroll: w.unenroll || null, goal: w.goal || null,
-      settings: w.settings || {},
+      settings: w.settings || {}, object: w.object || "company",
     };
   }
 
-  function blankRule() { return { field: "prospecting_status", op: "is_any", value: [] }; }
+  function blankRule() { return { field: defaultField(), op: "is_any", value: [] }; }
   function blankConds() { return { groups: [{ rules: [blankRule()] }] }; }
 
-  function openEditor(w) {
+  function openEditor(w, obj) {
+    curObj = w ? (w.object || "company") : (obj || "company");
     draft = w ? Object.assign({ id: w.id, enabled: w.enabled }, clone(defnOf(w))) : {
-      id: null, enabled: false, name: "", description: "", reenroll: true,
+      id: null, enabled: false, name: "", description: "", reenroll: true, object: curObj,
       trigger: { type: "filter", conditions: blankConds() },
       steps: { start: null, nodes: {} }, unenroll: null, goal: null, settings: {},
     };
@@ -323,6 +383,7 @@
     openMenu = null;
     historyState = { status: "", rows: [], detail: null };
     testState = { q: "", results: [], company: null, result: null };
+    centerNext = true;
     render();
   }
 
@@ -412,7 +473,7 @@
     if (kind === "action") node = { type: "action", action: defaultAction(extra), next: after };
     else if (kind === "delay") node = { type: "delay", delay: { kind: "duration", days: 1 }, next: after };
     else if (kind === "branch") {
-      node = { type: "branch", branch: { kind: "value", field: "prospecting_status",
+      node = { type: "branch", branch: { kind: "value", field: defaultField(),
         paths: [{ values: [], next: null }], else_next: after } };
     }
     draft.steps.nodes[id] = node;
@@ -423,10 +484,10 @@
     var a = { type: type || "set" };
     var meta = (S().actions || {})[a.type] || {};
     if (meta.field) {
-      var f = (S().fields || []).filter(function (x) {
+      var f = objFields(curObj).filter(function (x) {
         return x.editable && (!meta.types || meta.types.indexOf(x.type) !== -1);
       })[0];
-      a.field = f ? f.key : "prospecting_status";
+      a.field = f ? f.key : defaultField();
       if (a.type === "set") a.value = "";
       if (a.type === "set_date_offset") a.days = 7;
       if (a.type === "increment") a.amount = 1;
@@ -446,7 +507,7 @@
      y si la propiedad deja de ser fecha, vuelve a ser un Definir común. */
   function fixDateSet(act) {
     var f = field(act.field);
-    var isDate = f && f.type === "date";
+    var isDate = f && (f.type === "date" || f.type === "datetime");
     if (isDate && act.type === "set" && !act.value) { act.type = "set_today"; delete act.value; }
     if (!isDate && isDateSet(act)) { act.type = "set"; act.value = ""; delete act.days; }
   }
@@ -464,8 +525,15 @@
   /* =================================================================
      Editor — vista
      ================================================================= */
+  /* Cada cambio redibuja el editor entero: se guarda la posición del lienzo (y de la
+     página) y se restaura, para no volver al principio en cada click. Al abrir un
+     workflow (`centerNext`) arranca centrado en el disparador. */
+  var centerNext = false;
   function render() {
     if (!draft) return;
+    var cv = root.querySelector(".pr-wf-canvas");
+    var keep = cv ? { left: cv.scrollLeft, top: cv.scrollTop } : null;
+    var pageTop = root.scrollTop;
     root.innerHTML =
       '<div class="pr-wf-editor">' + topBar() +
         '<div class="pr-wf-errors" id="prWfErrors" hidden></div>' +
@@ -474,6 +542,17 @@
           : historyView()) +
       "</div>";
     bind();
+    var ncv = root.querySelector(".pr-wf-canvas");
+    if (ncv) {
+      if (centerNext || !keep) {
+        ncv.scrollLeft = Math.max(0, (ncv.scrollWidth - ncv.clientWidth) / 2);
+        centerNext = false;
+      } else {
+        ncv.scrollLeft = keep.left;
+        ncv.scrollTop = keep.top;
+      }
+    }
+    root.scrollTop = pageTop;
   }
 
   function topBar() {
@@ -499,8 +578,12 @@
   function canvas() {
     var order = numbering();
     var rendered = {};
-    return '<textarea class="pr-wf-desc" id="prWfDesc" rows="1" placeholder="Descripción (opcional)"' + dis() + ">" + esc(draft.description) + "</textarea>" +
-      triggerCard() + chain("start", draft.steps.start, order, rendered) + extrasCard();
+    // .pr-wf-flow mide lo que mide el dibujo (las ramas lo ensanchan) y el lienzo
+    // scrollea en las dos direcciones: centrado sin wrapper, lo que se pasa por la
+    // izquierda quedaba cortado y no había forma de llegar.
+    return '<div class="pr-wf-flow">' +
+      '<textarea class="pr-wf-desc" id="prWfDesc" rows="1" placeholder="Descripción (opcional)"' + dis() + ">" + esc(draft.description) + "</textarea>" +
+      triggerCard() + chain("start", draft.steps.start, order, rendered) + extrasCard() + "</div>";
   }
 
   /* Una cadena de pasos desde un puntero hasta el final (o un "ir a"). */
@@ -587,9 +670,9 @@
     var types = S().triggers || {};
     var body = "";
     if (t.type === "filter") {
-      body = '<p class="pr-wf-hint">Inscribir empresas que cumplan estas condiciones</p>' + conditionsEditor("trigger", t.conditions, false);
+      body = '<p class="pr-wf-hint">Inscribir ' + (curObj === "contact" ? "contactos" : "empresas") + ' que cumplan estas condiciones</p>' + conditionsEditor("trigger", t.conditions, false);
     } else if (t.type === "manual") {
-      body = '<p class="pr-note">Entran sólo las empresas que alguien inscribe: en la tabla, tildándolas → «Inscribir en workflow».</p>';
+      body = '<p class="pr-note">Entran sólo ' + (curObj === "contact" ? "los contactos" : "las empresas") + ' que alguien inscribe: en la tabla, tildándolas → «Inscribir en workflow».</p>';
     } else if (t.type === "event") {
       var evs = S().events || {};
       body = '<div class="pr-wf-row"><select class="pr-filter__input" data-trig="event"' + dis() + ">" +
@@ -598,7 +681,7 @@
         var hf = S().history_fields || [];
         var f = field(t.field);
         body += '<div class="pr-wf-row"><span class="pr-wf-lbl">Propiedad</span><select class="pr-filter__input" data-trig="field"' + dis() + ">" +
-          fieldOptions(t.field, function (x) { return hf.indexOf(x.key) !== -1; }) + "</select></div>";
+          fieldOptions(t.field, function (x) { return x.history !== false && (curObj !== "company" || hf.indexOf(x.key) !== -1); }) + "</select></div>";
         if (f && (f.type === "enum" || f.type === "owner")) {
           body += '<div class="pr-wf-row pr-wf-row--top"><span class="pr-wf-lbl">A (opcional)</span>' +
             chips(choices(f), t.to_values || [], 'data-trig-chip="1"') + "</div>";
@@ -624,7 +707,7 @@
       "</div>" + body +
       (t.type !== "manual"
         ? '<label class="pr-wf-reenroll"><span class="pr-switch pr-switch--sm"><input type="checkbox" data-set="reenroll"' + (draft.reenroll ? " checked" : "") + dis() + "><span></span></span>" +
-          "<span><strong>Reinscripción</strong>: una empresa puede volver a entrar " +
+          "<span><strong>Reinscripción</strong>: " + (curObj === "contact" ? "un contacto" : "una empresa") + " puede volver a entrar " +
           (t.type === "filter" ? "cada vez que vuelva a cumplir las condiciones (después de haber dejado de cumplirlas)." : "cada vez que se dispare.") +
           "</span></label>" : "") +
       "</div>";
@@ -651,7 +734,7 @@
         var path = key + "|" + gi + "|" + ri;
         return (ri ? '<div class="pr-wf-joiner">y</div>' : "") +
           '<div class="pr-wf-rule"><div class="pr-wf-rule__row">' +
-            '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field) + "</select>" +
+            '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true) + "</select>" +
             '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + optionTags(ops, r.op) + "</select>" +
             (canEdit ? '<button type="button" class="pr-wf-x" data-rdel="' + path + '" title="Quitar condición"><i class="fa-solid fa-xmark"></i></button>' : "") +
           "</div>" + ruleValue(r, path) + "</div>";
@@ -729,39 +812,50 @@
   function area(id, key, value, ph) {
     return '<textarea class="pr-filter__input pr-wf-area" rows="3" data-a="' + key + '" data-node="' + id + '" placeholder="' + esc(ph || "") + '"' + dis() + ">" + esc(value || "") + "</textarea>";
   }
-  var TOKENS = '<p class="pr-note pr-wf-tokens">Podés usar: {empresa} {dominio} {owner} {status} {semana} {not_icp} {link}</p>';
+  var TOKENS_COMPANY = '<p class="pr-note pr-wf-tokens">Podés usar: {empresa} {dominio} {owner} {status} {semana} {not_icp} {link}</p>';
+  var TOKENS_CONTACT = '<p class="pr-note pr-wf-tokens">Podés usar: {contacto} {email_contacto} {empresa} {owner} {status} {link}</p>';
+  var TOKENS = TOKENS_COMPANY;
 
   function actionParams(id, a, meta) {
+    TOKENS = curObj === "contact" ? TOKENS_CONTACT : TOKENS_COMPANY;
     var html = "";
     if (meta.field) {
       html += '<select class="pr-filter__input" data-a="field" data-node="' + id + '"' + dis() + ">" +
-        fieldOptions(a.field, function (f) { return f.editable && (!meta.types || meta.types.indexOf(f.type) !== -1); }) + "</select>";
+        fieldOptions(a.field, function (f) { return f.editable && (!meta.types || meta.types.indexOf(f.type) !== -1 || ((a.type === "set_today" || a.type === "set_date_offset") && f.type === "datetime")); }, curObj === "contact") + "</select>";
       var f = field(a.field);
-      if (f && f.type === "date" && (a.type === "set" || isDateSet(a))) {
+      if (f && (f.type === "date" || f.type === "datetime") && (a.type === "set" || isDateSet(a))) {
         html += '<select class="pr-filter__input" data-a="date_mode" data-node="' + id + '"' + dis() + ">" +
           optionTags([
             { value: "today", label: "La fecha en que se ejecuta esta acción" },
             { value: "offset", label: "La fecha de ejecución ± N días" },
             { value: "fixed", label: "Una fecha fija" },
           ], DATE_MODES[a.type]) + "</select>";
-        if (a.type === "set") html += inp(id, "value", a.value, "date");
+        if (a.type === "set") html += inp(id, "value", f.type === "datetime" ? String(a.value || "").slice(0, 16) : a.value, f.type === "datetime" ? "datetime-local" : "date");
         if (a.type === "set_date_offset") html += '<div class="pr-wf-days">' + inp(id, "days", a.days, "number") + "<span>días (negativo = antes)</span></div>";
         return html;
       }
       if (a.type === "set" && f) {
-        if (f.type === "enum" || f.type === "owner") {
+        if (f.type === "enum" || f.type === "owner" || f.type === "user") {
           html += '<select class="pr-filter__input" data-a="value" data-node="' + id + '"' + dis() + '><option value="">Elegir…</option>' + optionTags(choices(f), a.value) + "</select>";
-        } else html += inp(id, "value", a.value, f.type === "date" ? "date" : f.type === "number" ? "number" : "text");
+        } else if (f.type === "bool") {
+          html += '<select class="pr-filter__input" data-a="value" data-node="' + id + '"' + dis() + ">" +
+            optionTags([{ value: "", label: "Elegir…" }, { value: "true", label: "Sí (marcada)" }, { value: "false", label: "No (desmarcada)" }], a.value === true ? "true" : a.value === false ? "false" : (a.value || "")) + "</select>";
+        } else if (f.type === "multi") {
+          html += chips(choices(f), Array.isArray(a.value) ? a.value : [], 'data-achip="value" data-node="' + id + '"');
+        } else html += inp(id, "value", a.value, f.type === "number" ? "number" : f.type === "longtext" ? "text" : "text");
       }
       if (a.type === "set_date_offset") html += '<div class="pr-wf-days">' + inp(id, "days", a.days, "number") + "<span>días (negativo = antes)</span></div>";
       if (a.type === "increment") html += '<div class="pr-wf-days">' + inp(id, "amount", a.amount, "number") + "<span>(negativo = restar)</span></div>";
       if (a.type === "copy") {
         html += '<div class="pr-wf-full"><span class="pr-wf-lbl">Copiar desde</span><select class="pr-filter__input" data-a="from_field" data-node="' + id + '"' + dis() + '><option value="">Elegir…</option>' +
-          fieldOptions(a.from_field, function (x) { return x.key !== a.field; }) + "</select></div>";
+          fieldOptions(a.from_field, function (x) { return x.key !== a.field; }, true) + "</select></div>";
       }
       return html;
     }
     switch (a.type) {
+      case "associate_company":
+        return '<p class="pr-note">Busca la empresa cuyo dominio coincide con el del email del contacto y lo asocia a esa. ' +
+          "Si ya está asociado (lo normal cuando el BDR lo carga desde la empresa), no cambia nada y lo deja anotado.</p>";
       case "rotate_owner":
         return '<div class="pr-wf-full"><span class="pr-wf-lbl">Entre</span>' + chips(bdrChoices(), a.owners || [], 'data-achip="owners" data-node="' + id + '"') +
           '<label class="pr-check"><input type="checkbox" data-a="only_if_empty" data-node="' + id + '"' + (a.only_if_empty ? " checked" : "") + dis() + "> Sólo si no tiene owner</label></div>";
@@ -807,7 +901,7 @@
       body += '<div class="pr-wf-row">' + di("date", d.date, "date") + "<span>a las</span>" + di("time", d.time || "09:00", "time") + "</div>";
     } else if (d.kind === "until_property") {
       body += '<div class="pr-wf-row"><select class="pr-filter__input" data-d="field" data-node="' + id + '"' + dis() + ">" +
-        fieldOptions(d.field, function (f) { return f.type === "date"; }) + "</select></div>" +
+        fieldOptions(d.field, function (f) { return f.type === "date" || f.type === "datetime"; }, true) + "</select></div>" +
         '<div class="pr-wf-row">' + di("offset_days", d.offset_days || 0, "number") + "<span>días (±), a las</span>" + di("time", d.time || "09:00", "time") + "</div>";
     } else if (d.kind === "until_weekday") {
       body += '<div class="pr-wf-row">' + weekdayChips(d.days || [], 'data-dchip="days" data-node="' + id + '"') + "</div>" +
@@ -830,7 +924,7 @@
     if (b.kind === "value") {
       var f = field(b.field);
       body += '<select class="pr-filter__input" data-b="field" data-node="' + id + '"' + dis() + ">" +
-        fieldOptions(b.field, function (x) { return x.type === "enum" || x.type === "owner"; }) + "</select>";
+        fieldOptions(b.field, function (x) { return x.type === "enum" || x.type === "owner" || x.type === "user"; }, true) + "</select>";
       (b.paths || []).forEach(function (p, i) {
         body += '<div class="pr-wf-bpath"><span class="pr-wf-lbl">Rama ' + (i + 1) + "</span>" +
           chips(choices(f), p.values || [], 'data-bchip="' + id + "|" + i + '"') + pathDel(id, i, b) + "</div>";
@@ -895,15 +989,15 @@
       }).join("") + "</ul></div>" : "";
     return '<aside class="pr-wf-side">' +
       '<h3 class="pr-section__title">Vista previa</h3>' +
-      '<p class="pr-note">Qué empresas cumplen hoy el disparador, con lo que hay en pantalla (guardado o no). No escribe nada.</p>' +
+      '<p class="pr-note">Qué ' + (curObj === "contact" ? "contactos" : "empresas") + ' cumplen hoy el disparador, con lo que hay en pantalla (guardado o no). No escribe nada.</p>' +
       '<label class="pr-check"><input type="checkbox" id="prWfOnlyDummy" checked> Sólo dummies</label>' +
       '<button type="button" class="pr-btn pr-btn--primary" data-act="preview"' + (canEdit ? "" : " disabled") + '><i class="fa-solid fa-eye"></i> Vista previa</button>' +
       (canEdit && draft.id ? '<button type="button" class="pr-btn" data-act="apply"><i class="fa-solid fa-play"></i> Inscribir las que cumplen ahora</button>' : "") +
       '<div id="prWfPreviewOut"></div>' +
       '<hr class="pr-wf-hr">' +
-      '<h3 class="pr-section__title">Probar con una empresa</h3>' +
-      '<p class="pr-note">Muestra el recorrido entero (ramas, acciones, esperas) para una empresa. No escribe nada.</p>' +
-      '<input class="pr-filter__input pr-filter__input--search" id="prWfTestQ" placeholder="Buscar empresa…" value="' + esc(testState.q) + '"' + (canEdit ? "" : " disabled") + ">" +
+      '<h3 class="pr-section__title">Probar con ' + (curObj === "contact" ? "un contacto" : "una empresa") + "</h3>" +
+      '<p class="pr-note">Muestra el recorrido entero (ramas, acciones, esperas) para ' + (curObj === "contact" ? "un contacto" : "una empresa") + '. No escribe nada.</p>' +
+      '<input class="pr-filter__input pr-filter__input--search" id="prWfTestQ" placeholder="' + (curObj === "contact" ? "Buscar contacto…" : "Buscar empresa…") + '" value="' + esc(testState.q) + '"' + (canEdit ? "" : " disabled") + ">" +
       '<div class="pr-wf-testres" id="prWfTestRes">' + testResults() + "</div>" +
       path +
     "</aside>";
@@ -917,8 +1011,11 @@
   function fmtVal(k, v) {
     if (v == null || v === "") return "—";
     var f = field(k);
-    if (f && f.type === "owner") return P.ownerName(v) || v;
+    if (f && (f.type === "owner" || f.type === "user")) return P.ownerName(v) || v;
     if (f && f.type === "date") return fmtFecha(v);
+    if (f && f.type === "datetime") return fmtFechaHora(v);
+    if (f && f.type === "bool") return v === true || v === "true" ? "Sí" : "No";
+    if (Array.isArray(v)) return v.join(", ");
     return v;
   }
 
@@ -1003,8 +1100,13 @@
   function searchCompanies() {
     var q = testState.q.trim();
     if (!q) { testState.results = []; $("prWfTestRes").innerHTML = ""; return; }
-    P.api("/prospecting/companies?dummy=include&page_size=10&q=" + encodeURIComponent(q)).then(function (r) {
-      testState.results = r.rows;
+    var path = curObj === "contact" ? "/prospecting/contacts" : "/prospecting/companies";
+    P.api(path + "?dummy=include&page_size=10&q=" + encodeURIComponent(q)).then(function (r) {
+      testState.results = r.rows.map(function (x) {
+        return curObj === "contact"
+          ? { id: x.id, name: x.name + " · " + (x.company_name || ""), is_dummy: x.is_dummy, prospecting_status: x.lead_life }
+          : x;
+      });
       var box = $("prWfTestRes");
       if (box) box.innerHTML = testResults();
     });
@@ -1069,9 +1171,9 @@
         var conds = t.conditions;
         draft.trigger = { type: el.value };
         if (el.value === "filter") draft.trigger.conditions = hasConds(conds) ? conds : blankConds();
-        if (el.value === "event") { draft.trigger.event = "property_changed"; draft.trigger.field = "prospecting_status"; draft.trigger.to_values = []; }
+        if (el.value === "event") { draft.trigger.event = "property_changed"; draft.trigger.field = defaultField(); draft.trigger.to_values = []; }
         if (el.value === "schedule") draft.trigger.schedule = { kind: "daily", time: "09:00" };
-      } else if (a === "event") { t.event = el.value; if (el.value === "property_changed" && !t.field) t.field = "prospecting_status"; }
+      } else if (a === "event") { t.event = el.value; if (el.value === "property_changed" && !t.field) t.field = defaultField(); }
       else if (a === "field") { t.field = el.value; t.to_values = []; }
     } else if ((a = el.getAttribute("data-sch"))) {
       draft.trigger.schedule[a] = el.value;
@@ -1103,7 +1205,7 @@
       n = draft.steps.nodes[el.getAttribute("data-node")];
       if (a === "kind") {
         var defaults = { duration: { days: 1 }, until_date: { date: "", time: "09:00" },
-          until_property: { field: "prospecting_start_date", offset_days: 0, time: "09:00" },
+          until_property: { field: curObj === "contact" ? "follow_up_date" : "prospecting_start_date", offset_days: 0, time: "09:00" },
           until_weekday: { days: [0], time: "09:00" }, until_time: { time: "09:00" },
           until_condition: { conditions: blankConds(), max_days: 7 } };
         n.delay = Object.assign({ kind: el.value }, defaults[el.value] || {});
@@ -1115,7 +1217,7 @@
         var els = n.branch.else_next || null;
         if (el.value === "random") n.branch = { kind: "random", paths: [{ pct: 50, next: keep[0] || null }, { pct: 50, next: keep[1] || els }] };
         else if (el.value === "conditions") n.branch = { kind: "conditions", paths: keep.map(function (nx, i) { return { label: "Rama " + (i + 1), conditions: blankConds(), next: nx }; }), else_next: els };
-        else n.branch = { kind: "value", field: "prospecting_status", paths: keep.map(function (nx) { return { values: [], next: nx }; }), else_next: els };
+        else n.branch = { kind: "value", field: defaultField(), paths: keep.map(function (nx) { return { values: [], next: nx }; }), else_next: els };
         prune();
       } else if (a === "field") {
         n.branch.field = el.value;
@@ -1172,7 +1274,8 @@
       draft.trigger.schedule.days = toggleIn(draft.trigger.schedule.days || [], Number(b.getAttribute("data-chip")));
     } else if (b.getAttribute("data-achip") !== null) {
       var an = draft.steps.nodes[b.getAttribute("data-node")].action;
-      an.owners = toggleIn(an.owners || [], b.getAttribute("data-chip"));
+      var akey = b.getAttribute("data-achip");
+      an[akey] = toggleIn(Array.isArray(an[akey]) ? an[akey] : [], b.getAttribute("data-chip"));
     } else if (b.getAttribute("data-dchip") !== null) {
       var dn = draft.steps.nodes[b.getAttribute("data-node")].delay;
       dn.days = toggleIn(dn.days || [], Number(b.getAttribute("data-chip")));
@@ -1323,7 +1426,7 @@
   function runTest(companyId) {
     showErrors(null);
     P.api("/prospecting/workflows/test", {
-      method: "POST", body: JSON.stringify(Object.assign(payload(), { id: draft.id, company_id: companyId })),
+      method: "POST", body: JSON.stringify(Object.assign(payload(), { id: draft.id, record_id: companyId })),
     }).then(function (r) {
       testState.result = r;
       testState.results = [];

@@ -154,6 +154,10 @@ OPERATORS = {
     "not_changed_in_days":  {"label": "no cambió en los últimos",      "value": "days", "history": True},
     "known":                {"label": "tiene un valor",                "value": None},
     "unknown":              {"label": "está vacío",                    "value": None},
+    "is_true":              {"label": "está marcada",                  "value": None},
+    "is_false":             {"label": "no está marcada",               "value": None},
+    "has_any":              {"label": "incluye alguna de",             "value": "list"},
+    "has_none":             {"label": "no incluye ninguna de",         "value": "list"},
 }
 _CHANGED = ["changed_in_last_days", "not_changed_in_days"]
 OPERATORS_BY_TYPE = {
@@ -164,6 +168,14 @@ OPERATORS_BY_TYPE = {
     "url":      ["contains", "not_contains", "starts_with", "ends_with", "known", "unknown"],
     "number":   ["eq", "gt", "gte", "lt", "lte", "between", "known", "unknown"] + _CHANGED,
     "date":     ["is_today", "is_on", "before", "after", "between_dates", "older_than_days",
+                 "within_last_days", "in_next_days", "known", "unknown"] + _CHANGED,
+    # Tipos que usan los contactos (prospecting/contact_fields.py).
+    "user":     ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
+    "email":    ["equals", "contains", "not_contains", "starts_with", "ends_with", "known", "unknown"] + _CHANGED,
+    "phone":    ["equals", "contains", "starts_with", "known", "unknown"] + _CHANGED,
+    "bool":     ["is_true", "is_false", "known", "unknown"] + _CHANGED,
+    "multi":    ["has_any", "has_none", "known", "unknown"] + _CHANGED,
+    "datetime": ["is_today", "is_on", "before", "after", "between_dates", "older_than_days",
                  "within_last_days", "in_next_days", "known", "unknown"] + _CHANGED,
 }
 
@@ -182,6 +194,10 @@ ACTIONS = {
     "increment":      {"label": "Sumar o restar",               "group": "Editar registro", "field": True, "types": ["number"]},
     # Asignación
     "rotate_owner":   {"label": "Repartir entre BDRs (por turnos)", "group": "Asignación"},
+    # Sólo workflows de contacto: el "Crear asociaciones" de HubSpot. Hoy el BDR crea
+    # el contacto dentro de su empresa (ya nace asociado); sirve cuando lleguen
+    # contactos de Clay o haya que moverlos a la empresa de su dominio.
+    "associate_company": {"label": "Crear asociación con la empresa (por dominio del email)", "group": "Asociaciones", "objects": ["contact"]},
     # Comunicación interna
     "create_todo":    {"label": "Crear To-Do",                  "group": "Comunicación"},
     "send_email":     {"label": "Mandar mail interno",          "group": "Comunicación"},
@@ -195,13 +211,13 @@ ACTIONS = {
 
 # Disparadores (tarjeta de inscripción).
 TRIGGERS = {
-    "filter":   {"label": "Cuando la empresa cumple condiciones"},
+    "filter":   {"label": "Cuando cumple condiciones"},
     "event":    {"label": "Cuando pasa algo"},
     "schedule": {"label": "En un horario"},
     "manual":   {"label": "Sólo inscripción manual"},
 }
 EVENTS = {
-    "created":          {"label": "Se crea la empresa (llega de Clay)"},
+    "created":          {"label": "Se crea (empresa: llega de Clay · contacto: lo agrega un BDR)"},
     "property_changed": {"label": "Cambia una propiedad"},
 }
 SCHEDULES = {
