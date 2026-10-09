@@ -182,6 +182,10 @@ async function createPipelineCandidateFromApplicant(opportunityId, applicant) {
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 409 && data?.candidate?.candidate_id) {
+    // Ya existe con ese email / teléfono / LinkedIn: usar el existente, como createOrFindPipelineCandidate.
+    return data.candidate.candidate_id;
+  }
   if (!res.ok) {
     throw new Error(data?.error || `Failed to create pipeline candidate (${res.status})`);
   }

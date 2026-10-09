@@ -2483,6 +2483,25 @@ def link_or_create_candidate(opportunity_id):
             conn = get_connection()
             cursor = conn.cursor()
 
+            # Mismo freno de duplicados que el modal New (POST /candidates). El front
+            # ofrece vincular al existente con {candidate_id}.
+            from routes.candidates_routes import (
+                _clean_linkedin_for_storage,
+                _normalize_linkedin,
+                _normalize_phone_digits,
+                find_candidate_conflict,
+            )
+            conflict = find_candidate_conflict(
+                cursor,
+                email,
+                _normalize_phone_digits(phone or ''),
+                _normalize_linkedin(_clean_linkedin_for_storage(linkedin or '')),
+            )
+            if conflict:
+                cursor.close()
+                conn.close()
+                return jsonify(conflict), 409
+
             # Obtener el siguiente candidate_id
             cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
             max_id = cursor.fetchone()[0]

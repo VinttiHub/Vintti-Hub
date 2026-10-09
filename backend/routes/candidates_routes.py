@@ -650,6 +650,88 @@ def _linkedin_normalize_sql(column):
     """
 
 
+MIN_PHONE_DIGITS_FOR_DUPLICATE = 7
+
+
+def find_candidate_conflict(cursor, email, phone_digits, linkedin_normalized, exclude_id=None):
+    """Otro candidato con el mismo email / telefono / LinkedIn. Devuelve el payload del 409
+    (`error`, `conflict_fields`, `candidate`) o None.
+
+    Unica definicion para las tres vias que escriben esos datos: el modal New
+    (`POST /candidates`), crear desde el pipeline (`POST /opportunities/<id>/candidates`)
+    y editar en candidate-details (`PATCH /candidates/<id>`, con `exclude_id`). Hasta el
+    2026-10-09 solo la primera chequeaba, y asi nacio un segundo Pablo Acosta (#7344)
+    con el email del #484. `cursor` es uno comun (filas como tuplas).
+    """
+    email = (email or "").strip().lower()
+    # Hay ~150 telefonos basura de 1-6 digitos ("1", "549" = solo el codigo de pais):
+    # compararlos daria falsos duplicados.
+    if phone_digits and len(phone_digits) < MIN_PHONE_DIGITS_FOR_DUPLICATE:
+        phone_digits = None
+    conflict_clauses = []
+    params = []
+
+    if email:
+        conflict_clauses.append("LOWER(TRIM(COALESCE(email,''))) = %s")
+        params.append(email)
+    if phone_digits:
+        conflict_clauses.append("regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g') = %s")
+        params.append(phone_digits)
+    if linkedin_normalized:
+        conflict_clauses.append(f"{_linkedin_normalize_sql('linkedin')} = %s")
+        params.append(linkedin_normalized)
+
+    if not conflict_clauses:
+        return None
+
+    where_sql = " OR ".join(conflict_clauses)
+    exclude_sql = ""
+    if exclude_id is not None:
+        exclude_sql = "AND candidate_id <> %s"
+        params.append(exclude_id)
+    cursor.execute(
+        f"""
+        SELECT candidate_id, name, email, phone, linkedin
+        FROM candidates
+        WHERE ({where_sql}) {exclude_sql}
+        ORDER BY candidate_id
+        LIMIT 1
+        """,
+        tuple(params)
+    )
+    existing = cursor.fetchone()
+    if not existing:
+        return None
+
+    existing_candidate = {
+        "candidate_id": existing[0],
+        "name": existing[1],
+        "email": existing[2],
+        "phone": existing[3],
+        "linkedin": existing[4],
+    }
+    conflict_fields = []
+    if email and (existing_candidate["email"] or "").strip().lower() == email:
+        conflict_fields.append("email")
+    if phone_digits and _normalize_phone_digits(existing_candidate["phone"]) == phone_digits:
+        conflict_fields.append("phone")
+    if linkedin_normalized and _normalize_linkedin(existing_candidate["linkedin"]) == linkedin_normalized:
+        conflict_fields.append("linkedin")
+    label_map = {
+        "email": "duplicate email",
+        "phone": "duplicate phone",
+        "linkedin": "duplicate LinkedIn",
+    }
+    reason_labels = [label_map.get(field, field) for field in conflict_fields]
+    reason_text = " / ".join(reason_labels) if reason_labels else "duplicate candidate data"
+    reason_text = reason_text[0].upper() + reason_text[1:]
+    return {
+        "error": reason_text,
+        "conflict_fields": conflict_fields,
+        "candidate": existing_candidate,
+    }
+
+
 def _get_blacklist_columns(conn):
     global _BLACKLIST_COLUMN_CACHE
     if _BLACKLIST_COLUMN_CACHE is not None:
@@ -994,62 +1076,11 @@ def create_candidate_without_opportunity():
                     }
                 }), 409
 
-        conflict_clauses = []
-        params = []
-
-        if email:
-            conflict_clauses.append("LOWER(TRIM(COALESCE(email,''))) = %s")
-            params.append(email)
-        if phone_digits:
-            conflict_clauses.append("regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g') = %s")
-            params.append(phone_digits)
-        if linkedin_normalized:
-            conflict_clauses.append(f"{_linkedin_normalize_sql('linkedin')} = %s")
-            params.append(linkedin_normalized)
-
-        if conflict_clauses:
-            where_sql = " OR ".join(conflict_clauses)
-            cursor.execute(
-                f"""
-                SELECT candidate_id, name, email, phone, linkedin
-                FROM candidates
-                WHERE {where_sql}
-                LIMIT 1
-                """,
-                tuple(params)
-            )
-            existing = cursor.fetchone()
-            if existing:
-                existing_candidate = {
-                    "candidate_id": existing[0],
-                    "name": existing[1],
-                    "email": existing[2],
-                    "phone": existing[3],
-                    "linkedin": existing[4],
-                }
-                conflict_fields = []
-                if email and (existing_candidate["email"] or "").strip().lower() == email:
-                    conflict_fields.append("email")
-                if phone_digits and _normalize_phone_digits(existing_candidate["phone"]) == phone_digits:
-                    conflict_fields.append("phone")
-                if linkedin_normalized and _normalize_linkedin(existing_candidate["linkedin"]) == linkedin_normalized:
-                    conflict_fields.append("linkedin")
-                label_map = {
-                    "email": "duplicate email",
-                    "phone": "duplicate phone",
-                    "linkedin": "duplicate LinkedIn",
-                }
-                reason_labels = [label_map.get(field, field) for field in conflict_fields]
-                reason_text = " / ".join(reason_labels) if reason_labels else "duplicate candidate data"
-                if reason_text:
-                    reason_text = reason_text[0].upper() + reason_text[1:]
-                cursor.close()
-                conn.close()
-                return jsonify({
-                    "error": reason_text,
-                    "conflict_fields": conflict_fields,
-                    "candidate": existing_candidate,
-                }), 409
+        conflict = find_candidate_conflict(cursor, email, phone_digits, linkedin_normalized)
+        if conflict:
+            cursor.close()
+            conn.close()
+            return jsonify(conflict), 409
 
         cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) + 1 FROM candidates")
         new_candidate_id = cursor.fetchone()[0]
@@ -1629,6 +1660,37 @@ def get_candidate_equipments(candidate_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def _patch_identity_conflict(cursor, candidate_id, data):
+    """El PATCH de candidate-details tambien frena un email / telefono / LinkedIn que ya
+    tiene otro candidato. Solo mira lo que CAMBIA: el blur guarda aunque no se toque nada,
+    y un duplicado que ya existe no tiene que trabar cada blur."""
+    if not any(data.get(f) and str(data.get(f)).strip() for f in ('email', 'phone', 'linkedin')):
+        return None
+    cursor.execute(
+        "SELECT email, phone, linkedin FROM candidates WHERE candidate_id = %s",
+        (candidate_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    cur_email, cur_phone, cur_linkedin = row
+
+    email = phone_digits = linkedin_normalized = None
+    new_email = str(data.get('email') or '').strip().lower()
+    if new_email and new_email != (cur_email or '').strip().lower():
+        email = new_email
+    new_phone = _normalize_phone_digits(str(data.get('phone') or ''))
+    if new_phone and new_phone != _normalize_phone_digits(cur_phone):
+        phone_digits = new_phone
+    new_linkedin = _normalize_linkedin(_clean_linkedin_for_storage(str(data.get('linkedin') or '')))
+    if new_linkedin and new_linkedin != _normalize_linkedin(cur_linkedin):
+        linkedin_normalized = new_linkedin
+
+    return find_candidate_conflict(
+        cursor, email, phone_digits, linkedin_normalized, exclude_id=candidate_id
+    )
+
+
 @bp.route('/candidates/<int:candidate_id>', methods=['PATCH'])
 def update_candidate_fields(candidate_id):
     data = request.get_json()
@@ -1710,6 +1772,11 @@ def update_candidate_fields(candidate_id):
         cursor = conn.cursor()
         if 'process_error' in data:
             _ensure_process_error_column(cursor)
+        conflict = _patch_identity_conflict(cursor, candidate_id, data)
+        if conflict:
+            cursor.close()
+            conn.close()
+            return jsonify(conflict), 409
         cursor.execute(f"""
             UPDATE candidates
             SET {', '.join(updates)}

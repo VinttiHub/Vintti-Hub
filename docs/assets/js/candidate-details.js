@@ -2570,17 +2570,37 @@ function paintWaBtn(){
           if (value) el.innerText = value;
           if (value) el.innerText = value;
           el.contentEditable = "true";
-          el.addEventListener('blur', () => {
+          // Último valor guardado: si el backend frena un duplicado, el campo vuelve acá.
+          el.dataset.saved = value || '';
+          el.addEventListener('blur', async () => {
             const updated = el.innerText.trim();
-            fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ [fieldName]: updated })
-            });
 
             // Si este field es LinkedIn, refresca botón + normaliza visualmente
             if (fieldName === 'linkedin') {
               updateLinkedInUI(updated);
+            }
+
+            try {
+              const res = await fetch(`${candidatesApiBase()}/candidates/${candidateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [fieldName]: updated })
+              });
+              if (res.status === 409) {
+                // Email / teléfono / LinkedIn que ya tiene otro candidato: no se guardó.
+                const body = await res.json().catch(() => ({}));
+                const other = body?.candidate || {};
+                const label = { email: 'email', phone: 'phone', linkedin: 'LinkedIn' }[fieldName] || fieldName;
+                alert(`⚠️ This ${label} already belongs to ${other.name || 'another candidate'} (#${other.candidate_id ?? '?'}). It was not saved.`);
+                const previous = el.dataset.saved || '';
+                el.innerText = previous;
+                if (fieldName === 'linkedin') updateLinkedInUI(previous);
+                if (fieldName === 'phone') paintWaBtn();
+                return;
+              }
+              if (res.ok) el.dataset.saved = updated;
+            } catch (err) {
+              console.error(`Error saving ${fieldName}:`, err);
             }
           });
         }

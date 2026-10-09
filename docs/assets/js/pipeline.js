@@ -963,7 +963,32 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error('Failed to create candidate');
+    if (res.status === 409) {
+      // Ya existe un candidato con ese email / teléfono / LinkedIn: ofrecer vincularlo.
+      const body = await res.json().catch(() => ({}));
+      const other = body?.candidate || {};
+      const fields = (body?.conflict_fields || [])
+        .map(f => ({ email: 'email', phone: 'phone', linkedin: 'LinkedIn' }[f] || f))
+        .join(' / ') || 'data';
+      if (!other.candidate_id) throw new Error(body?.error || 'Duplicate candidate');
+      const ok = confirm(
+        `⚠️ ${other.name || 'A candidate'} (#${other.candidate_id}) already exists with the same ${fields}.\n\n` +
+        `Add the existing candidate to this opportunity instead?`
+      );
+      if (!ok) return;
+      const linkRes = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: other.candidate_id, stage })
+      });
+      if (!linkRes.ok) {
+        const linkBody = await linkRes.json().catch(() => ({}));
+        alert(linkBody?.error || 'Failed to add the existing candidate');
+        return;
+      }
+    } else if (!res.ok) {
+      throw new Error('Failed to create candidate');
+    }
 
     document.getElementById("candidatePopup").classList.add("hidden");
 
