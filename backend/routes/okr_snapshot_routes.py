@@ -416,7 +416,7 @@ def _reduce_value(rows, field, reduce):
         return None, f"valor no numérico: {v!r}"
 
 
-def _resolve_write(computed, fmt, ref_unf, ref_fmt):
+def _resolve_write(computed, fmt, ref_unf, ref_fmt, exact=False):
     """Decide QUÉ escribir según el formato de una celda de referencia ya cargada
     (misma fila). Devuelve (write_value, display, note).
 
@@ -425,7 +425,7 @@ def _resolve_write(computed, fmt, ref_unf, ref_fmt):
     - ref texto/vacía → escribe el string formateado (calca el tipeo manual)."""
     if computed is None:  # sin dato (dataset devolvió null) → escribe "NA", no vacío
         return "NA", "NA", "sin dato → NA"
-    disp = _display(computed, fmt)
+    disp = ("$" + f"{round(computed):,.0f}") if (fmt == "money" and exact) else _display(computed, fmt)
     ref_is_num = isinstance(ref_unf, (int, float)) and not isinstance(ref_unf, bool)
 
     if fmt == "pct" and ref_is_num:
@@ -438,7 +438,7 @@ def _resolve_write(computed, fmt, ref_unf, ref_fmt):
         return round(computed), disp, "celda numérica"
 
     if ref_is_num:
-        num = _round_money(computed) if fmt == "money" else round(computed)
+        num = _round_money(computed) if (fmt == "money" and not exact) else round(computed)
         return num, disp, "celda numérica"
 
     note = "celda de texto" if (ref_unf not in (None, "")) else "fila vacía → escribe texto"
@@ -487,9 +487,10 @@ def _match_tab_title(titles, cfg):
 # ---------------------------------------------------------------------------
 # Core: construye el snapshot de UNA pestaña (columna + filas + valores)
 # ---------------------------------------------------------------------------
-def _build_tab_snapshot(svc, tab, cfg, today, dataset_cache, inject_cutoff=False):
+def _build_tab_snapshot(svc, tab, cfg, today, dataset_cache, inject_cutoff=False,
+                        spreadsheet_id=None):
     date_format = cfg["date_format"]
-    fmt, unf = _read_grids(svc, SPREADSHEET_ID, tab)
+    fmt, unf = _read_grids(svc, spreadsheet_id or SPREADSHEET_ID, tab)
 
     date_row = _find_header_row(fmt, date_format, today.year)
     if date_row is None:
@@ -522,7 +523,7 @@ def _build_tab_snapshot(svc, tab, cfg, today, dataset_cache, inject_cutoff=False
         entry = {
             "tab": tab, "key": metric["key"], "dataset": metric["dataset"],
             "field": metric["field"], "reduce": metric["reduce"], "fmt": metric["fmt"],
-            "obj": _OBJ.get(metric["key"], ""),
+            "obj": metric.get("obj") or _OBJ.get(metric["key"], ""),
         }
         # localizar la fila por prefijo de label
         row_idx = None
@@ -564,7 +565,8 @@ def _build_tab_snapshot(svc, tab, cfg, today, dataset_cache, inject_cutoff=False
                     ref_fmt = _cell(fmt, row_idx, c)
                     break
 
-        write_value, display, note = _resolve_write(value, metric["fmt"], ref_unf, ref_fmt)
+        write_value, display, note = _resolve_write(
+            value, metric["fmt"], ref_unf, ref_fmt, metric.get("exact", False))
         entry["value"] = value
         entry["write_value"] = write_value
         entry["display"] = display

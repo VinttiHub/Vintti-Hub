@@ -4828,7 +4828,10 @@
     bindGlossary();
     bindStickyHead();
     bindSalesSheetUpdateBtn();
-    bindOkrSheetUpdateBtn();
+    bindSheetSnapshotBtn({ btnId: 'okrSheetUpdateBtn', base: '/okr/sheet-snapshot',
+      title: 'Actualizar Google Sheet · OKRs 2026', done: 'OKRs actualizados', what: 'OKRs' });
+    bindSheetSnapshotBtn({ btnId: 'salesAeSheetUpdateBtn', base: '/sales/ae-sheet',
+      title: 'Actualizar Google Sheet · Sales AE Metrics', done: 'Sheet de AE actualizado', what: 'Sales AE' });
     updateWindowLabels();
     updatePeriodLabels();
     hydrate();
@@ -4960,8 +4963,10 @@
   // TODOS los dashboards y las escribe en el Google Sheet de OKRs 2026 (dos pestañas:
   // "OKR 2 - 2026" + "Sales NEW"). Flujo preview → confirmar → commit. Visible para
   // cualquier sesión @vintti.com (el backend valida el email; el preview es la red).
-  function bindOkrSheetUpdateBtn() {
-    const btn = document.getElementById('okrSheetUpdateBtn');
+  // Mismo flujo para el botón "Actualizar Sheet AE" de Sales (Sheet "SALES - AE METRICS"):
+  // cfg = { btnId, base (ruta del blueprint), title, done, what }.
+  function bindSheetSnapshotBtn(cfg) {
+    const btn = document.getElementById(cfg.btnId);
     if (!btn) return;
     const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
       .toLowerCase().trim();
@@ -4985,17 +4990,17 @@
       const orig = btn.textContent;
       btn.disabled = true; btn.textContent = 'Calculando…';
       try {
-        const snap = await post('/okr/sheet-snapshot/preview');
+        const snap = await post(cfg.base + '/preview');
         btn.textContent = orig; btn.disabled = false;
-        openOkrSheetModal(snap, post);
+        openSheetSnapshotModal(snap, post, cfg);
       } catch (err) {
         btn.textContent = orig; btn.disabled = false;
-        alert('No pude calcular el snapshot de OKRs:\n' + (err.message || err));
+        alert(`No pude calcular el snapshot de ${cfg.what}:\n` + (err.message || err));
       }
     });
   }
 
-  function openOkrSheetModal(snap, post) {
+  function openSheetSnapshotModal(snap, post, cfg) {
     const tabs = snap.tabs || [];
     let okCount = 0, badCount = 0;
     const sections = tabs.map(t => {
@@ -5055,7 +5060,7 @@
     overlay.innerHTML = `
       <div style="background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">
         <div style="padding:20px 22px 4px;">
-          <h3 style="margin:0 0 4px;font-size:18px;color:#111;">Actualizar Google Sheet · OKRs 2026</h3>
+          <h3 style="margin:0 0 4px;font-size:18px;color:#111;">${escapeHtml(cfg.title)}</h3>
           <p style="margin:0;color:#555;font-size:13px;">${snap.as_of ? `<b style="color:#6c38ff;">as-of ${escapeHtml(snap.as_of)}</b> · ` : ''}hoy ${escapeHtml(snap.today || '')} · ${okCount} celda(s) a escribir${badCount ? ` · ${badCount} sin resolver` : ''}</p>
         </div>
         <div style="padding:0 22px;">${sections}</div>
@@ -5077,9 +5082,9 @@
       if (confirmBtn.disabled) return;
       confirmBtn.disabled = true; confirmBtn.textContent = 'Escribiendo…';
       try {
-        const res = await post('/okr/sheet-snapshot/commit');
+        const res = await post(cfg.base + '/commit');
         close();
-        alert(`✅ OKRs actualizados: ${res.cells_written} celda(s) escritas.`);
+        alert(`✅ ${cfg.done}: ${res.cells_written} celda(s) escritas.`);
       } catch (err) {
         confirmBtn.disabled = false; confirmBtn.textContent = `Escribir ${okCount} celda(s)`;
         alert('Falló la escritura:\n' + (err.message || err));

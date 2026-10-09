@@ -56,6 +56,7 @@ from routes.ae_commissions_routes import bp as ae_commissions_bp
 from routes.daily_digest_routes import bp as daily_digest_bp
 from routes.sales_snapshot_routes import bp as sales_snapshot_bp
 from routes.okr_snapshot_routes import bp as okr_snapshot_bp
+from routes.sales_ae_sheet_routes import bp as sales_ae_sheet_bp
 from routes.hirex_routes import bp as hirex_bp
 from routes.hirex_pipeline_routes import bp as hirex_pipeline_bp
 from routes.hirex_ai_routes import bp as hirex_ai_bp
@@ -145,6 +146,7 @@ def create_app() -> Flask:
     app.register_blueprint(daily_digest_bp)
     app.register_blueprint(sales_snapshot_bp)
     app.register_blueprint(okr_snapshot_bp)
+    app.register_blueprint(sales_ae_sheet_bp)
     app.register_blueprint(hirex_bp)
     app.register_blueprint(hirex_pipeline_bp)
     app.register_blueprint(hirex_ai_bp)
