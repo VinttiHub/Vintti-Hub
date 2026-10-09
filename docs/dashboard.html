@@ -2976,12 +2976,12 @@
       </div>
 
       <!-- ============================================================
-           SQL → Deep Dive · PER CLIENT (AE · ventana) — spec Bahía punto 1.
-           "SQL" = cuenta con reunión real (sql_meeting_date), NO creation_date.
-           Avanzó = la cuenta tiene >=1 opp con deep_dive_date. Canal por
-           where_come_from. Pertenencia M+B: account_manager ∈ M+B O la cuenta tiene
-           una opp con opp_sales_lead ∈ M+B (al ganar, el account_manager se reasigna
-           al AM post-venta y la cuenta se caería del funnel).
+           SQL → Deep Dive (live HubSpot, 2026-10-08). SQLs de la MISMA fuente que
+           MQL → SQL (Lead Life SQL+ de los contactos, + deals que pasaron por el stage
+           SQL), anclados en su fecha de SQL (Meeting Date & Time; desde el 2026-10-05 la
+           SQL Date del deal). Avanzó = algún deal llegó a Deep Dive (o el hub tiene la
+           opp con deep_dive_date). Canal por el Origin del contacto. Ver _sql_hubspot.py:
+           antes leía cuentas del hub y daba 9 SQLs con 21 al lado.
            ============================================================ -->
         <div class="card wrchan-card wr-violet setupfee-card">
         <div class="card__head">
@@ -9514,7 +9514,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_deepdive_30d_detail" data-bind="dtable"
                    data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cliente|raw,status|Estado|raw"
-                   data-empty-text="Sin SQLs (M+B) en la ventana."></div>
+                   data-empty-text="Sin SQLs en la ventana."></div>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Paso 2 · Clientes con Deep Dive en la ventana, por canal</h4>
@@ -9578,7 +9578,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
             <h3 class="kpi-drawer__title">SQL → Deep Dive · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">De los SQLs que entraron, qué % avanzó a Deep Dive.</p>
+            <p class="kpi-drawer__sub">De todos los SQLs de la ventana (Outbound e Inbound, en HubSpot), qué % pasó el AE a Deep Dive. Fecha del SQL: Meeting Date &amp; Time; desde el 5-oct, la SQL Date del deal.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -9599,7 +9599,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_deepdive_30d_detail" data-bind="dtable"
                    data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cliente|raw,status|Estado|raw"
-                   data-empty-text="Sin SQLs (M+B) en la ventana."></div>
+                   data-empty-text="Sin SQLs en la ventana."></div>
             </section>
           </div>
         </div>

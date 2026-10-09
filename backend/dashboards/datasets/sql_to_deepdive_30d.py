@@ -1,134 +1,45 @@
+"""SQL → Deep Dive por canal (ventana de 30d / filtro global, live HubSpot).
+
+De los SQLs de la ventana, cuántos pasó el AE a Deep Dive. Los SQLs salen de
+HubSpot, con la misma fuente que MQL → SQL (`_sql_hubspot.py`, que explica por qué
+las cuentas del hub no sirven para esto). Canal por el Origin del contacto:
+Outbound → Sales, Referral → Referrals, resto → Marketing. Delta vs la ventana previa.
+
+Comparte filas con `sql_to_deepdive_30d_detail` y con el paso 1 de
+`sql_to_ndasigned_30d`, así card, drawer y card compuesta dan lo mismo.
+"""
 from __future__ import annotations
 
-from datetime import date, datetime
-from ._now import today_ar
-
-from ._periods import prev_window_bounds, window_bounds
-from ._sql_anchor import SQL_ANCHOR
+from ._sql_hubspot import cur_and_prev, rate
 
 
-def _parse_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    raw = str(value).strip()
-    if not raw:
-        return None
-    parts = raw.split("-")
-    try:
-        if len(parts) == 3:
-            return date(int(parts[0]), int(parts[1]), int(parts[2]))
-        if len(parts) == 2:
-            return date(int(parts[0]), int(parts[1]), 1)
-    except (ValueError, TypeError):
-        return None
-    return None
+def _r1(x):
+    return round(x, 1) if x is not None else None
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or today_ar()
-    )
-    desde = _parse_date(filters.get("desde"))
-    hasta = _parse_date(filters.get("hasta"))
-
-    # SQL → Deep Dive conversion. "SQL generada" = account created (account.creation_date),
-    # channel = account.where_come_from (Outbound→Sales, Referral→Referrals, resto→Marketing).
-    # "Avanzó a Deep Dive" = la account tiene al menos una opp con deep_dive_date no nulo.
-    # Window = fecha de creación de la account (cohorte). Delta vs los 30d previos.
-    # M+B: account.account_manager ∈ (mariano, bahia) — owner a nivel account.
-    win_ini, win_fin = window_bounds(filters)
-    prev_ini, prev_fin = prev_window_bounds(filters)
-    sql = f"""
-        WITH acc AS (
-          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
-          SELECT
-            a.account_id,
-            {SQL_ANCHOR} AS sql_d,
-            CASE
-              WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
-              WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
-              ELSE 'marketing'
-            END AS channel,
-            EXISTS (
-              SELECT 1 FROM opportunity o
-              WHERE o.account_id = a.account_id
-                AND NULLIF(o.deep_dive_date::text, '')::date IS NOT NULL
-            ) AS reached_dd
-          FROM account a
-          WHERE {SQL_ANCHOR} IS NOT NULL
-            AND COALESCE(a.vintti_internal, FALSE) = FALSE
-            -- Solo clientes NUEVOS: el funnel mide adquisición, no expansión. Una
-            -- cuenta que ya era cliente antes de este evento (Elevate Clinics, 42 CW)
-            -- abriendo otra posición NO es una venta nueva. Sin este filtro entraban
-            -- 11 clientes existentes y el denominador casi se duplicaba.
-            AND NOT EXISTS (
-                  SELECT 1 FROM opportunity o3
-                  WHERE o3.account_id = a.account_id
-                    AND TRIM(o3.opp_stage) = 'Close Win'
-                    AND NULLIF(o3.opp_close_date::text,'')::date < {SQL_ANCHOR}
-              )
-            AND (
-                  TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-                OR EXISTS (
-                       SELECT 1 FROM opportunity o2
-                       WHERE o2.account_id = a.account_id
-                         AND TRIM(LOWER(o2.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
-                   )
-            )
-            AND (%(desde)s::date IS NULL OR {SQL_ANCHOR} >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR {SQL_ANCHOR} <= %(hasta)s::date)
-        ),
-        cur AS (
-          SELECT * FROM acc
-          WHERE sql_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-        ),
-        prev_rate AS (
-          SELECT ROUND(
-            COUNT(*) FILTER (WHERE reached_dd)::numeric * 100.0 / NULLIF(COUNT(*), 0), 1
-          ) AS prev_total_pct
-          FROM acc
-          WHERE sql_d BETWEEN %(prev_ini)s::date AND %(prev_fin)s::date
-        )
-        SELECT
-          COUNT(*) FILTER (WHERE channel='sales')::int                       AS sales_sqls,
-          COUNT(*) FILTER (WHERE channel='sales' AND reached_dd)::int        AS sales_dd,
-          ROUND(COUNT(*) FILTER (WHERE channel='sales' AND reached_dd)::numeric * 100.0
-                / NULLIF(COUNT(*) FILTER (WHERE channel='sales'), 0), 1)     AS sales_pct,
-
-          COUNT(*) FILTER (WHERE channel='marketing')::int                   AS mkt_sqls,
-          COUNT(*) FILTER (WHERE channel='marketing' AND reached_dd)::int    AS mkt_dd,
-          ROUND(COUNT(*) FILTER (WHERE channel='marketing' AND reached_dd)::numeric * 100.0
-                / NULLIF(COUNT(*) FILTER (WHERE channel='marketing'), 0), 1) AS mkt_pct,
-
-          COUNT(*) FILTER (WHERE channel='referrals')::int                   AS ref_sqls,
-          COUNT(*) FILTER (WHERE channel='referrals' AND reached_dd)::int    AS ref_dd,
-          ROUND(COUNT(*) FILTER (WHERE channel='referrals' AND reached_dd)::numeric * 100.0
-                / NULLIF(COUNT(*) FILTER (WHERE channel='referrals'), 0), 1) AS ref_pct,
-
-          COUNT(*)::int                              AS total_sqls,
-          COUNT(*) FILTER (WHERE reached_dd)::int    AS total_dd,
-          ROUND(COUNT(*) FILTER (WHERE reached_dd)::numeric * 100.0
-                / NULLIF(COUNT(*), 0), 1)            AS total_pct,
-          pr.prev_total_pct,
-          ROUND(
-            COUNT(*) FILTER (WHERE reached_dd)::numeric * 100.0 / NULLIF(COUNT(*), 0)
-            - COALESCE(pr.prev_total_pct, 0), 1
-          ) AS total_pct_delta
-        FROM cur
-        CROSS JOIN prev_rate pr
-        GROUP BY pr.prev_total_pct;
-    """
-
-    return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,
-        "prev_ini": prev_ini, "prev_fin": prev_fin, "corte": corte, "desde": desde, "hasta": hasta}
+def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
+    cur, prev, _ini, _fin = cur_and_prev(filters)
+    out = {}
+    for prefix, ch in (("sales", "sales"), ("mkt", "marketing"), ("ref", "referrals")):
+        num, den, pct = rate([r for r in cur if r["channel"] == ch])
+        out[f"{prefix}_sqls"] = den
+        out[f"{prefix}_dd"] = num
+        out[f"{prefix}_pct"] = _r1(pct)
+    num, den, pct = rate(cur)
+    _pn, _pd, prev_pct = rate(prev)
+    out.update({
+        "total_sqls": den,
+        "total_dd": num,
+        "total_pct": _r1(pct),
+        "prev_total_pct": _r1(prev_pct),
+        "total_pct_delta": _r1(pct - (prev_pct or 0)) if pct is not None else None,
+    })
+    return [out]
 
 
 DATASET = {
     "key": "sql_to_deepdive_30d",
-    "label": "SQL → Deep Dive por canal (30d)",
+    "label": "SQL → Deep Dive por canal (30d, live HubSpot)",
     "dimensions": [],
     "measures": [
         {"key": "sales_sqls", "label": "Sales · SQLs", "type": "number"},
@@ -147,5 +58,5 @@ DATASET = {
         {"key": "total_pct_delta", "label": "Total · Δ SQL→DD (pp)", "type": "percent"},
     ],
     "default_filters": {},
-    "query": query,
+    "compute": compute,
 }
