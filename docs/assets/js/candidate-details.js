@@ -5722,7 +5722,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
 
     if (cdLar) cdLar.textContent = currentReminder.lar ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueLar - now)}`;
     if (cdJaz) cdJaz.textContent = currentReminder.jaz ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueJaz - now)}`;
-    // El checkbox del AM solo existe en opps de Account Management (am_applies lo decide el backend).
+    // El checkbox del AM solo aparece si le llega el recordatorio (am_applies lo decide el backend).
     if (rowAm) rowAm.style.display = currentReminder.am_applies ? '' : 'none';
     if (cdAm && currentReminder.am_applies){
       const dueAm = nextDue(press, currentReminder.last_am_sent_at);

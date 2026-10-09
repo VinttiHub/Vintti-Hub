@@ -426,9 +426,9 @@ def press_and_send(candidate_id):
             )
 
 
-        # Pilar (el AM de hoy) se suma solo si la opp es de Account Management.
+        # El AM de hoy (Pilar) se suma a todos (ver _am_applies_to_reminder).
         to_list = _dedupe_emails(
-            [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL] + _am_recipients_for_opp(cur, opportunity_id)
+            [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL] + _am_recipients_for_reminder(cur, row)
         )
         # Lucia desactivada para hire reminders.
         # to_list = [JAZ_EMAIL, LAR_EMAIL, LUCIA_EMAIL, PGONZALES_EMAIL]
@@ -473,10 +473,11 @@ def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any
 
 def _serialize_reminder_with_am(cur, row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Igual que _serialize_reminder + `am_applies`: el front muestra el checkbox del AM
-    solo si la opp es de Account Management (es a quien le llega el recordatorio)."""
+    solo si al AM le llega este recordatorio (ver _am_applies_to_reminder)."""
+    am_applies = bool(_am_recipients_for_reminder(cur, row)) if row else False
     out = _serialize_reminder(row)
     if out is not None:
-        out["am_applies"] = bool(_am_recipients_for_opp(cur, out.get("opportunity_id")))
+        out["am_applies"] = am_applies
     return out
 
 def _anchor(text, url):
@@ -782,9 +783,9 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
     computer = (hire_for_opp or {}).get("computer")
 
     # Bahía salió de los Close Win el 2026-09-22 (pedido de la owner).
-    # Pilar (el AM de hoy) se suma solo si la opp es de Account Management.
-    am_to = list(current_ams()) if _is_am_sales_lead(ctx.get("opp_sales_lead")) else []
-    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL] + am_to)
+    # El AM de hoy (Pilar) recibe TODOS los Close Win, sin condicion (pedido de la owner,
+    # 2026-10-09; antes solo los de Account Management).
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL] + list(current_ams()))
     ok = _send_email(
         subject=f"🎉 Close Win: {ctx.get('candidate_name') or f'Candidate #{candidate_id}'} — Start {start_date or '—'}",
         html_body=_close_win_email_html(
@@ -936,16 +937,44 @@ def _is_am_sales_lead(sales_lead) -> bool:
     return str(sales_lead or "").strip().lower() in am_history()
 
 
-def _am_recipients_for_opp(cur, opportunity_id) -> List[str]:
-    """El AM de hoy si la opp es de Account Management; si no, nadie."""
-    if not opportunity_id:
+# Desde el 2026-10-09 el AM recibe el recordatorio de Signed de TODAS las opps, no solo
+# las de Account Management (pedido de la owner). Solo hacia adelante: habia 167
+# recordatorios viejos de opps de Sales con el checkbox del AM sin tildar (porque nunca
+# le llegaban), y sin este corte le caian todos de golpe, uno por dia.
+AM_ALL_SIGNED_SINCE = datetime(2026, 10, 9, tzinfo=BOGOTA_TZ)
+
+
+def _am_applies_to_reminder(sales_lead, press_date) -> bool:
+    """Opps de AM siempre; el resto, si el boton se apreto desde el corte. press_date
+    NULL = todavia no se apreto, y al apretarlo queda en now(), o sea despues del corte."""
+    if _is_am_sales_lead(sales_lead):
+        return True
+    if press_date is None:
+        return True
+    if isinstance(press_date, str):
+        try:
+            press_date = datetime.fromisoformat(press_date)
+        except ValueError:
+            return False
+    if press_date.tzinfo is None:
+        press_date = press_date.replace(tzinfo=BOGOTA_TZ)
+    return press_date >= AM_ALL_SIGNED_SINCE
+
+
+def _am_recipients_for_reminder(cur, row) -> List[str]:
+    """El AM de hoy si le toca este recordatorio (ver _am_applies_to_reminder); si no, nadie."""
+    if not row:
         return []
-    cur.execute(
-        "SELECT opp_sales_lead FROM opportunity WHERE opportunity_id = %s",
-        (opportunity_id,),
-    )
-    row = cur.fetchone()
-    if not row or not _is_am_sales_lead(row.get("opp_sales_lead")):
+    sales_lead = None
+    opportunity_id = row.get("opportunity_id")
+    if opportunity_id:
+        cur.execute(
+            "SELECT opp_sales_lead FROM opportunity WHERE opportunity_id = %s",
+            (opportunity_id,),
+        )
+        opp = cur.fetchone()
+        sales_lead = opp.get("opp_sales_lead") if opp else None
+    if not _am_applies_to_reminder(sales_lead, row.get("press_date")):
         return []
     return list(current_ams())
 
@@ -1777,8 +1806,8 @@ def send_due_reminders():
             plan = []
             if not r["jaz"] and _should_send(now, press, r["last_jaz_sent_at"]): plan.append(("jaz", JAZ_EMAIL))
             if not r["lar"] and _should_send(now, press, r["last_lar_sent_at"]): plan.append(("lar", LAR_EMAIL))
-            # El AM de hoy (Pilar) solo en las opps de Account Management; tilda su propio checkbox.
-            if (not r["am"] and _is_am_sales_lead(r.get("opp_sales_lead"))
+            # El AM de hoy (Pilar), ver _am_applies_to_reminder; tilda su propio checkbox.
+            if (not r["am"] and _am_applies_to_reminder(r.get("opp_sales_lead"), r["press_date"])
                     and _should_send(now, press, r["last_am_sent_at"])):
                 for am_email in current_ams():
                     plan.append(("am", am_email))
