@@ -476,7 +476,7 @@ def clean_value(col: str, v):
         return _to_int(v)
     if col == "prospecting_start_date":
         return _to_date(v)
-    if col == "prospecting_owner_email":
+    if col in ("prospecting_owner_email", "prospecting_owner_apollo"):
         s = _clean_text(v)
         return s.lower() if s else None
     if col == "week_label":

@@ -211,10 +211,9 @@
 
   function testBanner() {
     if (S().automation_real_data) return "";
-    return '<div class="pr-wf-banner"><i class="fa-solid fa-flask"></i><div>' +
-      "<strong>Fase de prueba:</strong> los workflows activos corren solos (al editar una empresa, cuando llega de Clay, en su horario) " +
-      "<strong>sólo sobre empresas dummy</strong>. Sobre empresas reales corren únicamente cuando alguien los aplica a mano. " +
-      "Y sobre una dummy, mails, Slack y To-Dos van siempre a destinos de prueba con [TEST].</div></div>";
+    return '<div class="pr-wf-banner pr-wf-banner--slim"><i class="fa-solid fa-flask"></i><div>' +
+      "<strong>Fase de prueba:</strong> lo automático corre sólo sobre <strong>dummies</strong>; mails, Slack y To-Dos van a destinos de prueba con [TEST]." +
+      "</div></div>";
   }
 
   var STATUS_LABEL = {
@@ -233,39 +232,98 @@
     }).join("");
   }
 
-  function renderList() {
-    var cards = list.map(function (w) {
+  /* Vista de la lista: tabla (por defecto) o tarjetas. Se recuerda por navegador. */
+  var LIST_VIEW_KEY = "pr_wf_list_view";
+  var listView = (function () { try { return localStorage.getItem(LIST_VIEW_KEY) || "table"; } catch (e) { return "table"; } })();
+  var listFilter = "all";
+
+  function plain(html) {
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    return (d.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  function objBadge(obj) {
+    return '<span class="pr-wf-obj pr-wf-obj--' + obj + '">' +
+      (obj === "contact" ? '<i class="fa-regular fa-user"></i> Contactos' : '<i class="fa-regular fa-building"></i> Empresas') + "</span>";
+  }
+  function switchHtml(w) {
+    return canEdit
+      ? '<label class="pr-switch" title="' + (w.enabled ? "Activo" : "Inactivo") + '"><input type="checkbox" data-toggle="' + w.id + '"' + (w.enabled ? " checked" : "") + '><span></span></label>'
+      : '<span class="pr-wf-pill' + (w.enabled ? " is-on" : "") + '">' + (w.enabled ? "Activo" : "Inactivo") + "</span>";
+  }
+  function totalIn(stats) { return Object.keys(stats || {}).reduce(function (a, k) { return a + stats[k]; }, 0); }
+
+  function renderCards(rows) {
+    return '<div class="pr-wf-grid">' + rows.map(function (w) {
       var tt = (S().triggers || {})[w.trigger.type] || {};
       curObj = w.object || "company";
       return '<article class="pr-wf-card' + (w.enabled ? " is-on" : "") + '" data-wf="' + w.id + '" tabindex="0">' +
-        '<header class="pr-wf-card__head">' +
-          '<h3 class="pr-wf-card__name"><span class="pr-wf-obj pr-wf-obj--' + curObj + '">' +
-            (curObj === "contact" ? '<i class="fa-regular fa-user"></i> Contactos' : '<i class="fa-regular fa-building"></i> Empresas') +
-            "</span>" + esc(w.name) + "</h3>" +
-          (canEdit
-            ? '<label class="pr-switch" title="' + (w.enabled ? "Activo" : "Inactivo") + '"><input type="checkbox" data-toggle="' + w.id + '"' + (w.enabled ? " checked" : "") + '><span></span></label>'
-            : '<span class="pr-wf-pill' + (w.enabled ? " is-on" : "") + '">' + (w.enabled ? "Activo" : "Inactivo") + "</span>") +
-        "</header>" +
-        (w.description ? '<p class="pr-wf-card__desc">' + esc(w.description) + "</p>" : "") +
-        '<div class="pr-wf-card__rule"><span class="pr-wf-card__tag">Si</span><div><span class="pr-note">' + esc(tt.label || "") + ":</span> " + triggerText(w.trigger) + "</div></div>" +
-        '<div class="pr-wf-card__rule"><span class="pr-wf-card__tag pr-wf-card__tag--do">Entonces</span><div>' +
-          nodeCount(w.steps) + " paso" + (nodeCount(w.steps) === 1 ? "" : "s") + "</div></div>" +
-        '<div class="pr-wf-card__stats">' + statsChips(w.stats) + "</div>" +
-        '<footer class="pr-wf-card__foot">' + (w.updated_by ? "Editado por " + esc(P.ownerName(w.updated_by) || w.updated_by) : "") + "</footer>" +
+        '<header class="pr-wf-card__head"><div>' + objBadge(curObj) +
+          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3></div>" + switchHtml(w) + "</header>" +
+        (w.description ? '<p class="pr-wf-card__desc pr-clamp-2" title="' + esc(w.description) + '">' + esc(w.description) + "</p>" : "") +
+        '<div class="pr-wf-card__rule"><span class="pr-wf-card__tag">Si</span><div class="pr-clamp-3">' + triggerText(w.trigger) + "</div></div>" +
+        '<div class="pr-wf-card__meta"><span>' + esc(tt.label || "") + "</span><span>" + nodeCount(w.steps) + " paso" + (nodeCount(w.steps) === 1 ? "" : "s") + "</span>" +
+          '<span class="pr-wf-card__stats">' + statsChips(w.stats) + "</span></div>" +
         "</article>";
-    }).join("");
+    }).join("") + "</div>";
+  }
+
+  function renderTable(rows) {
+    return '<div class="pr-wf-tablewrap"><table class="pr-table pr-wf-table"><thead><tr>' +
+      '<th class="pr-wf-table__on">Activo</th><th>Workflow</th><th>Objeto</th><th>Disparador</th>' +
+      '<th class="pr-num">Pasos</th><th>Inscriptos</th><th>Editado</th></tr></thead><tbody>' +
+      rows.map(function (w) {
+        curObj = w.object || "company";
+        var tt = (S().triggers || {})[w.trigger.type] || {};
+        var trig = plain(triggerText(w.trigger));
+        var n = totalIn(w.stats);
+        return '<tr data-wf="' + w.id + '" tabindex="0"' + (w.enabled ? ' class="is-on"' : "") + ">" +
+          '<td class="pr-wf-table__on">' + switchHtml(w) + "</td>" +
+          '<td class="pr-wf-table__name"><strong>' + esc(w.name) + "</strong>" +
+            (w.description ? '<span class="pr-note" title="' + esc(w.description) + '">' + esc(w.description) + "</span>" : "") + "</td>" +
+          "<td>" + objBadge(curObj) + "</td>" +
+          '<td class="pr-wf-table__trig" title="' + esc(trig) + '"><span class="pr-note">' + esc(tt.label || "") + "</span>" + esc(trig) + "</td>" +
+          '<td class="pr-num">' + nodeCount(w.steps) + "</td>" +
+          "<td>" + (n ? statsChips(w.stats) : '<span class="pr-note">—</span>') + "</td>" +
+          '<td class="pr-wf-table__by">' + esc((P.ownerName(w.updated_by) || w.updated_by || "").split(" ")[0]) + "<br>" + fmtFecha(w.updated_at) + "</td>" +
+          "</tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+
+  function renderList() {
+    var rows = list.filter(function (w) { return listFilter === "all" || (w.object || "company") === listFilter; });
+    var counts = { all: list.length, company: 0, contact: 0 };
+    list.forEach(function (w) { counts[w.object || "company"]++; });
+    var chip = function (k, label) {
+      return '<button type="button" class="pr-wf-hf' + (listFilter === k ? " is-on" : "") + '" data-lfilter="' + k + '">' + label + " <span>" + counts[k] + "</span></button>";
+    };
     root.innerHTML =
       '<div class="pr-wf-top">' +
         '<div><h2 class="pr-wf-title">Workflows</h2>' +
-        '<p class="pr-note" style="margin:0">Reglas que trabajan las empresas solas, como los workflows de HubSpot.' +
+        '<p class="pr-note" style="margin:0">Reglas que trabajan las empresas y los contactos solos, como los workflows de HubSpot.' +
         (canEdit ? "" : " Sólo pgonzales, manuela y mia pueden editarlos.") + "</p></div>" +
         (canEdit ? '<button type="button" class="pr-btn pr-btn--primary" id="prWfNew"><i class="fa-solid fa-plus"></i> Crear workflow</button>' : "") +
       "</div>" + testBanner() +
-      (list.length ? '<div class="pr-wf-grid">' + cards + "</div>"
-        : '<div class="pr-wf-empty">Todavía no hay workflows.' + (canEdit ? " Creá el primero." : "") + "</div>");
+      '<div class="pr-wf-bar"><div class="pr-wf-hfilters">' + chip("all", "Todos") + chip("company", "Empresas") + chip("contact", "Contactos") + "</div>" +
+        '<div class="pr-wf-viewtoggle" role="tablist">' +
+          '<button type="button" class="pr-wf-subtab' + (listView === "table" ? " is-active" : "") + '" data-lview="table"><i class="fa-solid fa-list"></i> Tabla</button>' +
+          '<button type="button" class="pr-wf-subtab' + (listView === "cards" ? " is-active" : "") + '" data-lview="cards"><i class="fa-solid fa-grip"></i> Tarjetas</button>' +
+        "</div></div>" +
+      (rows.length ? (listView === "cards" ? renderCards(rows) : renderTable(rows))
+        : '<div class="pr-wf-empty">' + (list.length ? "No hay workflows de este tipo." : "Todavía no hay workflows." + (canEdit ? " Creá el primero." : "")) + "</div>");
 
     var nb = $("prWfNew");
     if (nb) nb.onclick = function () { askObject().then(function (obj) { if (obj) openEditor(null, obj); }); };
+    root.querySelectorAll("[data-lview]").forEach(function (b) {
+      b.onclick = function () {
+        listView = b.getAttribute("data-lview");
+        try { localStorage.setItem(LIST_VIEW_KEY, listView); } catch (e) {}
+        renderList();
+      };
+    });
+    root.querySelectorAll("[data-lfilter]").forEach(function (b) {
+      b.onclick = function () { listFilter = b.getAttribute("data-lfilter"); renderList(); };
+    });
     root.querySelectorAll("[data-toggle]").forEach(function (cb) {
       cb.addEventListener("click", function (e) { e.stopPropagation(); });
       cb.addEventListener("change", function () {

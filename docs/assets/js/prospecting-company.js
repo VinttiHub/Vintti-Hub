@@ -94,7 +94,7 @@
           '<select class="pr-cell-select pr-status" data-edit="prospecting_status" data-status="' + esc(c.prospecting_status || "") + '">' +
             '<option value="">—</option>' + optionTags(opts().statuses || [], c.prospecting_status) + "</select></div>" +
         sel("prospecting_owner_email", "Prospecting Owner", ownerOptions()) +
-        inp("prospecting_owner_apollo", "Prospecting Owner Apollo") +
+        sel("prospecting_owner_apollo", "Prospecting Owner Apollo", ownerOptions()) +
         inp("prospecting_start_date", "Prospecting Start Date", "date") +
         inp("week_label", "Semana") +
         sel("not_icp_reason", "Not ICP Reason", opts().not_icp_reasons || []) +

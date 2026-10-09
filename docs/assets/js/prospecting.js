@@ -123,7 +123,8 @@
   }
   function ownerName(email) {
     if (!email) return "";
-    var hit = OPTS.bdrs.filter(function (b) { return b.email === email; })[0];
+    // BDRs y, si no, cualquier usuario del Hub (p. ej. manuela / mia, que editan workflows).
+    var hit = (OPTS.bdrs || []).concat(OPTS.users || []).filter(function (b) { return b.email === email; })[0];
     return hit ? (hit.name || hit.email) : email;
   }
 
@@ -240,7 +241,7 @@
     { key: "state", label: "Estado", render: function (r) { return cellText(r.state); } },
     { key: "country", label: "Pais", render: function (r) { return cellText(r.country); } },
     { key: "hubspot_company_id", label: "Id de la empresa (HubSpot)", render: function (r) { return cellText(r.hubspot_company_id); } },
-    { key: "prospecting_owner_apollo", label: "Prospecting Owner Apollo", render: function (r) { return cellText(r.prospecting_owner_apollo); } },
+    { key: "prospecting_owner_apollo", label: "Prospecting Owner Apollo", render: function (r) { return cellText(ownerName(r.prospecting_owner_apollo)); } },
   ];
 
   var COLS_KEY = "prospecting_columns_v1";
@@ -537,7 +538,7 @@
           f("prospecting_owner_email", "Prospecting Owner",
             '<select class="pr-filter__input" data-edit="prospecting_owner_email">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_email), c.prospecting_owner_email || "", "—") + "</select>") +
           f("prospecting_owner_apollo", "Prospecting Owner Apollo",
-            '<input class="pr-filter__input" data-edit="prospecting_owner_apollo" value="' + esc(c.prospecting_owner_apollo || "") + '">') +
+            '<select class="pr-filter__input" data-edit="prospecting_owner_apollo">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_apollo), c.prospecting_owner_apollo || "", "—") + "</select>") +
           f("prospecting_start_date", "Prospecting Start Date",
             '<input type="date" class="pr-filter__input" data-edit="prospecting_start_date" value="' + esc((c.prospecting_start_date || "").slice(0, 10)) + '">') +
           f("week_label", "Week",

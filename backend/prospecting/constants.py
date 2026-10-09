@@ -97,7 +97,9 @@ FIELDS = [
     {"key": "name", "label": "Nombre de la empresa", "type": "text"},
     {"key": "prospecting_status", "label": "Prospecting Status", "type": "enum", "options": STATUSES},
     {"key": "prospecting_owner_email", "label": "Prospecting Owner", "type": "owner"},
-    {"key": "prospecting_owner_apollo", "label": "Prospecting Owner Apollo", "type": "text"},
+    # Persona (BDR), igual que en HubSpot: el workflow 6 copia este valor a
+    # Prospecting Owner, y copiar texto a una persona no se permite.
+    {"key": "prospecting_owner_apollo", "label": "Prospecting Owner Apollo", "type": "owner"},
     {"key": "prospecting_start_date", "label": "Prospecting Start Date", "type": "date"},
     {"key": "not_icp_reason", "label": "Not ICP Reason", "type": "enum", "options": NOT_ICP_REASONS},
     {"key": "week_label", "label": "Semana", "type": "text"},

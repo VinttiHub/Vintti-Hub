@@ -25,6 +25,8 @@ LEAD_LIFE = [
     "MQL (BDRs)",
     "MQL (AE)",
     "SQL (AE)",
+    # No estaba en la planilla, pero lo usa el workflow 5 de HubSpot (2026-10-09).
+    "Closed Lost",
     "DQL",
     "Active Client",
     "Archived Lead",
@@ -146,6 +148,10 @@ CONTACT_FIELDS = [
     _f("last_closed_win_date", "Last Closed Win Date", "date", G[6]),
     _f("last_closed_lost_date", "Last Closed Lost Date", "date", G[6]),
     _f("lost_reason_detail", "Lost Reason Detail", "longtext", G[6]),
+    # Tampoco estaba en la planilla; la usa el workflow 5 de HubSpot. Texto libre
+    # hasta que pasen sus opciones (en HubSpot es probablemente una lista).
+    _f("mql_ae_lost_reason", "MQL (AE) Lost Reason", "text", G[6],
+       description="Por qué se perdió el lead después de la reunión con el AE."),
     # ---- Eventos ----------------------------------------------------------- #
     _f("event_name", "Event Name", "enum", G[7],
        ["F&M - Hal Smith", "F&M - Mason Brady", "F&M - Rubik", "F&M - Founder's Network"]),
