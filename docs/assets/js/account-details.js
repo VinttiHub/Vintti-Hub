@@ -3235,38 +3235,9 @@ console.log("accountId =", getAccountId());
     `;
   }).join("");
 
-  // 2) luego crea ToDos SIN romper la UI
-  items.forEach(b => {
-  const payoutRaw =
-    b.payout_date ?? b.payout ?? b.payout_at ?? b.payoutDate ?? b.payout_datetime;
-
-  const payoutISO = toISODateOrNull(payoutRaw); // YYYY-MM-DD o null
-
-  if (!payoutISO) {
-    console.warn("⚠️ Bonus sin payout parseable:", {
-      bonus_request_id: b.bonus_request_id,
-      payoutRaw,
-      keys: Object.keys(b || {})
-    });
-    return; // 👈 NO crees ToDo si no hay payout real
-  }
-
-  const employee =
-  b.candidate_id ? (b.candidate_name || `Candidate #${b.candidate_id}`) : (b.employee_name_manual || "Employee");
-
-
-  const amt = `${b.currency || ""} ${Number(b.amount || 0).toFixed(2)}`.trim();
-const accLabel =
-  getCurrentAccountName() ||
-  (b.account_name || "").trim() ||
-  `account #${b.account_id}`;
-
-  upsertTodoTask({
-    sourceKey: `bonus_request:${b.bonus_request_id}`,
-    description: `Pagar bono ${amt} a ${employee} (${accLabel})`,
-    due_date: payoutISO,
-  }).catch(err => console.warn("upsertTodoTask failed:", err));
-});
+  // Las tareas "Pagar bono" las crea el backend al cargar el bono, para los dueños de
+  // TODO_OWNER_USER_IDS (public_bonus_routes.py). Antes acá se creaban también para quien
+  // tuviera la cuenta abierta (localStorage.user_id), y le caían a cualquiera (ej. la AM).
 
 }
 
