@@ -862,7 +862,9 @@ def cv_review_reviewers():
     denied = _require_active_user()
     if denied:
         return denied
-    emails = sorted(set(_sales_lead_emails()) | set(OVERSIGHT_EMAILS))
+    # REVIEW_OVERRIDE_EMAILS (= supervisión + pilar) y no sólo OVERSIGHT_EMAILS: si no,
+    # Pilar puede decidir pero el popup no la detecta y el batch sale en modo cliente.
+    emails = sorted(set(_sales_lead_emails()) | REVIEW_OVERRIDE_EMAILS)
     return jsonify({"emails": emails})
 
 

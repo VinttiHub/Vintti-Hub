@@ -3925,15 +3925,15 @@ fetch(API_BASE + '/accounts')
   .catch(err => {
     console.error('Error loading accounts:', err);
   });
-fetch(API_BASE + '/users')
-  .then(response => response.json())
-  .then(users => {
-    const salesDropdown = document.getElementById('sales_lead');
-    if (!salesDropdown) return;
-
-fetch(API_BASE + '/users')
-  .then(response => response.json())
-  .then(users => {
+Promise.all([
+  fetch(API_BASE + '/users').then(response => response.json()),
+  // Los AM activos salen de users.role (hoy Pilar): así un cambio de AM no requiere tocar esta lista.
+  // Si falla, seguimos con la allow-list fija.
+  fetch(API_BASE + '/users/account-managers')
+    .then(response => (response.ok ? response.json() : []))
+    .catch(() => [])
+])
+  .then(([users, accountManagers]) => {
     const salesDropdown = document.getElementById('sales_lead');
     if (!salesDropdown) return;
 
@@ -3945,6 +3945,10 @@ fetch(API_BASE + '/users')
       'mariano@vintti.com',
       'mia@vintti.com'
     ]);
+    (Array.isArray(accountManagers) ? accountManagers : []).forEach(am => {
+      const email = (am.email_vintti || '').trim().toLowerCase();
+      if (email) allowedEmails.add(email);
+    });
 
     // Limpia opciones previas y agrega placeholder
     salesDropdown.innerHTML = '<option disabled selected>Select Sales Lead</option>';
@@ -3966,8 +3970,6 @@ fetch(API_BASE + '/users')
     Array.from(salesDropdown.options).forEach(opt => {
       if (/agustina\b/i.test(opt.textContent)) opt.remove();
     });
-  })
-  .catch(err => console.error('Error loading sales leads:', err));
   })
   .catch(err => console.error('Error loading sales leads:', err));
 
