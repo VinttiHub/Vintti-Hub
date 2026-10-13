@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="./assets/css/sidebar.css" />
   <!-- Tarjeta por recruiter, la MISMA que pinta docs/cv-review.html -->
   <link rel="stylesheet" href="./assets/css/cv-review-cards.css?v=20260827-shared" />
-  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=27" />
+  <link rel="stylesheet" href="./assets/css/recruiter-power.css?v=28" />
   <style>
     .metric-card[data-metric-detail] {
       cursor: pointer;
@@ -128,6 +128,14 @@
     .metric-detail-modal__item--negative .metric-detail-modal__badge {
       background: rgba(210, 95, 121, 0.18);
       color: #7b1c36;
+    }
+    .metric-detail-modal__item--warning {
+      border-color: rgba(230, 170, 60, 0.45);
+      background: #fff8e8;
+    }
+    .metric-detail-modal__item--warning .metric-detail-modal__badge {
+      background: rgba(230, 170, 60, 0.2);
+      color: #7a4b00;
     }
     .metric-detail-modal__empty {
       margin: 0;
@@ -369,11 +377,11 @@
       >
         <div class="metric-header">
           <span class="metric-label">Average days to first batch (Open)</span>
-          <span class="metric-pill metric-pill-conv">Active opps</span>
+          <span class="metric-pill metric-pill-conv">Current pipeline</span>
         </div>
         <div class="metric-value" id="avgBatchOpenValue">–</div>
         <p class="metric-caption">
-          Open opportunities starting within the range. 
+          All opportunities currently in Sourcing, Interviewing or Negotiating.
         </p>
       </article>
 
@@ -391,6 +399,40 @@
         <div class="metric-value" id="avgBatchClosedValue">–</div>
         <p class="metric-caption">
           Closed opportunities where the first batch landed before closing.
+        </p>
+      </article>
+
+      <article
+        class="metric-card metric-batch-cw metric-card--detail-disabled"
+        data-metric-detail="avgBatchCW"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
+        <div class="metric-header">
+          <span class="metric-label">Average days to first batch (Closed Win)</span>
+          <span class="metric-pill metric-pill-win-soft">Selected range</span>
+        </div>
+        <div class="metric-value" id="avgBatchCWValue">–</div>
+        <p class="metric-caption">
+          <strong>Closed Win</strong> opportunities in the selected range where the first batch landed before closing.
+        </p>
+      </article>
+
+      <article
+        class="metric-card metric-batch-cl metric-card--detail-disabled"
+        data-metric-detail="avgBatchCL"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
+        <div class="metric-header">
+          <span class="metric-label">Average days to first batch (Closed Lost)</span>
+          <span class="metric-pill metric-pill-lost-soft">Selected range</span>
+        </div>
+        <div class="metric-value" id="avgBatchCLValue">–</div>
+        <p class="metric-caption">
+          <strong>Closed Lost</strong> opportunities in the selected range where the first batch landed before closing.
         </p>
       </article>
       </section>
@@ -681,7 +723,7 @@
   <script src="./assets/js/sidebar.js?v=20261007-pilar-staffing" defer></script>
   <script src="./assets/js/cv-review-cards.js?v=20260827-shared"></script>
   <script src="./assets/js/jd-review-cards.js?v=20260925-1"></script>
-  <script src="./assets/js/recruiter-power.js?v=20260929-benjamin"></script>
+  <script src="./assets/js/recruiter-power.js?v=20261013-batch-before-start"></script>
   <script src="./assets/js/recruiter-power-jd.js?v=20260925-1"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>

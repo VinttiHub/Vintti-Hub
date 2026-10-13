@@ -605,15 +605,22 @@ function createDurationItems(entries = [], type) {
     if (entry.start_reference_date) {
       timelineParts.push(`Start ${formatDisplayDate(entry.start_reference_date)}`);
     }
-    const endLabel = type === "avgBatchOpen" || type === "avgBatchClosed" ? "First batch" : "Close";
-    const endDate =
-      type === "avgBatchOpen" || type === "avgBatchClosed" ? entry.first_batch_date : entry.close_date;
+    const isBatchMetric = ["avgBatchOpen", "avgBatchClosed", "avgBatchCW", "avgBatchCL"].includes(type);
+    const endLabel = isBatchMetric ? "First batch" : "Close";
+    const endDate = isBatchMetric ? entry.first_batch_date : entry.close_date;
     if (endDate) {
       timelineParts.push(`${endLabel} ${formatDisplayDate(endDate)}`);
     }
     const timeline = timelineParts.length ? timelineParts.join(" → ") : "";
+    // Batch anterior al start date (start cargado/pisado después): el backend lo cuenta
+    // como 1 día. Se marca para que la recruiter sepa que ese 1 no es real.
+    const startYmd = normalizeDateToYMD(entry.start_reference_date);
+    const batchYmd = normalizeDateToYMD(entry.first_batch_date);
+    const batchBeforeStart = isBatchMetric && startYmd && batchYmd && batchYmd < startYmd;
     const metaPieces = [];
-    if (daysText !== "Duration not documented") {
+    if (batchBeforeStart) {
+      metaPieces.push("Counted as 1 day: first batch sent before the start date");
+    } else if (daysText !== "Duration not documented") {
       const action = endLabel === "Close" ? "to close" : "to send first batch";
       metaPieces.push(`Took ${daysText} ${action}`);
     } else {
@@ -626,6 +633,8 @@ function createDurationItems(entries = [], type) {
       primary: title,
       secondary: client,
       meta: metaPieces.join(" · "),
+      statusLabel: batchBeforeStart ? "⚠️ Batch before start date · check the start date" : "",
+      statusVariant: batchBeforeStart ? "warning" : "",
     };
   });
 }
@@ -642,7 +651,7 @@ function resolveDurationEntryDate(entry = {}, metricKey) {
   if (metricKey === "avgBatchOpen") {
     return entry.start_reference_date || entry.first_batch_date || entry.close_date || null;
   }
-  if (metricKey === "avgBatchClosed") {
+  if (metricKey === "avgBatchClosed" || metricKey === "avgBatchCW" || metricKey === "avgBatchCL") {
     return entry.close_date || entry.first_batch_date || entry.start_reference_date || null;
   }
   return entry.close_date || entry.first_batch_date || entry.start_reference_date || null;
@@ -857,9 +866,12 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
   const getDurationEntries = (metricKey) => {
     if (!durationCache[metricKey]) {
       const rows = durationDetails[metricKey] || [];
-      durationCache[metricKey] = filterDetailEntries(rows, (entry) =>
-        resolveDurationEntryDate(entry, metricKey)
-      );
+      // Open es el pipeline de hoy (cualquier start date): no se recorta por el rango,
+      // o el detalle lista menos opps de las que promedia la card.
+      durationCache[metricKey] =
+        metricKey === "avgBatchOpen"
+          ? rows
+          : filterDetailEntries(rows, (entry) => resolveDurationEntryDate(entry, metricKey));
     }
     return durationCache[metricKey];
   };
@@ -982,7 +994,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
       const filteredAvg = computeDurationAverage(getDurationEntries("avgBatchOpen"));
       return {
         title: "Average days to first batch (Open)",
-        context: `Open opportunities${recruiterSuffix} with start dates inside ${readableRange}, tracking how long it took to send the first batch.`,
+        context: `Opportunities${recruiterSuffix} currently in Sourcing, Interviewing or Negotiating (any start date), tracking how long it took to send the first batch.`,
         summaryLines: [
           `Average: ${formatDaysSummary(
             useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_first_batch_open
@@ -990,7 +1002,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
           `Opportunities included: ${getDurationCount("avgBatchOpen")}`,
         ],
         items,
-        emptyMessage: "No open opportunities with a first batch recorded in the selected window.",
+        emptyMessage: "No open opportunities with a first batch recorded yet.",
       };
     }
     case "avgBatchClosed": {
@@ -1007,6 +1019,38 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
         ],
         items,
         emptyMessage: "No closed opportunities with a documented first batch in the selected window.",
+      };
+    }
+    case "avgBatchCW": {
+      const items = getDurationItems("avgBatchCW");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgBatchCW"));
+      return {
+        title: "Average days to first batch (Closed Win)",
+        context: `Closed Win opportunities${recruiterSuffix} that had a first batch before closing, limited to ${readableRange}.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(
+            useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_first_batch_cw
+          )}`,
+          `Opportunities included: ${getDurationCount("avgBatchCW")}`,
+        ],
+        items,
+        emptyMessage: "No Closed Win opportunities with a documented first batch in the selected window.",
+      };
+    }
+    case "avgBatchCL": {
+      const items = getDurationItems("avgBatchCL");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgBatchCL"));
+      return {
+        title: "Average days to first batch (Closed Lost)",
+        context: `Closed Lost opportunities${recruiterSuffix} that had a first batch before closing, limited to ${readableRange}.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(
+            useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_first_batch_cl
+          )}`,
+          `Opportunities included: ${getDurationCount("avgBatchCL")}`,
+        ],
+        items,
+        emptyMessage: "No Closed Lost opportunities with a documented first batch in the selected window.",
       };
     }
     case "interviewRate": {
@@ -1204,6 +1248,20 @@ const TEAM_METRIC_DETAIL_CONFIG = {
     aggregator: "average",
     metricKey: "avg_days_to_first_batch_closed",
     getValue: (row) => safeNumber(row?.avg_days_to_first_batch_closed),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  avgBatchCW: {
+    title: "Average days to first batch (Closed Win)",
+    aggregator: "average",
+    metricKey: "avg_days_to_first_batch_cw",
+    getValue: (row) => safeNumber(row?.avg_days_to_first_batch_cw),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  avgBatchCL: {
+    title: "Average days to first batch (Closed Lost)",
+    aggregator: "average",
+    metricKey: "avg_days_to_first_batch_cl",
+    getValue: (row) => safeNumber(row?.avg_days_to_first_batch_cl),
     formatValue: (value) => formatDaysValue(value),
   },
   interviewRate: {
@@ -1551,6 +1609,8 @@ function updateCardsForLead(hrLeadEmail) {
   const avgCloseLostEl = $("#avgCloseLostValue");
   const avgBatchOpenEl = $("#avgBatchOpenValue");
   const avgBatchClosedEl = $("#avgBatchClosedValue");
+  const avgBatchCWEl = $("#avgBatchCWValue");
+  const avgBatchCLEl = $("#avgBatchCLValue");
   const interviewRateEl = $("#interviewRateValue");
   const interviewHelperEl = $("#interviewRateHelper");
   const hireRateEl = $("#hireRateValue");
@@ -1583,6 +1643,8 @@ function updateCardsForLead(hrLeadEmail) {
     if (avgCloseLostEl) avgCloseLostEl.textContent = "–";
     if (avgBatchOpenEl) avgBatchOpenEl.textContent = "–";
     if (avgBatchClosedEl) avgBatchClosedEl.textContent = "–";
+    if (avgBatchCWEl) avgBatchCWEl.textContent = "–";
+    if (avgBatchCLEl) avgBatchCLEl.textContent = "–";
     if (interviewRateEl) interviewRateEl.textContent = "–";
     if (interviewHelperEl) interviewHelperEl.textContent = "(— / —)";
     if (hireRateEl) hireRateEl.textContent = "–";
@@ -1757,6 +1819,20 @@ function updateCardsForLead(hrLeadEmail) {
       });
     }
   }
+
+  [
+    [avgBatchCWEl, m.avg_days_to_first_batch_cw],
+    [avgBatchCLEl, m.avg_days_to_first_batch_cl],
+  ].forEach(([el, value]) => {
+    if (!el) return;
+    if (value == null) {
+      el.textContent = "–";
+      return;
+    }
+    animateValue(el, parseFloatSafe(el.textContent), value, {
+      formatter: (v) => formatDaysValue(v),
+    });
+  });
 
   // --- Interview / Hire rates (ratios) ---
   if (interviewRateEl && interviewHelperEl) {
@@ -2360,6 +2436,8 @@ function buildGlobalAverageSummary(state = metricsState) {
     "avg_days_to_close_lost",
     "avg_days_to_first_batch_open",
     "avg_days_to_first_batch_closed",
+    "avg_days_to_first_batch_cw",
+    "avg_days_to_first_batch_cl",
     "sent_vs_interview_sample_count",
     "churn_total",
     "hire_total_lifetime",
@@ -2774,16 +2852,6 @@ const HISTORY_METRICS = [
     formatter: (value) => formatDaysValue(value),
   },
   {
-    id: "avg_days_to_first_batch_open",
-    title: "Avg days to first batch · Open",
-    description: "Open opps reaching first batch.",
-    chart: "line",
-    color: "#f7b731",
-    goodWhenHigher: false,
-    extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_open),
-    formatter: (value) => formatDaysValue(value),
-  },
-  {
     id: "avg_days_to_first_batch_closed",
     title: "Avg days to first batch · Closed",
     description: "Closed opps reaching first batch.",
@@ -2791,6 +2859,26 @@ const HISTORY_METRICS = [
     color: "#f39c12",
     goodWhenHigher: false,
     extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_closed),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "avg_days_to_first_batch_cw",
+    title: "Avg days to first batch · Closed Win",
+    description: "Closed Win opps reaching first batch.",
+    chart: "line",
+    color: "#2bb673",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_cw),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "avg_days_to_first_batch_cl",
+    title: "Avg days to first batch · Closed Lost",
+    description: "Closed Lost opps reaching first batch.",
+    chart: "line",
+    color: "#ff6b6b",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_cl),
     formatter: (value) => formatDaysValue(value),
   },
   {
@@ -2846,6 +2934,8 @@ const HISTORY_METRIC_DETAIL_MAP = {
   avg_days_to_close_lost: "avgCloseLost",
   avg_days_to_first_batch_open: "avgBatchOpen",
   avg_days_to_first_batch_closed: "avgBatchClosed",
+  avg_days_to_first_batch_cw: "avgBatchCW",
+  avg_days_to_first_batch_cl: "avgBatchCL",
   interview_rate: "interviewRate",
   hire_rate: "hireRate",
   sent_vs_interview_ratio: "sentVsInterview",
@@ -3293,6 +3383,8 @@ function buildHistoryMetricCards(timeline = []) {
     avg_days_to_close_lost: "avgCloseLost",
     avg_days_to_first_batch_open: "avgBatchOpen",
     avg_days_to_first_batch_closed: "avgBatchClosed",
+    avg_days_to_first_batch_cw: "avgBatchCW",
+    avg_days_to_first_batch_cl: "avgBatchCL",
   };
   const computeDurationValue = (entry, metricKey) => {
     if (!entry) return null;

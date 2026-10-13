@@ -197,6 +197,7 @@ body {
 /* Días / batch / funnel: acento violeta (número ya hereda el violeta por defecto) */
 .metric-close-win-avg,  .metric-close-lost-avg,
 .metric-batch-open,     .metric-batch-closed,
+.metric-batch-cw,       .metric-batch-cl,
 .metric-interview-rate, .metric-hire-rate,
 .metric-sent-vs-interview { --accent: #8f7be0; }
 .metric-pill {
@@ -277,6 +278,14 @@ body {
 
 .metric-batch-closed::before {
   background: radial-gradient(circle at top right, rgba(255, 210, 180, 0.35), transparent 55%);
+}
+
+.metric-batch-cw::before {
+  background: radial-gradient(circle at top right, rgba(111, 211, 232, 0.32), transparent 55%);
+}
+
+.metric-batch-cl::before {
+  background: radial-gradient(circle at top right, rgba(247, 164, 195, 0.38), transparent 55%);
 }
 
 .metric-interview-rate::before {

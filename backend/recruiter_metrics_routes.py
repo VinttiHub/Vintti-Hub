@@ -338,29 +338,53 @@ def register_recruiter_metrics_routes(app):
                       AND NOT b.is_internal
                 ) AS avg_days_to_close_lost,
 
+                -- Batch ANTES del start date (start pisado después, p.ej. el lote del
+                -- 11-sep de HubSpot): cuenta como 1 día en vez de quedar afuera.
+                -- Open = todo el pipeline vivo (Sourcing/Interviewing/Negotiating), sin
+                -- importar el rango: es una foto de hoy, no un evento del período.
                 AVG(
-                    (fb.first_batch_date - b.start_reference_date)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
-                      AND fb.first_batch_date >= b.start_reference_date
-                      AND b.opp_stage NOT IN ('Close Win', 'Closed Lost')
-                      AND b.start_reference_date >= %(win_start)s
-                      AND b.start_reference_date <  %(win_end)s
+                      AND b.opp_stage IN ('Sourcing', 'Interviewing', 'Negotiating')
                 ) AS avg_days_to_first_batch_open,
 
                 AVG(
-                    (fb.first_batch_date - b.start_reference_date)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
                       AND b.opp_stage IN ('Close Win', 'Closed Lost')
                       AND b.close_date IS NOT NULL
-                      AND fb.first_batch_date >= b.start_reference_date
                       AND fb.first_batch_date <= b.close_date
                       AND b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
-                ) AS avg_days_to_first_batch_closed
+                ) AS avg_days_to_first_batch_closed,
+
+                AVG(
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                ) FILTER (
+                    WHERE fb.first_batch_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                      AND b.opp_stage = 'Close Win'
+                      AND b.close_date IS NOT NULL
+                      AND fb.first_batch_date <= b.close_date
+                      AND b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                ) AS avg_days_to_first_batch_cw,
+
+                AVG(
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                ) FILTER (
+                    WHERE fb.first_batch_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                      AND b.opp_stage = 'Closed Lost'
+                      AND b.close_date IS NOT NULL
+                      AND fb.first_batch_date <= b.close_date
+                      AND b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                ) AS avg_days_to_first_batch_cl
 
             FROM base b
             LEFT JOIN first_batches fb
@@ -398,6 +422,8 @@ def register_recruiter_metrics_routes(app):
             a.avg_days_to_close_lost,
             a.avg_days_to_first_batch_open,
             a.avg_days_to_first_batch_closed,
+            a.avg_days_to_first_batch_cw,
+            a.avg_days_to_first_batch_cl,
             c.last_20_count,
             c.last_20_win,
             pr.sent_candidate_count,
@@ -650,13 +676,10 @@ def register_recruiter_metrics_routes(app):
                 (
                     'avgBatchOpen',
                     CASE
-                        WHEN b.opp_stage NOT IN ('Close Win', 'Closed Lost')
+                        WHEN b.opp_stage IN ('Sourcing', 'Interviewing', 'Negotiating')
                           AND b.start_reference_date IS NOT NULL
-                          AND b.start_reference_date >= %(win_start)s
-                          AND b.start_reference_date <  %(win_end)s
                           AND fb.first_batch_date IS NOT NULL
-                          AND fb.first_batch_date >= b.start_reference_date
-                        THEN (fb.first_batch_date - b.start_reference_date)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 ),
@@ -669,9 +692,34 @@ def register_recruiter_metrics_routes(app):
                           AND b.close_date IS NOT NULL
                           AND fb.first_batch_date IS NOT NULL
                           AND b.start_reference_date IS NOT NULL
-                          AND fb.first_batch_date >= b.start_reference_date
                           AND fb.first_batch_date <= b.close_date
-                        THEN (fb.first_batch_date - b.start_reference_date)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        ELSE NULL
+                    END
+                ),
+                (
+                    'avgBatchCW',
+                    CASE
+                        WHEN b.opp_stage = 'Close Win'
+                          AND b.close_date >= %(win_start)s
+                          AND b.close_date <  %(win_end)s
+                          AND fb.first_batch_date IS NOT NULL
+                          AND b.start_reference_date IS NOT NULL
+                          AND fb.first_batch_date <= b.close_date
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        ELSE NULL
+                    END
+                ),
+                (
+                    'avgBatchCL',
+                    CASE
+                        WHEN b.opp_stage = 'Closed Lost'
+                          AND b.close_date >= %(win_start)s
+                          AND b.close_date <  %(win_end)s
+                          AND fb.first_batch_date IS NOT NULL
+                          AND b.start_reference_date IS NOT NULL
+                          AND fb.first_batch_date <= b.close_date
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 )
@@ -934,6 +982,8 @@ def register_recruiter_metrics_routes(app):
             avg_days_close_lost = _float_or_none(r.get("avg_days_to_close_lost"))
             avg_days_batch_open = _float_or_none(r.get("avg_days_to_first_batch_open"))
             avg_days_batch_closed = _float_or_none(r.get("avg_days_to_first_batch_closed"))
+            avg_days_batch_cw = _float_or_none(r.get("avg_days_to_first_batch_cw"))
+            avg_days_batch_cl = _float_or_none(r.get("avg_days_to_first_batch_cl"))
 
             sent_candidates = int(r.get("sent_candidate_count") or 0)
             interview_eligible_candidates = int(r.get("interview_eligible_candidate_count") or 0)
@@ -987,6 +1037,8 @@ def register_recruiter_metrics_routes(app):
                     "avg_days_to_close_lost": avg_days_close_lost,
                     "avg_days_to_first_batch_open": avg_days_batch_open,
                     "avg_days_to_first_batch_closed": avg_days_batch_closed,
+                    "avg_days_to_first_batch_cw": avg_days_batch_cw,
+                    "avg_days_to_first_batch_cl": avg_days_batch_cl,
                     "interview_rate": {
                         "pct": interview_pct,
                         "interviewed": interviewed_candidates,
