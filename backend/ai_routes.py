@@ -2053,26 +2053,42 @@ def _fetch_grain_transcript_from_link(link_or_id: str) -> str:
     if not token:
         raise RuntimeError("Grain integration is not configured. Missing GRAIN_API_TOKEN.")
 
+    # Grain retiró la v1 (/_/workspace-api) y responde 410. La v2 exige el header
+    # Public-Api-Version y devuelve el transcript como un array de segmentos
+    # {participant_id, speaker, start, end, text}.
+    api_version = (os.getenv("GRAIN_API_VERSION") or "2026-10-01").strip()
     response = requests.get(
-        f"https://api.grain.com/_/workspace-api/recordings/{recording_id}",
+        f"https://api.grain.com/_/public-api/v2/recordings/{recording_id}/transcript",
         headers={
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        params={
-            "transcript_format": "json",
+            "Public-Api-Version": api_version,
         },
         timeout=30,
     )
     if not response.ok:
         logging.error("Grain error body for recording_id=%s: %s", recording_id, response.text)
+        if response.status_code in (401, 403):
+            raise RuntimeError(
+                f"Grain rejected GRAIN_API_TOKEN ({response.status_code}). The v2 API needs a "
+                "Personal Access Token from grain.com/app/settings/integrations?tab=api, "
+                "with access to this recording."
+            )
+        if response.status_code == 404:
+            raise RuntimeError(
+                "Grain recording not found (404). Check the link, or that the token's owner "
+                "has access to this recording."
+            )
         raise RuntimeError(f"Failed to fetch Grain recording ({response.status_code}): {response.text}")
 
     payload = response.json()
-    transcript = (
-        _extract_grain_transcript_text(payload.get("transcript_json"))
-        or _extract_grain_transcript_text(payload.get("transcript"))
-    )
+    if isinstance(payload, dict):
+        transcript = (
+            _extract_grain_transcript_text(payload.get("transcript_json"))
+            or _extract_grain_transcript_text(payload.get("transcript"))
+            or _extract_grain_transcript_text(payload)
+        )
+    else:
+        transcript = _extract_grain_transcript_text(payload)
     if not transcript:
         raise RuntimeError("The Grain recording did not return transcript content.")
 
