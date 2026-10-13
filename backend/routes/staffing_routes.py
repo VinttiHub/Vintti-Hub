@@ -25,8 +25,11 @@ Ojo con dos trampas ya conocidas del repo:
 from __future__ import annotations
 
 import csv
+import html
 import io
+import re
 from datetime import date
+from html.parser import HTMLParser
 
 from flask import Blueprint, Response, jsonify, request
 from psycopg2.extras import Json, RealDictCursor
@@ -1499,3 +1502,267 @@ def edit_staffing_option(option_id: int):
         )
         return {"option": _option_out(cur.fetchone()), "renamed_rows": renamed_rows}, 200
     return _with_schema(run)
+
+
+# --------------------------------------------------------------------------- #
+# Mails a los contractors activos (botón "Email actives" de la pestaña Database)
+#
+# "Activo" = la misma definición que la pestaña: `status` de PAIRS_SELECT. No se
+# arma otra query. El destinatario lo resuelve SIEMPRE el servidor desde el
+# candidate_id y vuelve a chequear que siga activo: el navegador nunca manda un
+# mail, así este endpoint no sirve para escribirle a cualquiera.
+# --------------------------------------------------------------------------- #
+STAFFING_MAIL_ALLOWED = {
+    "pgonzales@vintti.com",
+    "jazmin@vintti.com",
+    "lara@vintti.com",
+}
+
+# Con un email acá, todo sale sólo a esa dirección con [TEST] en el asunto.
+TEST_ONLY_RECIPIENT = None
+
+# Fila de prueba: con un dict acá (viewer, candidate_id, name, first_name, mail,
+# accounts, status, is_test) le aparece sólo a `viewer`, arriba de la lista y como
+# única preseleccionada. Se usó para probar el envío el 2026-10-13.
+TEST_PERSON = None
+
+MAIL_BATCH_MAX = 25  # el front manda de a tandas; cada envío es un POST de hasta 30s
+NAME_PLACEHOLDER = "{nombre}"
+
+
+def _first_name(full_name: str) -> str:
+    first = (full_name or "").strip().split(" ")[0] if (full_name or "").strip() else ""
+    return first[:1].upper() + first[1:].lower() if first else ""
+
+
+def _active_people(cur, include_onboarding: bool, viewer: str = "") -> list:
+    """Una entrada por mail (o por candidato, si no tiene mail), con sus cuentas."""
+    wanted = {"Active", "Onboarding"} if include_onboarding else {"Active"}
+    people = {}
+    for r in _fetch_pairs(cur, include_orphans=False):
+        if r.get("status") not in wanted:
+            continue
+        mail = (r.get("mail") or "").strip().lower()
+        key = mail if "@" in mail else f"cid:{r['candidate_id']}"
+        p = people.get(key)
+        if p is None:
+            p = people[key] = {
+                "candidate_id": r["candidate_id"],
+                "name": r.get("candidate_name") or "",
+                "first_name": _first_name(r.get("candidate_name")),
+                "mail": mail if "@" in mail else None,
+                "accounts": [],
+                "status": r["status"],
+            }
+        client = r.get("client_name")
+        if client and client not in p["accounts"]:
+            p["accounts"].append(client)
+        if r["status"] == "Active":
+            p["status"] = "Active"
+    out = list(people.values())
+    out.sort(key=lambda p: p["name"].lower())
+    if TEST_PERSON and viewer == TEST_PERSON["viewer"]:
+        out.insert(0, {k: v for k, v in TEST_PERSON.items() if k != "viewer"})
+    return out
+
+
+def _ensure_mail_log(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS staffing_email_log (
+            log_id       BIGSERIAL PRIMARY KEY,
+            candidate_id BIGINT,
+            email        TEXT,
+            subject      TEXT,
+            sent_by      TEXT,
+            ok           BOOLEAN,
+            status_code  INTEGER,
+            sent_at      TIMESTAMPTZ DEFAULT NOW()
+        )
+        """
+    )
+
+
+class _MailSanitizer(HTMLParser):
+    """Lista blanca del editor del modal: negrita, cursiva, subrayado, listas y links.
+
+    El cuerpo llega como HTML de un contenteditable (y de lo que se pegue ahí desde
+    Gmail o Docs): todo lo que no esté en la lista se descarta, sin atributos salvo
+    `href` http(s)/mailto. El texto se re-escapa siempre.
+    """
+    TAGS = {"b", "strong", "i", "em", "u", "br", "p", "div", "ul", "ol", "li", "a"}
+    VOID = {"br"}
+    DROP_CONTENT = {"script", "style", "head", "title"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out = []
+        self.open = []
+        self.skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.DROP_CONTENT:
+            self.skip += 1
+            return
+        if self.skip or tag not in self.TAGS:
+            return
+        if tag == "a":
+            href = (dict(attrs).get("href") or "").strip()
+            if not re.match(r"(?i)^(https?:|mailto:)", href):
+                self.open.append(None)  # <a> sin link válido: queda el texto
+                return
+            self.out.append(f'<a href="{html.escape(href, quote=True)}" style="color:#6c38ff;">')
+            self.open.append("a")
+            return
+        self.out.append(f"<{tag}>")
+        if tag not in self.VOID:
+            self.open.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag in self.DROP_CONTENT:
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip or tag not in self.TAGS or tag in self.VOID:
+            return
+        # Cierra hasta la última apertura de ese tag; un cierre suelto se ignora.
+        for i in range(len(self.open) - 1, -1, -1):
+            if self.open[i] == tag or (tag == "a" and self.open[i] is None):
+                for t in reversed(self.open[i:]):
+                    if t:
+                        self.out.append(f"</{t}>")
+                del self.open[i:]
+                return
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.out.append(html.escape(data, quote=False))
+
+    def result(self) -> str:
+        self.out.extend(f"</{t}>" for t in reversed(self.open) if t)
+        self.open = []
+        return "".join(self.out)
+
+
+def _clean_mail_html(raw: str) -> str:
+    if not re.search(r"</?[a-zA-Z]", raw or ""):  # texto plano (un front cacheado con el <textarea> viejo)
+        return html.escape(raw or "").replace("\r\n", "\n").replace("\n", "<br>")
+    parser = _MailSanitizer()
+    parser.feed(raw)
+    parser.close()
+    return parser.result()
+
+
+def _mail_text(raw: str) -> str:
+    """Texto visible, para saber si el mensaje está vacío."""
+    return re.sub(r"<[^>]+>|&nbsp;|\s", "", raw or "")
+
+
+def _body_to_html(body: str) -> str:
+    return (
+        "<div style=\"font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;"
+        "line-height:1.6;color:#243B53;\">" + _clean_mail_html(body) + "</div>"
+    )
+
+
+@bp.route("/active-emails", methods=["GET", "OPTIONS"])
+def staffing_active_emails():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    if _current_email() not in STAFFING_MAIL_ALLOWED:
+        return _forbidden()
+    include_onboarding = request.args.get("onboarding") in ("1", "true", "yes")
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        _ensure_schema(cur)
+        conn.commit()
+        people = _active_people(cur, include_onboarding, viewer=_current_email())
+        cur.close()
+        return jsonify({"people": people, "test_only_recipient": TEST_ONLY_RECIPIENT})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@bp.route("/send-email", methods=["POST", "OPTIONS"])
+def staffing_send_email():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    sender = _current_email()
+    if sender not in STAFFING_MAIL_ALLOWED:
+        return _forbidden()
+
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages") or []
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "No messages to send."}), 400
+    if len(messages) > MAIL_BATCH_MAX:
+        return jsonify({"error": f"At most {MAIL_BATCH_MAX} messages per request."}), 400
+
+    from utils.transactional_email import post_transactional_email
+
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        _ensure_schema(cur)
+        _ensure_mail_log(cur)
+        conn.commit()
+        by_cid = {p["candidate_id"]: p for p in _active_people(cur, include_onboarding=True, viewer=sender)}
+
+        results = []
+        for m in messages:
+            cid = str((m or {}).get("candidate_id") or "").strip()
+            subject = ((m or {}).get("subject") or "").strip()
+            body = (m or {}).get("body") or ""
+            person = by_cid.get(cid)
+            if person is None:
+                results.append({"candidate_id": cid, "result": "not_active"})
+                continue
+            if not person["mail"]:
+                results.append({"candidate_id": cid, "result": "no_email"})
+                continue
+            if not subject or not _mail_text(body):
+                results.append({"candidate_id": cid, "result": "empty"})
+                continue
+            body = body.replace(NAME_PLACEHOLDER, html.escape(person["first_name"] or ""))
+            to_addr = person["mail"]
+            if TEST_ONLY_RECIPIENT:
+                body = f"<p><i>[TEST — habría ido a {html.escape(to_addr)}]</i></p>{body}"
+                subject = f"[TEST] {subject}"
+                to_addr = TEST_ONLY_RECIPIENT
+            try:
+                res = post_transactional_email(
+                    [to_addr], subject, _body_to_html(body), "staffing_actives", reply_to=sender,
+                )
+            except Exception as exc:  # timeout / red: se reporta y se sigue con el resto
+                res = {"sent": False, "status_code": None, "error": str(exc)}
+            cur.execute(
+                """
+                INSERT INTO staffing_email_log
+                       (candidate_id, email, subject, sent_by, ok, status_code)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (int(cid) if cid.isdigit() else None, to_addr, subject, sender, bool(res.get("sent")), res.get("status_code")),
+            )
+            conn.commit()
+            results.append({
+                "candidate_id": cid,
+                "result": "sent" if res.get("sent") else "failed",
+            })
+        cur.close()
+        return jsonify({
+            "results": results,
+            "sent": sum(1 for r in results if r["result"] == "sent"),
+            "failed": sum(1 for r in results if r["result"] != "sent"),
+        })
+    except Exception as exc:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()

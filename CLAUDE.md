@@ -1173,3 +1173,20 @@ desplegable sin tocar código; los valores se cargan en la celda, tipo Excel. De
   `staffing.css`. Si sumás un color, van los dos.
 - Provider no se edita en la celda cuando el equipo trae proveedor
   (`provider_locked`): `equipments.proveedor` gana y el cambio no se vería.
+
+### Email actives (mails a los contractors activos)
+
+Botón **Email actives** en la pestaña Database de `docs/staffing.html`, sólo para
+pgonzales, jazmin y lara (`STAFFING_MAIL_ALLOWED` en `staffing_routes.py`, `MAIL_ALLOWED` en
+`staffing.js`; Agustín y Pilar ven Staffing pero no esto). Lista con copiar todos / uno a uno
+(`GET /staffing/active-emails`) y envío desde el hub (`POST /staffing/send-email`).
+
+- "Activo" es el `status` de la pestaña (`_fetch_pairs`), deduplicado por mail. No hay otra query.
+  El modal arranca con **Onboarding incluido** (= el tile "Active" de la pestaña, pedido de la
+  owner 2026-10-13); el tilde "Include onboarding" lo saca.
+- **El mail del destinatario lo resuelve el servidor desde el candidate_id** y re-chequea que
+  siga activo: el navegador nunca manda una dirección.
+- Un mail por persona (nunca un `to` masivo); `{nombre}` = primer nombre; cada persona puede
+  tener su texto editado. Reply-to = quien lo manda (`reply_to` nuevo y opcional en
+  `/send_email`; aplica recién con el backend deployado, porque `post_transactional_email`
+  pega a prod). Registro en `staffing_email_log` (autocreada). `TEST_ONLY_RECIPIENT` para pruebas.

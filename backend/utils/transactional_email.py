@@ -44,10 +44,13 @@ def email_shell(intro_html, detail_html):
     """.strip()
 
 
-def post_transactional_email(recipients, subject, body, log_label):
+def post_transactional_email(recipients, subject, body, log_label, reply_to=None):
+    payload = {'to': recipients, 'subject': subject, 'body': body}
+    if reply_to:
+        payload['reply_to'] = reply_to
     response = requests.post(
         SEND_EMAIL_URL,
-        json={'to': recipients, 'subject': subject, 'body': body},
+        json=payload,
         timeout=30,
     )
     if not response.ok:

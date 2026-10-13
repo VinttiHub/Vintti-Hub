@@ -1894,6 +1894,375 @@
   }
 
   /* =====================================================================
+     Email actives — lista de mails de los contractors activos + envío desde
+     el hub, uno por persona y editable por persona. Sólo para MAIL_ALLOWED;
+     el gate real es el backend (STAFFING_MAIL_ALLOWED en staffing_routes.py).
+     El servidor resuelve el mail desde el candidate_id: acá nunca se manda.
+     ===================================================================== */
+  var MAIL_ALLOWED = ["pgonzales@vintti.com", "jazmin@vintti.com", "lara@vintti.com"];
+  var NAME_TOKEN = "{nombre}";
+  var MAIL_CHUNK = 20;
+
+  var mail = {
+    el: null, people: [], selected: {}, search: "", onboarding: true,
+    step: "list", subject: "", template: "Hi " + NAME_TOKEN + ",<br><br>", edits: {},
+    idx: 0, results: {}, sending: false
+  };
+
+  function mailPerson(cid) {
+    for (var i = 0; i < mail.people.length; i++) if (mail.people[i].candidate_id === cid) return mail.people[i];
+    return null;
+  }
+
+  function mailRecipients() {
+    return mail.people.filter(function (p) { return p.mail && mail.selected[p.candidate_id]; });
+  }
+
+  function mailBodyFor(p) {
+    if (Object.prototype.hasOwnProperty.call(mail.edits, p.candidate_id)) return mail.edits[p.candidate_id];
+    return mail.template.split(NAME_TOKEN).join(esc(p.first_name || ""));
+  }
+
+  function mailIsEmpty(htmlText) {
+    return !String(htmlText || "").replace(/<[^>]+>|&nbsp;|\s/g, "");
+  }
+
+  // Editor con formato: contenteditable + execCommand. El HTML lo vuelve a
+  // limpiar el backend con una lista blanca (_MailSanitizer en staffing_routes.py),
+  // así que acá no hace falta sanear lo que se pegue desde Gmail o Docs.
+  var RTE_BUTTONS = [
+    ["bold", "fa-bold", "Bold (Ctrl+B)"],
+    ["italic", "fa-italic", "Italic (Ctrl+I)"],
+    ["underline", "fa-underline", "Underline (Ctrl+U)"],
+    ["insertUnorderedList", "fa-list-ul", "Bulleted list"],
+    ["insertOrderedList", "fa-list-ol", "Numbered list"],
+    ["createLink", "fa-link", "Link"],
+    ["removeFormat", "fa-eraser", "Clear formatting"]
+  ];
+
+  function rteHtml(attr, content, tall) {
+    return '<div class="stf-rte">' +
+      '<div class="stf-rte__bar">' +
+        RTE_BUTTONS.map(function (b) {
+          return '<button type="button" class="stf-rte__btn" data-rte-cmd="' + b[0] + '" title="' + b[2] + '">' +
+                 '<i class="fa-solid ' + b[1] + '"></i></button>';
+        }).join("") +
+      '</div>' +
+      '<div class="stf-rte__area' + (tall ? " stf-rte__area--tall" : "") + '" contenteditable="true" ' + attr + '>' + content + '</div>' +
+    '</div>';
+  }
+
+  function bindRte(root) {
+    root.querySelectorAll(".stf-rte").forEach(function (box) {
+      var area = box.querySelector(".stf-rte__area");
+      box.querySelectorAll("[data-rte-cmd]").forEach(function (btn) {
+        // mousedown sin default: si no, el click le saca la selección al editor.
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        btn.addEventListener("click", function () {
+          var cmd = btn.dataset.rteCmd;
+          area.focus();
+          if (cmd === "createLink") {
+            var url = prompt("Link (https://…)", "https://");
+            if (!url || url === "https://") return;
+            if (!/^(https?:|mailto:)/i.test(url)) url = "https://" + url;
+            document.execCommand("createLink", false, url);
+          } else {
+            document.execCommand(cmd, false, null);
+          }
+          area.dispatchEvent(new Event("input"));
+        });
+      });
+    });
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } finally { document.body.removeChild(ta); }
+    return Promise.resolve();
+  }
+
+  function flash(btn, label) {
+    var old = btn.innerHTML;
+    btn.innerHTML = label;
+    setTimeout(function () { btn.innerHTML = old; }, 1400);
+  }
+
+  function loadMailPeople() {
+    var body = mail.el.querySelector("[data-mail-body]");
+    body.innerHTML = '<div class="stf-empty">Loading…</div>';
+    return api("/staffing/active-emails" + (mail.onboarding ? "?onboarding=1" : "")).then(function (data) {
+      var prev = mail.selected;
+      var first = !mail.people.length;
+      mail.people = data.people || [];
+      mail.selected = {};
+      // Con la fila de prueba presente, arranca seleccionada SÓLO ella: así un
+      // "Send to all" de prueba no le llega a los contractors reales.
+      var hasTest = mail.people.some(function (p) { return p.is_test; });
+      mail.people.forEach(function (p) {
+        if (!p.mail) return;
+        if (first ? (!hasTest || p.is_test) : (prev[p.candidate_id] || !(p.candidate_id in prev))) {
+          mail.selected[p.candidate_id] = true;
+        }
+      });
+      mail.testOnly = data.test_only_recipient || null;
+      renderMail();
+    }).catch(function (err) { body.innerHTML = '<div class="stf-empty">' + esc(err.message) + '</div>'; });
+  }
+
+  function renderMail() {
+    var recipients = mailRecipients();
+    mail.el.querySelectorAll("[data-mail-step]").forEach(function (b) {
+      b.classList.toggle("is-active", b.dataset.mailStep === mail.step);
+    });
+    mail.el.querySelector("[data-mail-count]").textContent =
+      recipients.length + " selected · " + mail.people.length + " active";
+    mail.el.querySelector("[data-mail-test]").style.display = mail.testOnly ? "" : "none";
+    if (mail.testOnly) {
+      mail.el.querySelector("[data-mail-test]").textContent =
+        "Test mode: every email goes only to " + mail.testOnly + ".";
+    }
+    if (mail.step === "list") renderMailList(); else renderMailCompose();
+  }
+
+  function renderMailList() {
+    var q = mail.search.trim().toLowerCase();
+    var rows = mail.people.filter(function (p) {
+      if (!q) return true;
+      return (p.name + " " + (p.mail || "") + " " + p.accounts.join(" ")).toLowerCase().indexOf(q) > -1;
+    });
+    var body = mail.el.querySelector("[data-mail-body]");
+    var html =
+      '<div class="stf-mail__toolbar">' +
+        '<input type="text" class="stf-filter__input" data-mail-search placeholder="Name, email or client…" value="' + esc(mail.search) + '">' +
+        '<label class="stf-mail__check"><input type="checkbox" data-mail-onb' + (mail.onboarding ? " checked" : "") + '> Include onboarding</label>' +
+        '<button type="button" class="stf-btn" data-mail-all="on">Select all</button>' +
+        '<button type="button" class="stf-btn" data-mail-all="off">Select none</button>' +
+        '<span class="stf-filters__spacer"></span>' +
+        '<button type="button" class="stf-btn" data-mail-copy><i class="fa-regular fa-copy"></i> Copy selected</button>' +
+      '</div>' +
+      '<div class="stf-mail__list">' +
+      rows.map(function (p) {
+        var cid = esc(p.candidate_id);
+        var res = mail.results[p.candidate_id];
+        return '<label class="stf-mail__row' + (p.mail ? "" : " is-disabled") + '">' +
+          '<input type="checkbox" data-mail-pick="' + cid + '"' +
+            (p.mail ? "" : " disabled") + (mail.selected[p.candidate_id] ? " checked" : "") + '>' +
+          '<span class="stf-mail__who"><strong>' + esc(p.name) + '</strong>' +
+            (p.status === "Onboarding" ? ' <span class="stf-mail__tag">Onboarding</span>' : "") +
+            (p.is_test ? ' <span class="stf-mail__tag stf-mail__tag--bad">Test</span>' : "") +
+            (res === "sent" ? ' <span class="stf-mail__tag stf-mail__tag--ok">Sent</span>' : "") +
+            '<small>' + esc(p.accounts.join(", ")) + '</small></span>' +
+          '<span class="stf-mail__addr">' + (p.mail ? esc(p.mail) : "No email on file") + '</span>' +
+          (p.mail ? '<button type="button" class="stf-mail__icon" title="Copy email" data-mail-copy-one="' + cid + '"><i class="fa-regular fa-copy"></i></button>' : "<span></span>") +
+        '</label>';
+      }).join("") +
+      (rows.length ? "" : '<div class="stf-empty">No matches.</div>') +
+      '</div>';
+    body.innerHTML = html;
+
+    var search = body.querySelector("[data-mail-search]");
+    search.addEventListener("input", function () {
+      mail.search = search.value;
+      var pos = search.selectionStart;
+      renderMailList();
+      var again = mail.el.querySelector("[data-mail-search]");
+      again.focus();
+      again.setSelectionRange(pos, pos);
+    });
+    body.querySelector("[data-mail-onb]").addEventListener("change", function (e) {
+      mail.onboarding = e.target.checked;
+      loadMailPeople();
+    });
+    body.querySelectorAll("[data-mail-all]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var on = b.dataset.mailAll === "on";
+        rows.forEach(function (p) { if (p.mail) { if (on) mail.selected[p.candidate_id] = true; else delete mail.selected[p.candidate_id]; } });
+        renderMail();
+      });
+    });
+    body.querySelectorAll("[data-mail-pick]").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        if (cb.checked) mail.selected[cb.dataset.mailPick] = true; else delete mail.selected[cb.dataset.mailPick];
+        mail.el.querySelector("[data-mail-count]").textContent =
+          mailRecipients().length + " selected · " + mail.people.length + " active";
+      });
+    });
+    body.querySelectorAll("[data-mail-copy-one]").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.preventDefault();
+        var p = mailPerson(b.dataset.mailCopyOne);
+        copyText(p.mail).then(function () { flash(b, '<i class="fa-solid fa-check"></i>'); });
+      });
+    });
+    var copyBtn = body.querySelector("[data-mail-copy]");
+    copyBtn.addEventListener("click", function () {
+      var list = mailRecipients().map(function (p) { return p.mail; });
+      if (!list.length) return;
+      copyText(list.join(", ")).then(function () { flash(copyBtn, '<i class="fa-solid fa-check"></i> Copied ' + list.length); });
+    });
+  }
+
+  function renderMailCompose() {
+    var recipients = mailRecipients();
+    var body = mail.el.querySelector("[data-mail-body]");
+    if (!recipients.length) {
+      body.innerHTML = '<div class="stf-empty">Select at least one person in Recipients.</div>';
+      return;
+    }
+    if (mail.idx >= recipients.length) mail.idx = recipients.length - 1;
+    if (mail.idx < 0) mail.idx = 0;
+    var p = recipients[mail.idx];
+    var edited = Object.prototype.hasOwnProperty.call(mail.edits, p.candidate_id);
+    var res = mail.results[p.candidate_id];
+    var pending = recipients.filter(function (r) { return mail.results[r.candidate_id] !== "sent"; }).length;
+
+    var meta = function () {
+      var isEdited = Object.prototype.hasOwnProperty.call(mail.edits, p.candidate_id);
+      return (mail.idx + 1) + ' of ' + recipients.length +
+        (isEdited ? ' · <span class="stf-mail__tag">Edited</span>' : "") +
+        (res === "sent" ? ' · <span class="stf-mail__tag stf-mail__tag--ok">Sent</span>' : "") +
+        (res && res !== "sent" ? ' · <span class="stf-mail__tag stf-mail__tag--bad">' + esc(res.replace("_", " ")) + '</span>' : "");
+    };
+
+    body.innerHTML =
+      '<div class="stf-mail__compose">' +
+        '<label class="stf-mail__field"><span>Subject</span>' +
+          '<input type="text" class="stf-filter__input" data-mail-subject value="' + esc(mail.subject) + '"></label>' +
+        '<div class="stf-mail__field"><span>Message template · <code>' + NAME_TOKEN + '</code> becomes each person\'s first name</span>' +
+          rteHtml("data-mail-template", mail.template, false) + '</div>' +
+        '<div class="stf-mail__preview">' +
+          '<div class="stf-mail__nav">' +
+            '<button type="button" class="stf-btn" data-mail-nav="-1"' + (mail.idx === 0 ? " disabled" : "") + '><i class="fa-solid fa-arrow-left"></i></button>' +
+            '<div class="stf-mail__navwho"><strong>' + esc(p.name) + '</strong> · ' + esc(p.mail) +
+              '<small data-mail-meta>' + meta() + '</small></div>' +
+            '<button type="button" class="stf-btn" data-mail-nav="1"' + (mail.idx === recipients.length - 1 ? " disabled" : "") + '><i class="fa-solid fa-arrow-right"></i></button>' +
+          '</div>' +
+          rteHtml("data-mail-person", mailBodyFor(p), true) +
+          '<div class="stf-mail__actions">' +
+            '<button type="button" class="stf-btn" data-mail-reset' + (edited ? "" : ' style="display:none"') + '>Reset to template</button>' +
+            '<span class="stf-filters__spacer"></span>' +
+            '<span class="stf-mail__status" data-mail-status></span>' +
+            '<button type="button" class="stf-btn" data-mail-send-one' + (mail.sending ? " disabled" : "") + '>Send to ' + esc(p.first_name || "this person") + '</button>' +
+            '<button type="button" class="stf-btn stf-btn--primary" data-mail-send-all' + (mail.sending || !pending ? " disabled" : "") + '>Send to all pending (' + pending + ')</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    bindRte(body);
+    var personArea = body.querySelector("[data-mail-person]");
+    body.querySelector("[data-mail-subject]").addEventListener("input", function (e) { mail.subject = e.target.value; });
+    body.querySelector("[data-mail-template]").addEventListener("input", function (e) {
+      mail.template = e.target.innerHTML;
+      if (!Object.prototype.hasOwnProperty.call(mail.edits, p.candidate_id)) {
+        personArea.innerHTML = mailBodyFor(p);
+      }
+    });
+    // Sin re-render al editar: re-dibujar un contenteditable le pierde el cursor.
+    personArea.addEventListener("input", function () {
+      mail.edits[p.candidate_id] = personArea.innerHTML;
+      body.querySelector("[data-mail-meta]").innerHTML = meta();
+      body.querySelector("[data-mail-reset]").style.display = "";
+    });
+    body.querySelectorAll("[data-mail-nav]").forEach(function (b) {
+      b.addEventListener("click", function () { mail.idx += Number(b.dataset.mailNav); renderMailCompose(); });
+    });
+    var reset = body.querySelector("[data-mail-reset]");
+    if (reset) reset.addEventListener("click", function () { delete mail.edits[p.candidate_id]; renderMailCompose(); });
+    body.querySelector("[data-mail-send-one]").addEventListener("click", function () {
+      if (mail.results[p.candidate_id] === "sent" &&
+          !confirm(p.name + " already got this email. Send it again?")) return;
+      sendMail([p]);
+    });
+    body.querySelector("[data-mail-send-all]").addEventListener("click", function () {
+      var list = recipients.filter(function (r) { return mail.results[r.candidate_id] !== "sent"; });
+      var edits = list.filter(function (r) { return Object.prototype.hasOwnProperty.call(mail.edits, r.candidate_id); }).length;
+      if (!confirm("Send \"" + mail.subject + "\" to " + list.length + " people, one email each" +
+                   (edits ? " (" + edits + " with a personalized message)" : "") + "?")) return;
+      sendMail(list);
+    });
+  }
+
+  function sendMail(list) {
+    if (!mail.subject.trim()) { alert("The subject is empty."); return; }
+    var empty = list.filter(function (p) { return mailIsEmpty(mailBodyFor(p)); });
+    if (empty.length) { alert("The message is empty for " + empty[0].name + "."); return; }
+    mail.sending = true;
+    renderMailCompose();
+    var done = 0;
+    var chunks = [];
+    for (var i = 0; i < list.length; i += MAIL_CHUNK) chunks.push(list.slice(i, i + MAIL_CHUNK));
+    var status = function () {
+      var el = mail.el.querySelector("[data-mail-status]");
+      if (el) el.textContent = "Sending… " + done + " / " + list.length;
+    };
+    status();
+    chunks.reduce(function (chain, chunk) {
+      return chain.then(function () {
+        return api("/staffing/send-email", {
+          method: "POST",
+          body: JSON.stringify({
+            messages: chunk.map(function (p) {
+              return { candidate_id: p.candidate_id, subject: mail.subject, body: mailBodyFor(p) };
+            })
+          })
+        }).then(function (data) {
+          (data.results || []).forEach(function (r) { mail.results[r.candidate_id] = r.result; });
+          done += chunk.length;
+          status();
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      mail.sending = false;
+      var sent = list.filter(function (p) { return mail.results[p.candidate_id] === "sent"; }).length;
+      renderMailCompose();
+      var el = mail.el.querySelector("[data-mail-status]");
+      if (el) el.textContent = sent + " sent" + (sent < list.length ? " · " + (list.length - sent) + " failed" : "");
+    }).catch(function (err) {
+      mail.sending = false;
+      renderMailCompose();
+      alert("Stopped after " + done + " of " + list.length + ": " + err.message);
+    });
+  }
+
+  function openMail() {
+    mail.el.classList.add("is-open");
+    mail.el.setAttribute("aria-hidden", "false");
+    if (!mail.people.length) loadMailPeople(); else renderMail();
+  }
+
+  function closeMail() {
+    if (mail.sending) return;
+    mail.el.classList.remove("is-open");
+    mail.el.setAttribute("aria-hidden", "true");
+  }
+
+  function initMail() {
+    mail.el = $("#stfMail");
+    if (!mail.el || MAIL_ALLOWED.indexOf(userEmail().toLowerCase()) === -1) return;
+    var bar = document.querySelector('[data-panel="database"] .stf-filters');
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "stf-btn stf-btn--primary";
+    btn.innerHTML = '<i class="fa-regular fa-envelope"></i> Email actives';
+    btn.addEventListener("click", openMail);
+    bar.insertBefore(btn, bar.querySelector(".stf-filters__spacer"));
+
+    mail.el.querySelectorAll("[data-mail-close]").forEach(function (el) { el.addEventListener("click", closeMail); });
+    mail.el.querySelectorAll("[data-mail-step]").forEach(function (b) {
+      b.addEventListener("click", function () { mail.step = b.dataset.mailStep; renderMail(); });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && mail.el.classList.contains("is-open")) closeMail();
+    });
+  }
+
+  /* =====================================================================
      Init
      ===================================================================== */
   function init() {
@@ -1911,12 +2280,12 @@
     });
     drawer.save.addEventListener("click", save);
 
-    $$(".stf-tab").forEach(function (btn) {
+    $$(".stf-tabs .stf-tab").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var tab = btn.dataset.tab;
         state.tab = tab;
         closePopover();
-        $$(".stf-tab").forEach(function (b) { b.classList.toggle("is-active", b === btn); });
+        $$(".stf-tabs .stf-tab").forEach(function (b) { b.classList.toggle("is-active", b === btn); });
         $$(".stf-panel").forEach(function (p) { p.classList.toggle("is-active", p.dataset.panel === tab); });
         $("#stfExportCsv").style.display = tab === "database" ? "" : "none";
         loadTab(tab);
@@ -1991,6 +2360,7 @@
     });
 
     $("#stfExportCsv").style.display = "";
+    initMail();
     // El catálogo va primero: sin él las columnas custom no tendrían dónde dibujarse.
     loadSchema().then(function () { loadTab("database"); });
   }

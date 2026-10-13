@@ -5,7 +5,7 @@ import traceback
 import logging
 from flask import request, jsonify, make_response
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, Cc
+from sendgrid.helpers.mail import Mail, Email, Cc, ReplyTo
 import requests
 import logging
 import re
@@ -36,7 +36,7 @@ def _html_to_plain(html: str) -> str:
     s = re.sub(r'\n{3,}', '\n\n', s)
     return s.strip()
 
-def send_email_message(to_emails, subject, body, cc_emails=None):
+def send_email_message(to_emails, subject, body, cc_emails=None, reply_to=None):
     """Envia un mail por SendGrid y devuelve el status code.
 
     Extraido de /send_email para poder reusarlo desde otras rutas (p. ej. el
@@ -73,6 +73,11 @@ def send_email_message(to_emails, subject, body, cc_emails=None):
         _already.add(addr)
         # Cc(), no Email(): sendgrid>=6 rechaza un Email generico en add_cc.
         message.add_cc(Cc(email))
+
+    # Opcional: que la respuesta le llegue a una persona y no a hub@vintti-hub.com
+    # (lo usan los mails de Staffing a los contractors activos).
+    if reply_to and '@' in str(reply_to):
+        message.reply_to = ReplyTo(str(reply_to).strip())
 
     response = SendGridAPIClient(api_key).send(message)
     return response.status_code
@@ -141,6 +146,7 @@ def register_send_email_route(app):
         cc_emails = data.get('cc', [])
         subject = data.get('subject')
         body = data.get('body')
+        reply_to = data.get('reply_to')
 
         if not to_emails or not subject or not body:
             logging.warning("⚠️ Faltan campos requeridos")
@@ -164,7 +170,7 @@ def register_send_email_route(app):
                 logging.error("❌ Fallo al conectar a SendGrid directamente")
                 logging.exception(e)
 
-            status_code = send_email_message(to_emails, subject, body, cc_emails)
+            status_code = send_email_message(to_emails, subject, body, cc_emails, reply_to=reply_to)
             logging.info("✅ Envío exitoso. Status: %s", status_code)
 
             resp = jsonify({"status": "Email sent", "code": status_code})
