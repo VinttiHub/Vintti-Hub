@@ -44,6 +44,7 @@ def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
     ini, fin = window_bounds(filters or {})
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
     mql_anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    lost_property = (os.environ.get("HUBSPOT_MQL_LOST_REASON_PROPERTY") or "mql_ae_lost_reason").strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
@@ -54,7 +55,8 @@ def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, mql_anchor, origin_prop, channel_prop, company_prop],
+        extra_properties=[lead_life_property, mql_anchor, origin_prop, channel_prop, company_prop,
+                          lost_property],
     )
 
     rows = []
@@ -87,6 +89,8 @@ def cohort_rows(filters: dict) -> tuple[list[dict], date, date]:
             "origin_ob": origin_ob,
             "lead_life": props.get(lead_life_property) or "—",
             "reached_sql": ll in _REACHED_SQL,
+            # Lo lee sólo `sales_mql_no_sql_reasons` (por qué no pasó a SQL).
+            "lost_reason": str(props.get(lost_property) or "").strip(),
         })
     return rows, ini, fin
 
