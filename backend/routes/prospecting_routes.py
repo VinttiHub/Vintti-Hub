@@ -11,6 +11,7 @@ Tres tipos de caller:
 """
 from __future__ import annotations
 
+import json
 import os
 from datetime import date, datetime
 
@@ -21,6 +22,8 @@ from db import get_connection
 from prospecting import store
 from prospecting import engine
 from prospecting import workflows as wf_store
+from prospecting import views as views_store
+from prospecting.rules import validate_conditions
 from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, WORKFLOW_EDITORS
 from prospecting.rules import InvalidWorkflow
 
@@ -128,8 +131,97 @@ def companies():
         filters = request.args.to_dict()
         if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
             filters["dummy"] = "exclude"
+        # Filtros avanzados (vistas guardadas): JSON con la forma de las condiciones
+        # de un workflow. Se validan con la misma lista blanca antes de llegar al SQL.
+        raw_adv = filters.pop("advanced", None)
+        if raw_adv:
+            try:
+                adv = json.loads(raw_adv)
+            except ValueError:
+                return jsonify({"error": "Filtros avanzados inválidos."}), 400
+            errors = validate_conditions(adv, "Filtros avanzados", wf_store._ctx(cur), required=False, obj="company")
+            if errors:
+                return jsonify({"error": "Los filtros avanzados tienen errores.", "errors": errors}), 400
+            filters["advanced"] = adv
         data = store.list_companies(cur, filters)
     return jsonify(_json_safe(data))
+
+
+# --------------------------------------------------------------------------- #
+# Vistas guardadas (por persona; ver prospecting/views.py)
+# --------------------------------------------------------------------------- #
+@bp.get("/views")
+def views_list():
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        data = views_store.list_for(cur, _current_email())
+    return jsonify(_json_safe(data))
+
+
+@bp.post("/views")
+def view_create():
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            view = views_store.create(cur, _current_email(), body, wf_store._ctx(cur))
+    except InvalidWorkflow as exc:
+        return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
+    return jsonify(_json_safe(view)), 201
+
+
+@bp.patch("/views/<int:view_id>")
+def view_update(view_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            email = _current_email()
+            existing = views_store.get_view(cur, view_id)
+            if existing is None:
+                return jsonify({"error": "La vista no existe."}), 404
+            if existing["owner_email"] != email:
+                return jsonify({"error": "Sólo quien creó la vista la puede editar. Duplicala para tener la tuya."}), 403
+            view = views_store.update(cur, email, view_id, body, wf_store._ctx(cur))
+    except InvalidWorkflow as exc:
+        return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
+    return jsonify(_json_safe(view))
+
+
+@bp.delete("/views/<int:view_id>")
+def view_delete(view_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        email = _current_email()
+        existing = views_store.get_view(cur, view_id)
+        if existing is None:
+            return jsonify({"error": "La vista no existe."}), 404
+        if existing["owner_email"] != email:
+            return jsonify({"error": "Sólo quien creó la vista la puede eliminar."}), 403
+        views_store.delete(cur, email, view_id)
+    return jsonify({"ok": True})
+
+
+@bp.put("/views/tabs")
+def view_tabs():
+    body = request.get_json(silent=True) or {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            tabs = views_store.set_tabs(cur, _current_email(), body.get("tabs"))
+    except InvalidWorkflow as exc:
+        return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
+    return jsonify({"tabs": tabs})
 
 
 @bp.get("/companies/<int:company_id>")

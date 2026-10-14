@@ -1145,6 +1145,18 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.
 - Las listas cerradas (status, Not ICP reasons, sizes) viven sólo en `constants.py`.
+- **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
+  crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
+  orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas
+  `prospect_saved_views` (privada salvo `shared`; compartida = otros la agregan y la
+  duplican, **sólo la dueña la edita**, lo frena el server) y `prospect_view_prefs`
+  (pestañas que ve cada uno y en qué orden; las 4 fijas `sys:*` se pueden ocultar).
+  Los filtros avanzados son condiciones de workflow: el param `advanced` de
+  `GET /prospecting/companies` pasa por `rules.validate_conditions()` +
+  `compile_conditions()`, la misma lista blanca. En el front reusa `conditionsEditor()` de
+  `prospecting-workflows.js` con la clave `"ext"` (`conditionsPanel()`), así el editor de
+  workflows no cambió. Owner `__me__` = quien mira la vista. Las fijas siguen guardando
+  columnas en `localStorage`.
 
 ## Staffing: columnas y opciones desde la vista
 

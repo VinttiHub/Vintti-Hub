@@ -463,7 +463,8 @@
   function condRef(key, create) {
     var parts = key.split(":");
     var holder, prop;
-    if (key === "trigger") { holder = draft.trigger; prop = "conditions"; }
+    if (key === "ext") { holder = ext && ext.holder; prop = "conditions"; }  // panel de filtros avanzados
+    else if (key === "trigger") { holder = draft.trigger; prop = "conditions"; }
     else if (key === "unenroll" || key === "goal") { holder = draft; prop = key; }
     else if (parts[0] === "branch") { holder = draft.steps.nodes[parts[1]].branch.paths[Number(parts[2])]; prop = "conditions"; }
     else if (parts[0] === "delay") { holder = draft.steps.nodes[parts[1]].delay; prop = "conditions"; }
@@ -1521,5 +1522,111 @@
     return P.api("/prospecting/workflows").then(function (r) { list = r.workflows; canEdit = !!r.can_edit; return r; });
   }
 
-  window.ProspectingWorkflows = { show: show, enrollCompanies: enrollCompanies, workflows: workflows };
+  /* =================================================================
+     Filtros avanzados de la tabla de empresas (vistas guardadas).
+     Reusa conditionsEditor() tal cual, con la clave "ext": condRef("ext") apunta a
+     `ext.holder` en vez de al `draft` del editor, así el editor de workflows no
+     cambia. Siempre sobre empresas y editable (filtrar no escribe nada).
+     ================================================================= */
+  var ext = null;  // { holder: {conditions}, el, onChange }
+
+  function withExt(fn) {
+    var saved = { obj: curObj, edit: canEdit };
+    curObj = "company";
+    canEdit = true;
+    try { return fn(); } finally { curObj = saved.obj; canEdit = saved.edit; }
+  }
+  function renderExt() {
+    ext.el.innerHTML = withExt(function () {
+      return hasConds(ext.holder.conditions)
+        ? conditionsEditor("ext", ext.holder.conditions, true)
+        : '<p class="pr-note">No advanced filters yet.</p>' +
+          '<button type="button" class="pr-wf-add" data-gadd="ext"><i class="fa-solid fa-plus"></i> Add a condition</button>';
+    });
+  }
+  function extChanged(redraw) {
+    if (redraw) renderExt();
+    if (ext.onChange) ext.onChange(ext.holder.conditions);
+  }
+  function extClick(e) {
+    var b = e.target.closest("button");
+    if (!b || !ext) return;
+    withExt(function () {
+      var v, p, ref;
+      if ((v = b.getAttribute("data-rchip")) !== null) {
+        var x = ruleAt(v);
+        x.rule.value = toggleIn(Array.isArray(x.rule.value) ? x.rule.value : [], b.getAttribute("data-chip"));
+      } else if ((v = b.getAttribute("data-radd")) !== null) {
+        p = v.split("|");
+        condRef("ext", true).conds.groups[Number(p[1])].rules.push(blankRule());
+      } else if ((v = b.getAttribute("data-rdel")) !== null) {
+        p = v.split("|");
+        ref = condRef("ext", false);
+        var g = ref.conds.groups[Number(p[1])];
+        g.rules.splice(Number(p[2]), 1);
+        if (!g.rules.length) ref.conds.groups.splice(Number(p[1]), 1);
+        if (!ref.conds.groups.length) ref.holder.conditions = null;
+      } else if ((v = b.getAttribute("data-gdel")) !== null) {
+        p = v.split("|");
+        condRef("ext", false).conds.groups.splice(Number(p[1]), 1);
+      } else if (b.getAttribute("data-gadd") !== null) {
+        ref = condRef("ext", false);
+        if (!ref || !hasConds(ref.conds)) condRef("ext", true);
+        else ref.conds.groups.push({ rules: [blankRule()] });
+      } else return;
+    });
+    extChanged(true);
+  }
+  function extChange(e) {
+    var el = e.target, a;
+    if (!ext) return;
+    if (el.tagName === "INPUT") return;  // lo toma extInput
+    withExt(function () {
+      if ((a = el.getAttribute("data-rfield"))) {
+        var x = ruleAt(a);
+        x.rule.field = el.value;
+        x.rule.op = ((S().operators_by_type || {})[field(el.value).type] || [])[0];
+        resetValue(x.rule);
+      } else if ((a = el.getAttribute("data-rop"))) {
+        var y = ruleAt(a), before = opDef(y.rule.op).value;
+        y.rule.op = el.value;
+        if (opDef(el.value).value !== before) resetValue(y.rule);
+      }
+    });
+    extChanged(true);
+  }
+  function extInput(e) {
+    var el = e.target, a;
+    if (!ext || !(a = el.getAttribute("data-val"))) return;
+    withExt(function () {
+      var r = ruleAt(a).rule, vi = el.getAttribute("data-vi");
+      if (vi !== null) { r.value = Array.isArray(r.value) ? r.value : ["", ""]; r.value[Number(vi)] = el.value; }
+      else r.value = el.value;
+    });
+    extChanged(false);  // sin redibujar: no perder el foco
+  }
+
+  /* Dibuja el armador en `el` sobre una COPIA de `conds`. onChange recibe las
+     condiciones (o null) en cada cambio; nada se aplica hasta que la tabla lo pide. */
+  function conditionsPanel(el, conds, onChange) {
+    P = P || window.Prospecting;
+    ext = { holder: { conditions: hasConds(conds) ? clone(conds) : null }, el: el, onChange: onChange };
+    el.onclick = extClick;
+    el.onchange = extChange;
+    el.oninput = extInput;
+    renderExt();
+    return {
+      get: function () { return ext && ext.el === el ? ext.holder.conditions : null; },
+      clear: function () { if (ext && ext.el === el) { ext.holder.conditions = null; extChanged(true); } },
+    };
+  }
+  function conditionsSummary(conds) {
+    P = P || window.Prospecting;
+    return withExt(function () { return conditionsText(conds); });
+  }
+
+  window.ProspectingWorkflows = {
+    show: show, enrollCompanies: enrollCompanies, workflows: workflows,
+    conditionsPanel: conditionsPanel, conditionsSummary: conditionsSummary,
+  };
 })();

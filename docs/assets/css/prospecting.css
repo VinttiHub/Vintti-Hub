@@ -1411,3 +1411,81 @@ a.pr-company__name:hover { color: var(--pr-violet); text-decoration: underline; 
 .pr-wf-table__name .pr-note { max-width: 280px; }
 /* En las tarjetas, «Si» no necesita la columna ancha de «Entonces» */
 .pr-wf-grid .pr-wf-card__tag { flex: 0 0 auto; min-width: 0; }
+
+/* =====================================================================
+   Vistas guardadas (prospecting.js → «Vistas»): pestañas por persona, menú ⋯,
+   popover «+», barra de cambios sin guardar y filtros avanzados.
+   ===================================================================== */
+.pr-tabs { align-items: center; }
+.pr-tabs__views { display: contents; }
+.pr-tab--view { display: inline-flex; align-items: center; gap: 6px; }
+.pr-tab__icon { font-size: 11px; opacity: .55; }
+.pr-tab__shared { font-size: 10px; color: var(--pr-violet); }
+.pr-tab__more {
+  display: inline-grid; place-items: center;
+  width: 20px; height: 20px; margin: 0 -8px 0 2px;
+  border-radius: 999px; color: var(--pr-ink-3); font-size: 11px;
+}
+.pr-tab__more:hover { background: var(--pr-card-soft); color: var(--pr-ink); }
+.pr-tab--add { padding: 8px 12px; color: var(--pr-ink-3); }
+.pr-tab--add:hover { color: var(--pr-violet); }
+.pr-tabs__sep { width: 1px; align-self: stretch; margin: 6px 4px; background: var(--pr-rule); }
+.pr-tab--view[draggable="true"] { cursor: pointer; }
+
+.pr-pop {
+  position: fixed; z-index: 120;
+  width: 300px; max-height: 70vh; overflow-y: auto;
+  background: #fff; border: 1px solid var(--pr-rule); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(13, 18, 30, .16);
+  padding: 8px;
+}
+.pr-pop__head {
+  padding: 6px 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--pr-ink-3);
+}
+.pr-pop__head--sep { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--pr-rule); }
+.pr-pop__note { margin: 0 8px 6px; font-size: 12px; color: var(--pr-ink-3); line-height: 1.4; }
+.pr-pop__item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  appearance: none; border: 0; background: transparent; font: inherit;
+  font-size: 13px; color: var(--pr-ink); text-align: left;
+  padding: 8px; border-radius: 8px; cursor: pointer;
+}
+.pr-pop__item i { width: 14px; color: var(--pr-ink-3); }
+.pr-pop__item:hover { background: var(--pr-card-soft); }
+.pr-pop__item.is-danger, .pr-pop__item.is-danger i { color: #d4204a; }
+.pr-pop__sub { margin-left: auto; font-size: 11px; color: var(--pr-ink-3); }
+.pr-pop__form { display: flex; flex-direction: column; gap: 6px; padding: 0 4px 6px; }
+.pr-pop { overflow-x: hidden; }
+.pr-pop__form .pr-filter__input { width: 100%; box-sizing: border-box; }
+.pr-pop__form .pr-btn { justify-content: center; margin-top: 2px; }
+
+.pr-viewbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 1px solid var(--pr-rule);
+  background: color-mix(in srgb, var(--pr-cyan) 10%, #fff); font-size: 13px;
+}
+.pr-viewbar > span:first-child { margin-right: auto; color: var(--pr-ink-2); }
+.pr-viewbar > span:first-child i { color: var(--pr-blue); margin-right: 4px; }
+
+.pr-adv__count { font-weight: 600; color: var(--pr-violet); }
+#prAdvBtn.is-on { border-color: rgba(108, 56, 255, .45); color: var(--pr-violet); }
+.pr-adv-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 1px solid var(--pr-rule);
+  background: color-mix(in srgb, var(--pr-violet) 5%, #fff); font-size: 13px;
+}
+.pr-adv-summary__label { font-weight: 600; color: var(--pr-violet); white-space: nowrap; }
+.pr-adv-summary__text { flex: 1; min-width: 200px; color: var(--pr-ink-2); line-height: 1.5; }
+.pr-adv-summary .pr-btn { padding: 5px 10px; }
+
+/* Menú de columnas: arrastrar para reordenar */
+.pr-cols__item { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.pr-cols__item .pr-check { flex: 1; }
+.pr-cols__grip { width: 14px; font-size: 11px; color: var(--pr-ink-3); padding-left: 4px; }
+.pr-cols__item.is-draggable { cursor: grab; }
+.pr-cols__item.is-dragging { opacity: .4; }
+.pr-cols__item.is-drop { box-shadow: inset 0 2px 0 var(--pr-violet); }
+.pr-cols__head--sub { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--pr-rule); }
+.pr-table th i.fa-solid { margin-left: 2px; }
+.pr-sort-arrow { font-size: 10px; }

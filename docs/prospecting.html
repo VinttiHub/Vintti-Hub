@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/prospecting.css?v=15" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=16" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -36,11 +36,12 @@
     </div>
 
     <div id="prApp" hidden>
-      <div class="pr-tabs" role="tablist">
-        <button type="button" class="pr-tab is-active" data-view="all" role="tab">Prospecting Companies</button>
-        <button type="button" class="pr-tab" data-view="mine" role="tab">My companies</button>
-        <button type="button" class="pr-tab" data-view="unassigned" role="tab">Unassigned</button>
-        <button type="button" class="pr-tab" data-view="recycled" role="tab">Recycled</button>
+      <!-- Vistas de la tabla: las fijas + las de cada persona (prospecting.js → renderTabs) -->
+      <div class="pr-tabs" role="tablist" id="prTabs">
+        <span class="pr-tabs__views" id="prViewTabs"></span>
+        <button type="button" class="pr-tab pr-tab--add" id="prViewAdd" title="Create or add a view" aria-label="Create or add a view">
+          <i class="fa-solid fa-plus"></i></button>
+        <span class="pr-tabs__sep" aria-hidden="true"></span>
         <button type="button" class="pr-tab" data-view="contacts" role="tab"><i class="fa-regular fa-user"></i> Contacts</button>
         <button type="button" class="pr-tab pr-tab--wf" data-view="workflows" role="tab">
           <i class="fa-solid fa-diagram-project"></i> Workflows</button>
@@ -82,6 +83,7 @@
             </select>
           </label>
           <div class="pr-filters__actions">
+          <button type="button" class="pr-btn" id="prAdvBtn"><i class="fa-solid fa-sliders"></i> Advanced filters <span class="pr-adv__count" id="prAdvCount"></span></button>
           <button type="button" class="pr-btn" id="prClear"><i class="fa-solid fa-rotate-left"></i> Clear</button>
           <div class="pr-cols">
             <button type="button" class="pr-btn" id="prColsBtn" aria-expanded="false">
@@ -92,6 +94,8 @@
           </div>
         </div>
 
+        <div class="pr-adv-summary" id="prAdvSummary" hidden></div>
+        <div class="pr-viewbar" id="prViewBar" hidden></div>
         <div class="pr-bulk" id="prBulk" hidden></div>
         <div class="pr-table-wrap">
           <table class="pr-table">
@@ -144,6 +148,8 @@
     </div>
   </main>
 
+  <div class="pr-pop" id="prViewPop" hidden></div>
+
   <div class="pr-toast" id="prToast" role="status" aria-live="polite" hidden></div>
 
   <!-- ============================== Drawer ============================== -->
@@ -166,8 +172,8 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20261007-pilar-staffing" defer></script>
-  <script src="./assets/js/prospecting.js?v=12" defer></script>
-  <script src="./assets/js/prospecting-workflows.js?v=16" defer></script>
+  <script src="./assets/js/prospecting.js?v=13" defer></script>
+  <script src="./assets/js/prospecting-workflows.js?v=17" defer></script>
   <script src="./assets/js/prospecting-contacts.js?v=2" defer></script>
 </body>
 </html>

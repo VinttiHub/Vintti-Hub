@@ -36,6 +36,7 @@ from prospecting.constants import (
     DEFAULT_WORKFLOWS,
     EDITABLE_FIELDS,
     FIELDS,
+    FIELDS_BY_KEY,
     OPERATORS,
     OPERATORS_BY_TYPE,
     WORKFLOW_EDITORS,
@@ -336,6 +337,9 @@ def ensure_schema(cur) -> None:
         ON CONFLICT DO NOTHING
         """
     )
+    # Vistas guardadas de la tabla, por persona (views.py).
+    from prospecting import views
+    views.ensure_schema(cur)
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -654,6 +658,19 @@ SORTS = {
 }
 
 
+def _order_sql(sort) -> str:
+    """Las claves viejas de SORTS, o `<campo>:<asc|desc>` con un campo del catálogo."""
+    if sort in SORTS:
+        return SORTS[sort]
+    from prospecting.views import parse_sort
+    parsed = parse_sort(sort)
+    if not parsed:
+        return SORTS["created_desc"]
+    key, d = parsed
+    expr = f"LOWER({key})" if FIELDS_BY_KEY[key]["type"] in ("text", "longtext", "url", "owner", "enum") else key
+    return f"{expr} {d.upper()} NULLS LAST, id {d.upper()}"
+
+
 def list_companies(cur, f: dict) -> dict:
     where, params = [], []
 
@@ -698,8 +715,19 @@ def list_companies(cur, f: dict) -> dict:
         where.append("(name ILIKE %s OR domain ILIKE %s OR hubspot_company_id = %s)")
         params += [f"%{q}%", f"%{q}%", q]
 
+    # Filtros avanzados de una vista: el route ya los validó con
+    # rules.validate_conditions(); se traducen con el mismo compilador de los workflows.
+    advanced = f.get("advanced")
+    if isinstance(advanced, dict) and advanced.get("groups"):
+        from prospecting.rules import compile_conditions
+        now = datetime.now().astimezone()
+        from prospecting.engine import as_of_of
+        adv_sql, adv_params = compile_conditions(advanced, as_of_of(now), now, "company")
+        where.append(adv_sql)
+        params += adv_params
+
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    order = SORTS.get(f.get("sort") or "", SORTS["created_desc"])
+    order = _order_sql(f.get("sort"))
     page = max(1, _to_int(f.get("page")) or 1)
     size = min(200, max(10, _to_int(f.get("page_size")) or 50))
 

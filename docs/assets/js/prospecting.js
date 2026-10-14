@@ -115,7 +115,10 @@
   /* ---------- Estado ---------- */
   var OPTS = { statuses: [], not_icp_reasons: [], sizes: [], bdrs: [], weeks: [], workflows: [] };
   var ME = { email: userEmail(), is_admin: false };
-  var state = { view: "all", page: 1, pageSize: 25, sort: "created_desc", total: 0 };
+  /* `view` = pestaña activa: "sys:<all|mine|unassigned|recycled>" (fijas) o "v:<id>"
+     (vista guardada, ver «Vistas» más abajo). `advanced` = filtros avanzados
+     (condiciones con la forma de los workflows) o null. */
+  var state = { view: "sys:all", page: 1, pageSize: 25, sort: "created_desc", total: 0, advanced: null };
   var rowsById = {};
 
   function ownerOptions() {
@@ -130,7 +133,8 @@
 
   /* ---------- Filtros ---------- */
   function fillFilters() {
-    var owners = [{ value: "__none__", label: "No owner" }].concat(ownerOptions());
+    // «Me» = quien mira la vista: sirve para compartir una vista de «mis empresas».
+    var owners = [{ value: "__me__", label: "Me" }, { value: "__none__", label: "No owner" }].concat(ownerOptions());
     $("prFOwner").innerHTML = optionsHtml(owners, "", "All");
     $("prFWeek").innerHTML = optionsHtml([{ value: "__none__", label: "No week" }].concat(OPTS.weeks), "", "All");
     $("prFStatus").innerHTML = optionsHtml([{ value: "__none__", label: "No status" }].concat(OPTS.statuses), "", "All");
@@ -150,10 +154,10 @@
       page: state.page,
       page_size: state.pageSize,
     };
-    // Las vistas son atajos de filtro, como las pestañas guardadas de HubSpot.
-    if (state.view === "mine") f.owner = ME.email;
-    if (state.view === "unassigned") f.owner = "__none__";
-    if (state.view === "recycled") f.status = "Recycled";
+    // Las pestañas fijas son atajos de filtro, como las vistas por defecto de HubSpot.
+    Object.assign(f, SYS_OVERRIDES[state.view] || {});
+    if (f.owner === "__me__") f.owner = ME.email;
+    if (hasAdvanced(state.advanced)) f.advanced = JSON.stringify(state.advanced);
     return f;
   }
 
@@ -168,6 +172,7 @@
   var loadSeq = 0;
   function load() {
     var seq = ++loadSeq;
+    renderViewBar();
     $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">Loading…</td></tr>';
     return api("/prospecting/companies?" + qs(currentFilters())).then(function (data) {
       if (seq !== loadSeq) return;
@@ -180,7 +185,8 @@
       $("prBody").closest(".pr-table-wrap").scrollTop = 0;
     }).catch(function (err) {
       if (seq !== loadSeq) return;
-      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">' + esc(err.message) + "</td></tr>";
+      var msg = esc(err.message) + (err.errors ? "<br>" + err.errors.map(esc).join("<br>") : "");
+      $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">' + msg + "</td></tr>";
     });
   }
 
@@ -244,17 +250,34 @@
     { key: "prospecting_owner_apollo", label: "Prospecting Owner Apollo", render: function (r) { return cellText(ownerName(r.prospecting_owner_apollo)); } },
   ];
 
+  /* Columnas visibles, EN ORDEN. En una vista guardada salen de su config; en las
+     pestañas fijas, de este navegador (como antes). `name` va siempre primera. */
   var COLS_KEY = "prospecting_columns_v1";
-  var visibleCols = (function () {
+  var COL_BY_KEY = {};
+  COLUMNS.forEach(function (c) { COL_BY_KEY[c.key] = c; });
+  function defaultCols() { return ["name"].concat(COLUMNS.filter(function (c) { return c.def; }).map(function (c) { return c.key; })); }
+  function normalizeCols(keys) {
+    var out = ["name"];
+    (keys || []).forEach(function (k) { if (COL_BY_KEY[k] && out.indexOf(k) === -1) out.push(k); });
+    return out;
+  }
+  function localCols() {
     try {
       var saved = JSON.parse(localStorage.getItem(COLS_KEY) || "null");
-      if (Array.isArray(saved) && saved.length) return saved;
+      if (Array.isArray(saved) && saved.length) return normalizeCols(saved);
     } catch (e) {}
-    return COLUMNS.filter(function (c) { return c.def; }).map(function (c) { return c.key; });
-  })();
+    return defaultCols();
+  }
+  var visibleCols = localCols();
 
   function activeColumns() {
-    return COLUMNS.filter(function (c) { return c.fixed || visibleCols.indexOf(c.key) !== -1; });
+    return visibleCols.map(function (k) { return COL_BY_KEY[k]; }).filter(Boolean);
+  }
+  /* Se ordena por cualquier columna que sea un campo (contacts_count es calculada). */
+  function sortable(c) { return c.key !== "contacts_count"; }
+  function parseSort(s) {
+    var m = /^([a-z0-9_]+):(asc|desc)$/.exec(s || "");
+    return m ? { key: m[1], dir: m[2] } : null;
   }
 
   /* Selección para «Inscribir en workflow» (sólo quien edita workflows). */
@@ -266,28 +289,41 @@
     $("prHead").innerHTML = (canEnroll()
       ? '<th class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" id="prSelAll" title="Seleccionar la página"></label></th>' : "") +
       activeColumns().map(function (c) {
-      var cls = [c.num ? "pr-num" : "", c.sort && c.sort === state.sort ? "is-sorted" : ""].filter(Boolean).join(" ");
-      return "<th" + (c.sort ? ' data-sort="' + c.sort + '"' : "") + (cls ? ' class="' + cls + '"' : "") + ">" + esc(c.label) + "</th>";
+      var cur = parseSort(state.sort);
+      var on = cur && cur.key === c.key;
+      var cls = [c.num ? "pr-num" : "", on ? "is-sorted" : ""].filter(Boolean).join(" ");
+      var arrow = on ? ' <i class="fa-solid fa-arrow-' + (cur.dir === "asc" ? "up" : "down") + ' pr-sort-arrow"></i>' : "";
+      return "<th" + (sortable(c) ? ' data-sort="' + c.key + '" title="Sort"' : "") + (cls ? ' class="' + cls + '"' : "") + ">" + esc(c.label) + arrow + "</th>";
     }).join("");
     $("prColsCount").textContent = activeColumns().length + "/" + COLUMNS.length;
   }
 
+  /* Visibles arriba, en su orden y arrastrables; las ocultas abajo. */
   function renderColsMenu() {
-    $("prColsMenu").innerHTML = '<div class="pr-cols__head">Show columns</div>' + COLUMNS.map(function (c) {
-      var on = c.fixed || visibleCols.indexOf(c.key) !== -1;
-      return '<label class="pr-check"><input type="checkbox" data-col="' + c.key + '"' + (on ? " checked" : "") +
-        (c.fixed ? " disabled" : "") + "> " + esc(c.label) + "</label>";
-    }).join("") +
+    var item = function (c, on) {
+      var drag = on && !c.fixed;
+      return '<div class="pr-cols__item' + (drag ? " is-draggable" : "") + '"' + (drag ? ' draggable="true" data-col-item="' + c.key + '"' : "") + ">" +
+        '<i class="fa-solid fa-grip-vertical pr-cols__grip"' + (drag ? "" : ' style="visibility:hidden"') + "></i>" +
+        '<label class="pr-check"><input type="checkbox" data-col="' + c.key + '"' + (on ? " checked" : "") +
+        (c.fixed ? " disabled" : "") + "> " + esc(c.label) + "</label></div>";
+    };
+    var hidden = COLUMNS.filter(function (c) { return visibleCols.indexOf(c.key) === -1; });
+    $("prColsMenu").innerHTML = '<div class="pr-cols__head">Shown · drag to reorder</div>' +
+      activeColumns().map(function (c) { return item(c, true); }).join("") +
+      (hidden.length ? '<div class="pr-cols__head pr-cols__head--sub">Hidden</div>' + hidden.map(function (c) { return item(c, false); }).join("") : "") +
       '<div class="pr-cols__foot"><button type="button" class="pr-btn" data-cols="all">All</button>' +
       '<button type="button" class="pr-btn" data-cols="default">Default</button></div>';
   }
 
   function setVisibleCols(keys) {
-    visibleCols = keys;
-    try { localStorage.setItem(COLS_KEY, JSON.stringify(keys)); } catch (e) {}
+    visibleCols = normalizeCols(keys);
+    if (isSys(state.view)) {
+      try { localStorage.setItem(COLS_KEY, JSON.stringify(visibleCols)); } catch (e) {}
+    }
     renderHead();
     renderColsMenu();
     renderRows(lastRows);
+    renderViewBar();
   }
 
   var lastRows = [];
@@ -463,6 +499,7 @@
   function closeDrawer() {
     $("prDrawer").classList.remove("is-open");
     $("prDrawer").setAttribute("aria-hidden", "true");
+    $("prDrawerSave").textContent = "Save";  // el panel de filtros avanzados lo cambia a «Apply»
     drawerSave = null;
   }
 
@@ -660,6 +697,455 @@
     state.page = 1;
   }
 
+  /* =====================================================================
+     Vistas guardadas (como las de HubSpot). Cada persona arma las suyas: filtros,
+     filtros avanzados, columnas en orden, orden de filas y tamaño de página.
+     Privadas salvo que se compartan; una compartida la puede agregar cualquiera a
+     sus pestañas y duplicarla, pero sólo la edita quien la creó (lo frena el server).
+     Qué pestañas ve cada persona y en qué orden también se guarda en el servidor:
+     las 4 fijas se pueden ocultar. Backend: backend/prospecting/views.py.
+     ===================================================================== */
+  var SYS_TABS = {
+    "sys:all": "Prospecting Companies",
+    "sys:mine": "My companies",
+    "sys:unassigned": "Unassigned",
+    "sys:recycled": "Recycled",
+  };
+  var SYS_OVERRIDES = {
+    "sys:mine": { owner: "__me__" },
+    "sys:unassigned": { owner: "__none__" },
+    "sys:recycled": { status: "Recycled" },
+  };
+  var ACTIVE_KEY = "prospecting_active_tab";
+  var VIEWS = { views: [], tabs: Object.keys(SYS_TABS) };
+  var baseline = "";      // la vista tal como está guardada, para saber si hay cambios
+  var advPanel = null;
+
+  function isSys(key) { return String(key || "").indexOf("sys:") === 0; }
+  function viewOf(key) {
+    if (isSys(key)) return null;
+    var id = Number(String(key).slice(2));
+    return VIEWS.views.filter(function (v) { return v.id === id; })[0] || null;
+  }
+  function tabLabel(key) { return isSys(key) ? SYS_TABS[key] : ((viewOf(key) || {}).name || "—"); }
+  function hasAdvanced(c) { return !!(c && c.groups && c.groups.length); }
+  function ruleCount(c) {
+    return hasAdvanced(c) ? c.groups.reduce(function (n, g) { return n + (g.rules || []).length; }, 0) : 0;
+  }
+
+  /* JSON con las claves ordenadas: JSONB devuelve las claves en otro orden. */
+  function canon(v) {
+    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+    if (v && typeof v === "object") {
+      return "{" + Object.keys(v).sort().filter(function (k) { return v[k] != null; })
+        .map(function (k) { return JSON.stringify(k) + ":" + canon(v[k]); }).join(",") + "}";
+    }
+    return JSON.stringify(v);
+  }
+
+  function filterInputs() {
+    var f = {
+      owner: $("prFOwner").value, week: $("prFWeek").value, status: $("prFStatus").value,
+      start_from: $("prFStartFrom").value, start_to: $("prFStartTo").value, q: $("prFQ").value.trim(),
+      contact_incomplete: $("prFIncomplete").checked ? "1" : "",
+      dummy: ME.sees_dummies && $("prFDummy").value !== "exclude" ? $("prFDummy").value : "",
+    };
+    Object.keys(f).forEach(function (k) { if (!f[k]) delete f[k]; });
+    return f;
+  }
+  function setFilterInputs(f) {
+    f = f || {};
+    var setSel = function (id, v) {
+      var el = $(id);
+      el.value = v || "";
+      if (el.value !== (v || "")) el.value = "";  // valor que ya no existe (p. ej. una semana vieja)
+    };
+    setSel("prFOwner", f.owner);
+    setSel("prFWeek", f.week);
+    setSel("prFStatus", f.status);
+    $("prFStartFrom").value = f.start_from || "";
+    $("prFStartTo").value = f.start_to || "";
+    $("prFQ").value = f.q || "";
+    $("prFIncomplete").checked = f.contact_incomplete === "1";
+    if (ME.sees_dummies) $("prFDummy").value = f.dummy || "exclude";
+  }
+
+  /* Lo que se compara contra lo guardado. En una fija no cuentan columnas ni tamaño de
+     página: esas ya se recuerdan en el navegador, como siempre. */
+  function snapshot() {
+    var sys = isSys(state.view);
+    return {
+      filters: filterInputs(),
+      advanced: hasAdvanced(state.advanced) ? state.advanced : null,
+      columns: sys ? null : visibleCols.slice(),
+      sort: state.sort === "created_desc" ? null : state.sort,
+      page_size: sys ? null : state.pageSize,
+    };
+  }
+  /* Lo que se guarda: en una fija, su atajo pasa a ser un filtro de verdad. */
+  function configToSave() {
+    var snap = snapshot();
+    Object.assign(snap.filters, SYS_OVERRIDES[state.view] || {});
+    snap.columns = visibleCols.slice();
+    snap.page_size = state.pageSize;
+    return snap;
+  }
+  function isDirty() { return canon(snapshot()) !== baseline; }
+
+  function loadViews() {
+    return api("/prospecting/views").then(function (r) {
+      VIEWS = { views: r.views || [], tabs: r.tabs || Object.keys(SYS_TABS) };
+    }).catch(function () { /* sin vistas igual anda la tabla con las fijas */ });
+  }
+
+  function showSection(kind) {
+    $("prTableCard").hidden = kind !== "table";
+    $("prWorkflows").hidden = kind !== "workflows";
+    $("prContactsView").hidden = kind !== "contacts";
+  }
+
+  function applyTab(key) {
+    var v = viewOf(key);
+    if (!isSys(key) && !v) key = VIEWS.tabs[0] || "sys:all";
+    v = viewOf(key);
+    state.view = key;
+    try { localStorage.setItem(ACTIVE_KEY, key); } catch (e) {}
+    var cfg = v ? (v.config || {}) : { filters: {}, advanced: null, columns: localCols(), sort: null };
+    setFilterInputs(cfg.filters);
+    state.advanced = hasAdvanced(cfg.advanced) ? JSON.parse(JSON.stringify(cfg.advanced)) : null;
+    visibleCols = normalizeCols(cfg.columns && cfg.columns.length ? cfg.columns : defaultCols());
+    state.sort = cfg.sort || "created_desc";
+    if (v) {
+      state.pageSize = cfg.page_size || 25;
+      $("prPageSize").value = String(state.pageSize);
+    }
+    state.page = 1;
+    selected = {};
+    baseline = canon(snapshot());
+    showSection("table");
+    renderTabs();
+    renderHead();
+    renderColsMenu();
+    renderAdvSummary();
+    load();
+  }
+
+  function switchTab(key) {
+    if (key === state.view && $("prTableCard").hidden === false) return;
+    var v = viewOf(state.view);
+    if (v && v.mine && !$("prTableCard").hidden && isDirty() &&
+        !confirm("La vista «" + v.name + "» tiene cambios sin guardar. ¿Descartarlos?")) return;
+    applyTab(key);
+  }
+
+  function renderTabs() {
+    var onTable = !$("prTableCard").hidden;
+    $("prViewTabs").innerHTML = VIEWS.tabs.map(function (key) {
+      var v = viewOf(key);
+      var active = onTable && key === state.view;
+      var icon = v && v.shared ? ' <i class="fa-solid fa-user-group pr-tab__shared" title="' +
+        esc(v.mine ? "Shared with the team" : "Shared by " + (v.owner_name || v.owner_email)) + '"></i>' : "";
+      return '<button type="button" class="pr-tab pr-tab--view' + (active ? " is-active" : "") + '" role="tab" draggable="true" data-tab="' + esc(key) + '">' +
+        '<i class="fa-solid fa-table-list pr-tab__icon"></i>' + esc(tabLabel(key)) + icon +
+        (active ? '<span class="pr-tab__more" data-tab-menu="' + esc(key) + '" title="View options" role="button"><i class="fa-solid fa-ellipsis"></i></span>' : "") +
+        "</button>";
+    }).join("");
+    document.querySelectorAll('.pr-tab[data-view]').forEach(function (t) {
+      t.classList.toggle("is-active", !onTable && t.getAttribute("data-view") === (!$("prWorkflows").hidden ? "workflows" : "contacts"));
+    });
+  }
+
+  /* «Guardar» / «Descartar» cuando la vista cambió respecto de lo guardado. */
+  function renderViewBar() {
+    var bar = $("prViewBar");
+    if (!bar) return;
+    if (!isDirty()) { bar.hidden = true; bar.innerHTML = ""; return; }
+    var v = viewOf(state.view);
+    bar.hidden = false;
+    bar.innerHTML = v && v.mine
+      ? '<span><i class="fa-solid fa-pen"></i> Unsaved changes to <strong>' + esc(v.name) + "</strong></span>" +
+        '<button type="button" class="pr-btn pr-btn--primary" data-vb="save"><i class="fa-solid fa-floppy-disk"></i> Save view</button>' +
+        '<button type="button" class="pr-btn" data-vb="saveas">Save as new view</button>' +
+        '<button type="button" class="pr-btn" data-vb="reset">Discard</button>'
+      : '<span><i class="fa-solid fa-filter"></i> You changed <strong>' + esc(tabLabel(state.view)) + "</strong>" +
+        (v ? " (shared by " + esc(v.owner_name || v.owner_email) + ")" : "") + "</span>" +
+        '<button type="button" class="pr-btn pr-btn--primary" data-vb="saveas"><i class="fa-solid fa-plus"></i> Save as new view</button>' +
+        '<button type="button" class="pr-btn" data-vb="reset">Reset</button>';
+  }
+
+  function renderAdvSummary() {
+    var n = ruleCount(state.advanced);
+    $("prAdvCount").textContent = n ? "(" + n + ")" : "";
+    $("prAdvBtn").classList.toggle("is-on", n > 0);
+    var box = $("prAdvSummary");
+    if (!n || !window.ProspectingWorkflows) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<span class="pr-adv-summary__label"><i class="fa-solid fa-sliders"></i> Advanced</span>' +
+      '<span class="pr-adv-summary__text">' + window.ProspectingWorkflows.conditionsSummary(state.advanced) + "</span>" +
+      '<button type="button" class="pr-btn" data-adv="edit">Edit</button>' +
+      '<button type="button" class="pr-btn" data-adv="clear" title="Remove advanced filters"><i class="fa-solid fa-xmark"></i></button>';
+  }
+
+  /* Panel lateral con el armador de condiciones de Workflows. */
+  function openAdvanced() {
+    if (!window.ProspectingWorkflows) return;
+    $("prDrawerEyebrow").textContent = "Filters";
+    $("prDrawerTitle").textContent = "Advanced filters";
+    $("prDrawerSub").textContent = "Groups are joined by OR; conditions inside a group, by AND. Same properties as the workflows.";
+    $("prDrawerBody").innerHTML = '<div class="pr-adv-panel" id="prAdvPanel"></div>' +
+      '<div class="pr-row" style="margin-top:12px"><button type="button" class="pr-btn" id="prAdvClearAll"><i class="fa-solid fa-trash"></i> Clear all</button></div>';
+    $("prDrawerStatus").textContent = "";
+    $("prDrawerFoot").hidden = false;
+    $("prDrawerSave").textContent = "Apply";
+    openDrawer();
+    advPanel = window.ProspectingWorkflows.conditionsPanel($("prAdvPanel"), state.advanced, function () {
+      $("prDrawerStatus").textContent = "";
+    });
+    $("prAdvClearAll").onclick = function () { advPanel.clear(); };
+    drawerSave = function () {
+      var conds = advPanel.get();
+      conds = hasAdvanced(conds) ? conds : null;
+      // Se prueba antes de cerrar: si una condición está incompleta, el error queda a la vista.
+      var probe = Object.assign(currentFilters(), { page: 1, page_size: 10 });
+      delete probe.advanced;
+      if (conds) probe.advanced = JSON.stringify(conds);
+      $("prDrawerStatus").textContent = "Checking…";
+      api("/prospecting/companies?" + qs(probe)).then(function () {
+        state.advanced = conds ? JSON.parse(JSON.stringify(conds)) : null;
+        state.page = 1;
+        closeDrawer();
+        renderAdvSummary();
+        load();
+      }).catch(function (err) {
+        $("prDrawerStatus").innerHTML = esc(err.errors ? err.errors.join(" · ") : err.message);
+      });
+    };
+  }
+
+  /* ---------- Popover (menú de una pestaña / «+») ---------- */
+  function closePop() { $("prViewPop").hidden = true; $("prViewPop").innerHTML = ""; }
+  function openPop(anchor, html) {
+    var pop = $("prViewPop");
+    pop.innerHTML = html;
+    pop.hidden = false;
+    var r = anchor.getBoundingClientRect();
+    var left = Math.min(r.left, window.innerWidth - pop.offsetWidth - 16);
+    pop.style.left = Math.max(16, left) + "px";
+    pop.style.top = (r.bottom + 6) + "px";
+  }
+
+  function tabMenu(anchor, key) {
+    var v = viewOf(key);
+    var item = function (act, icon, label, danger) {
+      return '<button type="button" class="pr-pop__item' + (danger ? " is-danger" : "") + '" data-vact="' + act + '" data-key="' + esc(key) + '">' +
+        '<i class="fa-solid ' + icon + '"></i> ' + esc(label) + "</button>";
+    };
+    var last = VIEWS.tabs.length <= 1;
+    var html = '<div class="pr-pop__head">' + esc(tabLabel(key)) + "</div>";
+    if (isSys(key)) {
+      html += '<p class="pr-pop__note">Default view. You can hide it from your tabs.</p>' +
+        item("duplicate", "fa-copy", "Save a copy as my view") +
+        (last ? "" : item("remove", "fa-eye-slash", "Hide from my tabs"));
+    } else if (v && v.mine) {
+      html += item("rename", "fa-pen", "Rename") +
+        item("duplicate", "fa-copy", "Duplicate") +
+        item("share", v.shared ? "fa-lock" : "fa-user-group", v.shared ? "Make private" : "Share with the team") +
+        (last ? "" : item("remove", "fa-eye-slash", "Remove from my tabs")) +
+        item("delete", "fa-trash", "Delete view", true);
+    } else if (v) {
+      html += '<p class="pr-pop__note">Shared by ' + esc(v.owner_name || v.owner_email) + ". Only they can edit it; duplicate it to have your own.</p>" +
+        item("duplicate", "fa-copy", "Duplicate") +
+        (last ? "" : item("remove", "fa-eye-slash", "Remove from my tabs"));
+    }
+    openPop(anchor, html);
+  }
+
+  function addMenu(anchor) {
+    var hidden = Object.keys(SYS_TABS).filter(function (k) { return VIEWS.tabs.indexOf(k) === -1; });
+    var notInTabs = VIEWS.views.filter(function (v) { return VIEWS.tabs.indexOf("v:" + v.id) === -1; });
+    var row = function (key, label, sub) {
+      return '<button type="button" class="pr-pop__item" data-vact="add" data-key="' + esc(key) + '"><i class="fa-solid fa-table-list"></i> ' +
+        esc(label) + (sub ? ' <span class="pr-pop__sub">' + esc(sub) + "</span>" : "") + "</button>";
+    };
+    var existing = hidden.map(function (k) { return row(k, SYS_TABS[k], "default"); }).join("") +
+      notInTabs.map(function (v) { return row("v:" + v.id, v.name, v.mine ? (v.shared ? "mine · shared" : "mine") : "by " + (v.owner_name || v.owner_email)); }).join("");
+    openPop(anchor,
+      '<div class="pr-pop__head">Create new view</div>' +
+      '<form class="pr-pop__form" id="prViewCreate">' +
+        '<input class="pr-filter__input" id="prViewName" maxlength="60" placeholder="View name" autocomplete="off" required>' +
+        '<label class="pr-check"><input type="radio" name="prViewFrom" value="current" checked> Start from the current view (filters, columns, sort)</label>' +
+        '<label class="pr-check"><input type="radio" name="prViewFrom" value="blank"> Start blank</label>' +
+        '<label class="pr-check"><input type="checkbox" id="prViewShared"> Share with the team</label>' +
+        '<button type="submit" class="pr-btn pr-btn--primary"><i class="fa-solid fa-plus"></i> Create view</button>' +
+      "</form>" +
+      '<div class="pr-pop__head pr-pop__head--sep">Add an existing view</div>' +
+      (existing || '<p class="pr-pop__note">Nothing to add: every view you can see is already in your tabs. Views your teammates share show up here.</p>'));
+    setTimeout(function () { var n = $("prViewName"); if (n) n.focus(); }, 0);
+  }
+
+  function saveTabs(tabs) {
+    VIEWS.tabs = tabs;
+    renderTabs();
+    return api("/prospecting/views/tabs", { method: "PUT", body: JSON.stringify({ tabs: tabs }) })
+      .then(function (r) { VIEWS.tabs = r.tabs; renderTabs(); })
+      .catch(function (err) { alert("Could not save your tabs: " + err.message); });
+  }
+
+  function createView(name, config, shared) {
+    return api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name, config: config, shared: !!shared }) })
+      .then(function (v) {
+        VIEWS.views.push(v);
+        if (VIEWS.tabs.indexOf("v:" + v.id) === -1) VIEWS.tabs.push("v:" + v.id);
+        applyTab("v:" + v.id);
+        toast('<i class="fa-solid fa-table-list"></i> View <strong>' + esc(v.name) + "</strong> created" + (v.shared ? " and shared with the team." : ". Only you can see it."));
+      });
+  }
+  function patchView(v, patch) {
+    return api("/prospecting/views/" + v.id, { method: "PATCH", body: JSON.stringify(patch) }).then(function (nv) {
+      Object.assign(v, nv);
+      return v;
+    });
+  }
+  function viewError(err) { alert(err.errors ? err.errors.join("\n") : err.message); }
+
+  /* Config de una pestaña (la activa con sus cambios, o como está guardada). */
+  function configOf(key) {
+    if (key === state.view) return configToSave();
+    var v = viewOf(key);
+    if (v) return JSON.parse(JSON.stringify(v.config || {}));
+    return { filters: Object.assign({}, SYS_OVERRIDES[key] || {}), columns: localCols(), page_size: state.pageSize };
+  }
+
+  function onViewAction(act, key) {
+    var v = viewOf(key);
+    closePop();
+    if (act === "add") {
+      if (VIEWS.tabs.indexOf(key) === -1) saveTabs(VIEWS.tabs.concat([key])).then(function () { applyTab(key); });
+      return;
+    }
+    if (act === "remove") {
+      var rest = VIEWS.tabs.filter(function (k) { return k !== key; });
+      if (!rest.length) return;
+      saveTabs(rest).then(function () { if (state.view === key) applyTab(VIEWS.tabs[0]); });
+      return;
+    }
+    if (act === "duplicate") {
+      var name = prompt("Name for the new view:", tabLabel(key) + " (copy)");
+      if (name && name.trim()) createView(name.trim(), configOf(key), false).catch(viewError);
+      return;
+    }
+    if (!v || !v.mine) return;
+    if (act === "rename") {
+      var nn = prompt("New name:", v.name);
+      if (nn && nn.trim() && nn.trim() !== v.name) patchView(v, { name: nn.trim() }).then(renderTabs).catch(viewError);
+    } else if (act === "share") {
+      patchView(v, { shared: !v.shared }).then(function () {
+        renderTabs();
+        toast(v.shared ? "Now your teammates can add <strong>" + esc(v.name) + "</strong> from the + button. Only you can edit it."
+                       : "<strong>" + esc(v.name) + "</strong> is private again.");
+      }).catch(viewError);
+    } else if (act === "delete") {
+      if (!confirm("Delete the view «" + v.name + "»?" + (v.shared ? " Teammates who added it will lose it too." : "") + " This cannot be undone.")) return;
+      api("/prospecting/views/" + v.id, { method: "DELETE" }).then(function () {
+        VIEWS.views = VIEWS.views.filter(function (x) { return x.id !== v.id; });
+        VIEWS.tabs = VIEWS.tabs.filter(function (k) { return k !== key; });
+        if (!VIEWS.tabs.length) VIEWS.tabs = ["sys:all"];
+        if (state.view === key) applyTab(VIEWS.tabs[0]); else renderTabs();
+      }).catch(viewError);
+    }
+  }
+
+  function onViewBar(act) {
+    var v = viewOf(state.view);
+    if (act === "reset") { applyTab(state.view); return; }
+    if (act === "save" && v && v.mine) {
+      patchView(v, { config: configToSave() }).then(function () {
+        baseline = canon(snapshot());
+        renderViewBar();
+        toast("View <strong>" + esc(v.name) + "</strong> saved.");
+      }).catch(viewError);
+      return;
+    }
+    if (act === "saveas") {
+      var name = prompt("Name for the new view:", v ? v.name + " (copy)" : tabLabel(state.view) + " (mine)");
+      if (name && name.trim()) createView(name.trim(), configToSave(), false).catch(viewError);
+    }
+  }
+
+  function bindViews() {
+    var dragTab = null;
+    $("prTabs").addEventListener("click", function (e) {
+      var more = e.target.closest("[data-tab-menu]");
+      if (more) { e.stopPropagation(); tabMenu(more, more.getAttribute("data-tab-menu")); return; }
+      if (e.target.closest("#prViewAdd")) { e.stopPropagation(); addMenu($("prViewAdd")); return; }
+      var tab = e.target.closest(".pr-tab");
+      if (!tab) return;
+      if (tab.hasAttribute("data-tab")) { switchTab(tab.getAttribute("data-tab")); return; }
+      var kind = tab.getAttribute("data-view");
+      if (kind !== "workflows" && kind !== "contacts") return;
+      showSection(kind);
+      renderTabs();
+      if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
+      else loadContacts();
+    });
+    // Reordenar pestañas arrastrando.
+    $("prViewTabs").addEventListener("dragstart", function (e) {
+      var t = e.target.closest("[data-tab]");
+      if (!t) return;
+      dragTab = t.getAttribute("data-tab");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", dragTab); } catch (err) {}
+    });
+    $("prViewTabs").addEventListener("dragover", function (e) {
+      if (dragTab && e.target.closest("[data-tab]")) e.preventDefault();
+    });
+    $("prViewTabs").addEventListener("drop", function (e) {
+      var t = e.target.closest("[data-tab]");
+      if (!dragTab || !t) return;
+      e.preventDefault();
+      var target = t.getAttribute("data-tab");
+      if (target === dragTab) { dragTab = null; return; }
+      var tabs = VIEWS.tabs.filter(function (k) { return k !== dragTab; });
+      var at = tabs.indexOf(target);
+      if (VIEWS.tabs.indexOf(dragTab) < VIEWS.tabs.indexOf(target)) at++;
+      tabs.splice(at, 0, dragTab);
+      dragTab = null;
+      saveTabs(tabs);
+    });
+    $("prViewPop").addEventListener("click", function (e) {
+      e.stopPropagation();
+      var b = e.target.closest("[data-vact]");
+      if (b) onViewAction(b.getAttribute("data-vact"), b.getAttribute("data-key"));
+    });
+    $("prViewPop").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = $("prViewName").value.trim();
+      if (!name) return;
+      var fromCurrent = (document.querySelector('input[name="prViewFrom"]:checked') || {}).value !== "blank";
+      var cfg = fromCurrent ? configToSave() : { filters: {}, columns: defaultCols(), page_size: 25 };
+      var shared = $("prViewShared").checked;
+      closePop();
+      createView(name, cfg, shared).catch(viewError);
+    });
+    document.addEventListener("click", closePop);
+    window.addEventListener("resize", closePop);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePop(); });
+    $("prViewBar").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-vb]");
+      if (b) onViewBar(b.getAttribute("data-vb"));
+    });
+    $("prAdvBtn").addEventListener("click", openAdvanced);
+    $("prAdvSummary").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-adv]");
+      if (!b) return;
+      if (b.getAttribute("data-adv") === "edit") { openAdvanced(); return; }
+      state.advanced = null;
+      state.page = 1;
+      renderAdvSummary();
+      load();
+    });
+  }
+
   /* ---------- Arranque ---------- */
   function refreshOptions() {
     return api("/prospecting/options").then(function (o) {
@@ -673,23 +1159,7 @@
   }
 
   function bind() {
-    document.querySelectorAll(".pr-tab").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        document.querySelectorAll(".pr-tab").forEach(function (t) { t.classList.toggle("is-active", t === tab); });
-        state.view = tab.getAttribute("data-view");
-        var isWf = state.view === "workflows", isCt = state.view === "contacts";
-        $("prTableCard").hidden = isWf || isCt;
-        $("prWorkflows").hidden = !isWf;
-        $("prContactsView").hidden = !isCt;
-        if (isWf) {
-          if (window.ProspectingWorkflows) window.ProspectingWorkflows.show();
-          return;
-        }
-        if (isCt) { loadContacts(); return; }
-        state.page = 1;
-        load();
-      });
-    });
+    bindViews();
     ["prFOwner", "prFWeek", "prFStatus", "prFStartFrom", "prFStartTo", "prFDummy", "prFIncomplete"].forEach(function (id) {
       $(id).addEventListener("change", function () { state.page = 1; load(); });
     });
@@ -701,6 +1171,8 @@
     $("prClear").addEventListener("click", function () {
       ["prFOwner", "prFWeek", "prFStatus", "prFStartFrom", "prFStartTo", "prFQ"].forEach(function (id) { $(id).value = ""; });
       $("prFIncomplete").checked = false;
+      state.advanced = null;
+      renderAdvSummary();
       state.page = 1;
       load();
     });
@@ -712,11 +1184,12 @@
     $("prPrev").addEventListener("click", function () { if (state.page > 1) { state.page--; load(); } });
     $("prNext").addEventListener("click", function () { state.page++; load(); });
     // Los <th> se regeneran al cambiar columnas: delegación sobre el <tr>.
+    // Click en el encabezado: ascendente → descendente → sin orden.
     $("prHead").addEventListener("click", function (e) {
       var th = e.target.closest("th[data-sort]");
       if (!th) return;
-      var s = th.getAttribute("data-sort");
-      state.sort = state.sort === s ? "created_desc" : s;
+      var key = th.getAttribute("data-sort"), cur = parseSort(state.sort);
+      state.sort = !cur || cur.key !== key ? key + ":asc" : cur.dir === "asc" ? key + ":desc" : "created_desc";
       state.page = 1;
       renderHead();
       load();
@@ -736,17 +1209,47 @@
       var key = e.target.getAttribute("data-col");
       if (!key) return;
       var next = visibleCols.filter(function (k) { return k !== key; });
-      if (e.target.checked) next.push(key);
-      // Mantener el orden de COLUMNS, no el de los clicks.
-      setVisibleCols(COLUMNS.map(function (c) { return c.key; }).filter(function (k) { return next.indexOf(k) !== -1; }));
+      if (e.target.checked) next.push(key);  // una columna nueva entra al final
+      setVisibleCols(next);
     });
     $("prColsMenu").addEventListener("click", function (e) {
       var mode = e.target.closest("[data-cols]");
       if (!mode) return;
-      setVisibleCols(COLUMNS.filter(function (c) {
-        return mode.getAttribute("data-cols") === "all" || c.def;
-      }).map(function (c) { return c.key; }));
+      setVisibleCols(mode.getAttribute("data-cols") === "all"
+        ? visibleCols.concat(COLUMNS.map(function (c) { return c.key; }))
+        : defaultCols());
     });
+    // Reordenar columnas arrastrando dentro del menú.
+    var dragCol = null;
+    $("prColsMenu").addEventListener("dragstart", function (e) {
+      var it = e.target.closest("[data-col-item]");
+      if (!it) return;
+      dragCol = it.getAttribute("data-col-item");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", dragCol); } catch (err) {}
+      it.classList.add("is-dragging");
+    });
+    $("prColsMenu").addEventListener("dragover", function (e) {
+      var it = e.target.closest("[data-col-item]");
+      if (!dragCol || !it) return;
+      e.preventDefault();
+      Array.prototype.forEach.call($("prColsMenu").querySelectorAll(".is-drop"), function (x) { x.classList.remove("is-drop"); });
+      it.classList.add("is-drop");
+    });
+    $("prColsMenu").addEventListener("drop", function (e) {
+      var it = e.target.closest("[data-col-item]");
+      if (!dragCol || !it) return;
+      e.preventDefault();
+      var target = it.getAttribute("data-col-item");
+      var next = visibleCols.filter(function (k) { return k !== dragCol; });
+      var at = next.indexOf(target);
+      // Soltar sobre una fila de más abajo la deja después; de más arriba, antes.
+      if (visibleCols.indexOf(dragCol) < visibleCols.indexOf(target)) at++;
+      next.splice(at, 0, dragCol);
+      dragCol = null;
+      setVisibleCols(next);
+    });
+    $("prColsMenu").addEventListener("dragend", function () { dragCol = null; renderColsMenu(); });
     $("prBody").addEventListener("change", function (e) {
       var sel = e.target.getAttribute && e.target.getAttribute("data-sel");
       if (sel) {
@@ -798,11 +1301,14 @@
       $("prApp").hidden = false;
       if (me.is_admin) $("prTestBtn").hidden = false;
       if (me.sees_dummies) $("prFDummyWrap").hidden = false;
-      renderHead();
-      renderColsMenu();
       bind();
       bindContacts();
-      return refreshOptions().then(load);
+      return Promise.all([refreshOptions(), loadViews()]).then(function () {
+        var saved = null;
+        try { saved = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+        var tabs = VIEWS.tabs;
+        applyTab(tabs.indexOf(saved) !== -1 ? saved : (tabs[0] || "sys:all"));
+      });
     }).catch(function (err) {
       $("prDenied").hidden = false;
       $("prDenied").querySelector("p").textContent = "Could not load Prospecting: " + err.message;
