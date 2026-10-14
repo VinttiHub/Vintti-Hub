@@ -5,7 +5,7 @@
   <title>My Profile • Vintti Hub</title>
   <script src="./assets/js/auth-guard.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="./assets/css/profile.css?v=20260929-birthdays" rel="stylesheet" />
+  <link href="./assets/css/profile.css?v=20261014-required2" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=14" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -190,7 +190,8 @@
           </div>
 
           <!-- tu formulario tal cual -->
-          <form id="profileForm" class="form">
+          <form id="profileForm" class="form" novalidate>
+            <div id="profileRequiredBanner" class="profile-required-banner" role="alert" hidden></div>
             <div class="grid">
               <label class="field">
                 <span class="label">Full Name</span>
@@ -208,18 +209,18 @@
               </label>
 
               <label class="field">
-                <span class="label">Emergency Contact</span>
-                <input name="emergency_contact" id="emergency_contact" placeholder="+57 300 000 0000 — Contact Name" />
+                <span class="label">Emergency Contact <span class="req" aria-hidden="true">*</span></span>
+                <input name="emergency_contact" id="emergency_contact" required placeholder="+57 300 000 0000 — Contact Name" />
               </label>
 
               <label class="field">
-                <span class="label">Vintti Start Date</span>
-                <input name="ingreso_vintti_date" id="ingreso_vintti_date" type="date" />
+                <span class="label">Vintti Start Date <span class="req" aria-hidden="true">*</span></span>
+                <input name="ingreso_vintti_date" id="ingreso_vintti_date" type="date" required />
               </label>
 
               <label class="field">
-                <span class="label">Date of Birth</span>
-                <input name="fecha_nacimiento" id="fecha_nacimiento" type="date" />
+                <span class="label">Date of Birth <span class="req" aria-hidden="true">*</span></span>
+                <input name="fecha_nacimiento" id="fecha_nacimiento" type="date" required />
               </label>
 
               <label class="field">
@@ -233,8 +234,8 @@
               </label>
 
               <label class="field field--full">
-                <span class="label">Address</span>
-                <input name="address" id="address" placeholder="Street, number, apartment, neighborhood" />
+                <span class="label">Address <span class="req" aria-hidden="true">*</span></span>
+                <input name="address" id="address" required placeholder="Street, number, apartment, neighborhood" />
               </label>
 
               <label class="field field--full">
@@ -852,7 +853,7 @@
 <script src="./assets/js/avatar-map.js?v=20260630-1" defer></script>
 <script src="./assets/js/monthly-mood.js?v=14" defer></script>
 <script src="./assets/js/main.js?v=20261013-pilar-sales-lead" defer></script>
-<script src="./assets/js/profile.js?v=20260930-birthdays7" defer></script>
+<script src="./assets/js/profile.js?v=20261014-required2" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

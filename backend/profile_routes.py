@@ -550,6 +550,16 @@ def update_user(user_id: int):
     )
     fields = {field: data.get(field) for field in editable_fields if field in data}
 
+    # Obligatorios del perfil: los mismos 4 que pide el mail diario
+    # (utils/profile_completion_reminder.py). Sólo se validan si vienen en el
+    # body: no se pueden vaciar, y el form de profile.html manda siempre los 4.
+    missing = [
+        f for f in ("emergency_contact", "ingreso_vintti_date", "fecha_nacimiento", "address")
+        if f in fields and not str(fields[f] or "").strip()
+    ]
+    if missing:
+        return jsonify({"error": "missing_required", "fields": missing}), 400
+
     avatar_specified = "avatar_url" in data
     avatar_value: Optional[str] = None
     if avatar_specified:

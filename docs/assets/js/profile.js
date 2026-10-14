@@ -3557,11 +3557,81 @@ async function onTimeoffSubmit(e){
 }
 
 // ============================= PROFILEEEE =============================
+// Obligatorios para guardar: los mismos 4 que pide el mail diario
+// (backend/utils/profile_completion_reminder.py::REQUIRED_FIELDS) y que
+// valida update_user en profile_routes.py. El `required` del HTML deja pasar
+// sólo espacios, por eso se chequea acá con trim().
+const PROFILE_REQUIRED_FIELDS = [
+  ["emergency_contact", "Emergency Contact"],
+  ["ingreso_vintti_date", "Vintti Start Date"],
+  ["fecha_nacimiento", "Date of Birth"],
+  ["address", "Address"],
+];
+
+// Pinta el mensaje debajo de cada campo y el aviso arriba del form. Quedan
+// fijos hasta que se completa el campo (el toast de al lado del botón se
+// borraba a los 3,5 s y no se veía).
+function setProfileFieldMissing(id, isMissing){
+  const field = document.getElementById(id)?.closest(".field");
+  if (!field) return;
+  field.classList.toggle("is-missing", isMissing);
+  let msg = field.querySelector(".field-error");
+  if (isMissing && !msg){
+    msg = document.createElement("span");
+    msg.className = "field-error";
+    msg.textContent = "This field is required";
+    field.appendChild(msg);
+  }
+  if (!isMissing) msg?.remove();
+}
+
+function updateProfileRequiredBanner(){
+  const banner = document.getElementById("profileRequiredBanner");
+  if (!banner) return;
+  const labels = PROFILE_REQUIRED_FIELDS
+    .filter(([id])=> document.getElementById(id)?.closest(".field")?.classList.contains("is-missing"))
+    .map(([, label])=> label);
+  banner.textContent = labels.length
+    ? `Please complete the required fields before saving: ${labels.join(", ")}.`
+    : "";
+  banner.hidden = !labels.length;
+}
+
+function markMissingProfileFields(ids){
+  const missing = new Set(ids);
+  PROFILE_REQUIRED_FIELDS.forEach(([id])=> setProfileFieldMissing(id, missing.has(id)));
+  updateProfileRequiredBanner();
+  const labels = PROFILE_REQUIRED_FIELDS.filter(([id])=> missing.has(id)).map(([, label])=> label);
+  if (labels.length){
+    document.getElementById("profileRequiredBanner")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById(ids[0])?.focus({ preventScroll: true });
+  }
+  return labels;
+}
+
+PROFILE_REQUIRED_FIELDS.forEach(([id])=>{
+  const onChange = (ev)=>{
+    if (!ev.target.value.trim()) return;
+    setProfileFieldMissing(id, false);
+    updateProfileRequiredBanner();
+  };
+  document.getElementById(id)?.addEventListener("input", onChange);
+  document.getElementById(id)?.addEventListener("change", onChange);
+});
+
 $("#profileForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
   if (AVATAR_CROP_STATE.uploadPending){
     const toast = $("#profileToast");
     showToast(toast, "Your photo is still uploading. Please wait a moment.", false);
+    return;
+  }
+  const missingIds = PROFILE_REQUIRED_FIELDS
+    .map(([id])=> id)
+    .filter((id)=> !(document.getElementById(id)?.value || "").trim());
+  if (missingIds.length){
+    const labels = markMissingProfileFields(missingIds);
+    showToast($("#profileToast"), `Please complete: ${labels.join(", ")}.`, false);
     return;
   }
   const avatarInput = ensureAvatarField();
@@ -3594,6 +3664,14 @@ $("#profileForm").addEventListener("submit", async (e)=>{
         body: JSON.stringify(payload)
       }
     );
+    if (r.status === 400){
+      const err = await r.clone().json().catch(()=> null);
+      if (err?.error === "missing_required" && Array.isArray(err.fields) && err.fields.length){
+        const labels = markMissingProfileFields(err.fields);
+        showToast(toast, `Please complete: ${labels.join(", ")}.`, false);
+        return;
+      }
+    }
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Saved. Done & dusted 💫");
     if (typeof window.rememberUserAvatar === "function") {
@@ -3861,6 +3939,7 @@ document.addEventListener("click", (e)=>{
       ensureAvatarField();
       setAvatarFieldValue(PROFILE_CACHE.avatar_url || "");
     }
+    markMissingProfileFields([]);
     showProfileEdit();
   }
 
