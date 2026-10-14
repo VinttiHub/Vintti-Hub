@@ -1,6 +1,9 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 const recruiterNameByEmail = {};
 let recruiterDirectory = [];
+// Fuera del listado (pedido de la owner, 2026-10-14). pilar@ = Pilar Flores Levalle,
+// no confundir con pilar.fernandez@.
+const SUMMARY_EXCLUDED_EMAILS = new Set(["jazmin@vintti.com", "pilar@vintti.com"]);
 
 async function loadRecruiters() {
   try {
@@ -13,6 +16,7 @@ async function loadRecruiters() {
         email: String(u.email_vintti).trim().toLowerCase(),
         name: u.user_name || u.email_vintti,
       }))
+      .filter((u) => !SUMMARY_EXCLUDED_EMAILS.has(u.email))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (err) {
     console.error("Error loading recruiters:", err);
