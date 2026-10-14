@@ -46,7 +46,7 @@ except ImportError:
 _CUTOVER = date.fromisoformat(SQL_CUTOVER)
 _CACHE_TTL_SECONDS = 300
 # Bump si cambia la forma de las filas: el cache vive en Postgres y sobrevive deploys.
-_CACHE_VERSION = 3
+_CACHE_VERSION = 4
 
 
 # Deals de prueba que no son un SQL. "prueba mia" (2026-10-05) está atado al contacto
@@ -203,6 +203,7 @@ def _fetch_rows(ini: date, fin: date) -> list[dict]:
         sql_from_deal = None
         reached_dd = False
         deal_is_sql = False
+        hs_outcomes = []
         for deal_id in deals_of.get(cid) or []:
             dp = deals.get(deal_id)
             if dp is None:
@@ -216,6 +217,13 @@ def _fetch_rows(ini: date, fin: date) -> list[dict]:
                 deal_is_sql = True
             dates = ho.stage_dates_from_deal(pipeline_map, pipeline_id, dp, _parse_hs_date_ms)
             key = ho.deal_stage_key(pipeline_map, pipeline_id, stage_id)
+            entry = ho.pipeline_entry(pipeline_map, pipeline_id) or {}
+            if key == "closed_won":
+                hs_outcomes.append("won")
+            elif entry.get("closed_lost_stage_id") and str(stage_id) == str(entry["closed_lost_stage_id"]):
+                hs_outcomes.append("lost")
+            else:
+                hs_outcomes.append("open")
             if dates.get("deep_dive_date") is not None or \
                     ho.HUBSPOT_STAGE_RANK.get(key or "", -1) >= dd_rank:
                 reached_dd = True
@@ -247,6 +255,10 @@ def _fetch_rows(ini: date, fin: date) -> list[dict]:
             "lead_source": (str(origin or "").strip()) or "NA",
             "lead_life": p.get(lead_life_property) or "—",
             "reached_dd": reached_dd,
+            # Para SQL → Close Win · AE + AM: con qué deals cruzar las opps del hub y en
+            # qué terminó cada deal en HubSpot (won / lost / open).
+            "deal_ids": [d for d in deals_of.get(cid) or [] if d in deals],
+            "hs_outcomes": hs_outcomes,
         })
     return rows
 
