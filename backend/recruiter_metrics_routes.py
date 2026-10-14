@@ -343,7 +343,7 @@ def register_recruiter_metrics_routes(app):
                 -- Open = todo el pipeline vivo (Sourcing/Interviewing/Negotiating), sin
                 -- importar el rango: es una foto de hoy, no un evento del período.
                 AVG(
-                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
@@ -351,7 +351,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_first_batch_open,
 
                 AVG(
-                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
@@ -363,7 +363,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_first_batch_closed,
 
                 AVG(
-                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
@@ -375,7 +375,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_first_batch_cw,
 
                 AVG(
-                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
+                    (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
@@ -679,7 +679,7 @@ def register_recruiter_metrics_routes(app):
                         WHEN b.opp_stage IN ('Sourcing', 'Interviewing', 'Negotiating')
                           AND b.start_reference_date IS NOT NULL
                           AND fb.first_batch_date IS NOT NULL
-                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 ),
@@ -693,7 +693,7 @@ def register_recruiter_metrics_routes(app):
                           AND fb.first_batch_date IS NOT NULL
                           AND b.start_reference_date IS NOT NULL
                           AND fb.first_batch_date <= b.close_date
-                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 ),
@@ -706,7 +706,7 @@ def register_recruiter_metrics_routes(app):
                           AND fb.first_batch_date IS NOT NULL
                           AND b.start_reference_date IS NOT NULL
                           AND fb.first_batch_date <= b.close_date
-                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 ),
@@ -719,7 +719,7 @@ def register_recruiter_metrics_routes(app):
                           AND fb.first_batch_date IS NOT NULL
                           AND b.start_reference_date IS NOT NULL
                           AND fb.first_batch_date <= b.close_date
-                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 1 ELSE fb.first_batch_date - b.start_reference_date END)::int
+                        THEN (CASE WHEN fb.first_batch_date < b.start_reference_date THEN 7 ELSE fb.first_batch_date - b.start_reference_date END)::int
                         ELSE NULL
                     END
                 )

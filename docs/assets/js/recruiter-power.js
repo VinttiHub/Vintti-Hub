@@ -613,13 +613,14 @@ function createDurationItems(entries = [], type) {
     }
     const timeline = timelineParts.length ? timelineParts.join(" → ") : "";
     // Batch anterior al start date (start cargado/pisado después): el backend lo cuenta
-    // como 1 día. Se marca para que la recruiter sepa que ese 1 no es real.
+    // como 7 días (antes 1, bajaba el promedio). Se marca para que la recruiter sepa que
+    // ese 7 no es real.
     const startYmd = normalizeDateToYMD(entry.start_reference_date);
     const batchYmd = normalizeDateToYMD(entry.first_batch_date);
     const batchBeforeStart = isBatchMetric && startYmd && batchYmd && batchYmd < startYmd;
     const metaPieces = [];
     if (batchBeforeStart) {
-      metaPieces.push("Counted as 1 day: first batch sent before the start date");
+      metaPieces.push("Counted as 7 days: first batch sent before the start date");
     } else if (daysText !== "Duration not documented") {
       const action = endLabel === "Close" ? "to close" : "to send first batch";
       metaPieces.push(`Took ${daysText} ${action}`);
