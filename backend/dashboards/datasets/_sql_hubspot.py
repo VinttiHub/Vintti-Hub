@@ -255,8 +255,8 @@ def _fetch_rows(ini: date, fin: date) -> list[dict]:
             "lead_source": (str(origin or "").strip()) or "NA",
             "lead_life": p.get(lead_life_property) or "—",
             "reached_dd": reached_dd,
-            # Para SQL → Close Win · AE + AM: con qué deals cruzar las opps del hub y en
-            # qué terminó cada deal en HubSpot (won / lost / open).
+            # Con qué deals cruzar las opps del hub y en qué terminó cada deal en
+            # HubSpot (won / lost / open). Hoy no lo lee nadie; queda para cruces.
             "deal_ids": [d for d in deals_of.get(cid) or [] if d in deals],
             "hs_outcomes": hs_outcomes,
         })

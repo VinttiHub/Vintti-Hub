@@ -1145,6 +1145,9 @@
     'Hunteo': '#c1ff72',      // verde lime
     'Applicant': '#ff1fdb',   // rosado magenta
     '(Sin origen)': '#aab2bd',
+    // Quién trajo el SQL (SQL → Close Win · AE + AM): azul vs magenta, bien distintos.
+    'AE': '#003bff',
+    'AM': '#ff1fdb',
   };
 
   function colorForLabel(label, idx) {

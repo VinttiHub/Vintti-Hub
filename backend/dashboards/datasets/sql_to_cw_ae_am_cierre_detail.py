@@ -1,4 +1,4 @@
-"""Sales · SQL → Close Win · AE + AM · por cierre — detalle (una fila por opp o deal).
+"""Sales · SQL → Close Win · AE + AM — detalle (una fila por opp o deal).
 
 Lee las mismas `rows()` que la card (`sql_to_cw_ae_am_cierre`), así la cantidad de
 filas es `total_sql` y las de grupo `cw` son `total_cw` por construcción. El drawer
@@ -15,7 +15,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
 DATASET = {
     "key": "sql_to_cw_ae_am_cierre_detail",
-    "label": "Sales · SQL → Close Win · AE + AM · por cierre — Detalle",
+    "label": "Sales · SQL → Close Win · AE + AM — Detalle",
     "dimensions": [
         {"key": "close_date", "label": "Cierre", "type": "date"},
         {"key": "grupo", "label": "Grupo", "type": "string"},
@@ -25,6 +25,7 @@ DATASET = {
         {"key": "position", "label": "Posición", "type": "string"},
         {"key": "sales_lead", "label": "Sales lead", "type": "string"},
         {"key": "opp_type", "label": "Tipo", "type": "string"},
+        {"key": "perdido_en", "label": "Se perdió en", "type": "string"},
         {"key": "motivo", "label": "Motivo", "type": "string"},
         {"key": "ref", "label": "Ref", "type": "string"},
     ],

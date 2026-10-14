@@ -3436,97 +3436,20 @@
       </div>
 
       <!-- ============================================================
-           SQL → Close Win · AE + AM (pedido de la owner, 2026-10-13). COHORTE: los SQLs
-           que ENTRARON en la ventana y en qué terminaron (CW / CL / abiertos); % = CW / SQLs.
-           AE = los mismos SQLs que SQL → Deep Dive (HubSpot); AM = opps New y Replacement
-           de un AM, por la fecha más temprana entre deep_dive_date y el arranque. Los CL
-           de AE se separan entre los que tenían opp y los que se perdieron SIN opp en el
-           hub (deal en Closed Lost en HubSpot). Dataset sql_to_cw_ae_am.
+           SQL → Close Win · AE + AM (pedido del equipo, 2026-10-14). De TODO lo que se
+           cerró en la ventana (por fecha de cierre, en la etapa que sea), CW / (CW + CL).
+           Sin filtro de tipo de opp ni de sales lead; unidad = opp o deal. Suma los SQLs de
+           AE perdidos sin opp (HubSpot, desde 2026-10-05). La versión cohorte se borró.
+           Dataset sql_to_cw_ae_am_cierre.
            ============================================================ -->
-        <div class="card wrchan-card wr-magenta setupfee-card">
+        <div class="card wrchan-card wr-violet setupfee-card">
         <div class="card__head">
           <div>
             <h3 class="card__title">SQL → Close Win · AE + AM <span data-window-label>30d</span></h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
-                  data-kpi-detail-open="sales-sql-cw-ae-am"
-                  aria-label="Ver detalle SQL a Close Win AE + AM">Ver detalle</button>
-        </div>
-
-        <div class="wrchan">
-          <div class="wrchan-total">
-            <div class="wrchan-gauge"
-                 data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="progress-fill"
-                 data-field="total_pct" data-reduce="first"
-                 data-axis="css-var" data-css-var="--pct"></div>
-            <div class="wrchan-total__row">
-              <span class="wrchan-total__pct"
-                    data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
-            </div>
-            <span class="wrchan-total__cap">
-              <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                    data-field="total_cw" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                    data-field="total_sql" data-reduce="first" data-fmt="int">—</span>
-              · <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                    data-field="total_cl" data-reduce="first" data-fmt="int">—</span> CL ·
-              <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                    data-field="total_abiertos" data-reduce="first" data-fmt="int">—</span> abiertos
-            </span>
-          </div>
-
-          <!-- Desglose: AE (M+B, incluye los SQL perdidos sin opp) / AM (Lara, Pilar) -->
-          <div class="wrchan-bars">
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Los mismos SQLs que SQL → Deep Dive (HubSpot), con o sin opp">AE</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
-                      data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="progress-fill"
-                      data-field="ae_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                      data-field="ae_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="ae_cw" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="ae_sql" data-reduce="first" data-fmt="int">—</span></span>
-              </span>
-            </div>
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Opps New y Replacement de los Account Managers">AM</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
-                      data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="progress-fill"
-                      data-field="am_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text"
-                      data-field="am_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="am_cw" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="am_sql" data-reduce="first" data-fmt="int">—</span></span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============================================================
-           SQL → Close Win · AE + AM · POR CIERRE — gemela de la de al lado, para
-           comparar (pedido de la owner, 2026-10-13). De lo que se DEFINIÓ en la ventana
-           (por fecha de cierre), CW / (CW + CL). Unidad = opp o deal. AE = opps New de M+B
-           + SQLs de AE perdidos sin opp (HubSpot, desde 2026-10-05); AM = opps New y
-           Replacement de un AM. Dataset sql_to_cw_ae_am_cierre.
-           ============================================================ -->
-        <div class="card wrchan-card wr-cyan setupfee-card">
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">SQL → Close Win · AE + AM · por cierre <span data-window-label>30d</span></h3>
-          </div>
-          <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-sql-cw-ae-am-cierre"
-                  aria-label="Ver detalle SQL a Close Win AE + AM por cierre">Ver detalle</button>
+                  aria-label="Ver detalle SQL a Close Win AE + AM">Ver detalle</button>
         </div>
 
         <div class="wrchan">
@@ -3551,7 +3474,7 @@
           <div class="wrchan-bars">
             <div class="wrchan-bar">
               <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Opps New de Mariano/Bahía + SQLs perdidos sin opp">AE</span>
+              <span class="wrchan-bar__label" title="Opps de Mariano/Bahía + SQLs perdidos sin opp">AE</span>
               <span class="wrchan-bar__track">
                 <span class="wrchan-bar__fill wrchan-bar__fill--sales"
                       data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="progress-fill"
@@ -3566,7 +3489,7 @@
             </div>
             <div class="wrchan-bar">
               <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
-              <span class="wrchan-bar__label" title="Opps New y Replacement de los Account Managers">AM</span>
+              <span class="wrchan-bar__label" title="Opps de los Account Managers">AM</span>
               <span class="wrchan-bar__track">
                 <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
                       data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="progress-fill"
@@ -3590,7 +3513,7 @@
            "Razones de Close Lost" de Operations, sin JS nuevo.
            · no SQL = MQLs de la card MQL → SQL que no pasaron (suma total_mql − total_sql);
              razón = mql_ae_lost_reason de HubSpot, los que siguen en MQL (AE) = "Todavía abierto".
-           · SQL perdidos = los Closed Lost de "SQL → Close Win · AE + AM · por cierre"
+           · SQL perdidos = los Closed Lost de "SQL → Close Win · AE + AM"
              (motive_close_lost del hub + sql_ae_lost_reason de los deals sin opp).
            ============================================================ -->
       <div class="card s-6">
@@ -3640,7 +3563,32 @@
             <ul></ul>
           </div>
         </div>
-        <p class="card__sub" style="margin:8px 4px 0;">Los Closed Lost de SQL → Close Win · AE + AM · por cierre (opps del hub + deals perdidos antes de Deep Dive). Click en una porción para ver los SQLs.</p>
+        <p class="card__sub" style="margin:8px 4px 0;">Los Closed Lost de SQL → Close Win · AE + AM (opps del hub + deals perdidos antes de Deep Dive). Click en una porción para ver los SQLs.</p>
+      </div>
+
+      <!-- ============================================================
+           ¿Dónde se pierden los SQLs? (2026-10-14). Mismos Closed Lost que "Razones de SQL
+           perdidos", agrupados por la ETAPA desde la que se cerraron
+           (opportunity.stage_before_closed_lost; deals sin opp = "SQL (antes del Deep
+           Dive)"; vacía = "Sin dato"). Dataset sales_sql_lost_stage.
+           ============================================================ -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">¿Dónde se pierden los SQLs?</h3>
+            <p class="card__sub"><span data-chart="sa_donut_sql_lost_stage" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> SQLs Closed Lost · AE + AM<span data-window-label>30d</span></p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="sales-sql-lost-stage-detail" data-category-key="stage" aria-label="Ver detalle de todos los SQLs perdidos por etapa">Ver detalle</button>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="sa_donut_sql_lost_stage" data-bind="donut" data-label="stage" data-value="count"
+               data-detail-panel="sales-sql-lost-stage-detail" data-detail-key="stage" viewBox="0 0 180 180"></svg>
+          <div class="donut__legend" data-chart="sa_donut_sql_lost_stage" data-bind="donut-legend" data-label="stage" data-value="count"
+               data-detail-panel="sales-sql-lost-stage-detail" data-detail-key="stage">
+            <ul></ul>
+          </div>
+        </div>
+        <p class="card__sub" style="margin:8px 4px 0;">Etapa desde la que se pasó a Closed Lost (no necesariamente donde se enfrió). Mismos SQLs que Razones de SQL perdidos. Click en una porción para verlos.</p>
       </div>
 
 
@@ -9661,65 +9609,16 @@
         </div>
 
         <!-- Panel · Sales · SQL → Close Win · AE + AM -->
-        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-cw-ae-am">
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-cw-ae-am-cierre">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's + AM's</span>
             <h3 class="kpi-drawer__title">SQL → Close Win · AE + AM · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">De los SQLs que <strong>entraron en la ventana</strong> (AE: los mismos que SQL → Deep Dive; AM: cada opp que abrió), cuántos terminaron en Close Win y cuántos en Closed Lost. Los que todavía no se definieron quedan como abiertos, así que el % de un período reciente sube a medida que cierran. Los SQLs de AE perdidos <strong>sin que se les abriera opp</strong> salen de HubSpot y se cuentan desde el 5-oct.</p>
+            <p class="kpi-drawer__sub">De <strong>todo lo que se cerró en la ventana</strong> (AE y AM, ganado o perdido, en la etapa que sea: Deep Dive, NDA, Interviewing…), qué % fue Close Win. Cada opp cuenta una vez, sea New o Replacement. Los SQLs de AE perdidos <strong>sin que se les abriera opp</strong> salen de HubSpot y se cuentan desde el 5-oct.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
               <span class="kpi-drawer__hero__label">SQL → Close Win · AE + AM · <span data-window-label>30d</span></span>
-              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="total_cw" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> SQLs que entraron · <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="total_cl" data-reduce="first" data-fmt="int">—</span> Closed Lost · <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="total_abiertos" data-reduce="first" data-fmt="int">—</span> abiertos · AE <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="ae_pct" data-reduce="first" data-fmt="percent">—</span> · AM <span data-chart="sa_kpi_sql_to_cw_ae_am_30d" data-bind="text" data-field="am_pct" data-reduce="first" data-fmt="percent">—</span></span>
-            </div>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Close Win <span class="count" data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="grupo" data-where-value="cw">—</span></h4>
-              <div class="dtable-wrap"
-                   data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="dtable"
-                   data-where-field="grupo" data-where-value="cw"
-                   data-cols="sql_date|Entró como SQL|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw,estado|Stage|raw"
-                   data-empty-text="Ninguno de estos SQLs llegó a Close Win (todavía)."></div>
-            </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Closed Lost · entraron como opp <span class="count" data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="grupo" data-where-value="cl_opp">—</span></h4>
-              <div class="dtable-wrap"
-                   data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="dtable"
-                   data-where-field="grupo" data-where-value="cl_opp"
-                   data-cols="sql_date|Entró como SQL|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw,estado|Stage|raw,motivo|Motivo|raw"
-                   data-empty-text="Ninguno de estos SQLs se perdió con opp abierta."></div>
-            </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Closed Lost · sin opp (SQL de AE perdido antes de abrir la opp) <span class="count" data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="grupo" data-where-value="cl_sin_opp">—</span></h4>
-              <div class="dtable-wrap"
-                   data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="dtable"
-                   data-where-field="grupo" data-where-value="cl_sin_opp"
-                   data-cols="sql_date|Entró como SQL|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw,estado|Stage|raw,motivo|Motivo|raw"
-                   data-empty-text="Ninguno en la ventana. Se cuentan desde el 5-oct."></div>
-            </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Todavía abiertos <span class="count" data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-where-field="grupo" data-where-value="abierto">—</span></h4>
-              <div class="dtable-wrap"
-                   data-chart="sa_table_sql_to_cw_ae_am_30d_detail" data-bind="dtable"
-                   data-where-field="grupo" data-where-value="abierto"
-                   data-cols="sql_date|Entró como SQL|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,estado|Stage|raw"
-                   data-empty-text="Todos los SQLs de la ventana ya se definieron."></div>
-            </section>
-          </div>
-        </div>
-
-        <!-- Panel · Sales · SQL → Close Win · AE + AM · por cierre -->
-        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-cw-ae-am-cierre">
-          <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">Sales · AE's + AM's</span>
-            <h3 class="kpi-drawer__title">SQL → Close Win · AE + AM · por cierre · <span data-window-label>30d</span></h3>
-            <p class="kpi-drawer__sub">De todos los SQLs (AE y AM) que <strong>se cerraron en la ventana</strong>, ganados o perdidos, qué % se ganó, aunque hayan entrado como SQL hace meses. Cada opp cuenta una vez. Los SQLs de AE perdidos <strong>sin que se les abriera opp</strong> salen de HubSpot y se cuentan desde el 5-oct.</p>
-            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
-          </header>
-          <div class="kpi-drawer__body">
-            <div class="kpi-drawer__hero">
-              <span class="kpi-drawer__hero__label">SQL → Close Win · por cierre · <span data-window-label>30d</span></span>
               <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="text" data-field="total_cw" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> SQLs cerrados · AE <span data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="text" data-field="ae_pct" data-reduce="first" data-fmt="percent">—</span> · AM <span data-chart="sa_kpi_sql_to_cw_ae_am_cierre_30d" data-bind="text" data-field="am_pct" data-reduce="first" data-fmt="percent">—</span></span>
             </div>
@@ -9728,7 +9627,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_cw_ae_am_cierre_30d_detail" data-bind="dtable"
                    data-where-field="grupo" data-where-value="cw"
-                   data-cols="close_date|Cierre|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw"
+                   data-cols="close_date|Cierre|raw,quien|AE/AM|chip,client_name|Cliente|raw,position|Posición|raw,opp_type|Tipo|raw"
                    data-empty-text="Sin Close Win en la ventana."></div>
             </section>
             <section class="kpi-drawer__section">
@@ -9736,7 +9635,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_cw_ae_am_cierre_30d_detail" data-bind="dtable"
                    data-where-field="grupo" data-where-value="cl_opp"
-                   data-cols="close_date|Cierre|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw,motivo|Motivo|raw"
+                   data-cols="close_date|Cierre|raw,quien|AE/AM|chip,client_name|Cliente|raw,position|Posición|raw,opp_type|Tipo|raw"
                    data-empty-text="Sin Closed Lost con opp en la ventana."></div>
             </section>
             <section class="kpi-drawer__section">
@@ -9744,7 +9643,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_cw_ae_am_cierre_30d_detail" data-bind="dtable"
                    data-where-field="grupo" data-where-value="cl_sin_opp"
-                   data-cols="close_date|Cierre|raw,quien|AE/AM|raw,client_name|Cliente|raw,position|Posición|raw,sales_lead|Sales lead|raw,opp_type|Tipo|raw,motivo|Motivo|raw"
+                   data-cols="close_date|Cierre|raw,quien|AE/AM|chip,client_name|Cliente|raw,position|Posición|raw,opp_type|Tipo|raw"
                    data-empty-text="Ninguno en la ventana. Se cuentan desde el 5-oct."></div>
             </section>
           </div>
@@ -10791,7 +10690,25 @@
               <h4 class="kpi-drawer__section-title">SQLs perdidos <span class="count" data-chart="sa_table_sql_lost_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
               <input type="text" class="dtable-filter" data-dtable-filter="sa_table_sql_lost_reasons_detail" placeholder="Filtrar por cuenta…" aria-label="Filtrar por cuenta" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
               <div class="dtable-wrap" data-chart="sa_table_sql_lost_reasons_detail" data-bind="dtable" data-filter-col="1"
-                   data-cols="reason|Razón|chip,client_name|Cuenta / deal|raw,position|Posición|raw,close_date|Fecha cierre|raw,quien|AE / AM|raw,sales_lead|Sales lead|raw,origen|Origen|raw"
+                   data-cols="reason|Razón|chip,client_name|Cuenta / deal|raw,position|Posición|raw,close_date|Fecha cierre|raw,quien|AE / AM|chip,origen|Origen|raw"
+                   data-empty-text="Sin SQLs perdidos en la ventana."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-lost-stage-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · SQL → Close Win · AE + AM</span>
+            <h3 class="kpi-drawer__title">¿Dónde se pierden los SQLs? · detalle</h3>
+            <p class="kpi-drawer__sub">Closed Lost con fecha de cierre en la ventana, con la etapa desde la que se cerraron (el stage en el que estaba la opp al pasarla a Closed Lost). Los deals de HubSpot perdidos sin opp figuran como "SQL (antes del Deep Dive)".</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">SQLs perdidos <span class="count" data-chart="sa_table_sql_lost_stage_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <input type="text" class="dtable-filter" data-dtable-filter="sa_table_sql_lost_stage_detail" placeholder="Filtrar por cuenta…" aria-label="Filtrar por cuenta" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
+              <div class="dtable-wrap" data-chart="sa_table_sql_lost_stage_detail" data-bind="dtable" data-filter-col="1"
+                   data-cols="stage|Se perdió en|chip,client_name|Cuenta / deal|raw,position|Posición|raw,close_date|Fecha cierre|raw,quien|AE / AM|chip,motivo|Motivo|raw"
                    data-empty-text="Sin SQLs perdidos en la ventana."></div>
             </section>
           </div>
@@ -11099,7 +11016,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=162" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=163" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

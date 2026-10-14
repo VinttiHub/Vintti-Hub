@@ -1,19 +1,20 @@
-"""Sales · SQL → Close Win · AE + AM · POR CIERRE (ventana de 30d / filtro global).
+"""Sales · SQL → Close Win · AE + AM (ventana de 30d / filtro global).
 
-Gemela de `sql_to_cw_ae_am` (la cohorte de SQLs que entraron), con otra pregunta: de
-todo lo que se DEFINIÓ en la ventana (por fecha de cierre), qué % se ganó →
-CW / (CW + CL). La owner pidió tener las dos a la vista para comparar (2026-10-13).
-Siempre da una tasa "madura", pero los SQLs pueden haber entrado hace meses.
+Pedido del equipo (2026-10-14): de TODO lo que se cerró en la ventana —por fecha de
+cierre, ganado o perdido, en la etapa que sea (Deep Dive, NDA, Interviewing…)—, qué %
+fue Close Win: CW / (CW + CL). Cuenta todo lo que entra al pipeline, así que no filtra
+por tipo de opp (New, Replacement…) ni por sales lead. Unidad = opp (o deal).
 
-Unidad = opp (o deal), no cliente:
-  - AE: opps New de M+B (`sales_leads()`).
-  - AM: opps New y Replacement de `am_history()`.
-  - AE SIN opp: deals de HubSpot que pasaron por el stage SQL (o tienen SQL Date) desde
-    el corte, hoy en Closed Lost, con `closedate` en la ventana y sin opp atada. Sólo
-    desde el 2026-10-05: antes no había stage SQL.
+  - AE: sales lead ∈ `sales_leads()` (M+B). AM: ∈ `am_history()`. Otro: el resto (Mia,
+    Agustín, sin sales lead): suma al total, sin barra propia.
+  - AE SIN opp: el hub crea la opp recién en Deep Dive, así que un SQL perdido antes no
+    existe en el hub. Salen de HubSpot: deals que pasaron por el stage SQL (o tienen SQL
+    Date) desde el corte, hoy en Closed Lost, `closedate` en la ventana y sin opp atada.
+    Sólo desde el 2026-10-05: antes no había stage SQL.
+  - `perdido_en`: la etapa donde cayó cada Closed Lost (`stage_before_closed_lost`).
 
-Mia y Agustín quedan afuera, como en el resto del tab Sales. Summary y detalle leen
-`rows()`, así el drawer suma igual que la card.
+Reemplaza a la versión cohorte (SQLs que entraron en la ventana), que se borró a pedido
+de la owner. Summary y detalle leen `rows()`, así el drawer suma igual que la card.
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ except ImportError:
     from utils import shared_cache  # type: ignore
 
 _CACHE_TTL_SECONDS = 300
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2
 
 GRUPO_LABEL = {
     "cw": "Close Win",
@@ -44,20 +45,17 @@ _HUB_SQL = """
       o.opportunity_id,
       NULLIF(o.opp_close_date::text, '')::date             AS close_d,
       TRIM(o.opp_stage)                                    AS stage,
-      TRIM(LOWER(o.opp_sales_lead))                        AS sales_lead,
+      TRIM(LOWER(COALESCE(o.opp_sales_lead, '')))          AS sales_lead,
       o.opp_type,
       a.client_name,
       o.opp_position_name,
-      NULLIF(TRIM(COALESCE(o.motive_close_lost, '')), '')  AS motivo
+      NULLIF(TRIM(COALESCE(o.motive_close_lost, '')), '')  AS motivo,
+      NULLIF(TRIM(COALESCE(o.stage_before_closed_lost, '')), '') AS perdido_en
     FROM opportunity o
     JOIN account a ON a.account_id = o.account_id
     WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
       AND COALESCE(a.vintti_internal, FALSE) = FALSE
       AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(ini)s AND %(fin)s
-      AND (
-            (TRIM(LOWER(o.opp_sales_lead)) IN %(ae)s AND o.opp_type = 'New')
-         OR (TRIM(LOWER(o.opp_sales_lead)) IN %(am)s AND o.opp_type IN ('New', 'Replacement'))
-      )
 """
 
 
@@ -67,7 +65,7 @@ def _hub_rows(ini: date, fin: date, ae: tuple, am: tuple) -> tuple[list[dict], s
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute(_HUB_SQL, {"ini": ini, "fin": fin, "ae": ae, "am": am})
+        cur.execute(_HUB_SQL, {"ini": ini, "fin": fin})
         cols = [c[0] for c in cur.description]
         recs = [dict(zip(cols, r)) for r in cur.fetchall()]
         # Todo deal atado a una opp, en cualquier stage o fecha: si el deal tiene opp,
@@ -85,12 +83,13 @@ def _hub_rows(ini: date, fin: date, ae: tuple, am: tuple) -> tuple[list[dict], s
         rows.append({
             "close_date": r["close_d"].isoformat(),
             "grupo": "cw" if won else "cl_opp",
-            "quien": "AE" if r["sales_lead"] in ae else "AM",
+            "quien": "AE" if r["sales_lead"] in ae else ("AM" if r["sales_lead"] in am else "Otro"),
             "client_name": r["client_name"] or "—",
             "position": r["opp_position_name"] or "—",
             "sales_lead": r["sales_lead"] or "—",
             "opp_type": r["opp_type"] or "—",
             "motivo": (r["motivo"] or "—") if not won else "—",
+            "perdido_en": (r["perdido_en"] or "—") if not won else "—",
             "ref": f"opp #{r['opportunity_id']}",
         })
     return rows, linked
@@ -146,6 +145,7 @@ def _hubspot_lost_without_opp(ini: date, fin: date, ae: tuple, linked: set[str])
             "sales_lead": sales_lead,
             "opp_type": "—",
             "motivo": p.get(lost_reason_prop) or "—",
+            "perdido_en": "SQL (antes del Deep Dive)",
             "ref": f"deal {deal_id}",
         })
     return rows
@@ -178,6 +178,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         ("total", rs),
         ("ae", [r for r in rs if r["quien"] == "AE"]),
         ("am", [r for r in rs if r["quien"] == "AM"]),
+        ("otro", [r for r in rs if r["quien"] == "Otro"]),
     ):
         cw = sum(1 for r in subset if r["grupo"] == "cw")
         out[f"{prefix}_sql"] = len(subset)
@@ -190,7 +191,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
 DATASET = {
     "key": "sql_to_cw_ae_am_cierre",
-    "label": "Sales · SQL → Close Win · AE + AM · por cierre (opps + SQLs sin opp)",
+    "label": "Sales · SQL → Close Win · AE + AM (todo lo cerrado en la ventana)",
     "dimensions": [],
     "measures": [
         {"key": "total_sql", "label": "Total · SQLs definidos", "type": "number"},
@@ -202,6 +203,9 @@ DATASET = {
         {"key": "am_sql", "label": "AM · SQLs definidos", "type": "number"},
         {"key": "am_cw", "label": "AM · Close Win", "type": "number"},
         {"key": "am_pct", "label": "AM · SQL→CW %", "type": "percent"},
+        {"key": "otro_sql", "label": "Otros sales leads · SQLs definidos", "type": "number"},
+        {"key": "otro_cw", "label": "Otros sales leads · Close Win", "type": "number"},
+        {"key": "otro_pct", "label": "Otros sales leads · SQL→CW %", "type": "percent"},
         {"key": "cl_opp", "label": "Closed Lost · con opp", "type": "number"},
         {"key": "cl_sin_opp", "label": "Closed Lost · sin opp (AE)", "type": "number"},
     ],
