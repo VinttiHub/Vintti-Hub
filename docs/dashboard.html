@@ -1064,17 +1064,17 @@
           <div class="bars__row">
             <span class="bars__name">NDA → Client
               <span class="bars__name-sub">
-                <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win"
+                <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1"
                       data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> CW ·
-                <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win"
+                <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1"
                       data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
               </span>
             </span>
             <span class="bars__val"
-                  data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win"
+                  data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1"
                   data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
             <span class="bars__bar violet"><span
-                  data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win"
+                  data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1"
                   data-bind="progress-fill" data-field="conversion_pct" data-reduce="first"></span></span>
           </div>
         </div>
@@ -7757,26 +7757,26 @@
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4">
                   <span class="kpi-drawer__stat__label">Conversion</span>
-                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
                 </button>
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4" data-detail-filter-field="opp_stage" data-detail-filter-value="Close Win">
                   <span class="kpi-drawer__stat__label">CW</span>
-                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
                 </button>
                 <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4">
                   <span class="kpi-drawer__stat__label">Closed</span>
-                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-requiere-nda="1" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
                 </button>
               </div>
               <div class="funnel-detail" data-funnel-detail-panel="conv-block-4" hidden>
                 <div class="dtable-wrap"
-                     data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
+                     data-chart="op_table_nda_close_win_30d_detail" data-override-requiere-nda="1" data-bind="dtable"
                      data-override-resultado="Total"
                      data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,close_d|Cierre|raw,opp_stage|Stage|raw,opportunity_id|Opp|raw"
                      data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
-            <p class="kpi-drawer__note">Cada barra usa el dataset de su pestaña fuente — "SQL → Close Win" es exactamente la card azul de Sales (per client, cohorte = clientes cerrados en la ventana, AE's M+B), y la versión "NDA → Client (ops)" abre el filtro a más AE's, por eso da distinto.</p>
+            <p class="kpi-drawer__note">Cada barra usa el dataset de su pestaña fuente — "SQL → Close Win" es exactamente la card azul de Sales (per client, cohorte = clientes cerrados en la ventana, AE's M+B), y "NDA → Client" es el mismo número que el hero "NDA → Close Win" de Operations (sólo opps con fecha de NDA, todos los que venden, Staffing + Recruiting), por eso da distinto.</p>
           </div>
         </div>
 
