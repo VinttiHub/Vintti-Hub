@@ -645,7 +645,12 @@ Tres cosas para tener en cuenta:
   cliente** (`resume-readonly.js`, vía `candidates_routes.py:1206-1250`). Cambiarla es visible
   para afuera.
 - **Sólo prende, nunca apaga.** Si un deal se mueve fuera del pipeline de AI, apagar la marca
-  cambiaría la marca de CVs ya enviados: eso lo decide una persona.
+  cambiaría la marca de CVs ya enviados: eso lo decide una persona. Desde el 2026-10-15 vale
+  también para `_link_existing_account_to_hubspot()` / `_insert_or_update_account()` (los usan
+  este sync y el botón **Sync HubSpot** del CRM): `vintti_ai = vintti_ai OR %s`, y
+  `account_manager` sólo se rellena si está vacío — antes el payload (dueño del deal) le
+  devolvía a Mariano una cuenta ganada y reasignada a la AM. El botón del CRM queda manual: las
+  SQL desde el corte entran por este cron y anclan en `sql_date`.
 - Se aplica en las dos ramas de `_process_hubspot_deal` (opp nueva y opp existente), porque las
   9 opps del pipeline de AI son anteriores al cambio y nunca pasan por la rama de creación de
   cuenta. Ojo que en la rama de opp existente va **después** de `changed = False`, o el reset se

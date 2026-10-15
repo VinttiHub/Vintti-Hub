@@ -1244,6 +1244,10 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
         "hubspot_company_id": (payload.get("hubspot_company_id") or "").strip(),
         "hubspot_contact_id": (payload.get("hubspot_contact_id") or "").strip(),
     })
+    # account_manager y vintti_ai NO se pisan: el AM sólo se rellena si está vacío (una
+    # cuenta ganada se reasigna a la AM y el payload trae siempre al dueño del deal), y
+    # vintti_ai sólo prende (la propiedad del contacto casi nunca está tildada y apagaría
+    # la marca que puso el pipeline de Vintti AI, que decide el logo del CV del cliente).
     cursor.execute(
         """
         UPDATE account
@@ -1266,9 +1270,9 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
             type = COALESCE(NULLIF(%s, ''), type),
             name = COALESCE(NULLIF(%s, ''), name),
             surname = COALESCE(NULLIF(%s, ''), surname),
-            account_manager = COALESCE(NULLIF(%s, ''), account_manager),
+            account_manager = COALESCE(NULLIF(account_manager, ''), NULLIF(%s, '')),
             credit_loop = COALESCE(NULLIF(%s, ''), credit_loop),
-            vintti_ai = %s,
+            vintti_ai = (COALESCE(vintti_ai, FALSE) OR %s),
             hubspot_deal_id = COALESCE(NULLIF(hubspot_deal_id, ''), NULLIF(%s, '')),
             hubspot_company_id = COALESCE(NULLIF(hubspot_company_id, ''), NULLIF(%s, '')),
             hubspot_contact_id = COALESCE(NULLIF(hubspot_contact_id, ''), NULLIF(%s, '')),
@@ -2009,6 +2013,10 @@ def _insert_or_update_account(cursor, payload):
 
     if existing:
         account_id = existing["account_id"] if isinstance(existing, dict) else existing[0]
+        # account_manager y vintti_ai NO se pisan: el AM sólo se rellena si está vacío (una
+        # cuenta ganada se reasigna a la AM y el payload trae siempre al dueño del deal), y
+        # vintti_ai sólo prende (la propiedad del contacto casi nunca está tildada y apagaría
+        # la marca que puso el pipeline de Vintti AI, que decide el logo del CV del cliente).
         cursor.execute(
             """
             UPDATE account
@@ -2031,9 +2039,9 @@ def _insert_or_update_account(cursor, payload):
                 type = COALESCE(NULLIF(%(type)s, ''), type),
                 name = COALESCE(NULLIF(%(name)s, ''), name),
                 surname = COALESCE(NULLIF(%(surname)s, ''), surname),
-                account_manager = COALESCE(NULLIF(%(account_manager)s, ''), account_manager),
+                account_manager = COALESCE(NULLIF(account_manager, ''), NULLIF(%(account_manager)s, '')),
                 credit_loop = COALESCE(NULLIF(%(credit_loop)s, ''), credit_loop),
-                vintti_ai = %(vintti_ai)s,
+                vintti_ai = (COALESCE(vintti_ai, FALSE) OR %(vintti_ai)s),
                 hubspot_deal_id = COALESCE(NULLIF(%(hubspot_deal_id)s, ''), hubspot_deal_id),
                 hubspot_company_id = COALESCE(NULLIF(%(hubspot_company_id)s, ''), hubspot_company_id),
                 hubspot_contact_id = COALESCE(NULLIF(%(hubspot_contact_id)s, ''), hubspot_contact_id),
