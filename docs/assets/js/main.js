@@ -681,8 +681,24 @@ function escapeAttribute(value) {
 }
 
 function normalizeDateOnly(value) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const copy = new Date(value.getTime());
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  }
   const raw = String(value || '').trim();
   if (!raw) return null;
+  // ISO (con o sin hora): el día calendario son los primeros 10 caracteres.
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  // Flask manda las fechas como "Sun, 14 Sep 2026 00:00:00 GMT" (medianoche UTC):
+  // pasarlas a hora local las corre al día anterior en Argentina. Se toma el día UTC.
+  if (/ GMT$/.test(raw)) {
+    const utc = new Date(raw);
+    if (Number.isNaN(utc.getTime())) return null;
+    return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
+  }
   const parsed = raw.length <= 10 ? new Date(`${raw}T00:00:00`) : new Date(raw);
   if (Number.isNaN(parsed.getTime())) return null;
   parsed.setHours(0, 0, 0, 0);
