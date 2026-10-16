@@ -12,8 +12,9 @@ es justamente la prueba de que un re-envío no pisa lo que cargó un BDR.
 
 Lee CLAY_WEBHOOK_TOKEN de backend/.env.
 
-Ojo: el webhook las crea con is_dummy = FALSE (Clay no manda esa marca), así que
-después de probar se borran a mano desde el panel o con el filtro "(sim)".
+Las manda con "is_dummy": true, así entran como dummies: los BDRs no las ven y se
+borran con "Borrar dummies" del Test panel. `--real` las manda sin la marca (ojo: el
+backend local escribe en la base de producción).
 """
 from __future__ import annotations
 
@@ -68,6 +69,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--send", action="store_true", help="manda de verdad (sin esto sólo imprime)")
     ap.add_argument("--base", default="http://localhost:5000")
+    ap.add_argument("--real", action="store_true", help="sin is_dummy: entran como empresas reales")
     args = ap.parse_args()
 
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -80,6 +82,8 @@ def main() -> int:
         print("Falta CLAY_WEBHOOK_TOKEN en backend/.env", file=sys.stderr)
         return 1
     for item in SAMPLE:
+        if not args.real:
+            item = {**item, "is_dummy": True}
         r = requests.post(
             f"{args.base.rstrip('/')}/prospecting/clay/webhook",
             json=item,

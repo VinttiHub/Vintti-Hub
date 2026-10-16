@@ -1107,6 +1107,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
   **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
   semana): esos sólo se rellenan si están vacíos.
+  **`"is_dummy": true` en el body la crea como prueba** (2026-10-15): así se prueba la columna
+  de Clay directo contra App Runner —Clay no llega a `localhost` sin túnel, y la owner no quiere
+  túnel— sin que los BDRs vean nada; se borra con "Borrar dummies". El match por dominio es
+  **dentro del mismo `is_dummy`**, y como `clay_record_id` es único en toda la tabla, la misma
+  fila de Clay mandada del otro lado se rechaza con un mensaje en vez de convertirse. El
+  simulador (`scripts/clay_webhook_simulator.py`) manda dummies por defecto (`--real` lo apaga).
+  Ojo: el backend local de la owner escribe en la RDS de producción.
 - **Workflows al nivel de HubSpot, armados desde la página** (pestaña *Workflows*). Son filas
   de `prospect_workflows` con un **disparador** (condiciones / evento "se crea" o "cambia una
   propiedad" / horario / manual), un **grafo de pasos** (acciones, esperas, ramas si-no / Y-O /

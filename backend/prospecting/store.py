@@ -541,14 +541,24 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
     domain = normalize_domain(data.get("website"))
     clay_id = data.get("clay_record_id")
 
+    # Dummies y reales no se mezclan: una prueba nunca actualiza la empresa real del
+    # mismo dominio, ni al revés. El clay_record_id es único en toda la tabla, así
+    # que si la misma fila de Clay ya entró del otro lado se rechaza en vez de
+    # convertirla.
     existing = None
     if clay_id:
         cur.execute("SELECT * FROM prospect_companies WHERE clay_record_id = %s", (clay_id,))
         existing = cur.fetchone()
+        if existing is not None and bool(existing.get("is_dummy")) != bool(is_dummy):
+            raise ValueError(
+                "Esa fila de Clay ya entró como prueba (dummy): borrá las dummies desde el Test panel y volvé a mandarla."
+                if existing.get("is_dummy") else
+                "Esa fila de Clay ya existe como empresa real: no se puede mandar como prueba (is_dummy)."
+            )
     if existing is None and domain:
         cur.execute(
-            "SELECT * FROM prospect_companies WHERE domain = %s ORDER BY id LIMIT 1",
-            (domain,),
+            "SELECT * FROM prospect_companies WHERE domain = %s AND is_dummy = %s ORDER BY id LIMIT 1",
+            (domain, bool(is_dummy)),
         )
         existing = cur.fetchone()
 

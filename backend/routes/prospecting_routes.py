@@ -393,6 +393,8 @@ def clay_webhook():
     """Una empresa por request (columna "HTTP API" de Clay, una fila = un POST).
 
     También acepta `{"companies": [...]}` para cargas en lote desde un script.
+    `"is_dummy": true` en una empresa la crea como prueba: los BDRs no la ven y se
+    borra con "Borrar dummies". Sirve para probar la columna de Clay contra prod.
     """
     if not _token_ok("CLAY_WEBHOOK_TOKEN", "X-Clay-Token"):
         return jsonify({"error": "unauthorized"}), 401
@@ -406,7 +408,9 @@ def clay_webhook():
         for item in items:
             try:
                 cur.execute("SAVEPOINT clay_item")
-                result = store.upsert_from_clay(cur, item)
+                is_dummy = str(item.get("is_dummy", "")).strip().lower() in ("true", "1", "yes", "si", "sí")
+                result = store.upsert_from_clay(cur, item, is_dummy=is_dummy)
+                result["is_dummy"] = is_dummy
                 kind = "created" if result["action"] == "created" else "updated"
                 result["workflows_applied"] = [
                     a["name"] for a in _run_instant(cur, result["id"], kind,
