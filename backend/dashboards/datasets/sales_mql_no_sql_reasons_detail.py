@@ -1,6 +1,7 @@
 """Sales · Razones de no SQL — detalle (un MQL por fila).
 
-Lee el mismo `rows()` que la dona (`sales_mql_no_sql_reasons`), así suma igual.
+Lee el mismo `rows()` que la dona (`sales_mql_no_sql_reasons`) pero con los abiertos
+(`estado = "abierto"`): el drawer los muestra aparte. Los `perdido` suman igual que la dona.
 """
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ from .sales_mql_no_sql_reasons import rows
 
 
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
-    return rows(filters)
+    return rows(filters, include_open=True)
 
 
 DATASET = {
@@ -16,6 +17,7 @@ DATASET = {
     "label": "Sales · Razones de no SQL — Detalle de MQLs (live HubSpot)",
     "dimensions": [
         {"key": "reason", "label": "Razón", "type": "string"},
+        {"key": "estado", "label": "Estado", "type": "string"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "mql_date", "label": "MQL date", "type": "date"},
         {"key": "tipo", "label": "Tipo", "type": "string"},

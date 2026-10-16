@@ -1,12 +1,15 @@
 """Sales · Razones de "no SQL": por qué los MQLs de la cohorte no pasaron a SQL.
 
 Universo = los MQLs de la card MQL → SQL (`sales_mql_to_sql_30d.cohort_rows()`) que NO
-llegaron a SQL, así la dona suma `total_mql − total_sql` por construcción. La razón es
-`mql_ae_lost_reason` del contacto en HubSpot. Los que siguen en `MQL (AE)` todavía no
-se perdieron: van en su propia porción, "Todavía abierto" (decisión de la owner,
-2026-10-14). Un Closed Lost sin razón cargada sale como "Sin razón".
+llegaron a SQL. La razón es `mql_ae_lost_reason` del contacto en HubSpot. Un Closed Lost
+sin razón cargada sale como "Sin razón".
 
-Dona y detalle leen `rows()`.
+Los que siguen en `MQL (AE)` todavía no se perdieron (`estado = "abierto"`): desde el
+2026-10-16 NO entran en la dona ni en el filtro de razón (pedido de la owner), sólo en el
+detalle, en su propia sección. Así la dona suma `total_mql − total_sql − abiertos`, y el
+drawer muestra cuántos abiertos explican la diferencia.
+
+Dona y detalle leen `rows()`; el detalle con `include_open=True`.
 """
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ except ImportError:
     from utils import shared_cache  # type: ignore
 
 _CACHE_TTL_SECONDS = 300
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2
 
 OPEN_LABEL = "Todavía abierto"
 NO_REASON_LABEL = "Sin razón"
@@ -31,8 +34,10 @@ def _reason(r: dict) -> str:
     return r.get("lost_reason") or NO_REASON_LABEL
 
 
-def rows(filters: dict) -> list[dict]:
-    """Una fila por MQL de la cohorte que no llegó a SQL, con su `reason`.
+def rows(filters: dict, include_open: bool = False) -> list[dict]:
+    """Una fila por MQL de la cohorte que no llegó a SQL, con su `reason` y `estado`.
+
+    Sin `include_open` descarta los que siguen abiertos (`estado = "abierto"`).
 
     La dona, el select y el drawer piden lo mismo a la vez y cada `cohort_rows()` es un
     search completo de contactos en HubSpot: se cachea 5 min por ventana.
@@ -46,6 +51,7 @@ def rows(filters: dict) -> list[dict]:
         cohort, _ini, _fin = cohort_rows(filters)
         rs = [{
             "reason": _reason(r),
+            "estado": "abierto" if _reason(r) == OPEN_LABEL else "perdido",
             "client_name": r["client_name"],
             "mql_date": r["mql_date"],
             "tipo": "Outbound" if r["bucket"] == "out" else "Inbound",
@@ -57,6 +63,8 @@ def rows(filters: dict) -> list[dict]:
         rs.sort(key=lambda r: r["mql_date"], reverse=True)
         shared_cache.set(key, rs, _CACHE_TTL_SECONDS)
 
+    if not include_open:
+        rs = [r for r in rs if r["estado"] != "abierto"]
     reason = str((filters or {}).get("reason") or "").strip()
     if reason:
         rs = [r for r in rs if r["reason"] == reason]
