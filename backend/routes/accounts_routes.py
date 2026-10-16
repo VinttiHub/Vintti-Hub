@@ -32,6 +32,7 @@ from utils.credit_loop import (
 )
 from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.second_interview_refs import SECOND_INTERVIEW_STAGE, start_second_interview_refs_reminder
+from utils.sourcing_slack import SOURCING_STAGE, notify_first_sourcing_async
 from utils.transactional_email import post_transactional_email
 from utils.signoff_email import (
     ensure_signoff_sent_column,
@@ -1344,6 +1345,11 @@ def update_opportunity_stage(opportunity_id):
         hubspot_push_notice = None
         if stage_changed:
             hubspot_push_notice = _maybe_push_stage_to_hubspot(opportunity_id, new_stage)
+
+        # Aviso a Slack de opp nueva en Sourcing (sólo la primera vez). En un hilo
+        # y después del commit, como el resto: nunca frena ni deshace el stage.
+        if stage_changed and (new_stage or "").strip() == SOURCING_STAGE:
+            notify_first_sourcing_async(opportunity_id, previous_stage)
 
         return jsonify({
             'success': True,

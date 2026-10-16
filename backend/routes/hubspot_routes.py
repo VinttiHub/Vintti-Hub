@@ -28,6 +28,7 @@ from utils import hubspot_push as hs_push
 from utils import hubspot_push_values as hs_push_values
 from utils.hubspot_waiting_alert import alerta_en_pausa, send_waiting_deals_alert
 from utils.opp_model_edits import model_edited_at
+from utils.sourcing_slack import SOURCING_STAGE, notify_first_sourcing_async
 from dashboards.datasets._now import today_ar
 
 
@@ -3824,11 +3825,19 @@ def sync_hubspot_opportunities():
             processed += 1
             deal_id = str(deal.get("id") or "")
             try:
-                items.append(_process_hubspot_deal(client, cursor, deal, ctx))
+                item = _process_hubspot_deal(client, cursor, deal, ctx)
+                items.append(item)
                 # Una transaccion por deal: un error no aborta el resto ni
                 # descarta lo ya escrito. En dry run se descarta a proposito, para
                 # que ni un write accidental pueda quedar.
                 conn.rollback() if dry_run else conn.commit()
+                # Aviso a Slack de opp nueva en Sourcing, despues del commit.
+                # Una opp creada por el sync no tenia stage previo (None).
+                if (not dry_run and item.get("opportunity_id")
+                        and item.get("action") in ("created", "adopted", "updated")
+                        and item.get("hub_stage_after") == SOURCING_STAGE):
+                    previo = None if item.get("action") == "created" else item.get("hub_stage_before")
+                    notify_first_sourcing_async(item["opportunity_id"], previo)
             except Exception as exc:  # noqa: BLE001
                 _rollback_quietly(conn, "deal %s" % deal_id)
                 logging.exception("HubSpot opportunity sync fallo en el deal %s", deal_id)

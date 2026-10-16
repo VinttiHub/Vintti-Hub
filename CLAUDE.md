@@ -1075,6 +1075,23 @@ para que las cierre o las mueva. Sin vencidas no se postea nada.
 - Canal **Sales & Opps** (`SLACK_CHANNEL_ID = "C07GZ8RQWF3"`, hardcodeado, definitivo desde
   el 2026-09-30; antes era el de prueba `C0C0UQ7SYBW`). El bot tiene que estar invitado.
 
+## Slack: opp nueva en Sourcing (sólo la primera vez)
+
+`backend/utils/sourcing_slack.py`: cuando una opp entra a **Sourcing por primera vez** sale un
+mensaje a Slack con cliente, puesto, modelo, sales lead (por nombre), start date y **@mención a
+la HR lead** (`opp_hr_lead`, vía `daily_digest.people.slack_id`). Lo disparan
+`update_opportunity_stage` y el sync de HubSpot (NDA Signed → Sourcing, o opp creada ahí),
+siempre después del commit, en un hilo y sin levantar nunca. En `dry_run` no sale.
+
+- Canal **Sales & Opps** (`SLACK_CHANNEL_ID = "C07GZ8RQWF3"`, hardcodeado, definitivo desde
+  el 2026-10-16; antes era el de prueba `C0C0UQ7SYBW`). El bot tiene que estar invitado.
+- "Primera vez" son dos frenos: `previous_stage` pre-Sourcing (vacío, Deep Dive, NDA Sent) —
+  reactivar desde Stop/Closed Lost o volver desde Interviewing **no** avisa — y la tabla
+  `sourcing_slack_notified` (una fila por opp, autocreada). Al crearse se **siembra** con todas
+  las opps que ya pasaron por Sourcing (stage posterior, start date o fila en `sourcing`), así
+  el deploy no avisa por opps viejas.
+- Se reclama la fila antes de postear; si Slack falla se suelta (no hay reintento automático).
+
 ## Stop ya no borra la start date (NDA)
 
 Hasta el 2026-10-01, mover una opp a **Stop** en `docs/opportunities.html` hacía
