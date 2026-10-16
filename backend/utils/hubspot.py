@@ -67,7 +67,8 @@ class HubSpotClient:
         return payload.get("results", [])
 
     def update_deal(self, deal_id, properties):
-        """PATCH de propiedades de un deal. EL UNICO WRITE del repo hacia HubSpot.
+        """PATCH de propiedades de un deal. Junto con update_contact/update_company, los
+        unicos WRITE del repo hacia HubSpot.
 
         Todo lo demas que habla con HubSpot lee (GET o POST /search). Este metodo
         escribe, asi que:
@@ -88,6 +89,29 @@ class HubSpotClient:
             return {}
         return self._request(
             "PATCH", f"/crm/v3/objects/deals/{deal_id}", json={"properties": props}
+        )
+
+    def update_contact(self, contact_id, properties):
+        """PATCH de propiedades de un contacto. Mismo contrato que update_deal.
+
+        Lo usa la edicion de campos de Account Details (utils/account_hubspot_push.py).
+        Necesita el scope `crm.objects.contacts.write`; sin el, 403 -> HubSpotError.
+        A diferencia de update_deal, un "" SI se manda: es como se vacia una propiedad.
+        """
+        return self._update_object("contacts", contact_id, properties)
+
+    def update_company(self, company_id, properties):
+        """PATCH de propiedades de una empresa. Scope `crm.objects.companies.write`."""
+        return self._update_object("companies", company_id, properties)
+
+    def _update_object(self, object_type, object_id, properties):
+        if not object_id:
+            raise HubSpotError(f"update de {object_type} necesita un id")
+        props = {k: v for k, v in (properties or {}).items() if v is not None}
+        if not props:
+            return {}
+        return self._request(
+            "PATCH", f"/crm/v3/objects/{object_type}/{object_id}", json={"properties": props}
         )
 
     def get_deal_pipelines(self):

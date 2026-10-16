@@ -1214,3 +1214,24 @@ pgonzales, jazmin y lara (`STAFFING_MAIL_ALLOWED` en `staffing_routes.py`, `MAIL
   tener su texto editado. Reply-to = quien lo manda (`reply_to` nuevo y opcional en
   `/send_email`; aplica recién con el backend deployado, porque `post_transactional_email`
   pega a prod). Registro en `staffing_email_log` (autocreada). `TEST_ONLY_RECIPIENT` para pruebas.
+
+## Account Details: lápiz + escritura en HubSpot
+
+En `docs/account-details.html` (Account Info) pgonzales, agustin, lara y pilar
+(`ACCOUNT_EDITORS`, en `accounts_routes.py` **y** en `account-details.js`) editan cada campo
+con ✎. El PATCH va con `?push_hubspot=1` + `X-User-Email` y, después del commit,
+`utils/account_hubspot_push.py` escribe el valor en HubSpot. Si no llega, el sync
+HubSpot → hub ("HubSpot gana si tiene valor", cada 30 min vía el de opps) lo pisa: por eso
+el toast siempre dice qué pasó del lado de HubSpot.
+
+- Se escribe en el objeto del que **lee** el sync (contact → company → deal, el primero con
+  la propiedad y con id). Hoy todos los campos caen en el **contacto**. Sin
+  `hubspot_contact_id` se busca el contacto por email (exacto, único) y se guarda el id.
+- Los desplegables se traducen label → value interno; un valor que HubSpot no acepta no se
+  manda (`rechazados`). `GET /accounts/hubspot-options` da las opciones ya normalizadas.
+- Necesita el scope **`crm.objects.contacts.write`** (y `companies.write` por si algún campo
+  cae en la empresa). Al 2026-10-16 el token sólo tiene `deals.write`: hasta agregarlo, se
+  guarda en el hub y el toast dice `sin_scope`.
+- `name`, `surname`, `industry`, `position`, `type`, `credit_loop` sólo los puede PATCHear
+  un editor. Los demás campos siguen abiertos porque `opportunity-detail` los edita.
+- Timezone es sólo del hub; Contract y los totales no tienen lápiz (se recalculan solos).

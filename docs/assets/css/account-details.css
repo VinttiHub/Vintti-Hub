@@ -1771,3 +1771,63 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 #billingEmailSection .subtle {
   margin: 0 0 12px;
 }
+
+/* ===== Lápiz de Account Info (edición inline + toast del resultado en HubSpot) ===== */
+.account-field-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+.account-field-input {
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid #c9c9d6;
+  border-radius: 8px;
+  min-width: 180px;
+  max-width: 100%;
+  background: #fff;
+}
+.account-field-input:focus {
+  outline: 2px solid #6c38ff;
+  outline-offset: 1px;
+}
+.account-field-btn {
+  border: 1px solid #c9c9d6;
+  background: #fff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.account-field-btn:hover:not(:disabled) { background: #f2eeff; }
+.account-field-btn:disabled { opacity: 0.5; cursor: default; }
+
+.account-field-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 20px);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #1d1d1f;
+  background: #eaffd2;
+  border: 1px solid #c1ff72;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 3000;
+}
+.account-field-toast[data-tone="warn"] {
+  background: #fff4e5;
+  border-color: #ffb35c;
+}
+.account-field-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

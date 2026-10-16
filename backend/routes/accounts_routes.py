@@ -1691,9 +1691,41 @@ def update_opportunity_fields(opportunity_id):
         logging.exception("❌ Error updating opportunity fields (opp=%s)", opportunity_id)
         return jsonify({'error': str(e)}), 500
 
+# Quienes editan los campos de la cuenta con el lapiz de Account Details, y con eso
+# escriben en HubSpot (utils/account_hubspot_push.py). Misma lista en
+# ACCOUNT_EDITORS de docs/assets/js/account-details.js: si tocas una, toca la otra.
+ACCOUNT_EDITORS = {
+    "pgonzales@vintti.com",
+    "agustin@vintti.com",
+    "lara@vintti.com",
+    "pilar@vintti.com",
+}
+
+# Columnas que hasta el lapiz no se editaban desde ninguna pagina: quedan sólo para
+# ACCOUNT_EDITORS. Las demas (size, state, mail, website...) se siguen editando desde
+# opportunity-detail por cualquiera, y frenarlas acá rompería esa pantalla.
+ACCOUNT_EDITOR_ONLY_FIELDS = {'name', 'surname', 'industry', 'position', 'type', 'credit_loop'}
+
+
+@bp.route('/accounts/hubspot-options', methods=['GET'])
+def account_hubspot_options():
+    """Opciones de los campos que en HubSpot son desplegables (read-only)."""
+    try:
+        from utils.account_hubspot_push import select_options
+        return jsonify({'options': select_options()}), 200
+    except Exception as exc:  # noqa: BLE001
+        logging.exception('No se pudieron leer las opciones de HubSpot')
+        return jsonify({'options': {}, 'error': str(exc)[:300]}), 200
+
+
 @bp.route('/accounts/<account_id>', methods=['PATCH'])
 def update_account_fields(account_id):
-    data = request.get_json()
+    data = request.get_json() or {}
+    editor_email = (request.headers.get('X-User-Email') or '').strip().lower()
+    push_hubspot = str(request.args.get('push_hubspot') or '').lower() in ('1', 'true', 'yes')
+    is_editor = editor_email in ACCOUNT_EDITORS
+    if (push_hubspot or ACCOUNT_EDITOR_ONLY_FIELDS & set(data)) and not is_editor:
+        return jsonify({'error': 'You do not have permission to edit these account fields.'}), 403
 
     allowed_fields = [
         'client_name',
@@ -1717,10 +1749,17 @@ def update_account_fields(account_id):
         'outsource',
         'vintti_ai',
         'billing_email',
+        'name',
+        'surname',
+        'industry',
+        'position',
+        'type',
+        'credit_loop',
     ]
 
 
     updates = []
+    saved = {}
     values = []
 
     for field in allowed_fields:
@@ -1739,6 +1778,7 @@ def update_account_fields(account_id):
                 values.append(normalize_account_manager(data[field]))
             else:
                 values.append(data[field])
+            saved[field] = values[-1]
 
     if not updates:
         return jsonify({'error': 'No valid fields provided'}), 400
@@ -1759,11 +1799,17 @@ def update_account_fields(account_id):
         cursor.close()
         conn.close()
 
-        return jsonify({'success': True}), 200
-
     except Exception as e:
         print("Error updating account fields:", e)
         return jsonify({'error': str(e)}), 500
+
+    response = {'success': True}
+    if push_hubspot:
+        # Despues del commit y fuera de la transaccion, como _maybe_push_stage_to_hubspot:
+        # el valor ya quedo en el hub aunque HubSpot falle. push_account_fields nunca levanta.
+        from utils.account_hubspot_push import push_account_fields
+        response['hubspot'] = push_account_fields(account_id, saved)
+    return jsonify(response), 200
 
 @bp.route('/accounts/sales-lead/suggest/bulk', methods=['POST'])
 def suggest_sales_lead_bulk():

@@ -508,6 +508,13 @@ if (clientNameInput) {
     const accountId = getIdFromURL();
     if (!accountId || !newName) return;
 
+    // Los editores de la cuenta guardan también en HubSpot (ver bloque del lápiz, al final).
+    if (isAccountEditor()) {
+      if (newName === String(ACCOUNT_DETAIL_RECORD?.client_name || '').trim()) return;
+      saveAccountField('client_name', newName);
+      return;
+    }
+
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -538,6 +545,10 @@ if (closeBtn) {
 
 });
 function editField(field) {
+  if (isAccountEditor()) {
+    startAccountFieldEdit(field);
+    return;
+  }
   const currentLink = document.getElementById(`${field}-link`).href;
   const newLink = prompt(`Enter new ${field} URL:`, currentLink);
 
@@ -3539,4 +3550,263 @@ async function createBonusTodosForApprovers(b){
       })
     )
   );
+}
+
+/* =========================================================================
+   Lápiz de Account Info: edición de campos + escritura en HubSpot
+   -------------------------------------------------------------------------
+   Sólo para ACCOUNT_EDITORS (misma lista que ACCOUNT_EDITORS de
+   backend/routes/accounts_routes.py: si tocás una, tocá la otra). El PATCH va con
+   ?push_hubspot=1 y el backend escribe el valor en HubSpot después de guardarlo
+   (utils/account_hubspot_push.py). Si no llega a HubSpot, el próximo sync lo pisaría
+   con el valor viejo: por eso el toast siempre dice qué pasó del lado de HubSpot.
+   ========================================================================= */
+const ACCOUNT_EDITORS = new Set([
+  'pgonzales@vintti.com',
+  'agustin@vintti.com',
+  'lara@vintti.com',
+  'pilar@vintti.com',
+]);
+
+// columna de `account` -> cómo se pinta en la página
+const ACCOUNT_EDITABLE_FIELDS = {
+  size: { el: 'account-size', label: 'Size' },
+  timezone: { el: 'account-timezone', label: 'Timezone' },
+  state: { el: 'account-state', label: 'State' },
+  name: { el: 'account-contact-name', label: 'Contact Name' },
+  surname: { el: 'account-contact-surname', label: 'Contact Surname' },
+  mail: { el: 'account-mail-link', label: 'Email', kind: 'mail' },
+  industry: { el: 'account-industry', label: 'Industry' },
+  where_come_from: { el: 'account-lead-source', label: 'Lead Source' },
+  lead_source_detail: { el: 'account-lead-source-detail', label: 'Lead Source Detail' },
+  conversion_channel: { el: 'account-conversion-channel', label: 'Conversion Channel' },
+  credit_loop: { el: 'account-credit-loop', label: 'Credit Loop?' },
+  referal_source: { el: 'account-referral-source', label: 'Referral Source' },
+  outsource: { el: 'account-outsource', label: 'Outsource Before' },
+  position: { el: 'account-position', label: 'Position' },
+  type: { el: 'account-type', label: 'Type' },
+  linkedin: { el: 'linkedin-link', label: 'LinkedIn', kind: 'link' },
+  website: { el: 'website-link', label: 'Website', kind: 'link' },
+};
+
+const HUBSPOT_SKIP_REASONS = {
+  sin_hubspot: 'this account is not linked to HubSpot',
+  sin_propiedad: 'HubSpot has no property for this field',
+  sin_scope: 'the HubSpot token cannot edit contacts/companies (missing scope)',
+  solo_hub: 'this field only exists in the hub',
+  error: 'HubSpot returned an error',
+};
+
+let ACCOUNT_HUBSPOT_OPTIONS = null;
+
+function currentAccountEditorEmail() {
+  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase()
+    .trim();
+}
+
+function isAccountEditor() {
+  return ACCOUNT_EDITORS.has(currentAccountEditorEmail());
+}
+
+function loadAccountHubspotOptions() {
+  if (!ACCOUNT_HUBSPOT_OPTIONS) {
+    ACCOUNT_HUBSPOT_OPTIONS = fetch(`${API_BASE_URL}/accounts/hubspot-options`)
+      .then(res => (res.ok ? res.json() : { options: {} }))
+      .then(data => data?.options || {})
+      .catch(() => ({}));
+  }
+  return ACCOUNT_HUBSPOT_OPTIONS;
+}
+
+function accountFieldValue(column) {
+  const raw = ACCOUNT_DETAIL_RECORD ? ACCOUNT_DETAIL_RECORD[column] : null;
+  if (column === 'outsource') {
+    if (raw === true) return 'Yes - No info';
+    if (raw === false) return 'No';
+  }
+  if (raw === null || raw === undefined) return '';
+  return String(raw).trim().replace(/^(null|undefined)$/i, '');
+}
+
+function renderAccountField(column) {
+  const cfg = ACCOUNT_EDITABLE_FIELDS[column];
+  if (!cfg) return;
+  const el = document.getElementById(cfg.el);
+  if (!el) return;
+  const value = accountFieldValue(column);
+  if (cfg.kind === 'mail') {
+    setMailLink(cfg.el, value);
+  } else if (cfg.kind === 'link') {
+    el.href = value || '#';
+  } else {
+    el.textContent = value || 'Not available';
+    el.classList.toggle('placeholder', !value);
+  }
+  if (column === 'credit_loop') updateCreditLoopPropertyState(value);
+}
+
+function showAccountFieldToast(message, tone) {
+  let toast = document.getElementById('accountFieldToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'accountFieldToast';
+    toast.className = 'account-field-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.dataset.tone = tone || 'ok';
+  toast.classList.add('is-visible');
+  clearTimeout(showAccountFieldToast._timer);
+  showAccountFieldToast._timer = setTimeout(() => toast.classList.remove('is-visible'), tone === 'warn' ? 9000 : 4000);
+}
+
+function describeHubspotResult(column, hubspot) {
+  if (!hubspot) return { tone: 'warn', text: 'Saved in the hub. HubSpot was not updated.' };
+  if (hubspot.error) return { tone: 'warn', text: `Saved in the hub, but HubSpot failed: ${hubspot.error}` };
+  if ((hubspot.escritos || []).some(w => w.campo === column)) {
+    return { tone: 'ok', text: 'Saved and updated in HubSpot ✓' };
+  }
+  const rejected = (hubspot.rechazados || []).find(r => r.campo === column);
+  if (rejected) {
+    return { tone: 'warn', text: `Saved in the hub, but HubSpot does not accept "${rejected.valor}" for this field. Valid options: ${(rejected.opciones || []).join(', ')}` };
+  }
+  const skipped = (hubspot.omitidos || []).find(o => o.campo === column);
+  if (skipped?.motivo === 'solo_hub') return { tone: 'ok', text: 'Saved ✓ (this field only exists in the hub)' };
+  const why = HUBSPOT_SKIP_REASONS[skipped?.motivo] || 'unknown reason';
+  return { tone: 'warn', text: `Saved in the hub, but not in HubSpot: ${why}. The next HubSpot sync may overwrite it.` };
+}
+
+async function saveAccountField(column, value) {
+  const accountId = getIdFromURL();
+  if (!accountId) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/accounts/${accountId}?push_hubspot=1`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Email': currentAccountEditorEmail(),
+      },
+      body: JSON.stringify({ [column]: value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    if (ACCOUNT_DETAIL_RECORD) ACCOUNT_DETAIL_RECORD[column] = value;
+    const { tone, text } = describeHubspotResult(column, data.hubspot);
+    showAccountFieldToast(text, tone);
+    return true;
+  } catch (err) {
+    console.error(`Failed to update ${column}:`, err);
+    showAccountFieldToast(`Could not save: ${err.message || err}`, 'warn');
+    return false;
+  }
+}
+
+async function startAccountFieldEdit(column) {
+  const cfg = ACCOUNT_EDITABLE_FIELDS[column];
+  if (!cfg || !isAccountEditor()) return;
+  const display = document.getElementById(cfg.el);
+  const row = display?.closest('p');
+  if (!row || row.querySelector('.account-field-editor')) return;
+
+  const current = accountFieldValue(column);
+  const options = (await loadAccountHubspotOptions())[column];
+
+  let input;
+  if (Array.isArray(options) && options.length) {
+    input = document.createElement('select');
+    const values = ['', ...options];
+    if (current && !options.some(o => o.toLowerCase() === current.toLowerCase())) values.splice(1, 0, current);
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v || '—';
+      if (v.toLowerCase() === current.toLowerCase()) opt.selected = true;
+      input.appendChild(opt);
+    });
+  } else {
+    input = document.createElement('input');
+    input.type = cfg.kind === 'mail' ? 'email' : (cfg.kind === 'link' ? 'url' : 'text');
+    input.value = current;
+  }
+  input.className = 'account-field-input';
+  input.setAttribute('aria-label', `Edit ${cfg.label}`);
+
+  const wrap = document.createElement('span');
+  wrap.className = 'account-field-editor';
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'account-field-btn';
+  ok.textContent = '✓';
+  ok.setAttribute('aria-label', 'Save');
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'account-field-btn';
+  cancel.textContent = '✕';
+  cancel.setAttribute('aria-label', 'Cancel');
+  wrap.append(input, ok, cancel);
+
+  const pencil = row.querySelector('.edit-btn');
+  display.hidden = true;
+  if (pencil) pencil.hidden = true;
+  display.insertAdjacentElement('afterend', wrap);
+  input.focus();
+
+  const close = () => {
+    wrap.remove();
+    display.hidden = false;
+    if (pencil) pencil.hidden = false;
+  };
+  const commit = async () => {
+    const next = String(input.value || '').trim();
+    if (next === current) { close(); return; }
+    ok.disabled = true;
+    cancel.disabled = true;
+    const saved = await saveAccountField(column, next);
+    if (saved) {
+      close();
+      renderAccountField(column);
+    } else {
+      ok.disabled = false;
+      cancel.disabled = false;
+    }
+  };
+  ok.addEventListener('click', commit);
+  cancel.addEventListener('click', close);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+  });
+}
+
+function initAccountFieldEditors() {
+  const editor = isAccountEditor();
+  Object.keys(ACCOUNT_EDITABLE_FIELDS).forEach(column => {
+    const display = document.getElementById(ACCOUNT_EDITABLE_FIELDS[column].el);
+    const row = display?.closest('p');
+    if (!row) return;
+    let pencil = row.querySelector('.edit-btn');
+    if (!editor) {
+      if (pencil) pencil.remove();
+      return;
+    }
+    if (!pencil) {
+      pencil = document.createElement('button');
+      pencil.type = 'button';
+      pencil.className = 'edit-btn';
+      pencil.textContent = '✎';
+      pencil.setAttribute('aria-label', `Edit ${ACCOUNT_EDITABLE_FIELDS[column].label}`);
+      pencil.addEventListener('click', () => startAccountFieldEdit(column));
+      row.appendChild(pencil);
+    }
+  });
+  if (editor) loadAccountHubspotOptions();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccountFieldEditors);
+} else {
+  initAccountFieldEditors();
 }
