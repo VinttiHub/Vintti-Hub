@@ -8,6 +8,8 @@ razón, la ETAPA desde la que se cerró cada uno:
     la cerraron, no necesariamente dónde se enfrió: una opp quieta en Interviewing y cerrada
     semanas después dice Interviewing. Vacía si se cerró por otro camino -> "Sin dato".
   - deals de HubSpot sin opp: "SQL (antes del Deep Dive)".
+  - Sourcing e Interviewing van juntos como "Active Pipeline" (pedido de la owner,
+    2026-10-16).
 
 Dona y detalle leen `rows()`, así la dona suma `cl_opp + cl_sin_opp` de la card.
 """
@@ -16,6 +18,8 @@ from __future__ import annotations
 from .sql_to_cw_ae_am_cierre import rows as cierre_rows
 
 NO_STAGE_LABEL = "Sin dato"
+ACTIVE_PIPELINE_LABEL = "Active Pipeline"
+ACTIVE_PIPELINE_STAGES = {"sourcing", "interviewing"}
 
 
 def rows(filters: dict) -> list[dict]:
@@ -24,6 +28,8 @@ def rows(filters: dict) -> list[dict]:
         if r["grupo"] not in ("cl_opp", "cl_sin_opp"):
             continue
         stage = str(r.get("perdido_en") or "").strip()
+        if stage.lower() in ACTIVE_PIPELINE_STAGES:
+            stage = ACTIVE_PIPELINE_LABEL
         out.append({
             "stage": stage if stage and stage != "—" else NO_STAGE_LABEL,
             "client_name": r["client_name"],
