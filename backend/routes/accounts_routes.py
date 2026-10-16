@@ -1784,10 +1784,22 @@ def update_account_fields(account_id):
         return jsonify({'error': 'No valid fields provided'}), 400
 
     values.append(account_id)
+    previous = {}
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
+        if push_hubspot:
+            # Foto de antes: si HubSpot rechaza el valor (email inválido o de otro
+            # contacto), se vuelve a esto para que los dos sistemas no queden distintos.
+            cursor.execute(
+                f"SELECT {', '.join(saved)} FROM account WHERE account_id = %s",
+                (account_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                previous = dict(zip(saved, row))
 
         cursor.execute(f"""
             UPDATE account
@@ -1808,7 +1820,31 @@ def update_account_fields(account_id):
         # Despues del commit y fuera de la transaccion, como _maybe_push_stage_to_hubspot:
         # el valor ya quedo en el hub aunque HubSpot falle. push_account_fields nunca levanta.
         from utils.account_hubspot_push import push_account_fields
-        response['hubspot'] = push_account_fields(account_id, saved)
+        hubspot = push_account_fields(account_id, saved)
+        rejected = [
+            o['campo'] for o in hubspot.get('omitidos', [])
+            if o.get('motivo') == 'invalido' and o.get('campo') in previous
+        ] + [
+            r['campo'] for r in hubspot.get('rechazados', []) if r.get('campo') in previous
+        ]
+        if rejected:
+            # HubSpot no lo acepta nunca: el hub vuelve al valor anterior. Si no, el
+            # hub queda distinto de HubSpot hasta que el sync lo pise (o para siempre,
+            # si nadie toca el deal).
+            try:
+                conn = get_connection()
+                with conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            f"UPDATE account SET {', '.join(f'{c} = %s' for c in rejected)} "
+                            "WHERE account_id = %s",
+                            [previous[c] for c in rejected] + [account_id],
+                        )
+                conn.close()
+                hubspot['revertidos'] = {c: previous[c] for c in rejected}
+            except Exception:  # noqa: BLE001
+                logging.exception('account %s: no se pudo revertir %s', account_id, rejected)
+        response['hubspot'] = hubspot
     return jsonify(response), 200
 
 @bp.route('/accounts/sales-lead/suggest/bulk', methods=['POST'])

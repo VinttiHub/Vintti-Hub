@@ -1235,3 +1235,6 @@ el toast siempre dice qué pasó del lado de HubSpot.
 - `name`, `surname`, `industry`, `position`, `type`, `credit_loop` sólo los puede PATCHear
   un editor. Los demás campos siguen abiertos porque `opportunity-detail` los edita.
 - Timezone es sólo del hub; Contract y los totales no tienen lápiz (se recalculan solos).
+- **Si HubSpot rechaza el valor, el hub vuelve al anterior** (`revertidos` en la respuesta).
+  Pasa con el email: HubSpot valida el formato y **no deja dos contactos con el mismo email**
+  (prueba del 2026-10-16 en la cuenta 333). Guardarlo igual dejaba al hub distinto de HubSpot.

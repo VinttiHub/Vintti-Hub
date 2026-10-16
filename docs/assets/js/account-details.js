@@ -511,7 +511,9 @@ if (clientNameInput) {
     // Los editores de la cuenta guardan también en HubSpot (ver bloque del lápiz, al final).
     if (isAccountEditor()) {
       if (newName === String(ACCOUNT_DETAIL_RECORD?.client_name || '').trim()) return;
-      saveAccountField('client_name', newName);
+      saveAccountField('client_name', newName).then(ok => {
+        if (!ok) clientNameInput.value = ACCOUNT_DETAIL_RECORD?.client_name || '';
+      });
       return;
     }
 
@@ -3593,6 +3595,7 @@ const HUBSPOT_SKIP_REASONS = {
   sin_hubspot: 'this account is not linked to HubSpot',
   sin_propiedad: 'HubSpot has no property for this field',
   sin_scope: 'the HubSpot token cannot edit contacts/companies (missing scope)',
+  invalido: 'HubSpot rejected the value',
   solo_hub: 'this field only exists in the hub',
   error: 'HubSpot returned an error',
 };
@@ -3665,6 +3668,13 @@ function showAccountFieldToast(message, tone) {
 
 function describeHubspotResult(column, hubspot) {
   if (!hubspot) return { tone: 'warn', text: 'Saved in the hub. HubSpot was not updated.' };
+  if (hubspot.revertidos && column in hubspot.revertidos) {
+    const skipped = (hubspot.omitidos || []).find(o => o.campo === column);
+    const rejected = (hubspot.rechazados || []).find(r => r.campo === column);
+    const why = skipped?.detalle
+      || (rejected ? `valid options: ${(rejected.opciones || []).join(', ')}` : 'invalid value');
+    return { tone: 'warn', text: `Not saved — HubSpot rejected it: ${why}. Nothing was changed.` };
+  }
   if (hubspot.error) return { tone: 'warn', text: `Saved in the hub, but HubSpot failed: ${hubspot.error}` };
   if ((hubspot.escritos || []).some(w => w.campo === column)) {
     return { tone: 'ok', text: 'Saved and updated in HubSpot ✓' };
@@ -3693,9 +3703,11 @@ async function saveAccountField(column, value) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    if (ACCOUNT_DETAIL_RECORD) ACCOUNT_DETAIL_RECORD[column] = value;
     const { tone, text } = describeHubspotResult(column, data.hubspot);
     showAccountFieldToast(text, tone);
+    // HubSpot rechazó el valor y el backend ya devolvió el hub al anterior.
+    if (data.hubspot?.revertidos && column in data.hubspot.revertidos) return false;
+    if (ACCOUNT_DETAIL_RECORD) ACCOUNT_DETAIL_RECORD[column] = value;
     return true;
   } catch (err) {
     console.error(`Failed to update ${column}:`, err);
@@ -3762,6 +3774,11 @@ async function startAccountFieldEdit(column) {
   const commit = async () => {
     const next = String(input.value || '').trim();
     if (next === current) { close(); return; }
+    if (cfg.kind === 'mail' && next && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(next)) {
+      showAccountFieldToast('That email does not look valid.', 'warn');
+      input.focus();
+      return;
+    }
     ok.disabled = true;
     cancel.disabled = true;
     const saved = await saveAccountField(column, next);

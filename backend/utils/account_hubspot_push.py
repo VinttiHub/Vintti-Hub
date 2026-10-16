@@ -20,7 +20,9 @@ Reglas:
 - NUNCA levanta: el valor ya se guardo en el hub y la persona lo vio cambiar.
 """
 
+import json
 import logging
+import re
 
 from db import get_connection
 from utils.hubspot import HubSpotClient, HubSpotError
@@ -194,12 +196,42 @@ def _is_scope_error(exc):
     return " 403 " in text or "MISSING_SCOPES" in text
 
 
+def _is_validation_error(exc):
+    """HubSpot rechazo el VALOR (400 VALIDATION_ERROR): email invalido, email que ya
+    tiene otro contacto, opcion inexistente... Distinto de un error de red/permiso:
+    aca el valor nunca va a entrar, asi que el hub tiene que volver al anterior."""
+    text = str(exc)
+    return " 400 " in text and "VALIDATION_ERROR" in text
+
+
+def _hubspot_message(exc):
+    """El mensaje legible de HubSpot, sin el JSON alrededor."""
+    text = str(exc)
+    if "already has that value" in text:
+        # Email (y otras unicas): HubSpot no deja dos contactos con el mismo valor.
+        return "another HubSpot contact already uses this value"
+    start = text.find("{")
+    if start >= 0:
+        try:
+            body = json.loads(text[start:])
+            msgs = [e.get("message") for e in body.get("errors") or [] if e.get("message")]
+            if msgs:
+                return "; ".join(msgs)[:300]
+            msg = str(body.get("message") or "")
+            match = re.search(r'\\?"message\\?":\\?"([^"\\]+)', msg)
+            return (match.group(1) if match else msg)[:300]
+        except ValueError:
+            pass
+    return text[:300]
+
+
 def push_account_fields(account_id, changed):
     """Escribe en HubSpot las columnas editadas. NUNCA levanta.
 
     `changed` = {columna_de_account: valor_guardado_en_el_hub}.
     Devuelve {escritos: [...], omitidos: [{campo, motivo}], rechazados: [...], error}.
-    Motivos de omitidos: solo_hub, sin_hubspot, sin_propiedad, sin_scope, error.
+    Motivos de omitidos: solo_hub, sin_hubspot, sin_propiedad, sin_scope, invalido
+    (HubSpot rechazo el valor: el PATCH de la cuenta lo revierte en el hub), error.
     """
     result = {"escritos": [], "omitidos": [], "rechazados": [], "error": None}
     try:
@@ -278,10 +310,17 @@ def push_account_fields(account_id, changed):
                         "valor": v,
                     })
             except HubSpotError as exc:
-                motivo = "sin_scope" if _is_scope_error(exc) else "error"
+                if _is_scope_error(exc):
+                    motivo = "sin_scope"
+                elif _is_validation_error(exc):
+                    motivo = "invalido"
+                else:
+                    motivo = "error"
                 logging.warning("account %s: push a HubSpot %s fallo: %s", account_id, object_type, exc)
                 for column in columns:
-                    result["omitidos"].append({"campo": column, "motivo": motivo, "detalle": str(exc)[:300]})
+                    result["omitidos"].append(
+                        {"campo": column, "motivo": motivo, "detalle": _hubspot_message(exc)}
+                    )
     except Exception as exc:  # noqa: BLE001
         logging.exception("account %s: push de campos a HubSpot fallo", account_id)
         result["error"] = str(exc)[:300]
