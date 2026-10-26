@@ -133,6 +133,20 @@ NRR = (mrr_inicial + upsells + expansion_precio
        − contraccion − downgrades_recorte − churn_no_recorte) / mrr_inicial
 ```
 
+**Sobre qué se valúa (2026-10-26, pedido de la owner por las métricas del AM):**
+- **NRR · AM = MRR** (sólo `fee`). Los 4 `am_nrr_*.py` fijan `METRIC = "Fee"` y **no**
+  leen `filters["metric"]`: el filtro Metric del tab Growth viaja en el state global de
+  `fetchChart` y si no se fijara le cambiaría la base al AM sin que nadie lo note.
+- **NRR global en las dos versiones**: GMRR (salary + fee) y MRR. Mismas chart keys
+  (`am_kpi_nrr_30d`, `am_line_nrr`, los dos detalles), la versión la elige
+  `data-override-metric="Revenue"` / `"Fee"` en cada elemento (`_val()` de
+  `_nrr_decomp.py`: `'Fee'` → fee, cualquier otro → salary + fee). El tile es un split
+  GMRR | MRR, hay una card mensual por versión y dos drawers (`am-nrr` = GMRR,
+  `am-nrr-mrr` = MRR). **Todo elemento del NRR global tiene que llevar el override**, o
+  cae en GMRR por default y además sigue al filtro de Growth.
+- `refetchMonthDetails()` pasa `data-override-metric`: sin eso las dos cards mensuales
+  mostraban el mismo detalle.
+
 **Está escrita una sola vez, en `backend/dashboards/datasets/_nrr_decomp.py`**
 (`decomp_cte()` → el CTE `nrr_rows`, una fila por unidad). Los summary lo agregan con
 `SUM(...) FILTER`, los detalles lo listan tal cual: por eso la suma del drawer da el
@@ -211,16 +225,18 @@ Cinco cosas que no son obvias:
   del cierre de M−1, le faltan justo los `buyouts`. El CRR sigue contando el buyout como
   churn: no se cambió ahí. Las etiquetas `audit` de los 4 detalles excluyen el flag `buyout`.
 - **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Sin ella se
-  lee como si fuera el GMRR de hoy y no cuadra con el tile de al lado: con corte
-  22-sep, GMRR · AM da $237,4K y la base del NRR $208,1K, que es el GMRR · AM del
-  23-ago. Es el mismo indicador en dos fechas — el `+14% vs 30d` del propio tile es ese
+  lee como si fuera el MRR de hoy y no cuadra con el tile de al lado: con corte
+  22-sep, GMRR · AM daba $237,4K y la base del NRR $208,1K, que era el GMRR · AM del
+  23-ago (ejemplo de cuando el NRR · AM era sobre GMRR; desde el 2026-10-26 se compara
+  con el tile **MRR · AM**). Es el mismo indicador en dos fechas — el `+14% vs 30d` del propio tile es ese
   salto — pero sin la fecha a la vista parece un error de cálculo (reportado por la
   owner el 2026-09-22).
 
 En el NRR del AM hay un séptimo componente, **`entradas_m3`**: lo que entró al libro
 porque venció el M3 del AE. Va **fuera del cociente** a propósito — es un traspaso, no
 algo que hizo el AM. No es marginal: en septiembre de 2026 eran $28.8K contra una base
-de $228K, así que contarlo como expansión subiría el NRR del AM de 94% a ~107%.
+de $228K (valores en GMRR, de antes de pasar a MRR), así que contarlo como expansión
+subía el NRR del AM de 94% a ~107%.
 
 ## Sync HubSpot → Opportunities
 

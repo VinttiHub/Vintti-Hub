@@ -29,13 +29,8 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _norm_metric(value) -> str:
-    raw = str(value or "").strip().lower()
-    if raw == "fee":
-        return "Fee"
-    if raw == "revenue":
-        return "Revenue"
-    return "All"
+# Siempre MRR (solo fee): ver `am_nrr_30d_summary`.
+METRIC = "Fee"
 
 
 # En el motor del AM la fecha de Close Win se llama `close_d`, no `opp_close_d`.
@@ -56,7 +51,7 @@ MESES_CTE = """
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    metric = _norm_metric(filters.get("metric"))
+    metric = METRIC
     am = str(filters.get("am") or "").strip().lower()
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))

@@ -3510,6 +3510,9 @@
         // mensual de NDA → Close Win (Operations), y sin él no cuadra con su línea.
         const ov = el.dataset.overrideOrigen ? { origen: el.dataset.overrideOrigen } : {};
         if (el.dataset.overrideRequiereNda) ov.requiere_nda = el.dataset.overrideRequiereNda;
+        // `metric` también: el NRR general tiene una card GMRR y otra MRR con el mismo
+        // detalle mensual, y sin él las dos mostrarían el mismo desglose.
+        if (el.dataset.overrideMetric) ov.metric = el.dataset.overrideMetric;
         const res = await fetchChart(chartKey, { ...ov, mes: month, corte: endOfMonth(month) });
         renderMonthDetail(el, res.rows || [], { month });
       } catch (e) {

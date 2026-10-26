@@ -14,17 +14,12 @@ D_INI = "(%(win_ini)s::date - 1)"
 D_FIN = "%(win_fin)s::date"
 
 
-def _norm_metric(value) -> str:
-    raw = str(value or "").strip().lower()
-    if raw == "fee":
-        return "Fee"
-    if raw == "revenue":
-        return "Revenue"
-    return "All"
+# Siempre MRR (solo fee): ver `am_nrr_30d_summary`.
+METRIC = "Fee"
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    metric = _norm_metric(filters.get("metric"))
+    metric = METRIC
     am = str(filters.get("am") or "").strip().lower()
     win_ini, win_fin = window_bounds(filters)
 

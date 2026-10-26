@@ -6,6 +6,9 @@ Account Management (`_am_mrr_staffing`), que excluye las vacantes todavia dentro
 
 Lo que entra al libro del AM porque vencio ese M3 NO cuenta como expansion: sale aparte
 en `entradas_m3`, fuera del cociente. Es un traspaso del AE, no algo que hizo el AM.
+
+Se valua sobre MRR (solo fee), no GMRR: ver `METRIC`. El NRR general sigue aceptando
+`metric` y el dashboard lo muestra en las dos versiones.
 """
 from __future__ import annotations
 
@@ -27,17 +30,14 @@ D_INI = "(%(win_ini)s::date - 1)"
 D_FIN = "%(win_fin)s::date"
 
 
-def _norm_metric(value) -> str:
-    raw = str(value or "").strip().lower()
-    if raw == "fee":
-        return "Fee"
-    if raw == "revenue":
-        return "Revenue"
-    return "All"
+# El NRR del AM es SIEMPRE sobre MRR (solo fee), no GMRR: es la metrica del AM
+# (decision de la owner, 2026-10-26). Se fija aca y no se lee `filters["metric"]`,
+# porque el filtro Metric del tab Growth viaja en el state global y lo pisaria.
+METRIC = "Fee"
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    metric = _norm_metric(filters.get("metric"))
+    metric = METRIC
     am = str(filters.get("am") or "").strip().lower()
     win_ini, win_fin = window_bounds(filters)
 
