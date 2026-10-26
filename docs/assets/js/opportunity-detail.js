@@ -4630,6 +4630,7 @@ const CV_CHECKLIST_LABELS = {
   tools_in_experience: 'Tools in experiences',
   recorder_link: 'Recorder link',
   dates_ok: 'Dates',
+  clip_name: 'Clip name',
 };
 
 async function approvalCvChecklistOk(candidates) {
