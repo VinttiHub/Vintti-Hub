@@ -216,6 +216,56 @@ def get_opportunity_batch_sourcing_dates():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route('/opportunities/batch-candidates', methods=['GET'])
+def get_opportunity_batch_candidates():
+    """Una fila por (batch, candidato) — alimenta el CSV "Batches CSV" de Opportunities.
+
+    Sólo lo que llegó al cliente: "Rejected by sales" se excluye (mismo criterio que
+    Interviewed → Sent; el casing de cb.status es inconsistente, por eso LOWER).
+    candidates_batches.opportunity_id está 100% NULL, así que la opp sale de batch.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+              b.opportunity_id,
+              b.batch_id,
+              b.batch_number,
+              to_char(b.presentation_date::date, 'YYYY-MM-DD') AS presentation_date,
+              c.candidate_id,
+              c.name AS candidate_name,
+              cb.status AS candidate_status,
+              oc.stage_pipeline AS pipeline_stage
+            FROM batch b
+            JOIN candidates_batches cb
+              ON cb.batch_id = b.batch_id
+            JOIN candidates c
+              ON c.candidate_id = cb.candidate_id
+            LEFT JOIN opportunity_candidates oc
+              ON oc.opportunity_id = b.opportunity_id
+             AND oc.candidate_id = cb.candidate_id
+            WHERE b.presentation_date IS NOT NULL
+              AND LOWER(TRIM(COALESCE(cb.status, ''))) <> 'rejected by sales'
+            ORDER BY
+              b.opportunity_id,
+              b.presentation_date::date,
+              b.batch_number,
+              c.name
+            """
+        )
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        data = [dict(zip(columns, row)) for row in rows]
+        cursor.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as exc:
+        logging.exception("Failed to fetch opportunity batch candidates")
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route('/data')
 def get_accounts():
     try:

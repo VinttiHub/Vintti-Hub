@@ -2111,6 +2111,133 @@ if (downloadCsvBtn) {
   });
 }
 
+// Una fila por candidato enviado en cada batch, para las opps que quedan con los
+// filtros de la tabla (incluido el rango de fechas, que ya decide close date vs start date).
+// batch_days = días desde el envío hasta hoy, igual que "Time (days)" de opportunity-detail.
+function daysSinceIsoDate(ymd) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd || '')) return '';
+  const [Y, M, D] = ymd.split('-').map(Number);
+  const now = new Date();
+  const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return String(Math.floor((utcToday - Date.UTC(Y, M - 1, D)) / 86400000));
+}
+
+// Lo que muestra el dropdown de la pestaña Candidates (getCanonicalCandidateStatus de
+// opportunity-detail.js): vacío = "Client Interviewing", y unifica el casing viejo.
+function batchCandidateStatusLabel(status) {
+  const raw = String(status || '').trim();
+  const canonical = {
+    'rejected by sales': 'Rejected By Sales',
+    'client rejected cv': 'Client Rejected CV',
+    'client interviewing/testing': 'Client Interviewing',
+    'client interviewing': 'Client Interviewing',
+    'candidate testing': 'Candidate Testing',
+    'client rejected after interviewing': 'Client Rejected after interviewing',
+    'candidate failed test': 'Candidate Failed Test',
+    'candidate abandoned process': 'Candidate abandoned process',
+    'client abandoned process': 'Client abandoned process',
+    'client hired': 'Candidate hired',
+    'candidate hired': 'Candidate hired'
+  };
+  if (!raw) return 'Client Interviewing';
+  return canonical[raw.toLowerCase()] || raw;
+}
+
+const downloadBatchCandidatesCsvBtn =document.getElementById('downloadBatchCandidatesCsvBtn');
+if (downloadBatchCandidatesCsvBtn) {
+  downloadBatchCandidatesCsvBtn.addEventListener('click', async () => {
+    const label = downloadBatchCandidatesCsvBtn.textContent;
+    try {
+      downloadBatchCandidatesCsvBtn.disabled = true;
+      downloadBatchCandidatesCsvBtn.textContent = 'Preparing CSV...';
+
+      const filteredNodes = table.rows({ search: 'applied', order: 'applied' }).nodes().toArray();
+      if (!filteredNodes.length) {
+        alert('No rows available to export with the current filters.');
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/opportunities/batch-candidates`);
+      if (!res.ok) throw new Error(`batch-candidates failed ${res.status}`);
+      const rows = await res.json();
+      const candidatesByOpp = new Map();
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        const key = String(r?.opportunity_id || '');
+        if (!key) return;
+        if (!candidatesByOpp.has(key)) candidatesByOpp.set(key, []);
+        candidatesByOpp.get(key).push(r);
+      });
+
+      const opportunitiesById = new Map(
+        (Array.isArray(data) ? data : []).map((opp) => [String(opp.opportunity_id), opp])
+      );
+
+      const headers = [
+        'opportunity_id',
+        'client',
+        'position',
+        'opp_stage',
+        'opp_status',
+        'opened_date',
+        'closed_date',
+        'batch_number',
+        'batch_presentation_date',
+        'batch_days',
+        'candidate_id',
+        'candidate_name',
+        'candidate_status',
+        'pipeline_stage',
+      ];
+      const lines = [headers.map(csvEscape).join(',')];
+
+      filteredNodes.forEach((row) => {
+        const stageSelect = row.querySelector('.stage-dropdown');
+        const opportunityId = String(stageSelect?.dataset?.id || '');
+        const sent = candidatesByOpp.get(opportunityId);
+        if (!opportunityId || !sent?.length) return;
+
+        const opp = opportunitiesById.get(opportunityId) || {};
+        const stage = opp.opp_stage || stageSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+        const isClosed = stage === 'Close Win' || stage === 'Closed Lost';
+
+        sent.forEach((r) => {
+          const values = {
+            opportunity_id: opportunityId,
+            client: row.children?.[1]?.textContent?.trim() || '',
+            position: row.children?.[2]?.textContent?.trim() || opp.opp_position_name || '',
+            opp_stage: stage,
+            opp_status: isClosed ? stage : 'Active',
+            opened_date: toIsoDate(opp.nda_signature_or_start_date),
+            closed_date: isClosed ? toIsoDate(opp.opp_close_date) : '',
+            batch_number: r.batch_number != null ? `#${r.batch_number}` : '',
+            batch_presentation_date: r.presentation_date || '',
+            batch_days: daysSinceIsoDate(r.presentation_date),
+            candidate_id: r.candidate_id ?? '',
+            candidate_name: r.candidate_name || '',
+            candidate_status: batchCandidateStatusLabel(r.candidate_status),
+            pipeline_stage: r.pipeline_stage || '',
+          };
+          lines.push(headers.map((h) => csvEscape(values[h])).join(','));
+        });
+      });
+
+      if (lines.length === 1) {
+        alert('None of the filtered opportunities has candidates sent in a batch.');
+        return;
+      }
+
+      const today = toIsoDate(new Date()) || 'today';
+      downloadTextFile(`batch_candidates_${today}.csv`, `${lines.join('\n')}\n`, 'text/csv;charset=utf-8;');
+    } catch (err) {
+      console.error('Batch candidates CSV export failed:', err);
+      alert('Could not export CSV. Please try again.');
+    } finally {
+      downloadBatchCandidatesCsvBtn.disabled = false;
+      downloadBatchCandidatesCsvBtn.textContent = label;
+    }
+  });
+}
+
 
 // El resultado se guarda antes de recargar y se pinta despues: si lo dejaramos
 // solo en la consola, el reload lo borraria — y en la practica nadie abre devtools.
