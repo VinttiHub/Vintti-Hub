@@ -24,18 +24,15 @@ function isExcludedRecruiter(row = {}) {
   return EXCLUDED_EMAILS.has(email) || (name.includes("pilar") && name.includes("fernandez"));
 }
 
-// 🔸 Personas que sólo deben ver SU propia opción
-const RESTRICTED_EMAILS = new Set([
-  "constanza@vintti.com",
-  "pilar@vintti.com",
+// 🔸 Quiénes ven a TODAS las recruiters + el promedio general. Cualquier otra persona
+// que abra la página ve sólo su propia opción: así una recruiter nueva (que entra por su
+// rol, ver /users/access en sidebar.js) queda restringida sin sumarla a ninguna lista.
+// Antes era al revés (lista de restringidas) y quien no estaba en ella veía todo.
+const FULL_VIEW_EMAILS = new Set([
+  "pgonzales@vintti.com",
   "agostina@vintti.com",
-  "julieta@vintti.com",
-  "paz@vintti.com",
-  "valentina@vintti.com",
-  "benjamin@vintti.com",
-]);
-const RESTRICTION_EXCEPTIONS = new Set([
-  "agostina@vintti.com",
+  "lara@vintti.com",
+  "agustin@vintti.com",
 ]);
 const RECRUITER_POWER_ALLOWED = new Set([
   "pgonzales@vintti.com",
@@ -130,10 +127,7 @@ function isoToYMD(iso) {
 function isRestrictedEmail(email) {
   if (!email) return false;
   const normalized = String(email).toLowerCase();
-  return (
-    RESTRICTED_EMAILS.has(normalized) &&
-    !RESTRICTION_EXCEPTIONS.has(normalized)
-  );
+  return !FULL_VIEW_EMAILS.has(normalized);
 }
 
 function showRangeError(msg) {

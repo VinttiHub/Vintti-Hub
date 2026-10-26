@@ -208,6 +208,61 @@ def list_recruiters():
     return _list_users_by_role('recruiter')
 
 
+# Mismo patrón que `prospecting.constants.BDR_ROLE_PATTERN`: `users.role` es texto libre.
+BDR_ROLE_PATTERN = '%BDR%'
+
+
+@bp.route('/users/access')
+def current_user_access():
+    """Qué pestañas le tocan a quien mira, según su ROL y no según una lista de emails.
+
+    Lo lee `docs/assets/js/sidebar.js` (cacheado 10 min) para que una recruiter o un BDR
+    nuevo vea lo mismo que el resto apenas se lo da de alta con su rol en el panel de
+    admin. Antes eran listas copiadas en 6 archivos JS y cada alta había que sumarla a mano
+    (Benjamin 2026-09-29, Luz 2026-10-26).
+
+    - `is_recruiter`: fila `user_roles.role_type='recruiter'`, igual que `/users/recruiters`.
+    - `is_bdr`: `users.role` contiene "BDR". NO es `prospecting.store.has_access()`, que
+      también da True a los admins y editores de workflows (mia, manuela): a esas no se las
+      limita a CRM + Opportunities.
+    """
+    email = (request.headers.get('X-User-Email') or request.args.get('email') or '').strip().lower()
+    out = {'email': email, 'is_recruiter': False, 'is_bdr': False}
+    if not email:
+        return jsonify(out)
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    EXISTS (SELECT 1 FROM user_roles ur
+                             WHERE ur.user_id = u.user_id
+                               AND ur.role_type = 'recruiter') AS is_recruiter,
+                    UPPER(COALESCE(u.role, '')) LIKE %s AS is_bdr
+                FROM users u
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE LOWER(TRIM(u.email_vintti)) = %s
+                  AND COALESCE(aua.is_active, TRUE)
+                LIMIT 1
+                """,
+                (BDR_ROLE_PATTERN, email),
+            )
+            row = cur.fetchone()
+        if row:
+            out['is_recruiter'] = bool(row['is_recruiter'])
+            out['is_bdr'] = bool(row['is_bdr'])
+        return jsonify(out)
+    except Exception as exc:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 # Roles de `users.role` que significan "Account Manager". Es el MISMO campo que edita
 # el organigrama, a proposito: el 2026-09-21 Lara paso a Chief of Staff y Pilar a AM, y
 # hasta entonces 'lara@vintti.com' estaba escrito a mano en el JS que reasigna la cuenta

@@ -111,12 +111,16 @@
     // real, backend/routes/prospecting_routes.py) y se cachea 10 min por usuario.
     paintProspectingLink(email, setDisplay);
 
-    setDisplay('candidateSearchLink', new Set([
+    // Candidate Search y Recruiter Power: toda recruiter por su ROL (paintRoleLinks, más
+    // abajo) + estas listas, que quedan para quien las usa sin ser recruiter. Una recruiter
+    // nueva NO se suma acá: alcanza con darle el rol en el panel de admin.
+    const candidateSearchOk = new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pgonzales@vintti.com','agostina@vintti.com',
       'julieta@vintti.com','paz@vintti.com','benjamin@vintti.com',
       'valentina@vintti.com'
-    ]).has(email));
+    ]).has(email);
+    setDisplay('candidateSearchLink', candidateSearchOk);
 
     setDisplay('salesLink', new Set([
       'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com', 'camila@vintti.com',
@@ -132,11 +136,12 @@
     setDisplay('customDashboardLink', dashOk);
     setDisplay('managementMetricsLink', dashOk);
 
-    setDisplay('recruiterPowerLink', new Set([
+    const recruiterPowerOk = new Set([
       'pgonzales@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
       'constanza@vintti.com','pilar@vintti.com','julieta@vintti.com','paz@vintti.com',
       'valentina@vintti.com','benjamin@vintti.com'
-    ]).has(email));
+    ]).has(email);
+    setDisplay('recruiterPowerLink', recruiterPowerOk);
 
     // Gate del CV Review: sales leads + la supervisión (pgonzales y agostina). Se mantiene
     // en sincronía a mano con OVERSIGHT_EMAILS + user_roles.role_type='sales_lead' del
@@ -182,6 +187,93 @@
       'justo@vintti.com','ana@vintti.com','pilar@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
+
+    paintRoleLinks(email, setDisplay);
+  }
+
+  /* -------------------------
+     Acceso por rol (recruiter / BDR) — GET /users/access
+  ------------------------- */
+  // Quién es recruiter o BDR lo dice la base (`user_roles` / `users.role`), no una lista de
+  // emails: así quien entra nuevo ve lo mismo que el resto de su equipo apenas se lo da de
+  // alta con su rol. Cacheado 10 min por usuario, igual que Prospecting.
+  const ACCESS_CACHE_KEY = 'hub_access_cache';
+  const ACCESS_CACHE_MS = 10 * 60 * 1000;
+
+  function fetchHubAccess(email) {
+    try {
+      const c = JSON.parse(sessionStorage.getItem(ACCESS_CACHE_KEY) || 'null');
+      if (c && c.email === email && Date.now() - c.at < ACCESS_CACHE_MS) {
+        return Promise.resolve(c.access);
+      }
+    } catch {}
+    // Misma detección de localhost que paintCvReviewBadge: si no, una prueba local
+    // le pegaría al backend deployado.
+    const base = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+      ? 'http://127.0.0.1:5000'
+      : apiBase;
+    return fetch(`${base}/users/access`, { headers: { 'X-User-Email': email } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(access => {
+        if (!access) return null;
+        try {
+          sessionStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify({ email, access, at: Date.now() }));
+        } catch {}
+        return access;
+      })
+      .catch(() => null);   // sin respuesta quedan las listas por email, como antes
+  }
+
+  function paintRoleLinks(email, setDisplay) {
+    fetchHubAccess(email).then(access => {
+      if (!access) return;
+      if (access.is_recruiter) {
+        setDisplay('candidateSearchLink', true);
+        setDisplay('recruiterPowerLink', true);
+      }
+      if (access.is_bdr && !BDR_UNLIMITED.has(email)) enforceBdrUI();
+    });
+  }
+
+  /* -------------------------
+     BDRs: Candidates, CRM, Opportunities, Prospecting, To-Do y Calendar
+  ------------------------- */
+  // Antes vivía en crm.js con 4 emails fijos (felipe, felicitas, luca, abril): sólo corría
+  // en el CRM, antes de que se montara el sidebar, y de los 15 BDRs alcanzaba a abril.
+  // Ahora es el rol BDR (`users.role` contiene "BDR"), en todas las páginas con sidebar.
+  // Las 6 pestañas son las que la owner fijó el 2026-10-26 (Candidates, CRM, Opportunities,
+  // Prospecting, To-Do, Calendar). Quienes arman los workflows de Prospecting (manuela, mia)
+  // no tienen rol BDR, pero por las dudas la owner nunca se limita.
+  const BDR_UNLIMITED = new Set(['pgonzales@vintti.com']);
+  const BDR_ALLOWED_LINKS = new Set([
+    'candidates.html', 'crm.html', 'opportunities.html', 'prospecting.html',
+    'to-do-details.html', 'calendar.html'
+  ]);
+  // Además de esas, los detalles a los que se llega desde ellas y el perfil, que el
+  // recordatorio diario les pide completar. Por nombre exacto: con palabras sueltas
+  // "candidate" dejaría pasar candidate-search.
+  const BDR_ALLOWED_PAGES = new Set([
+    ...[...BDR_ALLOWED_LINKS].map(f => f.replace('.html', '')),
+    'candidate-details', 'resume-readonly', 'account-details', 'opportunity-detail',
+    'prospecting-company', 'profile'
+  ]);
+
+  function enforceBdrUI() {
+    document.querySelectorAll('.sidebar .menu-item').forEach(el => {
+      const href = (el.getAttribute('href') || '').split('?')[0].split('/').pop();
+      if (!BDR_ALLOWED_LINKS.has(href)) {
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      }
+    });
+    const prospecting = document.getElementById('prospectingLink');
+    if (prospecting) { prospecting.style.display = 'flex'; prospecting.removeAttribute('aria-hidden'); }
+
+    // GitHub Pages sirve /crm y /crm.html: se compara sin la extensión.
+    const page = (location.pathname || '').toLowerCase().split('/').pop().replace(/\.html$/, '');
+    if (page && !BDR_ALLOWED_PAGES.has(page)) {
+      try { location.replace('opportunities.html'); } catch { location.href = 'opportunities.html'; }
+    }
   }
 
   /* -------------------------

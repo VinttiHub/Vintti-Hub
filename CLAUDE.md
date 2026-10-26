@@ -1271,3 +1271,28 @@ el toast siempre dice qué pasó del lado de HubSpot.
 - **Si HubSpot rechaza el valor, el hub vuelve al anterior** (`revertidos` en la respuesta).
   Pasa con el email: HubSpot valida el formato y **no deja dos contactos con el mismo email**
   (prueba del 2026-10-16 en la cuenta 333). Guardarlo igual dejaba al hub distinto de HubSpot.
+
+## Sidebar: recruiters y BDRs entran por su rol
+
+Dar de alta a una recruiter o un BDR = ponerle el rol en el panel de admin. **No hay que
+sumar su email a ninguna lista.** `sidebar.js` pregunta a `GET /users/access`
+(`routes/users_routes.py`, cacheado 10 min en `sessionStorage`) y pinta según:
+
+- **`is_recruiter`** = fila `user_roles.role_type='recruiter'` (la misma de
+  `/users/recruiters` y de los dashboards de recruiters). Prende Candidate Search y Recruiter
+  Power. Las listas por email que quedan en `sidebar.js` son sólo para quien usa esas
+  pestañas **sin** ser recruiter (agustin, lara, pgonzales…). Luz (2026-10-26) no veía nada
+  porque eran listas copiadas en 6 archivos; las copias de `main.js` / `crm.js` /
+  `candidate.js` se borraron (corrían antes de montar el sidebar: eran código muerto).
+- **`is_bdr`** = `users.role` contiene "BDR". `enforceBdrUI()` deja en el sidebar sólo
+  Candidates, CRM, Opportunities, Prospecting, To-Do y Calendar (`BDR_ALLOWED_LINKS`, las que
+  fijó la owner el 2026-10-26), y desde cualquier otra página manda a Opportunities. Se
+  permiten además los detalles (candidate-details, resume-readonly, account-details,
+  opportunity-detail, prospecting-company) y profile: `BDR_ALLOWED_PAGES`, por nombre exacto. Antes vivía en `crm.js`
+  con 4 emails fijos y de los 15 BDRs sólo alcanzaba a abril. No es
+  `prospecting.store.has_access()`: ese incluye a los editores de workflows (mia, manuela).
+- **Recruiter Power** restringe al revés que antes: ven a todas sólo `FULL_VIEW_EMAILS`
+  (pgonzales, agostina, lara, agustin); cualquier otra persona ve sólo su fila.
+- El link de applicants de `opportunity-detail.js` ya caía a `/users/recruiters`.
+
+Todo es client-side, como antes: ninguno de estos endpoints tiene gate por rol.

@@ -2453,44 +2453,8 @@ async function initSidebarProfileCRM(){
 // mantener este listener tal cual
 document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
 
-// Enforce limited UI for specific users (CRM + Opportunities only)
-(function enforceLimitedUI() {
-  const LIMITED_USERS = new Set(['felipe@vintti.com','felicitas@vintti.com','luca@vintti.com','abril@vintti.com']);
-  const ALLOWED_IDS = new Set(['crmLink','opportunitiesLink']);
-  const ALLOWED_TEXT_KEYWORDS = ['crm', 'opportunit', 'prospecting'];
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  if (!LIMITED_USERS.has(email)) return;
-
-  const navCandidates = Array.from(document.querySelectorAll(`
-    .sidebar a, .sidebar button, nav a, nav button,
-    .topbar a, .topbar button, .menu a, .menu button,
-    .bubble-button, a[id], button[id]
-  `));
-
-  navCandidates.forEach(el => {
-    const id = (el.id || '').toLowerCase();
-    const txt = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase().trim();
-    const isAllowedById = id && ALLOWED_IDS.has(id);
-    const isAllowedByText = ALLOWED_TEXT_KEYWORDS.some(k => txt.includes(k));
-    if (!isAllowedById && !isAllowedByText) {
-      el.style.display = 'none';
-      el.setAttribute('aria-hidden', 'true');
-    }
-  });
-
-  ['crmLink', 'opportunitiesLink'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.style.display = ''; el.removeAttribute('aria-hidden'); }
-  });
-
-  const path = (location.pathname || '').toLowerCase();
-  const isAllowedPage = path.includes('opportunit') || path.includes('crm');
-  if (!isAllowedPage) {
-    const fallback = document.getElementById('opportunitiesLink')?.getAttribute('href') || 'opportunities.html';
-    try { location.replace(fallback); } catch { location.href = fallback; }
-  }
-})();
+// La UI limitada de los BDRs (sólo CRM + Opportunities + Prospecting) vive en sidebar.js
+// (enforceBdrUI), por rol BDR y en todas las páginas.
 
 // Inject Dashboard + Management Metrics for allowed users 
 // --- Equipments(visibilidad por email) ---
@@ -2535,30 +2499,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   if (dash) dash.style.display = 'flex';
   if (mgmt) mgmt.style.display = 'flex';
 })();
-// --- Recruiter Power (visibilidad por email) ---
-(() => {
-  const link = document.getElementById('recruiterPowerLink');
-  if (!link) return;
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-  const RECRUITER_POWER_ALLOWED = new Set([
-    'pgonzales@vintti.com',
-    'agostina@vintti.com',
-    'agostin@vintti.com',
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'constanza@vintti.com',
-    'pilar@vintti.com',
-    'julieta@vintti.com',
-    'paz@vintti.com',
-    'valentina@vintti.com',
-    'benjamin@vintti.com'
-  ]);
-
-  // Mantener flex para icono + texto alineados
-  link.style.display = RECRUITER_POWER_ALLOWED.has(email) ? 'flex' : 'none';
-})();
 // --- Sales Metrics ---
 (() => {
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
@@ -2579,28 +2519,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   }
 
   if (sales) sales.style.display = 'flex';
-})();
-/* === Candidate Search button visibility (igual que en main) === */
-(() => {
-  const candidateSearchLink = document.getElementById('candidateSearchLink');
-  if (!candidateSearchLink) return;
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-  const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'constanza@vintti.com',
-    'pilar@vintti.com',
-    'pgonzales@vintti.com',
-    'agostina@vintti.com',
-    'julieta@vintti.com',
-    'paz@vintti.com',
-    'benjamin@vintti.com',
-    'valentina@vintti.com'
-  ]);
-
-  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';
 })();
 // Summary / Equipments visibility
 (() => {

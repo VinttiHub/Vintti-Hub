@@ -1532,31 +1532,6 @@ function installAdvancedFilters(table) {
   if (dash) dash.style.display = 'flex';
   if (mgmt) mgmt.style.display = 'flex';
 })();
-// --- Recruiter Power (visibilidad por email) ---
-(() => {
-  const link = document.getElementById('recruiterPowerLink');
-  if (!link) return;
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-
-  const RECRUITER_POWER_ALLOWED = new Set([
-    'pgonzales@vintti.com',
-    'agostina@vintti.com',
-    'agostin@vintti.com',
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'constanza@vintti.com',
-    'pilar@vintti.com',
-    'julieta@vintti.com',
-    'paz@vintti.com',
-    'valentina@vintti.com',
-    'benjamin@vintti.com'
-  ]);
-
-  // Mantener flex para icono + texto alineados
-  link.style.display = RECRUITER_POWER_ALLOWED.has(email) ? 'flex' : 'none';
-})();
 // --- Sales Metrics ---
 (() => {
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
@@ -1577,28 +1552,6 @@ function installAdvancedFilters(table) {
   }
 
   if (sales) sales.style.display = 'flex';
-})();
-/* === Candidate Search button visibility (igual que en main) === */
-(() => {
-  const candidateSearchLink = document.getElementById('candidateSearchLink');
-  if (!candidateSearchLink) return;
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-  const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'constanza@vintti.com',
-    'pilar@vintti.com',
-    'pgonzales@vintti.com',
-    'agostina@vintti.com',
-    'julieta@vintti.com',
-    'paz@vintti.com',
-    'benjamin@vintti.com',
-    'valentina@vintti.com'
-  ]);
-
-  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';
 })();
 // Summary / Equipments visibility
 (() => {
