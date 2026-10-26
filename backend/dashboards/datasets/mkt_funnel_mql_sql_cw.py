@@ -3,7 +3,8 @@
 Por etapa ALCANZADA (el lead_life actual = la etapa máxima a la que llegó), filtrado
 por marketing (`mql_source` ∈ {Inbound MQL, Event MQL}). Cada etapa se ancla con su
 PROPIA fecha para cuadrar con sus cards: MQL por `date_of_meeting_scheduled` (se
-agendó), SQL y CW por `meeting_date___time` (la reunión ocurrió). Normalmente
+agendó), SQL y CW por `meeting_date___time` (la reunión ocurrió; desde el 2026-10-05,
+la SQL Date del deal, ver `_mkt_sql_anchor.py`). Normalmente
 MQL ≥ SQL ≥ CW; con anclas distintas puede invertirse en bordes de período (raro).
 """
 from __future__ import annotations
@@ -15,7 +16,8 @@ from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
 # DQL (descalificados) se EXCLUYE del embudo (no son conversiones reales).
 _WON = {"active client", "inactive client"}
-# SQL = llegó a SQL y calificó — NO cuenta los Closed Lost (los perdidos no son SQL).
+# SQL = llegó a SQL y calificó — NO cuenta los Closed Lost (los perdidos no son SQL),
+# salvo desde el 2026-10-05 si su deal pasó por el stage SQL (`_mkt_sql_anchor`).
 _REACHED_SQL = _WON | {"sql (ae)"}
 # MQL = agendó reunión: SÍ incluye los que después se perdieron (Closed Lost) o avanzaron.
 _REACHED_MQL = _REACHED_SQL | {"mql (ae)", "closed lost"}
@@ -52,6 +54,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         extra_properties=[lead_life_property, mql_anchor, sql_anchor, origin_prop, "mql_source"],
     )
 
+    # SQL / CW: quién es SQL y en qué fecha lo decide `_mkt_sql_anchor` (meeting antes
+    # del 2026-10-05, SQL Date del deal desde ahí; suma los SQL que después se perdieron).
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     mql = sqlc = cw = 0
     for c in contacts:
         props = c.get("properties") or {}
@@ -65,12 +72,12 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         if ll not in _REACHED_MQL:
             continue
         d_mql = _parse_hs_date_ms(props.get(mql_anchor))
-        d_sql = _parse_hs_date_ms(props.get(sql_anchor))
+        d_sql = sql_date_of(c, deal_dates, sql_anchor, lead_life_property)
         in_mql = d_mql is not None and ini <= d_mql <= fin
         in_sql = d_sql is not None and ini <= d_sql <= fin
         if in_mql:
             mql += 1
-        if ll in _REACHED_SQL and in_sql:
+        if in_sql:
             sqlc += 1
         if ll in _WON and in_sql:
             cw += 1

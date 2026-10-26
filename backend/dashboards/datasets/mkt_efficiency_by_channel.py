@@ -39,12 +39,12 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
         _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
     )
     from .mkt_mqls_by_origin import _parse_hs_date_ms, _IN_VALUES, _REACHED_MQL
-    from .mkt_funnel_mql_sql_cw import _REACHED_SQL
     from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
     # Ancla DOBLE: MQL por `date_of_meeting_scheduled` (se agendó), SQL por
-    # `meeting_date___time` (la reunión ocurrió) — para que el SQL cuadre con sus cards.
+    # `meeting_date___time` (la reunión ocurrió; desde el 2026-10-05, la SQL Date del
+    # deal) — para que el SQL cuadre con sus cards.
     mql_anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
     sql_anchor = (
         os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
@@ -58,6 +58,11 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[lead_life_property, mql_anchor, sql_anchor, origin_prop, "mql_source"],
     )
+    # SQL: `_mkt_sql_anchor` (meeting antes del 2026-10-05, SQL Date del deal desde ahí;
+    # suma los SQL que después se perdieron), igual que el card de SQLs.
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     sql_contacts, mql_by_origin = [], Counter()
     for c in contacts:
         p = c.get("properties") or {}
@@ -74,10 +79,9 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
         d_mql = _parse_hs_date_ms(p.get(mql_anchor))
         if d_mql is not None and ini <= d_mql <= fin:
             mql_by_origin[origin] += 1
-        if ll in _REACHED_SQL:
-            d_sql = _parse_hs_date_ms(p.get(sql_anchor))
-            if d_sql is not None and ini <= d_sql <= fin:
-                sql_contacts.append((str(c.get("id") or "").strip(), origin))
+        d_sql = sql_date_of(c, deal_dates, sql_anchor, lead_life_property)
+        if d_sql is not None and ini <= d_sql <= fin:
+            sql_contacts.append((str(c.get("id") or "").strip(), origin))
     return sql_contacts, mql_by_origin
 
 

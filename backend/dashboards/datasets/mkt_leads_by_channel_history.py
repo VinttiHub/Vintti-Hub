@@ -3,7 +3,8 @@
 `lead_type` (filtro) elige la métrica, AMBAS live desde HubSpot con la misma
 definición que los cards/detalles: 'mql' = etapa alcanzada MQL(AE)+ (ancla
 `date_of_meeting_scheduled`, cuando se agendó), 'sql' = etapa alcanzada SQL(AE)+
-(ancla `meeting_date___time`, cuando ocurrió el meeting); filtro `mql_source` ∈
+(ancla `meeting_date___time`, cuando ocurrió el meeting; desde el 2026-10-05 la SQL Date
+del deal, ver `_mkt_sql_anchor.py`); filtro `mql_source` ∈
 {Inbound MQL, Event MQL}. La periodicidad define la granularidad del eje X DENTRO
 del período seleccionado:
   semana → días · mes → semanas · q/año → meses
@@ -68,8 +69,7 @@ def _sql_counts(ini: date, fin: date, unit: str):
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
     )
-    from .mkt_mqls_by_origin import _parse_hs_date_ms, _IN_VALUES
-    from .mkt_funnel_mql_sql_cw import _REACHED_SQL
+    from .mkt_mqls_by_origin import _IN_VALUES
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
     anchor = (
@@ -85,12 +85,15 @@ def _sql_counts(ini: date, fin: date, unit: str):
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
     )
+    # Quién es SQL y en qué fecha: `_mkt_sql_anchor` (meeting antes del 2026-10-05,
+    # SQL Date del deal desde ahí), igual que el card.
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     counts, totals = {}, {}
     for c in contacts:
         p = c.get("properties") or {}
-        if str(p.get(lead_life_property) or "").strip().lower() not in _REACHED_SQL:
-            continue
-        d = _parse_hs_date_ms(p.get(anchor))
+        d = sql_date_of(c, deal_dates, anchor, lead_life_property)
         if d is None or d < ini or d > fin:
             continue
         if not is_marketing_mql_source(p.get("mql_source")):

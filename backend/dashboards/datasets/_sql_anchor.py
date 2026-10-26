@@ -17,8 +17,8 @@ escribe nunca una `sql_date` anterior al corte (`sql_date_from_deal` en
 utils/hubspot_opportunities.py, mismo `SQL_DATE_CUTOVER`): si tocás uno, tocá el otro.
 
 Sin `%` en el SQL: psycopg2 lo leería como placeholder.
-El tab Marketing NO usa esto: sigue leyendo Meeting Date & Time en vivo de los
-contactos (decisión de la owner, 2026-10-05).
+El tab Marketing aplica la misma regla sobre los contactos de HubSpot en
+`_mkt_sql_anchor.py` (desde el 2026-10-26; el mismo corte).
 """
 from __future__ import annotations
 

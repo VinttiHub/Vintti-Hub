@@ -5,8 +5,9 @@ y su variación vs el MISMO span del período anterior (MTD vs MTD, YTD vs YTD, 
 
   - sqls         → contactos que ALCANZARON la etapa SQL (AE) en HubSpot, anclados
                    por `meeting_date___time` (la fecha REAL del meeting = cuando se
-                   volvió SQL; NO la de agendamiento), en el período. Misma definición
-                   que mkt_sqls_by_origin / mkt_sqls_by_origin_detail.
+                   volvió SQL; NO la de agendamiento), en el período. Desde el
+                   2026-10-05, la SQL Date del deal (ver `_mkt_sql_anchor.py`). Misma
+                   definición que mkt_sqls_by_origin / mkt_sqls_by_origin_detail.
   - new_clients  → cuentas con su PRIMER Close Win (opp_close_date) en el período.
   - close_rate   → win rate por cliente de lo decidido (cierre en el período):
                    Close Win ÷ (Close Win + solo Closed Lost), a nivel cuenta.
@@ -30,10 +31,8 @@ from datetime import date, timedelta
 from .mkt_sqls_by_origin import period_bounds, LABEL_SEMANA_VENCIDA
 from ._marketing_scope import is_marketing_mql_source, is_non_marketing_origin
 
-# Definición de SQL = etapa ALCANZADA en HubSpot (idéntica a mkt_funnel_mql_sql_cw):
-#   SQL = llegó a SQL (AE) o más (active/inactive client). NO cuenta Closed Lost.
-_WON = {"active client", "inactive client"}
-_REACHED_SQL = _WON | {"sql (ae)"}
+# Definición de SQL: `_mkt_sql_anchor.sql_date_of` (etapa ALCANZADA SQL (AE)+; desde el
+# 2026-10-05 también un deal que pasó por el stage SQL, aunque se haya perdido).
 # Valores exactos de lead_life para acotar el search en HubSpot.
 _IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
 
@@ -83,12 +82,12 @@ def _fmt_range(ini: date, fin: date) -> str:
 
 def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, int]:
     """SQLs (etapa alcanzada en HubSpot, ancla meeting_date___time = fecha real del
-    meeting) para el período actual [ini, fin] y el anterior [pini, pfin]."""
+    meeting; desde el corte, la SQL Date del deal) para el período actual [ini, fin] y
+    el anterior [pini, pfin]."""
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value,
     )
-    from .mkt_mqls_by_origin import _parse_hs_date_ms
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
     # Ancla SQL = fecha REAL del meeting (`meeting_date___time`), no la de agendamiento.
@@ -108,10 +107,14 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
         extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
     )
 
+    # Desde el 2026-10-05 la fecha (y quién es SQL) la decide `_mkt_sql_anchor`.
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     cur = prev = 0
     for c in contacts:
         props = c.get("properties") or {}
-        d = _parse_hs_date_ms(props.get(anchor))
+        d = sql_date_of(c, deal_dates, anchor, lead_life_property)
         if d is None:
             continue
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
@@ -120,9 +123,6 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
         # Excluir origins que no son marketing (Outbound = Sales), aunque el
         # mql_source diga inbound (contactos mal marcados en HubSpot).
         if is_non_marketing_origin(_first_mapped_value(pm, "where_come_from", contact=c)):
-            continue
-        ll = str(props.get(lead_life_property) or "").strip().lower()
-        if ll not in _REACHED_SQL:
             continue
         if ini <= d <= fin:
             cur += 1

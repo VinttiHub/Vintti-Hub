@@ -294,8 +294,13 @@ estuvieron gateados por stage, entran solos cuando la opp se crea en Deep Dive.
 - **Las 16 cards de SQL del tab Sales anclan en `_sql_anchor.py`**: `sql_meeting_date` si es
   anterior al corte (historia congelada), si no `sql_date`, si no `sql_meeting_date`. Pedido
   de la owner: que no cambie ningún número de antes del corte (verificado: 0 diferencias en
-  los 16 datasets). Si cambiás el corte, cambialo en los dos archivos. **El tab Marketing NO
-  se tocó**: sigue leyendo Meeting Date & Time en vivo de los contactos.
+  los 16 datasets). Si cambiás el corte, cambialo en los dos archivos (y en `_mkt_sql_anchor.py`).
+- **El tab Marketing usa la misma regla desde el 2026-10-26**, sobre los contactos de HubSpot:
+  `_mkt_sql_anchor.py` (`sql_date_of()`) en los 7 datasets `mkt_*` que cuentan SQL. Meeting
+  Date & Time anterior al corte → esa; si no, la SQL Date mínima de sus deals; si no, Meeting.
+  Desde el corte, un contacto cuyo deal pasó por el stage SQL **cuenta como SQL aunque esté en
+  Closed Lost** (decisión de la owner, igual que Sales). Verificado: 0 diferencias antes del
+  corte. Alimenta también el OKR O3·KR4 "SQL Marketing" (`mkt_business_metrics`).
 
 ### Vincular a mano: la adopción automática casi nunca alcanza
 

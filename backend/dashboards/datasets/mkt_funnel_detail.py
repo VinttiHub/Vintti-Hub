@@ -4,7 +4,8 @@
 `mql_source`) que alcanzaron esa etapa en el período, con su etapa actual (lead_life).
 Mismos tiers y MISMAS anclas que mkt_funnel_mql_sql_cw: MQL por
 `date_of_meeting_scheduled` (se agendó), SQL/CW por `meeting_date___time` (la reunión
-ocurrió), para que el detalle cuadre con el conteo del embudo.
+ocurrió; desde el 2026-10-05, la SQL Date del deal, ver `_mkt_sql_anchor.py`), para que
+el detalle cuadre con el conteo del embudo.
 """
 from __future__ import annotations
 
@@ -53,10 +54,19 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         extra_properties=[lead_life_property, anchor, origin_prop, "mql_source", company_prop],
     )
 
+    if is_sql_or_cw:
+        # Mismo criterio que el embudo: `_mkt_sql_anchor` (meeting antes del 2026-10-05,
+        # SQL Date del deal desde ahí; suma los SQL que después se perdieron).
+        from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+        deal_dates = deal_sql_dates(client)
+
     rows = []
     for c in contacts:
         props = c.get("properties") or {}
-        d = _parse_hs_date_ms(props.get(anchor))
+        if is_sql_or_cw:
+            d = sql_date_of(c, deal_dates, anchor, lead_life_property)
+        else:
+            d = _parse_hs_date_ms(props.get(anchor))
         if d is None or d < ini or d > fin:
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
@@ -68,7 +78,8 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         ll = str(props.get(lead_life_property) or "").strip().lower()
-        if ll not in tier:
+        # En SQL la etapa ya la validó `sql_date_of` (incluye los SQL perdidos).
+        if stage != "sql" and ll not in tier:
             continue
         name = (
             _first_mapped_value(pm, "client_name", contact=c)
@@ -92,7 +103,7 @@ DATASET = {
     "key": "mkt_funnel_detail",
     "label": "Marketing · Detalle embudo (por etapa, live HubSpot)",
     "dimensions": [
-        {"key": "created", "label": "Fecha meeting", "type": "date"},
+        {"key": "created", "label": "Fecha (meeting / SQL)", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},
         {"key": "lead_life", "label": "Etapa actual", "type": "string"},

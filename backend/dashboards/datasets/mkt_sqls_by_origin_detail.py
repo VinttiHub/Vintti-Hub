@@ -3,7 +3,8 @@
 Una fila por SQL contado en el card de Métricas de Negocio: contactos cuyo lead_life
 ALCANZÓ la etapa SQL (AE) o más (active/inactive client), anclados por
 `meeting_date___time` (la fecha REAL del meeting = cuando se volvió SQL) en el
-período. Misma definición y mismas bounds que `mkt_business_metrics` (sqls) y
+período; desde el 2026-10-05, la SQL Date del deal, y suma los SQL que se perdieron
+(`_mkt_sql_anchor.py`). `sql_date` es el ancla; `meeting_date` queda de referencia. Misma definición y mismas bounds que `mkt_business_metrics` (sqls) y
 `mkt_sqls_by_origin`, para que el detalle cuadre con el conteo.
 """
 from __future__ import annotations
@@ -52,19 +53,22 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         ],
     )
 
+    # Quién es SQL y en qué fecha: `_mkt_sql_anchor` (meeting antes del 2026-10-05,
+    # SQL Date del deal desde ahí), igual que el conteo.
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     rows = []
     for c in contacts:
         props = c.get("properties") or {}
-        # Cohorte por etapa alcanzada: tiene que haber llegado a SQL (AE) o más allá.
         ll = str(props.get(lead_life_property) or "").strip()
-        if ll.lower() not in _REACHED_SQL:
-            continue
-        # Filtramos por el ancla (date_of_meeting_scheduled). En SNAPSHOT_MODE no
-        # filtramos por fecha ni excluimos outbound (mostrar todo).
-        if not SNAPSHOT_MODE:
-            anchor_d = _parse_hs_date_ms(props.get(anchor_property))
-            if anchor_d is None or anchor_d < ini or anchor_d > fin:
+        # En SNAPSHOT_MODE no filtramos por fecha ni excluimos outbound (mostrar todo).
+        sql_d = sql_date_of(c, deal_dates, anchor_property, lead_life_property)
+        if SNAPSHOT_MODE:
+            if ll.lower() not in _REACHED_SQL:
                 continue
+        elif sql_d is None or sql_d < ini or sql_d > fin:
+            continue
         origin = _normalize_lead_source(
             _first_mapped_value(property_maps, "where_come_from", contact=c)
         )
@@ -84,6 +88,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         created_d = _parse_hs_date_ms(props.get("createdate"))
         meeting_d = _parse_hs_date_ms(props.get(meeting_property))
         rows.append({
+            "sql_date": sql_d.isoformat() if sql_d else "",
             "created": created_d.isoformat() if created_d else "",
             "meeting_date": meeting_d.isoformat() if meeting_d else "",
             "client_name": str(name),
@@ -92,7 +97,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         })
 
     rows.sort(key=lambda r: r["client_name"])
-    rows.sort(key=lambda r: r["meeting_date"], reverse=True)
+    rows.sort(key=lambda r: r["sql_date"], reverse=True)
     return rows
 
 
@@ -100,6 +105,7 @@ DATASET = {
     "key": "mkt_sqls_by_origin_detail",
     "label": "Marketing · detalle SQLs (período, live HubSpot)",
     "dimensions": [
+        {"key": "sql_date", "label": "Fecha SQL", "type": "date"},
         {"key": "meeting_date", "label": "Meeting (fecha real)", "type": "date"},
         {"key": "created", "label": "Creación (SQL)", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},

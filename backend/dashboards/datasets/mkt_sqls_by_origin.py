@@ -2,7 +2,8 @@
 
 SQL = contacto que ALCANZÓ la etapa SQL (AE) o más (active/inactive client) en
 HubSpot, anclado por `meeting_date___time` (la fecha REAL del meeting, = cuando se
-volvió SQL; NO la de agendamiento, que es el ancla del MQL). Misma definición que el
+volvió SQL; NO la de agendamiento, que es el ancla del MQL). Desde el 2026-10-05 ancla
+en la SQL Date del deal y suma los SQL perdidos (`_mkt_sql_anchor.py`). Misma definición que el
 card de SQLs (mkt_business_metrics) — ya NO es
 account.creation_date sobre Postgres. Marketing-scope = Inbound en AMBAS dimensiones
 (origin/MQL Source + conversion_channel/Booking Source). Segmentado por origin.
@@ -82,7 +83,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         _first_mapped_value,
         _normalize_lead_source,
     )
-    from .mkt_mqls_by_origin import _parse_hs_date_ms, SNAPSHOT_MODE
+    from .mkt_mqls_by_origin import SNAPSHOT_MODE
 
     ini, fin, label = period_bounds(filters)
 
@@ -107,14 +108,20 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         extra_properties=[lead_life_property, anchor_property, origin_prop, "mql_source"],
     )
 
+    # Quién es SQL y en qué fecha: `_mkt_sql_anchor` (meeting antes del 2026-10-05,
+    # SQL Date del deal desde ahí).
+    from ._mkt_sql_anchor import deal_sql_dates, sql_date_of
+    deal_dates = deal_sql_dates(client)
+
     counts: dict[str, int] = {}
     for c in contacts:
-        # Tiene que haber ALCANZADO SQL (AE) o más allá.
-        ll = str((c.get("properties") or {}).get(lead_life_property) or "").strip().lower()
-        if ll not in _REACHED_SQL:
-            continue
-        if not SNAPSHOT_MODE:
-            d = _parse_hs_date_ms((c.get("properties") or {}).get(anchor_property))
+        if SNAPSHOT_MODE:
+            # Sin filtro de fecha: sólo la etapa alcanzada (SQL (AE) o más).
+            ll = str((c.get("properties") or {}).get(lead_life_property) or "").strip().lower()
+            if ll not in _REACHED_SQL:
+                continue
+        else:
+            d = sql_date_of(c, deal_dates, anchor_property, lead_life_property)
             if d is None or d < ini or d > fin:
                 continue
         origin = _normalize_lead_source(
