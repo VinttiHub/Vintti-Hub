@@ -39,6 +39,7 @@ from utils.transactional_email import (
 from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.types import to_bool
 from utils.second_interview_refs import ensure_second_interview_refs_schema_standalone
+from routes.dashboards_routes import _require_active_user
 
 bp = Blueprint('candidates', __name__)
 
@@ -1393,67 +1394,76 @@ def delete_candidate_test(candidate_id):
         logging.exception("Failed to delete candidate test (candidate_id=%s, key=%s)", candidate_id, key)
         return jsonify({"error": str(exc)}), 500
 
+def _cv_brand_sql(scope_opp):
+    """SQL de la marca del CV client-version (`vintti_ai`) y sus parámetros.
+
+    La decide LA VACANTE, no el candidato: la misma persona puede estar en un proceso
+    de Vintti AI y en uno de Vintti normal, y el CV tiene que salir con la marca de la
+    cuenta a la que se lo está mandando. Por eso `scope_opp` (?opportunity_id=) manda
+    cuando viene. Espera el alias `c` para candidates.
+    """
+    if scope_opp:
+        vintti_ai_sql = """
+            COALESCE((
+              SELECT a_ai.vintti_ai
+              FROM opportunity o_ai
+              JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+              WHERE o_ai.opportunity_id = %s
+            ), FALSE) AS vintti_ai"""
+        head_params = (scope_opp,)
+    else:
+        # Sin vacante en la URL (links viejos ya enviados, Account Overview) no hay a
+        # quién preguntarle: AI sólo si TODOS los vínculos del candidato son con
+        # cuentas AI. Mezclado → Vintti, porque mandarle marca AI a un cliente que no
+        # es de AI es el error caro. (GET /candidates sigue con el OR de siempre: ahí
+        # el flag es para el filtro Workspace del listado, no para el branding.)
+        vintti_ai_sql = """
+            (
+              (
+                EXISTS (
+                  SELECT 1
+                  FROM opportunity_candidates oc_ai
+                  JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
+                  JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+                  WHERE oc_ai.candidate_id = c.candidate_id
+                    AND COALESCE(a_ai.vintti_ai, FALSE)
+                ) OR EXISTS (
+                  SELECT 1
+                  FROM hire_opportunity h_ai
+                  JOIN account a_ai ON a_ai.account_id = h_ai.account_id
+                  WHERE h_ai.candidate_id = c.candidate_id
+                    AND COALESCE(a_ai.vintti_ai, FALSE)
+                )
+              ) AND NOT (
+                EXISTS (
+                  SELECT 1
+                  FROM opportunity_candidates oc_no
+                  JOIN opportunity o_no ON o_no.opportunity_id = oc_no.opportunity_id
+                  JOIN account a_no ON a_no.account_id = o_no.account_id
+                  WHERE oc_no.candidate_id = c.candidate_id
+                    AND NOT COALESCE(a_no.vintti_ai, FALSE)
+                ) OR EXISTS (
+                  SELECT 1
+                  FROM hire_opportunity h_no
+                  JOIN account a_no ON a_no.account_id = h_no.account_id
+                  WHERE h_no.candidate_id = c.candidate_id
+                    AND NOT COALESCE(a_no.vintti_ai, FALSE)
+                )
+              )
+            ) AS vintti_ai"""
+        head_params = ()
+    return vintti_ai_sql, head_params
+
+
 @bp.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):
     try:
         # La columna references_filled se autocrea: sin esto el SELECT fallaría en
         # un entorno donde todavía no corrió el recordatorio de Second Interview.
         ensure_second_interview_refs_schema_standalone()
-        # Marca del CV client-version (resume-readonly). La decide LA VACANTE, no el
-        # candidato: la misma persona puede estar en un proceso de Vintti AI y en uno de
-        # Vintti normal, y el CV tiene que salir con la marca de la cuenta a la que se lo
-        # está mandando. Por eso ?opportunity_id= manda cuando viene.
+        # Marca del CV client-version: ver _cv_brand_sql().
         scope_opp = request.args.get('opportunity_id', type=int)
-        if scope_opp:
-            vintti_ai_sql = """
-                COALESCE((
-                  SELECT a_ai.vintti_ai
-                  FROM opportunity o_ai
-                  JOIN account a_ai ON a_ai.account_id = o_ai.account_id
-                  WHERE o_ai.opportunity_id = %s
-                ), FALSE) AS vintti_ai"""
-            head_params = (scope_opp,)
-        else:
-            # Sin vacante en la URL (links viejos ya enviados, Account Overview) no hay a
-            # quién preguntarle: AI sólo si TODOS los vínculos del candidato son con
-            # cuentas AI. Mezclado → Vintti, porque mandarle marca AI a un cliente que no
-            # es de AI es el error caro. (GET /candidates sigue con el OR de siempre: ahí
-            # el flag es para el filtro Workspace del listado, no para el branding.)
-            vintti_ai_sql = """
-                (
-                  (
-                    EXISTS (
-                      SELECT 1
-                      FROM opportunity_candidates oc_ai
-                      JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
-                      JOIN account a_ai ON a_ai.account_id = o_ai.account_id
-                      WHERE oc_ai.candidate_id = c.candidate_id
-                        AND COALESCE(a_ai.vintti_ai, FALSE)
-                    ) OR EXISTS (
-                      SELECT 1
-                      FROM hire_opportunity h_ai
-                      JOIN account a_ai ON a_ai.account_id = h_ai.account_id
-                      WHERE h_ai.candidate_id = c.candidate_id
-                        AND COALESCE(a_ai.vintti_ai, FALSE)
-                    )
-                  ) AND NOT (
-                    EXISTS (
-                      SELECT 1
-                      FROM opportunity_candidates oc_no
-                      JOIN opportunity o_no ON o_no.opportunity_id = oc_no.opportunity_id
-                      JOIN account a_no ON a_no.account_id = o_no.account_id
-                      WHERE oc_no.candidate_id = c.candidate_id
-                        AND NOT COALESCE(a_no.vintti_ai, FALSE)
-                    ) OR EXISTS (
-                      SELECT 1
-                      FROM hire_opportunity h_no
-                      JOIN account a_no ON a_no.account_id = h_no.account_id
-                      WHERE h_no.candidate_id = c.candidate_id
-                        AND NOT COALESCE(a_no.vintti_ai, FALSE)
-                    )
-                  )
-                ) AS vintti_ai"""
-            head_params = ()
+        vintti_ai_sql, head_params = _cv_brand_sql(scope_opp)
 
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1537,6 +1547,71 @@ def get_candidate_by_id(candidate_id):
         return jsonify(candidate)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/public/candidates/<int:candidate_id>', methods=['GET'])
+def get_public_candidate(candidate_id):
+    """Lo único que necesita el CV público (resume-readonly.html): nombre, país y marca.
+
+    Ese link lo abre el cliente sin login, así que no puede pegarle a
+    GET /candidates/<id>, que trae email, teléfono, dirección, DNI y referencias.
+    No agregues campos acá sin pensar que los ve cualquiera que tenga el link.
+    """
+    try:
+        vintti_ai_sql, head_params = _cv_brand_sql(request.args.get('opportunity_id', type=int))
+        conn = get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(f"""
+                    SELECT c.name, c.country, {vintti_ai_sql}
+                    FROM candidates c
+                    WHERE c.candidate_id = %s
+                """, head_params + (candidate_id,))
+                candidate = cursor.fetchone()
+        finally:
+            conn.close()
+        if not candidate:
+            return jsonify({"error": "Candidate not found"}), 404
+        return jsonify(candidate)
+    except Exception:
+        logging.exception("GET /public/candidates/%s", candidate_id)
+        return jsonify({"error": "Unable to load candidate"}), 500
+
+
+# Lo que el CV público muestra. GET /resumes/<id> trae además extract_cv_pdf (el texto
+# entero del PDF, con email y teléfono) y cv_pdf_s3: eso no puede llegar al cliente.
+PUBLIC_RESUME_FIELDS = (
+    'about', 'work_experience', 'education', 'tools', 'languages',
+    'video_link', 'stars', 'comments_stars',
+)
+# Lo único que PATCH /resumes/<id> acepta sin usuario del hub: la calificación del cliente.
+PUBLIC_RATING_FIELDS = {'stars', 'comments_stars'}
+
+
+@bp.route('/public/resumes/<int:candidate_id>', methods=['GET'])
+def get_public_resume(candidate_id):
+    """El resume del CV público (resume-readonly.html), sin el PDF ni su texto."""
+    try:
+        conn = get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    f"SELECT {', '.join(PUBLIC_RESUME_FIELDS)} FROM resume WHERE candidate_id = %s",
+                    (candidate_id,),
+                )
+                row = cursor.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            # Mismo vacío que GET /resumes/<id>, para que la página pinte igual.
+            row = {
+                "about": "", "work_experience": "[]", "education": "[]", "tools": "[]",
+                "languages": "[]", "video_link": "", "stars": 0, "comments_stars": "",
+            }
+        return jsonify(row)
+    except Exception:
+        logging.exception("GET /public/resumes/%s", candidate_id)
+        return jsonify({"error": "Unable to load resume"}), 500
 
 @bp.route('/candidates/<int:candidate_id>/hire_opportunity', methods=['GET'])
 def get_hire_opportunity(candidate_id):
@@ -3327,6 +3402,14 @@ def resumes(candidate_id):
     try:
         logging.info("📥 PATCH /resumes/%s", candidate_id)
         data = request.get_json(silent=True) or {}
+        # El CV público (resume-readonly) deja acá la calificación del cliente, sin login.
+        # Eso, y sólo eso, sigue abierto: editar el contenido del CV exige un usuario
+        # activo del hub (X-User-Email), o cualquiera con un link podía reescribir el CV
+        # de cualquier candidato cambiando el id.
+        if not set(data) <= PUBLIC_RATING_FIELDS:
+            denied = _require_active_user()
+            if denied is not None:
+                return denied
         allow_clear = (request.args.get('allow_clear', 'false').lower() == 'true')
         rating_payload = any(field in data for field in ("stars", "comments_stars"))
 

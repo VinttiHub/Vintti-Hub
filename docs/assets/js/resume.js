@@ -1180,7 +1180,11 @@ async function saveNow(options = {}){
       try {
         lastRes = await fetch(url, {
           method: 'PATCH',
-          headers: { 'Content-Type':'application/json' },
+          // Editar el CV exige un usuario activo del hub; sin esto el backend responde 401.
+          headers: {
+            'Content-Type':'application/json',
+            'X-User-Email': (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase().trim(),
+          },
           body: JSON.stringify(patch)
         });
       } catch (netErr) {

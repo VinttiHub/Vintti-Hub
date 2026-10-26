@@ -110,14 +110,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // Se reutiliza más abajo para nombre y país: evita pedir el candidato dos veces.
+  // Va al endpoint público, que trae SÓLO nombre, país y marca: esta página la abre el
+  // cliente sin login, y GET /candidates/:id trae email, teléfono, DNI y referencias.
+  const fetchCandidateMeta = async () => {
+    const qs = brandOppId ? `?opportunity_id=${encodeURIComponent(brandOppId)}` : "";
+    let metaRes = await fetch(`${API_BASE}/public/candidates/${candidateId}${qs}`);
+    // 404 = backend todavía sin la ruta nueva (docs/ se publica antes que App Runner).
+    if (metaRes.status === 404) metaRes = await fetch(`${API_BASE}/candidates/${candidateId}${qs}`);
+    if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status} al traer el candidato`);
+    const meta = await metaRes.json();
+    return { name: meta.name, country: meta.country, vintti_ai: meta.vintti_ai };
+  };
   let candidateMeta = null;
   if (candidateId) {
     try {
-      const metaUrl = brandOppId
-        ? `${API_BASE}/candidates/${candidateId}?opportunity_id=${encodeURIComponent(brandOppId)}`
-        : `${API_BASE}/candidates/${candidateId}`;
-      const metaRes = await fetch(metaUrl);
-      candidateMeta = await metaRes.json();
+      candidateMeta = await fetchCandidateMeta();
     } catch (_) {
       candidateMeta = null;
     }
@@ -227,6 +234,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.warn("Unable to notify parent about resume readiness", err);
       }
     }
+  };
+
+  // Si los datos no llegan (p. ej. la red del cliente bloquea el dominio de App Runner),
+  // la página quedaba con la plantilla vacía y sin ningún aviso. Mejor decirlo.
+  const showLoadError = () => {
+    if (isPdfExport) return;
+    const container = document.querySelector(".cv-container");
+    if (ratingEl) ratingEl.remove();
+    if (downloadBtn) downloadBtn.remove();
+    if (!container) return;
+    container.innerHTML = `
+      <div style="text-align:center;padding:64px 16px;">
+        <h1 class="cv-title" style="margin-bottom:12px;">We couldn't load this profile</h1>
+        <p style="color:#5b6478;max-width:460px;margin:0 auto;line-height:1.5;">
+          Something on your network or browser may be blocking it. Please try again from
+          another network or device, or contact your Vintti representative.
+        </p>
+      </div>`;
   };
 
   const setRatingStatus = (message, tone) => {
@@ -402,6 +427,7 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
   if (!candidateId) {
     console.error("❌ Candidate ID missing in URL");
     notifyParent(false);
+    showLoadError();
     return;
   }
 
@@ -420,7 +446,13 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
         res = null;
       }
     }
-    if (!res) res = await fetch(`${API_BASE}/resumes/${candidateId}`);
+    if (!res) {
+      // Ruta pública: sin el texto del PDF (extract_cv_pdf) ni su link de S3.
+      // 404 = backend todavía sin la ruta nueva (docs/ se publica antes que App Runner).
+      res = await fetch(`${API_BASE}/public/resumes/${candidateId}`);
+      if (res.status === 404) res = await fetch(`${API_BASE}/resumes/${candidateId}`);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} al traer el CV`);
     const data = await res.json();
     console.log("📦 Resume completo recibido:", data);
 
@@ -432,7 +464,7 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     console.log("📹 Video Link:", data.video_link);
     // Nombre del candidato (fetch adicional)
     // Ya se pidió arriba para resolver la marca; se reutiliza.
-    const nameData = candidateMeta || await (await fetch(`${API_BASE}/candidates/${candidateId}`)).json();
+    const nameData = candidateMeta || await fetchCandidateMeta();
     const displayName = nameData.name || "Unnamed Candidate";
     const candidateNameTitle = document.getElementById("candidateNameTitle");
     const firstName = renderCandidateName(candidateNameTitle, displayName, isTalentDrop);
@@ -1024,6 +1056,7 @@ if (isPdfExport) {
   } catch (error) {
     console.error("❌ Error loading resume data:", error);
     notifyParent(false);
+    showLoadError();
   }
 });
 document.addEventListener('paste', function (e) {
