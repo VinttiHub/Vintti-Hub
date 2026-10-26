@@ -1325,6 +1325,38 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   // Asegurar helper
   const ensureFn = window.Resume?.ensure || (typeof ensureResumeExists==='function' ? ensureResumeExists : async()=>true);
 
+  // Reporte de cobertura de la JD (backend: utils/resume_coverage.py). Va arriba de la
+  // pestaña Resume porque el popup se cierra al terminar. Sin vacante no viene nada y el
+  // aviso se borra.
+  function renderCoverageReport(cov) {
+    const host = document.getElementById('resume');
+    if (!host) return;
+    host.querySelector('#ai-coverage-report')?.remove();
+    if (!cov) return;
+    const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const chips = (list) => (list || []).map((x) => `<span class="ai-cov-chip">${esc(x)}</span>`).join('');
+    const box = document.createElement('div');
+    box.id = 'ai-coverage-report';
+    box.className = 'ai-coverage-report';
+    let html = '<div class="ai-cov-head"><strong>JD must-haves in this CV</strong>'
+      + '<button type="button" class="ai-cov-close" aria-label="Dismiss">×</button></div>';
+    if (cov.covered?.length) {
+      html += `<div class="ai-cov-row ai-cov-ok"><span class="ai-cov-label">✅ Covered</span>${chips(cov.covered)}</div>`;
+    }
+    if (cov.weak?.length) {
+      html += `<div class="ai-cov-row ai-cov-weak"><span class="ai-cov-label">🟡 Weak evidence</span>${chips(cov.weak)}</div>`;
+    }
+    if (cov.not_in_sources?.length) {
+      html += `<div class="ai-cov-row ai-cov-miss"><span class="ai-cov-label">⚠️ Not found in the sources</span>${chips(cov.not_in_sources)}</div>`
+        + '<p class="ai-cov-hint">The CV does not claim these. If the candidate does have them, '
+        + 'add the fact in "Do you want me to take something into account?" and generate again.</p>';
+    }
+    box.innerHTML = html;
+    box.querySelector('.ai-cov-close')?.addEventListener('click', () => box.remove());
+    host.prepend(box);
+  }
+
   letsGoBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     if (!candidateId) return alert('Missing candidate id');
@@ -1411,6 +1443,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
       if (window.Resume?.applyGenerated) {
         window.Resume.applyGenerated(out);
       }
+      renderCoverageReport(out.coverage);
 
       // 5) UI: ir a Resume, cerrar popup
       if (typeof setActiveTab === 'function') setActiveTab('resume');

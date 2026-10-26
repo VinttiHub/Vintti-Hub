@@ -1296,3 +1296,28 @@ sumar su email a ninguna lista.** `sidebar.js` pregunta a `GET /users/access`
 - El link de applicants de `opportunity-detail.js` ya caía a `/users/recruiters`.
 
 Todo es client-side, como antes: ninguno de estos endpoints tiene gate por rol.
+
+## CV con IA: cobertura de la JD y CVs hermanos (2026-10-26)
+
+`POST /generate_resume_fields` se salteaba must-haves y los CVs de una misma vacante salían
+clonados ("3 years of Python" en los tres). Ahora, cuando hay vacante, pasa por
+`backend/utils/resume_coverage.py`:
+
+1. `build_coverage_map()`: una llamada (gpt-4o, temp 0) lista los **must-haves** de la JD
+   (los nice-to-have se cortan con `optional_section_start()`) con su evidencia en las fuentes
+   del candidato y sus **años reales**, calculados con las fechas de los roles.
+2. El prompt recibe ese checklist y los **CVs hermanos**: lo último generado para esa vacante
+   en `resume_generations` (autocreada; fallback: `resume` de los candidatos del pipeline).
+3. `check_draft()` revisa sin modelo: tool con evidencia que no aparece en ningún bullet
+   (`_tool_find()` de `cv_review_ai.py`), el número de años **del cliente** copiado al CV, y
+   frases de 6+ palabras compartidas con un hermano (8+ con la JD). Si falla algo, **una sola**
+   pasada de reparación; si la reparación devuelve menos roles, queda el primer borrador.
+
+- **El número de años nunca sale de la JD.** El bloque TARGET ROLE lo etiqueta como umbral
+  del cliente, y si el CV dice exactamente ese número y no es el del candidato, se repara.
+- **Un must-have sin evidencia no se afirma** (decisión de la owner): sale en el reporte
+  `coverage.not_in_sources`, que `renderCoverageReport()` de `candidate-details.js` pinta arriba
+  de la pestaña Resume. Si la recruiter sabe que lo tiene, lo agrega en las notas y regenera.
+- `"dry_run": true` en el body genera y devuelve sin escribir `resume` ni `resume_generations`.
+- Sin vacante, todo esto no corre y el CV sale como antes. Los editores ✨ por sección
+  (`/ai/improve_*`) todavía no usan los hermanos.

@@ -29,6 +29,7 @@ from openai import OpenAI
 from PyPDF2 import PdfReader 
 from urllib.parse import parse_qs, urlparse
 from utils.applicant_matching import score_candidate_against_job
+from utils import resume_coverage
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -1269,7 +1270,12 @@ def _build_resume_target_role_block(target: Optional[Dict[str, Any]]) -> str:
     if target.get("career_country"):
         lines.append(f"Country / market: {target['career_country']}")
     if target.get("years_experience"):
-        lines.append(f"Experience the client asked for: {target['years_experience']}")
+        # Etiquetado a propósito: sin esto el modelo copiaba el umbral del cliente
+        # ("3 years of Python") en todos los CVs de la vacante.
+        lines.append(
+            f"Experience the client asked for: {target['years_experience']} "
+            "(the client's threshold - never copy this number into the CV)"
+        )
     jd = (target.get("jd") or "").strip()
     if jd:
         lines.append("Job description (verbatim from the client):\n---\n" + jd + "\n---")
@@ -1289,6 +1295,8 @@ def _build_resume_generation_prompt(
     first_interview_transcript: str,
     notes: str,
     today: str,
+    coverage_block: str = "",
+    siblings_block: str = "",
 ) -> str:
     return f"""You are a senior recruiter at Vintti writing a client-facing CV in English.
 Vintti presents LatAm talent to US clients, so the CV must read like a professional,
@@ -1817,10 +1825,17 @@ LANGUAGES
       if the candidate held a full professional conversation in English, that is "Fluent".
   Beyond these two, do not guess.
 
+{coverage_block}
+{siblings_block}
 =========================
 FINAL CHECK BEFORE ANSWERING
 =========================
 Go back over your draft and verify each of these. Fix anything that fails.
+- COVERAGE CHECKLIST (if given): every FOUND must-have appears in the bullets of the role
+  its evidence names, in this candidate's own words; no NOT FOUND item is claimed anywhere;
+  no number of years was copied from the job.
+- OTHER CVs (if given): the About does not open like any of them, and no phrase of 6+
+  words is shared with them.
 - ROLE LIST: every role printed on the WRITTEN CV is present. Then check the reverse — for
   each entry you produced, confirm that company appears on the written CV. If one does not,
   it came from LinkedIn or a transcript only, and unless the recruiter asked for it or there
@@ -3072,6 +3087,9 @@ Return STRICT JSON:
             deep_dive_transcript = data.get('deep_dive_transcript', '')
             first_interview_transcript = data.get('first_interview_transcript', '')
             notes = str(data.get('notes', '') or '')[:RESUME_NOTES_LIMIT]
+            # dry_run: genera y devuelve sin escribir resume ni resume_generations,
+            # para probar contra una vacante real sin pisar el CV de nadie.
+            dry_run = bool(data.get('dry_run'))
 
             # Grain degrada suave: un link vencido, un token faltante o una
             # grabación sin transcript no puede tumbar toda la generación del CV.
@@ -3130,6 +3148,29 @@ Return STRICT JSON:
                 len((target_role or {}).get("jd") or ""),
             )
 
+            # Checklist de must-haves contra las fuentes + CVs de los otros candidatos
+            # de la vacante. Sin opp/JD los dos vuelven vacíos y el CV sale como antes.
+            today_iso = datetime.date.today().isoformat()
+            coverage = None
+            siblings = []
+            if target_role:
+                coverage = resume_coverage.build_coverage_map(
+                    target_role,
+                    "\n\n".join(x for x in [
+                        cv_pdf_scrapper, linkedin_scrapper, intro_call_transcript,
+                        deep_dive_transcript, first_interview_transcript,
+                        ("RECRUITER NOTES:\n" + notes) if notes.strip() else "",
+                    ] if (x or "").strip()),
+                    today_iso,
+                )
+                siblings = resume_coverage.load_siblings(opportunity_id, candidate_id)
+            coverage_block = resume_coverage.coverage_prompt_block(coverage)
+            siblings_block = resume_coverage.siblings_prompt_block(siblings)
+            logging.info(
+                "generate_resume_fields coverage: items=%s siblings=%s",
+                len((coverage or {}).get("items") or []), len(siblings),
+            )
+
             prompt = _build_resume_generation_prompt(
                 target_role_block=target_role_block,
                 candidate_name=candidate_ctx.get("name", ""),
@@ -3140,19 +3181,19 @@ Return STRICT JSON:
                 deep_dive_transcript=deep_dive_transcript,
                 first_interview_transcript=first_interview_transcript,
                 notes=notes,
-                today=datetime.date.today().isoformat(),
+                today=today_iso,
+                coverage_block=coverage_block,
+                siblings_block=siblings_block,
+            )
+            system_prompt = (
+                "You are a senior recruiter writing client-facing CVs. You never "
+                "invent facts, and you always reply with a single valid JSON object."
             )
 
             completion = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a senior recruiter writing client-facing CVs. You never "
-                            "invent facts, and you always reply with a single valid JSON object."
-                        ),
-                    },
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
@@ -3175,6 +3216,44 @@ Return STRICT JSON:
 
             content = choice.message.content
             json_data = _parse_model_json(content)
+
+            # Chequeo sin modelo (must-haves con evidencia ausentes, años copiados de la
+            # JD, frases calcadas de un hermano o de la JD) y UNA sola pasada de
+            # reparación. Si la reparación falla o sale peor, queda el primer borrador.
+            check = None
+            repaired = False
+            if target_role:
+                check = resume_coverage.check_draft(
+                    json_data, coverage, siblings, target_role.get("jd") or "")
+                if check["issues"]:
+                    logging.info(
+                        "generate_resume_fields: repairing %s issue(s): %s",
+                        len(check["issues"]), check["issues"],
+                    )
+                    try:
+                        fix = call_openai_with_retry(
+                            model="gpt-4o",
+                            messages=resume_coverage.repair_messages(
+                                json_data, check["issues"], coverage_block,
+                                siblings_block, system_prompt),
+                            temperature=0.3,
+                            max_tokens=16000,
+                            response_format={"type": "json_object"},
+                        )
+                        fix_choice = fix.choices[0]
+                        if getattr(fix_choice, "finish_reason", "") != "length":
+                            fixed = _parse_model_json(fix_choice.message.content)
+                            # La reparación no puede perder roles: si devuelve menos
+                            # entradas, es más dañina que lo que arregla.
+                            if (fixed.get("work_experience") and
+                                    len(fixed["work_experience"]) >= len(json_data.get("work_experience") or [])):
+                                json_data = fixed
+                                repaired = True
+                                check = resume_coverage.check_draft(
+                                    json_data, coverage, siblings, target_role.get("jd") or "")
+                    except Exception:
+                        logging.exception("generate_resume_fields: repair pass failed; keeping draft")
+            coverage_out = resume_coverage.coverage_report(coverage, check, repaired)
 
             today = datetime.date.today()
             education_country_source = "\n".join([
@@ -3224,6 +3303,17 @@ Return STRICT JSON:
             tools = json.dumps(tools_list)
             languages = json.dumps(languages_list)
 
+            if dry_run:
+                payload = {
+                    "success": True, "dry_run": True,
+                    "about": about_text, "education": education,
+                    "work_experience": work_experience, "tools": tools,
+                    "languages": languages, "tailored_to_opportunity_id": opportunity_id,
+                    "coverage": coverage_out,
+                    "issues_left": (check or {}).get("issues") or [],
+                }
+                return jsonify(payload)
+
             conn = get_connection()
             cursor = conn.cursor()
 
@@ -3260,6 +3350,11 @@ Return STRICT JSON:
             cursor.close()
             conn.close()
 
+            # De acá salen los "hermanos" del próximo CV para esta vacante.
+            if opportunity_id:
+                resume_coverage.record_generation(
+                    candidate_id, opportunity_id, about_text, work_experience, coverage_out)
+
             # Las claves vacías se OMITEN a propósito: applyGenerated() en
             # resume.js gatea con hasOwnProperty, no por truthiness, así que
             # mandar about:"" o languages:"[]" borraría lo que ya había.
@@ -3276,6 +3371,8 @@ Return STRICT JSON:
                 payload["languages"] = languages
             if grain_warnings:
                 payload["warnings"] = grain_warnings
+            if coverage_out:
+                payload["coverage"] = coverage_out
             return jsonify(payload)
 
         except Exception as e:

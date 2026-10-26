@@ -7589,3 +7589,24 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   }
   .cv-checklist { position: static; }
 }
+
+/* Reporte de cobertura de la JD tras generar el CV (renderCoverageReport en candidate-details.js) */
+.ai-coverage-report {
+  background: var(--card);
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #6c38ff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 20px 0 20px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.ai-cov-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ai-cov-close { background: none; border: 0; font-size: 18px; line-height: 1; cursor: pointer; color: var(--label); }
+.ai-cov-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
+.ai-cov-label { font-weight: 600; color: var(--label); margin-right: 4px; }
+.ai-cov-chip { padding: 2px 8px; border-radius: 999px; background: #f3f4f6; }
+.ai-cov-ok .ai-cov-chip { background: color-mix(in srgb, #c1ff72 45%, #fff); color: #3a6b00; }
+.ai-cov-weak .ai-cov-chip { background: #fef3c7; color: #92400e; }
+.ai-cov-miss .ai-cov-chip { background: #fee2e2; color: #991b1b; }
+.ai-cov-hint { margin: 6px 0 0; color: var(--label); }
