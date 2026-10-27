@@ -10,6 +10,8 @@ ya instalada, `GET /daily-digest/slack-users` devuelve el mapa listo para pegar.
 """
 from __future__ import annotations
 
+import logging
+import time
 from datetime import date
 
 # mail Vintti -> Slack member ID (el `U...` de "View full profile / Copy member ID").
@@ -21,6 +23,8 @@ from datetime import date
 # opp cambie de duenio la mencion tiene que salir bien sin tocar codigo. Quien no
 # figure se renderiza con el nombre en negrita (se ve, no notifica) y aparece
 # listado al pie del mensaje.
+log = logging.getLogger(__name__)
+
 SLACK_MEMBER_IDS: dict[str, str] = {
     "abril@vintti.com": "U09CDE89WJZ",
     "agostina@vintti.com": "U075E47TYE9",
@@ -183,5 +187,37 @@ POSTEAR_SIN_PENDIENTES = True
 EMOJI_TODO_AL_DIA = ":tada:"
 
 
+# Directorio en vivo, para quien no esta en SLACK_MEMBER_IDS (altas posteriores
+# al 2026-09-09, como Luz). Sin esto la mencion caia al nombre en negrita y a la
+# recruiter no le sonaba el aviso de Sourcing. Cache por proceso; un fallo se
+# recuerda menos tiempo para no pagar el timeout de Slack en cada mensaje.
+_LIVE_TTL_OK = 6 * 3600
+_LIVE_TTL_FAIL = 10 * 60
+_live = {"members": {}, "until": 0.0}
+
+
+def _live_members() -> dict:
+    now = time.time()
+    if now < _live["until"]:
+        return _live["members"]
+    from utils import slack as slack_api  # perezoso: people.py se importa en todos lados
+
+    r = slack_api.list_members()
+    if r["ok"]:
+        _live.update(members=r["members"], until=now + _LIVE_TTL_OK)
+    else:
+        log.warning("slack_id: no se pudo leer el directorio de Slack: %s", r["error"])
+        _live["until"] = now + _LIVE_TTL_FAIL
+    return _live["members"]
+
+
 def slack_id(email: str) -> str | None:
-    return SLACK_MEMBER_IDS.get((email or "").strip().lower())
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    if email in SLACK_MEMBER_IDS:
+        return SLACK_MEMBER_IDS[email]
+    mid = _live_members().get(email)
+    if not mid:
+        log.warning("slack_id: %s no tiene usuario en Slack con ese mail", email)
+    return mid

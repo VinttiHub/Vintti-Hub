@@ -1122,6 +1122,11 @@ siempre después del commit, en un hilo y sin levantar nunca. En `dry_run` no sa
   las opps que ya pasaron por Sourcing (stage posterior, start date o fila en `sourcing`), así
   el deploy no avisa por opps viejas.
 - Se reclama la fila antes de postear; si Slack falla se suelta (no hay reintento automático).
+- **La @mención sale de `slack_id()`** (`daily_digest/people.py`): primero el mapa fijo
+  `SLACK_MEMBER_IDS` (cosechado el 2026-09-09) y, si el mail no está, el directorio en vivo
+  (`slack.list_members()`, cache 6 h por proceso). Sin ID la persona sale en negrita y **no
+  le suena**: le pasaba a las recruiters dadas de alta después del mapa. Si en Slack tiene
+  otro mail que en el hub, no hay match: agregarla a mano al mapa.
 
 ## Stop ya no borra la start date (NDA)
 
