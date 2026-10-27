@@ -1005,6 +1005,16 @@ Toda la lógica vive en `backend/utils/second_interview_refs.py`.
 - Modo prueba: `TEST_ONLY_RECIPIENT` en el módulo (hoy `None` = producción). Con un email ahí,
   todo va sólo a esa dirección con `[TEST]` en el asunto y un aviso de a quién habría ido.
 
+## Mails de referencias: Lara sólo recibe el de las dos
+
+En los dos circuitos (datos de contacto que carga el candidato →
+`public_candidate_references_routes.py`; feedback que responden las referencias →
+`public_reference_feedback_routes.py`) `lara@vintti.com` va **sólo en los mails que traen las
+dos referencias**, re-envíos incluidos — nunca en el de la primera (pedido de la owner,
+2026-10-27). La lista es `BOTH_REFERENCES_RECIPIENTS` y se suma con
+`with_both_references_recipients()`, deduplicando. **No** está en
+`reference_feedback_recipients()`: ese también arma el mail del análisis IA, y ahí no va.
+
 ## Perfil incompleto: recordatorio diario hasta completarlo
 
 Cada persona activa (`COALESCE(admin_user_access.is_active, TRUE)`) a la que le falte

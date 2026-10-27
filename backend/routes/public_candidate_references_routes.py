@@ -7,7 +7,10 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection
 # Same CTA block the feedback mails use, so the button looks and behaves
 # identically across every reference email.
-from routes.public_reference_feedback_routes import profile_cta_block
+from routes.public_reference_feedback_routes import (
+    profile_cta_block,
+    with_both_references_recipients,
+)
 
 
 bp = Blueprint('public_candidate_references', __name__, url_prefix='/public/candidate_references')
@@ -323,6 +326,7 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
         combined_recipients = list(recipients)
         if sales_lead:
             combined_recipients.append(sales_lead)
+        combined_recipients = with_both_references_recipients(combined_recipients)
         subject = f"References updated for {candidate_name} • {opportunity_name}"
         _send_email(subject, _reference_email_html(ctx, merged, [1, 2], candidate_id=candidate_id), combined_recipients)
 
@@ -330,6 +334,7 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
         combined_recipients = list(recipients)
         if sales_lead:
             combined_recipients.append(sales_lead)
+        combined_recipients = with_both_references_recipients(combined_recipients)
         subject = f"Both references received for {candidate_name} • {opportunity_name}"
         _send_email(subject, _reference_email_html(ctx, merged, [1, 2], candidate_id=candidate_id), combined_recipients)
 

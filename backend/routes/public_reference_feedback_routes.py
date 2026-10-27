@@ -12,6 +12,20 @@ from db import get_connection
 bp = Blueprint('public_reference_feedback', __name__, url_prefix='/public/reference_feedback')
 _DIV_TAG_RE = re.compile(r'</?div\b[^>]*>', flags=re.I)
 
+# Only on the mails that carry BOTH references (both circuits: the contacts the
+# candidate submits and the feedback the references send back), re-sends included.
+# Never on the single-reference mail, so their inbox doesn't get the first one and
+# then both. Not part of reference_feedback_recipients(): the AI-analysis mail uses it.
+BOTH_REFERENCES_RECIPIENTS = ['lara@vintti.com']
+
+
+def with_both_references_recipients(recipients):
+    merged = list(recipients)
+    for email in BOTH_REFERENCES_RECIPIENTS:
+        if email not in merged:
+            merged.append(email)
+    return merged
+
 
 def _clean_text(value):
     text = str(value or '').strip()
@@ -382,6 +396,8 @@ def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, su
 
     both_in = len(latest_by_reference) >= 2
     recipients = reference_feedback_recipients(ctx, include_sales_lead=both_in)
+    if both_in:
+        recipients = with_both_references_recipients(recipients)
 
     if both_in:
         subject = f"Reference feedback completed for {candidate_name} • {opportunity_name}"
