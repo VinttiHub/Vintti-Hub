@@ -1973,6 +1973,16 @@ MAIN_CHARTS = [
         "sort_order": 87.3,
     },
     {
+        "chart_key": "sa_select_sql_lost_stage_quien",
+        "tab_key": "sales",
+        "title": "Sales · ¿Dónde se pierden los SQLs? (filtro AE / AM)",
+        "type": "table",
+        "dataset_key": "sales_sql_lost_quien",
+        "config": {"mapping": {"columns": ["quien", "count"]}},
+        "position": {"x": 0, "y": 47, "w": 1, "h": 1},
+        "sort_order": 87.301,
+    },
+    {
         "chart_key": "sa_table_sql_lost_stage_detail",
         "tab_key": "sales",
         "title": "Sales · detalle de SQL perdidos por etapa",

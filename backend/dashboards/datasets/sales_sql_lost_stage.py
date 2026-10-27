@@ -11,6 +11,9 @@ razón, la ETAPA desde la que se cerró cada uno:
   - Sourcing e Interviewing van juntos como "Active Pipeline" (pedido de la owner,
     2026-10-16).
 
+Filtro `quien` ("AE" / "AM" / "Otro", el de `sql_to_cw_ae_am_cierre`): lo setea el
+desplegable de la card (opciones en `sales_sql_lost_quien`), en la dona y en el detalle.
+
 Dona y detalle leen `rows()`, así la dona suma `cl_opp + cl_sin_opp` de la card.
 """
 from __future__ import annotations
@@ -44,6 +47,10 @@ def rows(filters: dict) -> list[dict]:
     stage = str((filters or {}).get("stage") or "").strip()
     if stage:
         out = [r for r in out if r["stage"] == stage]
+    # Filtro AE / AM de la card (`sa_select_sql_lost_stage_quien`, data-override-quien).
+    quien = str((filters or {}).get("quien") or "").strip()
+    if quien:
+        out = [r for r in out if r["quien"] == quien]
     return out
 
 

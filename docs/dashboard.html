@@ -3618,7 +3618,8 @@
            perdidos", agrupados por la ETAPA desde la que se cerraron
            (opportunity.stage_before_closed_lost; deals sin opp = "SQL (antes del Deep
            Dive)"; vacía = "Sin dato"; Sourcing + Interviewing = "Active Pipeline").
-           Dataset sales_sql_lost_stage.
+           Dataset sales_sql_lost_stage. Desplegable AE / AM (2026-10-27): filtra dona +
+           drawer por `quien` (opciones: sales_sql_lost_quien).
            ============================================================ -->
       <div class="card s-6">
         <div class="card__head">
@@ -3627,6 +3628,12 @@
             <p class="card__sub"><span data-chart="sa_donut_sql_lost_stage" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> SQLs Closed Lost · AE + AM<span data-window-label>30d</span></p>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="sales-sql-lost-stage-detail" data-category-key="stage" aria-label="Ver detalle de todos los SQLs perdidos por etapa">Ver detalle</button>
+        </div>
+        <div class="donut-filter">
+          <select class="recruiter-filter" data-chart="sa_select_sql_lost_stage_quien" data-bind="filter-select"
+                  data-filter-field="quien" data-opt-value="quien" data-opt-label="quien" data-all-label="AE + AM: Todos"
+                  data-target-chart="sa_donut_sql_lost_stage" data-target-panel="sales-sql-lost-stage-detail"
+                  aria-label="Filtrar SQLs perdidos por AE o AM"></select>
         </div>
         <div class="donut" style="margin-top:8px">
           <svg data-chart="sa_donut_sql_lost_stage" data-bind="donut" data-label="stage" data-value="count"
