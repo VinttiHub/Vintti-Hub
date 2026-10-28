@@ -120,63 +120,136 @@ FIELDS = [
 ]
 FIELDS_BY_KEY = {f["key"]: f for f in FIELDS}
 
-# Operadores por tipo. `value`: qué pide el operador —
-#   None = nada, "list" = varios valores de la lista, "text", "number",
-#   "days" = cantidad de días, "date" = una fecha,
-#   "number_range" / "date_range" = [desde, hasta].
+# Operadores por tipo. Los nombres y lo que hace cada uno salen del doc de la owner
+# («Hubspot - Hub : NUEVO CRM», sección filtros avanzados): se copian LITERALES. Los
+# del hub que el doc no tiene van al final de cada menú con su nombre de antes.
+# `value`: qué pide el operador —
+#   None = nada, "list" = varios valores (de la lista si la propiedad tiene opciones;
+#   si no, textos libres), "text", "number", "days" = cantidad de días,
+#   "date" = una fecha, "number_range" / "date_range" = [desde, hasta],
+#   "period" = una clave de PERIODS, "field" = otra propiedad del mismo registro.
 # `history`: se responde con el historial (prospect_company_events), no con el
 # valor actual. Ojo: sólo hay historial de los campos que se editan en el Hub.
 OPERATORS = {
-    "is_any":               {"label": "es cualquiera de",              "value": "list"},
-    "is_none_of":           {"label": "no es ninguno de",              "value": "list"},
-    "ever_was":             {"label": "alguna vez fue",                "value": "list", "history": True},
-    "never_was":            {"label": "nunca fue",                     "value": "list", "history": True},
-    "equals":               {"label": "es igual a",                    "value": "text"},
-    "contains":             {"label": "contiene",                      "value": "text"},
-    "not_contains":         {"label": "no contiene",                   "value": "text"},
-    "starts_with":          {"label": "empieza con",                   "value": "text"},
-    "ends_with":            {"label": "termina con",                   "value": "text"},
-    "eq":                   {"label": "es igual a",                    "value": "number"},
-    "gt":                   {"label": "es mayor que",                  "value": "number"},
-    "gte":                  {"label": "es mayor o igual que",          "value": "number"},
-    "lt":                   {"label": "es menor que",                  "value": "number"},
-    "lte":                  {"label": "es menor o igual que",          "value": "number"},
-    "between":              {"label": "está entre",                    "value": "number_range"},
-    "is_today":             {"label": "es hoy",                        "value": None},
-    "is_on":                {"label": "es el día",                     "value": "date"},
-    "before":               {"label": "es antes del",                  "value": "date"},
-    "after":                {"label": "es después del",                "value": "date"},
-    "between_dates":        {"label": "está entre las fechas",         "value": "date_range"},
-    "older_than_days":      {"label": "es de hace más de",             "value": "days"},
-    "within_last_days":     {"label": "es de los últimos",             "value": "days"},
-    "in_next_days":         {"label": "es en los próximos",            "value": "days"},
-    "changed_in_last_days": {"label": "cambió en los últimos",         "value": "days", "history": True},
-    "not_changed_in_days":  {"label": "no cambió en los últimos",      "value": "days", "history": True},
-    "known":                {"label": "tiene un valor",                "value": None},
-    "unknown":              {"label": "está vacío",                    "value": None},
-    "is_true":              {"label": "está marcada",                  "value": None},
-    "is_false":             {"label": "no está marcada",               "value": None},
-    "has_any":              {"label": "incluye alguna de",             "value": "list"},
-    "has_none":             {"label": "no incluye ninguna de",         "value": "list"},
+    # 1. Texto
+    "equals":                  {"label": "Es igual a",                          "value": "text"},
+    "not_equals":              {"label": "No es igual a",                       "value": "text"},
+    "equals_any":              {"label": "Es igual a cualquiera de",            "value": "list"},
+    "not_equals_any":          {"label": "No es igual a ninguno de",            "value": "list"},
+    "contains":                {"label": "Contiene cualquiera de",              "value": "list"},
+    # También en selección: "excluye los registros que tienen cualquiera de los valores".
+    "not_contains":            {"label": "No contiene ninguno de",              "value": "list"},
+    "contains_exactly":        {"label": "Contiene exactamente",                "value": "text"},
+    "not_contains_exactly":    {"label": "No contiene exactamente",             "value": "text"},
+    "starts_with":             {"label": "Comienza con cualquiera de",          "value": "list"},
+    "ends_with":               {"label": "Termina con cualquiera de",           "value": "list"},
+    # 2. Selección
+    "is_any":                  {"label": "Es cualquiera de",                    "value": "list"},
+    "is_none_of":              {"label": "No es ninguno de",                    "value": "list"},
+    "contains_all":            {"label": "Contiene todos de",                   "value": "list"},
+    "not_contains_all":        {"label": "No contiene todos de",                "value": "list"},
+    "equals_all":              {"label": "Es igual a todos de",                 "value": "list"},
+    "not_equals_all":          {"label": "No es igual a todos de",              "value": "list"},
+    # 3. Número
+    "eq":                      {"label": "Es igual a",                          "value": "number"},
+    "not_eq":                  {"label": "No es igual a",                       "value": "number"},
+    "gt":                      {"label": "Es mayor que",                        "value": "number"},
+    "gte":                     {"label": "Es mayor o igual que",                "value": "number"},
+    "lt":                      {"label": "Es menor que",                        "value": "number"},
+    "lte":                     {"label": "Es menor o igual que",                "value": "number"},
+    "gt_field":                {"label": "Es mayor que otra propiedad",         "value": "field"},
+    "lt_field":                {"label": "Es menor que otra propiedad",         "value": "field"},
+    # 4. Fecha
+    "is_period":               {"label": "Es",                                  "value": "period"},
+    "before":                  {"label": "Es anterior a",                       "value": "date"},
+    "after":                   {"label": "Es posterior a",                      "value": "date"},
+    "between_dates":           {"label": "Está entre",                          "value": "date_range"},
+    "not_between_dates":       {"label": "No está entre",                       "value": "date_range"},
+    "older_than_days":         {"label": "Hace más de",                         "value": "days"},
+    "more_than_days_ahead":    {"label": "Dentro de más de",                    "value": "days"},
+    # 5. Históricos
+    "ever_was":                {"label": "Alguna vez fue cualquiera de",        "value": "list", "history": True},
+    "never_was":               {"label": "Nunca fue ninguno de",                "value": "list", "history": True},
+    "ever_equals":             {"label": "Alguna vez fue igual a",              "value": "text", "history": True},
+    "never_equals":            {"label": "Nunca fue igual a",                   "value": "text", "history": True},
+    "ever_equals_any":         {"label": "Alguna vez fue igual a cualquiera de", "value": "list", "history": True},
+    "never_equals_any":        {"label": "Nunca fue igual a ninguno de",        "value": "list", "history": True},
+    "ever_contained_exactly":  {"label": "Alguna vez contuvo exactamente",      "value": "text", "history": True},
+    "never_contained_exactly": {"label": "Nunca contuvo exactamente",           "value": "text", "history": True},
+    # 6. Valor vacío y actualización (cualquier tipo). «Actualizado en los últimos» de
+    # la sección 5 es esta misma función: se muestra sólo el nombre de la sección 6.
+    "known":                   {"label": "Es conocido",                         "value": None},
+    "unknown":                 {"label": "Es desconocido",                      "value": None},
+    "changed_in_last_days":    {"label": "Se actualizó en los últimos…",        "value": "days", "history": True},
+    "not_changed_in_days":     {"label": "No se actualizó en los últimos…",     "value": "days", "history": True},
+    "updated_after_field":     {"label": "Se actualizó después de otra propiedad", "value": "field", "history": True},
+    "updated_before_field":    {"label": "Se actualizó antes de otra propiedad",   "value": "field", "history": True},
+    # Del hub, no están en el doc: al final del menú, con su nombre de siempre.
+    "is_on":                   {"label": "es el día",                           "value": "date"},
+    "between":                 {"label": "está entre",                          "value": "number_range"},
+    "within_last_days":        {"label": "es de los últimos",                   "value": "days"},
+    "in_next_days":            {"label": "es en los próximos",                  "value": "days"},
+    "is_true":                 {"label": "está marcada",                        "value": None},
+    "is_false":                {"label": "no está marcada",                     "value": None},
+    # Sólo para leer reglas guardadas antes del cambio: rules.normalize_rule() las
+    # traduce (has_any → is_any, has_none → not_contains, is_today → is_period "today").
+    "has_any":                 {"label": "Es cualquiera de",                    "value": "list"},
+    "has_none":                {"label": "No contiene ninguno de",              "value": "list"},
+    "is_today":                {"label": "Es hoy",                              "value": None},
 }
-_CHANGED = ["changed_in_last_days", "not_changed_in_days"]
+LEGACY_OPERATORS = {"has_any", "has_none", "is_today"}
+
+# «Es» de fechas: período relativo a hoy (hora Argentina). Semana = lunes a domingo.
+# Los límites los calcula rules.period_bounds(), el mismo para SQL y Python.
+PERIODS = {
+    "today":              "Hoy",
+    "yesterday":          "Ayer",
+    "tomorrow":           "Mañana",
+    "this_week":          "Esta semana",
+    "this_week_to_date":  "Esta semana hasta la fecha",
+    "last_week":          "La semana pasada",
+    "next_week":          "La próxima semana",
+    "this_month":         "Este mes",
+    "this_month_to_date": "Este mes hasta la fecha",
+    "last_month":         "El mes pasado",
+    "next_month":         "El próximo mes",
+    "this_quarter":       "Este trimestre",
+    "last_quarter":       "El trimestre pasado",
+    "this_year":          "Este año",
+    "this_year_to_date":  "Este año hasta la fecha",
+    "last_year":          "El año pasado",
+    "last_7_days":        "Últimos 7 días",
+    "last_30_days":       "Últimos 30 días",
+    "last_90_days":       "Últimos 90 días",
+}
+
+# Orden de cada menú = el del doc: los del tipo → históricos → sección 6 → sobrantes.
+_TEXT = ["equals", "not_equals", "equals_any", "not_equals_any", "contains", "not_contains",
+         "contains_exactly", "not_contains_exactly", "starts_with", "ends_with"]
+_TEXT_HISTORY = ["ever_equals", "never_equals", "ever_equals_any", "never_equals_any",
+                 "ever_contained_exactly", "never_contained_exactly"]
+_SELECT = ["is_any", "is_none_of", "not_contains"]
+_SELECT_HISTORY = ["ever_was", "never_was"]
+_EMPTY_UPDATED = ["known", "unknown", "changed_in_last_days", "not_changed_in_days",
+                  "updated_after_field", "updated_before_field"]
+_DATE = ["is_period", "before", "after", "between_dates", "not_between_dates",
+         "older_than_days", "more_than_days_ahead"] + _EMPTY_UPDATED + ["is_on", "within_last_days", "in_next_days"]
 OPERATORS_BY_TYPE = {
-    "enum":     ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
-    "owner":    ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
-    "text":     ["equals", "contains", "not_contains", "starts_with", "ends_with", "known", "unknown"] + _CHANGED,
-    "longtext": ["contains", "not_contains", "known", "unknown"],
-    "url":      ["contains", "not_contains", "starts_with", "ends_with", "known", "unknown"],
-    "number":   ["eq", "gt", "gte", "lt", "lte", "between", "known", "unknown"] + _CHANGED,
-    "date":     ["is_today", "is_on", "before", "after", "between_dates", "older_than_days",
-                 "within_last_days", "in_next_days", "known", "unknown"] + _CHANGED,
+    "enum":     _SELECT + _SELECT_HISTORY + _EMPTY_UPDATED,
+    "owner":    _SELECT + _SELECT_HISTORY + _EMPTY_UPDATED,
+    "text":     _TEXT + _TEXT_HISTORY + _EMPTY_UPDATED,
+    "longtext": _TEXT + _TEXT_HISTORY + _EMPTY_UPDATED,
+    "url":      _TEXT + _TEXT_HISTORY + _EMPTY_UPDATED,
+    "number":   ["eq", "not_eq", "gt", "gte", "lt", "lte", "gt_field", "lt_field"] + _EMPTY_UPDATED + ["between"],
+    "date":     _DATE,
     # Tipos que usan los contactos (prospecting/contact_fields.py).
-    "user":     ["is_any", "is_none_of", "ever_was", "never_was", "known", "unknown"] + _CHANGED,
-    "email":    ["equals", "contains", "not_contains", "starts_with", "ends_with", "known", "unknown"] + _CHANGED,
-    "phone":    ["equals", "contains", "starts_with", "known", "unknown"] + _CHANGED,
-    "bool":     ["is_true", "is_false", "known", "unknown"] + _CHANGED,
-    "multi":    ["has_any", "has_none", "known", "unknown"] + _CHANGED,
-    "datetime": ["is_today", "is_on", "before", "after", "between_dates", "older_than_days",
-                 "within_last_days", "in_next_days", "known", "unknown"] + _CHANGED,
+    "user":     _SELECT + _SELECT_HISTORY + _EMPTY_UPDATED,
+    "email":    _TEXT + _TEXT_HISTORY + _EMPTY_UPDATED,
+    "phone":    _TEXT + _TEXT_HISTORY + _EMPTY_UPDATED,
+    "bool":     _EMPTY_UPDATED + ["is_true", "is_false"],
+    # Casillas múltiples: la sección Selección completa («todos de» sólo tiene sentido acá).
+    "multi":    _SELECT + ["contains_all", "not_contains_all", "equals_all", "not_equals_all"] + _EMPTY_UPDATED,
+    "datetime": _DATE,
 }
 
 # --------------------------------------------------------------------------- #

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from psycopg2.extras import Json
 
-from prospecting.rules import Ctx, InvalidWorkflow, prune_steps, validate_definition
+from prospecting.rules import Ctx, InvalidWorkflow, normalize_tree, prune_steps, validate_definition
 from prospecting.store import list_bdrs
 
 WF_COLUMNS = """
@@ -40,6 +40,9 @@ def normalize(row: dict) -> dict:
     wf["object"] = wf.get("object") or "company"
     wf.pop("conditions", None)
     wf.pop("actions", None)
+    # Reglas guardadas antes de pasar a los operadores del doc (has_any, is_today, …).
+    for k in ("trigger", "steps", "unenroll", "goal"):
+        normalize_tree(wf.get(k))
     return wf
 
 

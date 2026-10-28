@@ -101,6 +101,24 @@
     var hit = choices(f).filter(function (c) { return c.value === v; })[0];
     return hit ? hit.label : v;
   }
+  function periodLabel(k) {
+    var hit = (S().periods || []).filter(function (p) { return p.value === k; })[0];
+    return hit ? hit.label : (k || "");
+  }
+  /* «Otra propiedad» (gt_field / lt_field / updated_*_field): siempre del mismo objeto
+     que la regla. En una regla cruzada (`company.x`) el valor es la clave sin prefijo. */
+  function otherFields(f, op) {
+    if (!f) return [];
+    var obj = f.cross || curObj, bare = f.cross ? f.key.slice(f.cross.length + 1) : f.key;
+    var numeric = op === "gt_field" || op === "lt_field";
+    return objFields(obj).filter(function (x) {
+      return x.key !== bare && (numeric ? x.type === "number" : x.history !== false);
+    });
+  }
+  function otherField(f, key) {
+    if (!f) return null;
+    return objFields(f.cross || curObj).filter(function (x) { return x.key === key; })[0] || null;
+  }
   function optionTags(items, selected) {
     return items.map(function (o) {
       return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(selected) ? " selected" : "") + ">" + esc(o.label) + "</option>";
@@ -130,13 +148,17 @@
     if (!f) return "—";
     var od = opDef(r.op);
     var v = r.value, t = "";
-    if (od.value === "list") t = (v || []).map(function (x) { return "<em>" + esc(choiceLabel(f, x)) + "</em>"; }).join(" o ");
+    if (od.value === "list") t = (Array.isArray(v) ? v : [v]).map(function (x) { return "<em>" + esc(choiceLabel(f, x)) + "</em>"; }).join(" o ");
+    else if (od.value === "period") t = "<em>" + esc(periodLabel(v)).toLowerCase() + "</em>";
+    else if (od.value === "field") { var of = otherField(f, v); t = "<em>" + esc(of ? of.label : v) + "</em>"; }
     else if (od.value === "days") t = "<em>" + esc(v) + " días</em>";
     else if (od.value === "date") t = "<em>" + fmtFecha(v) + "</em>";
     else if (od.value === "number_range") t = "<em>" + esc((v || [])[0]) + " y " + esc((v || [])[1]) + "</em>";
     else if (od.value === "date_range") t = "<em>" + fmtFecha((v || [])[0]) + " y " + fmtFecha((v || [])[1]) + "</em>";
     else if (od.value) t = "<em>" + esc(v) + "</em>";
-    return "<strong>" + esc(f.label) + "</strong> " + esc(od.label) + (t ? " " + t : "");
+    // Los nombres del doc van con mayúscula en el menú; dentro de la frase, en minúscula.
+    var opLabel = od.label.charAt(0).toLowerCase() + od.label.slice(1);
+    return "<strong>" + esc(f.label) + "</strong> " + esc(opLabel) + (t ? " " + t : "");
   }
   function conditionsText(c) {
     return ((c && c.groups) || []).map(function (g) {
@@ -826,7 +848,20 @@
     var kind = opDef(r.op).value;
     var v = r.value;
     if (!kind) return "";
-    if (kind === "list") return chips(choices(f), v || [], 'data-rchip="' + path + '"');
+    if (kind === "list") {
+      if (f && (choices(f).length || ["enum", "owner", "user", "multi"].indexOf(f.type) !== -1))
+        return chips(choices(f), v || [], 'data-rchip="' + path + '"');
+      // Texto libre («Contiene cualquiera de», «Es igual a cualquiera de»…): uno por línea.
+      return '<textarea class="pr-filter__input pr-wf-list" rows="2" data-val="' + path + '" data-list="1" placeholder="Un valor por línea…"' + dis() + ">" +
+        esc((Array.isArray(v) ? v : []).join("\n")) + "</textarea>";
+    }
+    if (kind === "period") {
+      return '<select class="pr-filter__input" data-val="' + path + '"' + dis() + ">" + optionTags(S().periods || [], v) + "</select>";
+    }
+    if (kind === "field") {
+      var others = otherFields(f, r.op).map(function (x) { return { value: x.key, label: x.label }; });
+      return '<select class="pr-filter__input" data-val="' + path + '"' + dis() + '><option value="">Elegí una propiedad…</option>' + optionTags(others, v) + "</select>";
+    }
     if (kind === "days") {
       var changed = r.op === "changed_in_last_days" || r.op === "not_changed_in_days";
       return '<div class="pr-wf-days"><input type="number" min="0" step="1" class="pr-filter__input" data-val="' + path + '" value="' + esc(v == null ? "" : v) + '"' + dis() + "><span>" + (changed ? "días (0 = hoy)" : "días") + "</span></div>";
@@ -1132,7 +1167,11 @@
   }
   function resetValue(r) {
     var kind = opDef(r.op).value;
-    r.value = kind === "list" ? [] : (kind === "number_range" || kind === "date_range") ? ["", ""] : "";
+    r.value = kind === "list" ? [] : (kind === "number_range" || kind === "date_range") ? ["", ""]
+      : kind === "period" ? ((S().periods || [])[0] || {}).value || "today" : "";
+  }
+  function listValue(text) {
+    return String(text || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean);
   }
   function toggleIn(arr, v) {
     var i = arr.indexOf(v);
@@ -1179,6 +1218,7 @@
     if ((a = el.getAttribute("data-val"))) {
       var r = ruleAt(a).rule, vi = el.getAttribute("data-vi");
       if (vi !== null) { r.value = Array.isArray(r.value) ? r.value : ["", ""]; r.value[Number(vi)] = el.value; }
+      else if (el.hasAttribute("data-list")) r.value = listValue(el.value);
       else r.value = el.value;
       markDirty();
       return;
@@ -1601,6 +1641,7 @@
     withExt(function () {
       var r = ruleAt(a).rule, vi = el.getAttribute("data-vi");
       if (vi !== null) { r.value = Array.isArray(r.value) ? r.value : ["", ""]; r.value[Number(vi)] = el.value; }
+      else if (el.hasAttribute("data-list")) r.value = listValue(el.value);
       else r.value = el.value;
     });
     extChanged(false);  // sin redibujar: no perder el foco

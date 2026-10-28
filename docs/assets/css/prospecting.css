@@ -815,7 +815,11 @@
   background: var(--pr-card-soft);
 }
 .pr-wf-rule__row { display: flex; gap: 8px; align-items: center; }
-.pr-wf-rule__row .pr-filter__input { flex: 1 1 0; min-width: 0; }
+.pr-wf-rule__row { flex-wrap: wrap; }
+/* Propiedad y operador con ancho propio: si no entran, el operador baja de línea en vez de
+   cortarse («Es igual a» se leía «Es igual», «Alguna vez fue igual a cualquiera de»…). */
+.pr-wf-rule__row .pr-filter__input { flex: 1 1 180px; min-width: 0; }
+.pr-wf-rule__row [data-rop] { flex: 1 1 230px; }
 .pr-wf-joiner {
   margin: 6px 0 6px 10px;
   font-size: 12px;
@@ -1007,6 +1011,7 @@
 .pr-wf-dur, .pr-wf-range { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pr-ink-2); margin-top: 8px; }
 .pr-wf-dur .pr-filter__input { width: 80px; }
 .pr-wf-range .pr-filter__input { flex: 1; }
+.pr-wf-list { width: 100%; min-height: 52px; margin-top: 8px; resize: vertical; font: inherit; line-height: 1.4; }
 .pr-wf-delay, .pr-wf-branch { display: flex; flex-direction: column; gap: 8px; }
 .pr-wf-bpath { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--pr-card-soft); }
 .pr-wf-bpath--cond { flex-direction: column; align-items: stretch; }

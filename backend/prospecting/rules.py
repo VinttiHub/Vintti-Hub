@@ -29,6 +29,7 @@ del parámetro (y los `%` / `_` que escribe la persona se escapan).
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime, time, timedelta
 try:
@@ -42,8 +43,10 @@ from prospecting.constants import (
     DELAYS,
     EVENTS,
     INTERNAL_EMAIL_DOMAIN,
+    LEGACY_OPERATORS,
     OPERATORS,
     OPERATORS_BY_TYPE,
+    PERIODS,
     SCHEDULES,
     TIMEZONE,
     TRIGGERS,
@@ -133,6 +136,100 @@ def changed_since(as_of: date, days: int) -> datetime:
     return datetime.combine(as_of - timedelta(days=days), time(0, 0), tzinfo=_TZ)
 
 
+def _month_start(d: date, add: int = 0) -> date:
+    m = d.year * 12 + d.month - 1 + add
+    return date(m // 12, m % 12 + 1, 1)
+
+
+def period_bounds(key: str, as_of: date) -> tuple[date, date]:
+    """[desde, hasta] (inclusive) del período relativo «Es …». Uno solo para SQL y
+    Python, así la paridad sale por construcción."""
+    d = timedelta(days=1)
+    mon = as_of - timedelta(days=as_of.weekday())
+    q0 = _month_start(as_of, -((as_of.month - 1) % 3))
+    y0 = date(as_of.year, 1, 1)
+    if key == "today":
+        return as_of, as_of
+    if key == "yesterday":
+        return as_of - d, as_of - d
+    if key == "tomorrow":
+        return as_of + d, as_of + d
+    if key == "this_week":
+        return mon, mon + timedelta(days=6)
+    if key == "this_week_to_date":
+        return mon, as_of
+    if key == "last_week":
+        return mon - timedelta(days=7), mon - d
+    if key == "next_week":
+        return mon + timedelta(days=7), mon + timedelta(days=13)
+    if key == "this_month":
+        return _month_start(as_of), _month_start(as_of, 1) - d
+    if key == "this_month_to_date":
+        return _month_start(as_of), as_of
+    if key == "last_month":
+        return _month_start(as_of, -1), _month_start(as_of) - d
+    if key == "next_month":
+        return _month_start(as_of, 1), _month_start(as_of, 2) - d
+    if key == "this_quarter":
+        return q0, _month_start(q0, 3) - d
+    if key == "last_quarter":
+        return _month_start(q0, -3), q0 - d
+    if key == "this_year":
+        return y0, date(as_of.year, 12, 31)
+    if key == "this_year_to_date":
+        return y0, as_of
+    if key == "last_year":
+        return date(as_of.year - 1, 1, 1), date(as_of.year - 1, 12, 31)
+    m = re.match(r"^last_(\d+)_days$", key or "")
+    if m:  # incluye hoy: «últimos 7 días» = hoy y los 6 anteriores
+        return as_of - timedelta(days=int(m.group(1)) - 1), as_of
+    raise InvalidWorkflow([f"Período desconocido: {key}"])
+
+
+# Operadores que antes pedían UN texto y ahora piden una lista («… cualquiera de»).
+_TEXT_TO_LIST = {"contains", "not_contains", "starts_with", "ends_with"}
+
+
+def normalize_rule(rule) -> None:
+    """Traduce en el lugar una regla guardada antes de pasar a los nombres del doc.
+    Las reglas viejas siguen andando sin script: se llama al validar, compilar y
+    evaluar, y al leer workflows y vistas."""
+    if not isinstance(rule, dict):
+        return
+    op = rule.get("op")
+    if op == "has_any":
+        rule["op"] = "is_any"
+    elif op == "has_none":
+        rule["op"] = "not_contains"
+    elif op == "is_today":
+        rule["op"], rule["value"] = "is_period", "today"
+    elif op in _TEXT_TO_LIST and isinstance(rule.get("value"), str):
+        rule["value"] = [rule["value"]] if rule["value"].strip() else []
+
+
+def normalize_conditions(conditions) -> None:
+    """normalize_rule() sobre cada regla de {"groups": [{"rules": [...]}]}."""
+    if not isinstance(conditions, dict):
+        return
+    for g in conditions.get("groups") or []:
+        if isinstance(g, dict):
+            for r in g.get("rules") or []:
+                normalize_rule(r)
+
+
+def normalize_tree(obj) -> None:
+    """normalize_rule() sobre todas las condiciones de un JSON de workflow (disparador,
+    ramas, esperas, meta, desinscripción): cualquier dict con "field" y "op"."""
+    if isinstance(obj, dict):
+        if "op" in obj and "field" in obj:
+            normalize_rule(obj)
+        for v in obj.values():
+            normalize_tree(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            normalize_tree(v)
+
+
 # --------------------------------------------------------------------------- #
 # Validación de condiciones
 # --------------------------------------------------------------------------- #
@@ -163,6 +260,7 @@ def _check_rule(rule: dict, where: str, ctx: Ctx, obj: str) -> list[str]:
     owner_obj, field, _cross = resolve(obj, rule.get("field"))
     if not field:
         return [f"{where}: elegí una propiedad."]
+    normalize_rule(rule)
     op = rule.get("op")
     if op not in OPERATORS_BY_TYPE[field["type"]]:
         return [f"{where}: «{field['label']}» no admite esa condición."]
@@ -181,6 +279,19 @@ def _check_rule(rule: dict, where: str, ctx: Ctx, obj: str) -> list[str]:
             bad = [x for x in v if x not in allowed]
             if bad:
                 return [f"{label}: valor que no está en la lista ({', '.join(map(str, bad))})."]
+        elif field["type"] not in SELECTION and any(not isinstance(x, str) or not x.strip() for x in v):
+            return [f"{label}: hay un texto vacío."]
+        return []
+    if kind == "period":
+        return [] if v in PERIODS else [f"{label}: elegí un período."]
+    if kind == "field":
+        other = OBJECTS[owner_obj]["fields"].get(v) if isinstance(v, str) else None
+        if not other or other["key"] == field["key"]:
+            return [f"{label}: elegí otra propiedad."]
+        if op in ("gt_field", "lt_field") and other["type"] != "number":
+            return [f"{label}: «{other['label']}» no es numérica."]
+        if OPERATORS[op].get("history") and other["key"] not in OBJECTS[owner_obj]["history"]:
+            return [f"{label}: «{other['label']}» no guarda historial."]
         return []
     if kind == "text":
         return [] if isinstance(v, str) and v.strip() else [f"{label}: escribí un texto."]
@@ -207,6 +318,7 @@ def validate_conditions(conditions, where: str, ctx: Ctx, required: bool = True,
     groups = conditions.get("groups") if isinstance(conditions, dict) else None
     if not groups:
         return [f"{where}: agregá al menos una condición."] if required else []
+    normalize_conditions(conditions)
     if not isinstance(groups, list):
         return [f"{where}: formato inválido."]
     errors = []
@@ -576,12 +688,42 @@ def _like(v) -> str:
     return str(v).strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _eq_key(v) -> str:
+    """Clave de «es igual a»: TRIM de Postgres saca sólo espacios, por eso strip(" ")."""
+    return str(v).strip(" ").lower()
+
+
+def _word_body(v) -> str:
+    """Texto de «contiene exactamente» como regex: todo lo que no es letra/número va
+    escapado con barra, que es literal tanto en Postgres (ARE) como en Python."""
+    return "".join(ch if ch.isalnum() else "\\" + ch for ch in str(v).strip())
+
+
+def _word_re_sql(v) -> str:
+    return f"(^|[^[:alnum:]_]){_word_body(v)}([^[:alnum:]_]|$)"
+
+
+def _word_hit(s, v) -> bool:
+    return s is not None and re.search(rf"(^|[^\w]){_word_body(v)}([^\w]|$)", str(s), re.I) is not None
+
+
+# Selección: desplegables y personas. `multi` (casillas) va aparte: es un array JSON.
+SELECTION = ("enum", "owner", "user", "multi")
+
+
+def _other_field(obj: str, rule: dict) -> dict:
+    """La «otra propiedad» de gt_field / lt_field / updated_*_field (ya validada)."""
+    return OBJECTS[obj]["fields"][rule["value"]]
+
+
 def _rule_sql_on(obj: str, field: dict, rule: dict, as_of: date, now: datetime) -> tuple[str, list]:
+    normalize_rule(rule)
     col = sql_expr(obj, field)  # de la lista blanca, nunca del JSON
     ty = field["type"]
     textual = ty in TEXTUAL
     op = rule["op"]
     v = rule.get("value")
+    hist = f"FROM prospect_company_events e WHERE {history_filter(obj)} AND e.field = %s"
     if op == "known":
         if ty == "multi":
             return f"COALESCE(jsonb_array_length({col}) > 0, FALSE)", []
@@ -594,41 +736,76 @@ def _rule_sql_on(obj: str, field: dict, rule: dict, as_of: date, now: datetime) 
         return f"COALESCE({col}, FALSE)", []
     if op == "is_false":
         return f"NOT COALESCE({col}, FALSE)", []
-    if op in ("has_any", "has_none"):
-        sql = f"COALESCE({col} ?| %s::text[], FALSE)"
-        return (sql if op == "has_any" else f"NOT {sql}"), [[str(x) for x in v]]
-    if op == "is_any":
-        return f"COALESCE({col} = ANY(%s), FALSE)", [list(v)]
-    if op == "is_none_of":
-        # Como en HubSpot: "no es ninguno de" incluye a las que no tienen valor.
-        return f"({col} IS NULL OR NOT ({col} = ANY(%s)))", [list(v)]
-    hist = f"FROM prospect_company_events e WHERE {history_filter(obj)} AND e.field = %s"
-    if op in ("ever_was", "never_was"):
-        sql = f"(COALESCE({col} = ANY(%s), FALSE) OR EXISTS (SELECT 1 {hist} AND e.new_value = ANY(%s)))"
-        params = [list(v), field["key"], [str(x) for x in v]]
-        return (sql if op == "ever_was" else f"NOT {sql}"), params
+    if op in ("updated_after_field", "updated_before_field"):
+        last = f"(SELECT MAX(e.at) {hist})"
+        if op == "updated_after_field":
+            # La otra sin actualizaciones cuenta como más vieja.
+            return f"COALESCE({last} > COALESCE({last}, '-infinity'::timestamptz), FALSE)", \
+                [field["key"], _other_field(obj, rule)["key"]]
+        return f"COALESCE({last} < {last}, FALSE)", [field["key"], _other_field(obj, rule)["key"]]
     if op in ("changed_in_last_days", "not_changed_in_days"):
         sql = f"EXISTS (SELECT 1 {hist} AND e.at >= %s)"
         params = [field["key"], changed_since(as_of, parse_int(v))]
         return (sql if op == "changed_in_last_days" else f"NOT {sql}"), params
-    if op == "equals":
-        return f"COALESCE(LOWER(TRIM({col})) = LOWER(TRIM(%s)), FALSE)", [str(v)]
-    if op == "contains":
-        return f"COALESCE({col} ILIKE %s, FALSE)", [f"%{_like(v)}%"]
-    if op == "not_contains":
-        return f"({col} IS NULL OR {col} NOT ILIKE %s)", [f"%{_like(v)}%"]
+    # Casillas múltiples: array JSON de textos.
+    if ty == "multi":
+        vals = [str(x) for x in v]
+        if op in ("is_any", "is_none_of", "not_contains"):
+            sql = f"COALESCE({col} ?| %s::text[], FALSE)"
+            return (sql if op == "is_any" else f"NOT {sql}"), [vals]
+        if op in ("contains_all", "not_contains_all"):
+            sql = f"COALESCE({col} ?& %s::text[], FALSE)"
+            return (sql if op == "contains_all" else f"NOT {sql}"), [vals]
+        if op in ("equals_all", "not_equals_all"):
+            arr = json.dumps(vals)
+            sql = f"COALESCE(({col} @> %s::jsonb AND {col} <@ %s::jsonb), FALSE)"
+            return (sql if op == "equals_all" else f"NOT {sql}"), [arr, arr]
+    if op == "is_any":
+        return f"COALESCE({col} = ANY(%s), FALSE)", [list(v)]
+    if op == "is_none_of" or (op == "not_contains" and ty in SELECTION):
+        # Como en HubSpot: "no es ninguno de" incluye a las que no tienen valor.
+        return f"({col} IS NULL OR NOT ({col} = ANY(%s)))", [list(v)]
+    if op in ("ever_was", "never_was"):
+        sql = f"(COALESCE({col} = ANY(%s), FALSE) OR EXISTS (SELECT 1 {hist} AND e.new_value = ANY(%s)))"
+        params = [list(v), field["key"], [str(x) for x in v]]
+        return (sql if op == "ever_was" else f"NOT {sql}"), params
+    if op in ("ever_equals", "never_equals", "ever_equals_any", "never_equals_any"):
+        keys = [_eq_key(x) for x in (v if isinstance(v, list) else [v])]
+        sql = (f"(COALESCE(LOWER(TRIM({col}::text)) = ANY(%s), FALSE) OR EXISTS (SELECT 1 {hist} "
+               f"AND LOWER(TRIM(e.new_value)) = ANY(%s)))")
+        return (sql if op.startswith("ever_") else f"NOT {sql}"), [keys, field["key"], keys]
+    if op in ("ever_contained_exactly", "never_contained_exactly"):
+        pat = _word_re_sql(v)
+        sql = f"(COALESCE({col}::text ~* %s, FALSE) OR EXISTS (SELECT 1 {hist} AND e.new_value ~* %s))"
+        return (sql if op == "ever_contained_exactly" else f"NOT {sql}"), [pat, field["key"], pat]
+    if op in ("equals", "not_equals", "equals_any", "not_equals_any"):
+        keys = [_eq_key(x) for x in (v if isinstance(v, list) else [v])]
+        sql = f"COALESCE(LOWER(TRIM({col}::text)) = ANY(%s), FALSE)"
+        return (sql if op in ("equals", "equals_any") else f"NOT {sql}"), [keys]
+    if op in ("contains", "not_contains"):
+        sql = f"COALESCE({col}::text ILIKE ANY(%s), FALSE)"
+        return (sql if op == "contains" else f"NOT {sql}"), [[f"%{_like(x)}%" for x in v]]
     if op == "starts_with":
-        return f"COALESCE({col} ILIKE %s, FALSE)", [f"{_like(v)}%"]
+        return f"COALESCE({col}::text ILIKE ANY(%s), FALSE)", [[f"{_like(x)}%" for x in v]]
     if op == "ends_with":
-        return f"COALESCE({col} ILIKE %s, FALSE)", [f"%{_like(v)}"]
+        return f"COALESCE({col}::text ILIKE ANY(%s), FALSE)", [[f"%{_like(x)}" for x in v]]
+    if op in ("contains_exactly", "not_contains_exactly"):
+        sql = f"COALESCE({col}::text ~* %s, FALSE)"
+        return (sql if op == "contains_exactly" else f"NOT {sql}"), [_word_re_sql(v)]
     if op in ("eq", "gt", "gte", "lt", "lte"):
         sym = {"eq": "=", "gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[op]
         return f"COALESCE({col} {sym} %s, FALSE)", [parse_number(v)]
+    if op == "not_eq":
+        return f"NOT COALESCE({col} = %s, FALSE)", [parse_number(v)]
+    if op in ("gt_field", "lt_field"):
+        other = sql_expr(obj, _other_field(obj, rule))
+        return f"COALESCE({col} {'>' if op == 'gt_field' else '<'} {other}, FALSE)", []
     if op == "between":
         return f"COALESCE({col} BETWEEN %s AND %s, FALSE)", [parse_number(v[0]), parse_number(v[1])]
     d = sql_date(obj, field)
-    if op == "is_today":
-        return f"COALESCE({d} = %s::date, FALSE)", [as_of]
+    if op == "is_period":
+        lo, hi = period_bounds(v, as_of)
+        return f"COALESCE({d} BETWEEN %s::date AND %s::date, FALSE)", [lo, hi]
     if op == "is_on":
         return f"COALESCE({d} = %s::date, FALSE)", [parse_date(v)]
     if op == "before":
@@ -637,8 +814,13 @@ def _rule_sql_on(obj: str, field: dict, rule: dict, as_of: date, now: datetime) 
         return f"COALESCE({d} > %s::date, FALSE)", [parse_date(v)]
     if op == "between_dates":
         return f"COALESCE({d} BETWEEN %s::date AND %s::date, FALSE)", [parse_date(v[0]), parse_date(v[1])]
+    if op == "not_between_dates":
+        # Sin fecha no está «fuera del intervalo»: falso.
+        return f"COALESCE(NOT ({d} BETWEEN %s::date AND %s::date), FALSE)", [parse_date(v[0]), parse_date(v[1])]
     if op == "older_than_days":
         return f"COALESCE({d} < %s::date - %s::int, FALSE)", [as_of, parse_int(v)]
+    if op == "more_than_days_ahead":
+        return f"COALESCE({d} > %s::date + %s::int, FALSE)", [as_of, parse_int(v)]
     if op == "within_last_days":
         return f"COALESCE({d} >= %s::date - %s::int AND {d} <= %s::date, FALSE)", [as_of, parse_int(v), as_of]
     if op == "in_next_days":
@@ -689,22 +871,43 @@ def _as_date(field: dict, v):
     return parse_date(v)
 
 
-def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, history: dict) -> bool:
+def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, history: dict,
+                obj: str = "company") -> bool:
+    normalize_rule(rule)
     key = field["key"]
     ty = field["type"]
     textual = ty in TEXTUAL
     op = rule["op"]
     v = rule.get("value")
     cur = row.get(key)
+    if op in ("updated_after_field", "updated_before_field"):
+        mine = max((e["at"] for e in history.get(key, [])), default=None)
+        theirs = max((e["at"] for e in history.get(_other_field(obj, rule)["key"], [])), default=None)
+        if mine is None:
+            return False
+        if op == "updated_after_field":
+            return theirs is None or mine > theirs
+        return theirs is not None and mine < theirs
+    if op in ("changed_in_last_days", "not_changed_in_days"):
+        since = changed_since(as_of, parse_int(v))
+        hit = any(e["at"] >= since for e in history.get(key, []))
+        return hit if op == "changed_in_last_days" else not hit
     if ty == "multi":
-        lst = cur if isinstance(cur, list) else []
+        lst = {str(y) for y in cur} if isinstance(cur, list) else set()
         if op == "known":
             return len(lst) > 0
         if op == "unknown":
             return len(lst) == 0
-        if op in ("has_any", "has_none"):
-            hit = any(str(x) in {str(y) for y in lst} for x in v)
-            return hit if op == "has_any" else not hit
+        vals = {str(x) for x in v}
+        if op in ("is_any", "is_none_of", "not_contains"):
+            hit = bool(lst & vals)
+            return hit if op == "is_any" else not hit
+        if op in ("contains_all", "not_contains_all"):
+            hit = vals <= lst
+            return hit if op == "contains_all" else not hit
+        if op in ("equals_all", "not_equals_all"):
+            hit = vals == lst
+            return hit if op == "equals_all" else not hit
     if ty == "bool":
         b = _bool(cur)
         if op == "is_true":
@@ -725,43 +928,56 @@ def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, 
         return not has
     if op == "is_any":
         return cur is not None and cur in v
-    if op == "is_none_of":
+    if op == "is_none_of" or (op == "not_contains" and ty in SELECTION):
         return cur is None or cur not in v
     if op in ("ever_was", "never_was"):
         vals = {str(x) for x in v}
         hit = (cur is not None and cur in v) or any(e["new"] in vals for e in history.get(key, []))
         return hit if op == "ever_was" else not hit
-    if op in ("changed_in_last_days", "not_changed_in_days"):
-        since = changed_since(as_of, parse_int(v))
-        hit = any(e["at"] >= since for e in history.get(key, []))
-        return hit if op == "changed_in_last_days" else not hit
-    if op in ("equals", "contains", "not_contains", "starts_with", "ends_with"):
-        s = None if cur is None else str(cur)
-        if op == "equals":
-            # TRIM de Postgres saca sólo espacios: strip(" ") para dar lo mismo.
-            return s is not None and s.strip(" ").lower() == str(v).strip(" ").lower()
-        needle = str(v).strip().lower()
-        if op == "not_contains":
-            return s is None or needle not in s.lower()
-        if s is None:
-            return False
-        low = s.lower()
-        if op == "contains":
-            return needle in low
-        return low.startswith(needle) if op == "starts_with" else low.endswith(needle)
-    if op in ("eq", "gt", "gte", "lt", "lte", "between"):
+    s = None if cur is None else str(cur)
+    if op in ("ever_equals", "never_equals", "ever_equals_any", "never_equals_any"):
+        keys = {_eq_key(x) for x in (v if isinstance(v, list) else [v])}
+        hit = (s is not None and _eq_key(s) in keys) or any(
+            e["new"] is not None and _eq_key(e["new"]) in keys for e in history.get(key, []))
+        return hit if op.startswith("ever_") else not hit
+    if op in ("ever_contained_exactly", "never_contained_exactly"):
+        hit = _word_hit(s, v) or any(_word_hit(e["new"], v) for e in history.get(key, []))
+        return hit if op == "ever_contained_exactly" else not hit
+    if op in ("equals", "not_equals", "equals_any", "not_equals_any"):
+        keys = {_eq_key(x) for x in (v if isinstance(v, list) else [v])}
+        hit = s is not None and _eq_key(s) in keys
+        return hit if op in ("equals", "equals_any") else not hit
+    if op in ("contains", "not_contains", "starts_with", "ends_with"):
+        low = None if s is None else s.lower()
+        needles = [str(x).strip().lower() for x in v]
+        if op == "starts_with":
+            return low is not None and any(low.startswith(n) for n in needles)
+        if op == "ends_with":
+            return low is not None and any(low.endswith(n) for n in needles)
+        hit = low is not None and any(n in low for n in needles)
+        return hit if op == "contains" else not hit
+    if op in ("contains_exactly", "not_contains_exactly"):
+        hit = _word_hit(s, v)
+        return hit if op == "contains_exactly" else not hit
+    if op in ("eq", "not_eq", "gt", "gte", "lt", "lte", "between", "gt_field", "lt_field"):
         n = _num(cur)
+        if op == "not_eq":
+            return n is None or n != parse_number(v)
         if n is None:
             return False
         if op == "between":
             return parse_number(v[0]) <= n <= parse_number(v[1])
+        if op in ("gt_field", "lt_field"):
+            o = _num(row.get(_other_field(obj, rule)["key"]))
+            return o is not None and (n > o if op == "gt_field" else n < o)
         t = parse_number(v)
         return {"eq": n == t, "gt": n > t, "gte": n >= t, "lt": n < t, "lte": n <= t}[op]
     d = _as_date(field, cur)
     if d is None:
         return False
-    if op == "is_today":
-        return d == as_of
+    if op == "is_period":
+        lo, hi = period_bounds(v, as_of)
+        return lo <= d <= hi
     if op == "is_on":
         return d == parse_date(v)
     if op == "before":
@@ -770,9 +986,13 @@ def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, 
         return d > parse_date(v)
     if op == "between_dates":
         return parse_date(v[0]) <= d <= parse_date(v[1])
+    if op == "not_between_dates":
+        return not (parse_date(v[0]) <= d <= parse_date(v[1]))
     n = parse_int(v)
     if op == "older_than_days":
         return d < as_of - timedelta(days=n)
+    if op == "more_than_days_ahead":
+        return d > as_of + timedelta(days=n)
     if op == "within_last_days":
         return as_of - timedelta(days=n) <= d <= as_of
     if op == "in_next_days":
@@ -783,11 +1003,11 @@ def _rule_py_on(field: dict, rule: dict, row: dict, as_of: date, now: datetime, 
 def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict, obj: str, related: dict) -> bool:
     target, field, cross = resolve(obj, rule["field"])
     if not cross:
-        return _rule_py_on(field, rule, row, as_of, now, history)
+        return _rule_py_on(field, rule, row, as_of, now, history, target)
     if target == "company":
         comp = related.get("company")
-        return bool(comp) and _rule_py_on(field, rule, comp["row"], as_of, now, comp["history"])
-    return any(_rule_py_on(field, rule, c["row"], as_of, now, c["history"]) for c in related.get("contacts") or [])
+        return bool(comp) and _rule_py_on(field, rule, comp["row"], as_of, now, comp["history"], target)
+    return any(_rule_py_on(field, rule, c["row"], as_of, now, c["history"], target) for c in related.get("contacts") or [])
 
 
 def matches(conditions, row: dict, as_of: date, now: datetime, history: dict | None = None,

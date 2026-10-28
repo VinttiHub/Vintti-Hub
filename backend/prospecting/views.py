@@ -19,7 +19,7 @@ from __future__ import annotations
 from psycopg2.extras import Json
 
 from prospecting.constants import FIELDS_BY_KEY, STATUSES
-from prospecting.rules import InvalidWorkflow, has_conditions, validate_conditions
+from prospecting.rules import InvalidWorkflow, has_conditions, normalize_tree, validate_conditions
 
 SYSTEM_TABS = ["sys:all", "sys:mine", "sys:unassigned", "sys:recycled"]
 # Columnas de la tabla que no son campo (se muestran, no se filtran ni ordenan).
@@ -119,6 +119,7 @@ def _clean_name(name) -> str:
 
 def _row(r, email: str) -> dict:
     d = dict(r)
+    normalize_tree(d.get("config"))  # filtros guardados con los operadores de antes
     d["mine"] = d["owner_email"] == email
     return d
 

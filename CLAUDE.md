@@ -1185,6 +1185,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **sólo con la lista blanca** `FIELDS` / `OPERATORS` de `constants.py`, y además las evalúa en
   Python para ramas y pruebas: **las dos tienen que dar lo mismo** (hay test de paridad; si tocás
   un operador, tocá los dos). Editan **pgonzales, manuela y mia** (`WORKFLOW_EDITORS`).
+- **Los operadores (filtros avanzados + condiciones de workflows) son los del doc de la owner**
+  («Hubspot - Hub : NUEVO CRM», 2026-10-28): nombre literal y misma función, en el orden del
+  doc (los del tipo → históricos → «Es conocido / Se actualizó…»). Los del hub que el doc no
+  tiene (`is_on`, `between` de números, `within_last_days`, `in_next_days`, `is_true/is_false`)
+  quedan **al final** con su nombre viejo. «Actualizado en los últimos» de la sección 5 es el
+  mismo `changed_in_last_days`: se muestra sólo el nombre de la sección 6. Los «… todos de»
+  sólo en `multi`. Las reglas guardadas con la forma vieja (`has_any`, `has_none`, `is_today`,
+  `contains` con un texto suelto) las traduce `rules.normalize_rule()` al validar, compilar,
+  evaluar y leer: no hay script. «Es» de fechas usa `PERIODS` + `rules.period_bounds()`, uno
+  solo para SQL y Python.
 - **Motor con estado** (`engine.py`): cada empresa inscripta es una fila de
   `prospect_wf_enrollments` con su paso actual y `wake_at`; el log de cada paso va a
   `prospect_wf_step_log` (pestaña Historial). El disparador por condiciones inscribe sólo en la
