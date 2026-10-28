@@ -818,7 +818,7 @@
             '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true) + "</select>" +
             '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + optionTags(ops, r.op) + "</select>" +
             (canEdit ? '<button type="button" class="pr-wf-x" data-rdel="' + path + '" title="Quitar condición"><i class="fa-solid fa-xmark"></i></button>' : "") +
-          "</div>" + ruleValue(r, path) + "</div>";
+          "</div>" + ruleValue(r, path) + crossHint(f) + "</div>";
       }).join("");
       return (gi ? '<div class="pr-wf-or-sep"><span>o</span></div>' : "") +
         '<div class="pr-wf-group' + (compact ? " pr-wf-group--compact" : "") + '">' +
@@ -843,6 +843,36 @@
     return chips((S().weekdays || []).map(function (n, i) { return { value: i, label: n }; }), selected, attr);
   }
 
+  /* Aclaración debajo de los valores: las opciones marcadas de UNA condición son «o»
+     (o «y» en los «todos de»), y con «Algún contacto» cada condición busca su propio
+     contacto (rules.cross_wrap: un EXISTS por regla). */
+  var HINT_ANY = { is_any: "es", ever_was: "alguna vez fue", equals_any: "es igual a", contains: "contiene",
+    starts_with: "comienza con", ends_with: "termina con", ever_equals_any: "alguna vez fue igual a" };
+  var HINT_NONE = { is_none_of: "no es", not_contains: "no contiene", never_was: "nunca fue",
+    not_equals_any: "no es igual a", never_equals_any: "nunca fue igual a" };
+  var HINT_ALL = { contains_all: "tiene", equals_all: "tiene exactamente" };
+  var HINT_NOT_ALL = { not_contains_all: "", not_equals_all: "exactamente " };
+  function ruleHint(r, f, freeText) {
+    var op = r.op, out = "";
+    var vals = (Array.isArray(r.value) ? r.value : []).map(function (x) { return "<em>" + esc(choiceLabel(f, x)) + "</em>"; });
+    var O = ' <strong>o</strong> ', Y = ' <strong>y</strong> ';
+    if (freeText) {
+      if (HINT_ANY[op]) out = "Un valor por línea · cumple con cualquiera (<strong>o</strong>).";
+      else if (HINT_NONE[op]) out = "Un valor por línea · cumple si no coincide con ninguno.";
+    } else if (vals.length >= 2) {
+      if (HINT_ANY[op]) out = "Cumple si " + HINT_ANY[op] + " " + vals.join(O) + ".";
+      else if (HINT_NONE[op]) out = "Cumple si " + HINT_NONE[op] + " ninguno: " + vals.join(", ") + ".";
+      else if (HINT_ALL[op]) out = "Cumple si " + HINT_ALL[op] + " " + vals.join(Y) + ".";
+      else if (op in HINT_NOT_ALL) out = "Cumple salvo que tenga " + HINT_NOT_ALL[op] + vals.join(Y) + " juntas.";
+    }
+    return out ? '<p class="pr-wf-rule-hint">' + out + "</p>" : "";
+  }
+  function crossHint(f) {
+    if (!f || f.cross !== "contact") return "";
+    return '<p class="pr-wf-rule-hint">Se busca en cualquier contacto de la empresa. Si agregás otra condición ' +
+      "(<strong>y</strong>) de «Algún contacto», la puede cumplir un contacto distinto.</p>";
+  }
+
   function ruleValue(r, path) {
     var f = field(r.field);
     var kind = opDef(r.op).value;
@@ -850,10 +880,11 @@
     if (!kind) return "";
     if (kind === "list") {
       if (f && (choices(f).length || ["enum", "owner", "user", "multi"].indexOf(f.type) !== -1))
-        return chips(choices(f), v || [], 'data-rchip="' + path + '"');
+        return chips(choices(f), v || [], 'data-rchip="' + path + '"') + ruleHint(r, f, false);
       // Texto libre («Contiene cualquiera de», «Es igual a cualquiera de»…): uno por línea.
+      // La aclaración es fija: el textarea no redibuja mientras se escribe.
       return '<textarea class="pr-filter__input pr-wf-list" rows="2" data-val="' + path + '" data-list="1" placeholder="Un valor por línea…"' + dis() + ">" +
-        esc((Array.isArray(v) ? v : []).join("\n")) + "</textarea>";
+        esc((Array.isArray(v) ? v : []).join("\n")) + "</textarea>" + ruleHint(r, f, true);
     }
     if (kind === "period") {
       return '<select class="pr-filter__input" data-val="' + path + '"' + dis() + ">" + optionTags(S().periods || [], v) + "</select>";

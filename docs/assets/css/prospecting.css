@@ -1011,6 +1011,9 @@
 .pr-wf-dur, .pr-wf-range { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pr-ink-2); margin-top: 8px; }
 .pr-wf-dur .pr-filter__input { width: 80px; }
 .pr-wf-range .pr-filter__input { flex: 1; }
+.pr-wf-rule-hint { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--pr-ink-2); }
+.pr-wf-rule-hint strong { color: var(--pr-violet); }
+.pr-wf-rule-hint em { font-style: normal; font-weight: 600; color: var(--pr-ink); }
 .pr-wf-list { width: 100%; min-height: 52px; margin-top: 8px; resize: vertical; font: inherit; line-height: 1.4; }
 .pr-wf-delay, .pr-wf-branch { display: flex; flex-direction: column; gap: 8px; }
 .pr-wf-bpath { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--pr-card-soft); }
