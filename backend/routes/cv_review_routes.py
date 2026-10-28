@@ -1655,9 +1655,18 @@ def list_cv_reviews():
         offset = max(int(request.args.get("offset", 0)), 0)
     except ValueError:
         return jsonify({"error": "limit and offset must be integers"}), 400
+    # El CTA del mail de un batch apunta a una oportunidad. Filtrarla acá y no sólo en el
+    # navegador: con el corte de `limit` y los pendientes viejos primero, los del batch recién
+    # mandado quedaban fuera de las 100 filas y la página decía "Nothing to review" (opp 884).
+    opportunity_id = (request.args.get("opportunity_id") or "").strip()
+    if opportunity_id and not opportunity_id.isdigit():
+        return jsonify({"error": "opportunity_id must be an integer"}), 400
 
     where = ["TRUE"]
     params = {}
+    if opportunity_id:
+        where.append("r.opportunity_id = %(opportunity_id)s")
+        params["opportunity_id"] = int(opportunity_id)
     if status:
         if status not in ("pending", "approved", "rejected", "changes_requested", "cancelled"):
             return jsonify({"error": "unknown status"}), 400

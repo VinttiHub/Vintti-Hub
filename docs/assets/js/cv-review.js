@@ -2331,6 +2331,9 @@ ${/* v7 dejó de capear y de poner pisos. Un análisis guardado de antes sigue m
     if ($('cvrStatus').value) p.set('status', $('cvrStatus').value);
     if ($('cvrRecruiter').value) p.set('recruiter', $('cvrRecruiter').value);
     if ($('cvrMine').checked) p.set('mine', '1');
+    // El filtro del deep-link va al backend: filtrado sólo acá, los reviews de un batch nuevo
+    // podían quedar fuera del corte de 100 filas y la cola salía vacía.
+    if (deepOppId) p.set('opportunity_id', String(deepOppId));
     return p.toString();
   };
 
