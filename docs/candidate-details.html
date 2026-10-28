@@ -12,7 +12,7 @@
 
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261026-cv-coverage2" />
+  <link rel="stylesheet" href="./assets/css/candidate-details.css?v=20261028-contact-via2" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -335,6 +335,25 @@
                 </div>
               </div>
 
+              <!-- Contacted via (contacted_apriora / contacted_whatsapp): se carga al
+                   crear el candidato (Candidates o Pipeline) y se corrige acá. Va en
+                   Contact, al lado de Timezone: al final de References no se veía. -->
+              <div class="ov-field">
+                <label>Contacted via</label>
+                <div id="contact-channel-block" class="ov-allset ov-contact-via">
+                  <label class="pretty-check ov-chip">
+                    <input type="checkbox" id="contacted-apriora-check" data-field="contacted_apriora" />
+                    <span class="box" aria-hidden="true"></span>
+                    <span class="txt">Apriora</span>
+                  </label>
+                  <label class="pretty-check ov-chip">
+                    <input type="checkbox" id="contacted-whatsapp-check" data-field="contacted_whatsapp" />
+                    <span class="box" aria-hidden="true"></span>
+                    <span class="txt">WhatsApp</span>
+                  </label>
+                </div>
+              </div>
+
               <!-- LINKEDIN DE HOY, pegado a mano: el CV Review compara el CV contra el LinkedIn,
                    y la copia de Coresignal puede tener meses. Lo llena candidate-details.js.
                    `ov-span-2`: ocupa las dos columnas, si no la grilla estira la tarjeta de al lado. -->
@@ -587,20 +606,6 @@
               </label>
             </div>
 
-            <!-- Contacted via (contacted_apriora / contacted_whatsapp): se carga al
-                 crear el candidato (Candidates o Pipeline) y se corrige acá. -->
-            <div id="contact-channel-block" class="ov-allset">
-              <label class="pretty-check ov-chip">
-                <input type="checkbox" id="contacted-apriora-check" data-field="contacted_apriora" />
-                <span class="box" aria-hidden="true"></span>
-                <span class="txt">Contacted via Apriora</span>
-              </label>
-              <label class="pretty-check ov-chip">
-                <input type="checkbox" id="contacted-whatsapp-check" data-field="contacted_whatsapp" />
-                <span class="box" aria-hidden="true"></span>
-                <span class="txt">Contacted via WhatsApp</span>
-              </label>
-            </div>
           </section>
 
           <!-- Toast del check de arriba -->

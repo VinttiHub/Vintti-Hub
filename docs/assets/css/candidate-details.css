@@ -7425,6 +7425,26 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
   margin-top: 8px;
 }
 
+/* Contacted via: vive dentro de un .ov-field de Contact, sin el separador de
+   arriba que llevan los otros bloques .ov-allset, y los dos chips en una fila. */
+#overview .ov-allset.ov-contact-via {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#overview .ov-allset.ov-contact-via .ov-chip + .ov-chip {
+  margin-top: 0;
+}
+/* Mismo ancho los dos y la altura del selector de Timezone. */
+#overview .ov-allset.ov-contact-via .ov-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 12px;
+}
+
 /* ---------- Equipment ---------- */
 #overview #equipments-card .chips-row {
   font-size: 13px;
