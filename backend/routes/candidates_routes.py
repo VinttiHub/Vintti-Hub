@@ -3858,7 +3858,7 @@ def candidate_linkedin_paste(candidate_id):
 # envío a Sales Review (de a uno y por batch) avisa si falta algo pero no frena.
 # Tabla aparte y no columnas en candidates: CREATE TABLE no pide lock sobre candidates.
 # Si sumás una clave, sumala también en candidate-details.html y opportunity-detail.js.
-CV_CHECKLIST_KEYS = ("job_hopping", "linkedin_match", "tools_in_experience", "recorder_link", "dates_ok")
+CV_CHECKLIST_KEYS = ("job_hopping", "linkedin_match", "tools_in_experience", "recorder_link", "dates_ok", "clip_name")
 _CV_CHECKLIST_READY = False
 
 
