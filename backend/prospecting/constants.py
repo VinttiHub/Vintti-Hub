@@ -37,7 +37,6 @@ BDR_ROLE_PATTERN = "%BDR%"
 BDR_FIELDS = (
     "prospecting_status",
     "prospecting_owner_email",
-    "prospecting_owner_apollo",
     "prospecting_start_date",
     "not_icp_reason",
     "week_label",
@@ -96,10 +95,9 @@ AUTOMATION_REAL_DATA = False
 FIELDS = [
     {"key": "name", "label": "Nombre de la empresa", "type": "text"},
     {"key": "prospecting_status", "label": "Prospecting Status", "type": "enum", "options": STATUSES},
+    # Un solo owner (2026-10-28): "Prospecting Owner Apollo" venía de HubSpot y se
+    # sacó. La columna sigue en la tabla, sin uso.
     {"key": "prospecting_owner_email", "label": "Prospecting Owner", "type": "owner"},
-    # Persona (BDR), igual que en HubSpot: el workflow 6 copia este valor a
-    # Prospecting Owner, y copiar texto a una persona no se permite.
-    {"key": "prospecting_owner_apollo", "label": "Prospecting Owner Apollo", "type": "owner"},
     {"key": "prospecting_start_date", "label": "Prospecting Start Date", "type": "date"},
     {"key": "not_icp_reason", "label": "Not ICP Reason", "type": "enum", "options": NOT_ICP_REASONS},
     {"key": "week_label", "label": "Semana", "type": "text"},
@@ -271,8 +269,7 @@ DEFAULT_WORKFLOWS = [
             {"field": "prospecting_status", "op": "is_any", "value": [STATUS_IN_PROGRESS]},
         ]}]}},
         "steps": {"start": "n1", "nodes": {
-            "n1": {"type": "action", "action": {"type": "clear", "field": "prospecting_owner_email"}, "next": "n2"},
-            "n2": {"type": "action", "action": {"type": "clear", "field": "prospecting_owner_apollo"}, "next": "n3"},
+            "n1": {"type": "action", "action": {"type": "clear", "field": "prospecting_owner_email"}, "next": "n3"},
             "n3": {"type": "action", "action": {"type": "clear", "field": "prospecting_start_date"}, "next": "n4"},
             "n4": {"type": "action", "action": {"type": "set", "field": "prospecting_status", "value": STATUS_RECYCLED}, "next": None},
         }},

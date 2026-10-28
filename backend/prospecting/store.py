@@ -372,7 +372,7 @@ def list_bdrs(cur) -> list[dict]:
     """BDRs activos + los admins (pgonzales siempre)."""
     cur.execute(
         """
-        SELECT LOWER(TRIM(u.email_vintti)) AS email, u.user_name AS name, u.role
+        SELECT u.user_id AS id, LOWER(TRIM(u.email_vintti)) AS email, u.user_name AS name, u.role
           FROM users u
           LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
          WHERE COALESCE(aua.is_active, TRUE)
@@ -427,7 +427,8 @@ _ALIASES = {
     "week_label": ["week_label", "semana", "week"],
     "prospecting_status": ["prospecting_status"],
     "prospecting_owner_email": ["prospecting_owner_email", "prospecting_owner", "prospecting_owner_hubspot", "owner_email"],
-    "prospecting_owner_apollo": ["prospecting_owner_apollo"],
+    # El ID del BDR en el Hub (users.user_id): lo que reparte el round robin de Clay.
+    "prospecting_owner_id": ["prospecting_owner_id", "owner_id", "bdr_id", "hub_owner_id"],
     "prospecting_start_date": ["prospecting_start_date"],
     "not_icp_reason": ["not_icp_reason"],
 }
@@ -480,7 +481,7 @@ def clean_value(col: str, v):
         return _to_int(v)
     if col == "prospecting_start_date":
         return _to_date(v)
-    if col in ("prospecting_owner_email", "prospecting_owner_apollo"):
+    if col in ("prospecting_owner_email", "prospecting_owner_id"):
         s = _clean_text(v)
         return s.lower() if s else None
     if col == "week_label":
@@ -538,6 +539,7 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
     data = map_clay_payload(payload)
     if not data.get("name"):
         raise ValueError("Falta el nombre de la empresa (name / company_name).")
+    owner_warning = resolve_owner(cur, data)
     domain = normalize_domain(data.get("website"))
     clay_id = data.get("clay_record_id")
 
@@ -579,7 +581,7 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
         )
         new_id = cur.fetchone()["id"]
         log_event(cur, new_id, "clay", None, None, None, "created")
-        return {"id": new_id, "action": "created"}
+        return _with_warning({"id": new_id, "action": "created"}, owner_warning)
 
     sets, vals, changes = [], [], []
     for c in CLAY_FIELDS:
@@ -610,8 +612,45 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
     )
     for field, old, new in changes:
         log_event(cur, existing["id"], "clay", None, field, old, new)
-    return {"id": existing["id"], "action": "updated", "changed": [c[0] for c in changes],
-            "changes_detail": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
+    return _with_warning(
+        {"id": existing["id"], "action": "updated", "changed": [c[0] for c in changes],
+         "changes_detail": [{"field": f, "old": o, "new": n} for f, o, n in changes]},
+        owner_warning,
+    )
+
+
+def _with_warning(result: dict, warning: str | None) -> dict:
+    if warning:
+        result["owner_warning"] = warning
+    return result
+
+
+def resolve_owner(cur, data: dict) -> str | None:
+    """Deja en `data["prospecting_owner_email"]` el email de un BDR, o nada.
+
+    Clay reparte las empresas con un round robin de IDs del Hub (`users.user_id`),
+    como antes repartía IDs de owner de HubSpot. Acepta el id en
+    `prospecting_owner_id` o un número suelto en el campo del owner, y también un
+    email, pero sólo si es de un BDR: un owner que no coincide con nadie dejaba la
+    empresa asignada a un texto que ningún BDR ve como suyo. Devuelve el aviso para
+    la celda de Clay cuando no matchea; la empresa entra igual, sin owner.
+    """
+    raw_id = data.pop("prospecting_owner_id", None)
+    raw = data.pop("prospecting_owner_email", None)
+    if raw_id is None and raw is None:
+        return None
+    bdrs = list_bdrs(cur)
+    if raw_id is not None or (raw or "").isdigit():
+        key = str(raw_id if raw_id is not None else raw).strip()
+        match = next((b for b in bdrs if str(b["id"]) == key), None)
+        if match is None:
+            return f"No hay un BDR con id {key}: la empresa entró sin owner."
+    else:
+        match = next((b for b in bdrs if b["email"] == raw), None)
+        if match is None:
+            return f"{raw} no es un BDR del Hub: la empresa entró sin owner."
+    data["prospecting_owner_email"] = match["email"]
+    return None
 
 
 def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user") -> dict | None:
@@ -653,7 +692,7 @@ LIST_COLUMNS = """
     id, hubspot_company_id, name, domain, website, linkedin_url, description, industry,
     keywords, technologies, job_types, size, city, state, country,
     open_jobs, founded_year, lead_source, week_label, prospecting_status,
-    prospecting_owner_email, prospecting_owner_apollo, prospecting_start_date,
+    prospecting_owner_email, prospecting_start_date,
     not_icp_reason, is_dummy, created_at, updated_at, contact_incomplete,
     (SELECT COUNT(*) FROM prospect_contacts ct WHERE ct.company_id = prospect_companies.id) AS contacts_count
 """

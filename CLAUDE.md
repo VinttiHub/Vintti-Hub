@@ -1167,6 +1167,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   fila de Clay mandada del otro lado se rechaza con un mensaje en vez de convertirse. El
   simulador (`scripts/clay_webhook_simulator.py`) manda dummies por defecto (`--real` lo apaga).
   Ojo: el backend local de la owner escribe en la RDS de producción.
+- **El owner llega como ID del Hub** (2026-10-28): igual que con HubSpot, Clay reparte las
+  empresas con un **round robin** de IDs, que ahora son `users.user_id` del BDR, mandados
+  en `prospecting_owner_id`. `resolve_owner()` (`store.py`) los convierte en el email del
+  BDR; también acepta un email, pero **sólo si es de un BDR**. Si no coincide con nadie, la
+  empresa entra sin owner y la celda de Clay muestra `owner_warning`. Antes se guardaba
+  cualquier texto ("abril acosta") y la empresa no le aparecía a nadie. Los IDs se ven en
+  el botón **BDR IDs (Clay)** de `prospecting.html` (sólo admin). Hay **un solo owner**:
+  "Prospecting Owner Apollo" salió de `FIELDS` y de la UI. La columna queda en la tabla,
+  sin uso. Los workflows guardados que la nombraban los limpia
+  `scripts/drop_owner_apollo_from_workflows.py`.
 - **Workflows al nivel de HubSpot, armados desde la página** (pestaña *Workflows*). Son filas
   de `prospect_workflows` con un **disparador** (condiciones / evento "se crea" o "cambia una
   propiedad" / horario / manual), un **grafo de pasos** (acciones, esperas, ramas si-no / Y-O /

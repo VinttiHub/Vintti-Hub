@@ -247,7 +247,6 @@
     { key: "state", label: "Estado", render: function (r) { return cellText(r.state); } },
     { key: "country", label: "Pais", render: function (r) { return cellText(r.country); } },
     { key: "hubspot_company_id", label: "Id de la empresa (HubSpot)", render: function (r) { return cellText(r.hubspot_company_id); } },
-    { key: "prospecting_owner_apollo", label: "Prospecting Owner Apollo", render: function (r) { return cellText(ownerName(r.prospecting_owner_apollo)); } },
   ];
 
   /* Columnas visibles, EN ORDEN. En una vista guardada salen de su config; en las
@@ -513,7 +512,6 @@
   var FIELD_LABELS = {
     prospecting_status: "Prospecting Status",
     prospecting_owner_email: "Prospecting Owner",
-    prospecting_owner_apollo: "Prospecting Owner Apollo",
     prospecting_start_date: "Prospecting Start Date",
     not_icp_reason: "Not ICP Reason",
     week_label: "Week",
@@ -574,8 +572,6 @@
             '<select class="pr-filter__input" data-edit="not_icp_reason">' + optionsHtml(withCurrent(OPTS.not_icp_reasons, c.not_icp_reason), c.not_icp_reason || "", "—") + "</select>") +
           f("prospecting_owner_email", "Prospecting Owner",
             '<select class="pr-filter__input" data-edit="prospecting_owner_email">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_email), c.prospecting_owner_email || "", "—") + "</select>") +
-          f("prospecting_owner_apollo", "Prospecting Owner Apollo",
-            '<select class="pr-filter__input" data-edit="prospecting_owner_apollo">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_apollo), c.prospecting_owner_apollo || "", "—") + "</select>") +
           f("prospecting_start_date", "Prospecting Start Date",
             '<input type="date" class="pr-filter__input" data-edit="prospecting_start_date" value="' + esc((c.prospecting_start_date || "").slice(0, 10)) + '">') +
           f("week_label", "Week",
@@ -625,6 +621,36 @@
   }
 
   /* ---------- Panel de pruebas (sólo admin) ---------- */
+  /* IDs del Hub (users.user_id) para el round robin de Clay: Clay reparte estos
+     números en `prospecting_owner_id` y el webhook los convierte en el BDR. */
+  function showBdrIds() {
+    drawerSave = null;
+    var bdrs = (OPTS.bdrs || []).filter(function (b) { return b.id != null; });
+    $("prDrawerEyebrow").textContent = "Clay";
+    $("prDrawerTitle").textContent = "BDR IDs";
+    $("prDrawerSub").textContent = "Use these IDs in Clay's round robin and send the result as prospecting_owner_id.";
+    $("prDrawerFoot").hidden = true;
+    $("prDrawerBody").innerHTML =
+      '<section class="pr-section">' +
+        '<div class="pr-row"><button type="button" class="pr-btn pr-btn--primary" data-copy="' +
+          esc(bdrs.map(function (b) { return b.id; }).join(", ")) + '"><i class="fa-solid fa-copy"></i> Copy all IDs</button></div>' +
+        '<table class="pr-table" style="margin-top:12px"><thead><tr><th>ID</th><th>BDR</th><th>Email</th><th></th></tr></thead><tbody>' +
+        bdrs.map(function (b) {
+          return "<tr><td><strong>" + esc(b.id) + "</strong></td><td>" + esc(b.name || "") + "</td><td>" + esc(b.email) + "</td>" +
+            '<td><button type="button" class="pr-btn" data-copy="' + esc(b.id) + '" title="Copy"><i class="fa-solid fa-copy"></i></button></td></tr>';
+        }).join("") +
+        "</tbody></table></section>";
+    openDrawer();
+    $("prDrawerBody").querySelectorAll("[data-copy]").forEach(function (btn) {
+      btn.onclick = function () {
+        var text = btn.getAttribute("data-copy");
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+          .then(function () { toast("Copied: " + esc(text)); })
+          .catch(function () { window.prompt("Copy:", text); });
+      };
+    });
+  }
+
   function showTestPanel() {
     drawerSave = null;
     $("prDrawerEyebrow").textContent = "Test panel";
@@ -1289,6 +1315,7 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
     $("prDrawerSave").addEventListener("click", function () { if (drawerSave) drawerSave(); });
     $("prTestBtn").addEventListener("click", showTestPanel);
+    $("prBdrIdsBtn").addEventListener("click", showBdrIds);
   }
 
   function init() {
@@ -1299,7 +1326,10 @@
       }
       ME = me;
       $("prApp").hidden = false;
-      if (me.is_admin) $("prTestBtn").hidden = false;
+      if (me.is_admin) {
+        $("prTestBtn").hidden = false;
+        $("prBdrIdsBtn").hidden = false;
+      }
       if (me.sees_dummies) $("prFDummyWrap").hidden = false;
       bind();
       bindContacts();

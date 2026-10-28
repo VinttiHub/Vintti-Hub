@@ -76,7 +76,7 @@
         '<input type="' + (type || "text") + '" class="pr-filter__input" data-edit="' + key + '" value="' + esc(v) + '"></label>';
     };
     var clay = companyFields().filter(function (f) {
-      return ["prospecting_status", "prospecting_owner_email", "prospecting_owner_apollo", "prospecting_start_date",
+      return ["prospecting_status", "prospecting_owner_email", "prospecting_start_date",
         "not_icp_reason", "week_label", "name"].indexOf(f.key) === -1;
     });
     return '<div class="pr-co-card">' +
@@ -94,7 +94,6 @@
           '<select class="pr-cell-select pr-status" data-edit="prospecting_status" data-status="' + esc(c.prospecting_status || "") + '">' +
             '<option value="">—</option>' + optionTags(opts().statuses || [], c.prospecting_status) + "</select></div>" +
         sel("prospecting_owner_email", "Prospecting Owner", ownerOptions()) +
-        sel("prospecting_owner_apollo", "Prospecting Owner Apollo", ownerOptions()) +
         inp("prospecting_start_date", "Prospecting Start Date", "date") +
         inp("week_label", "Semana") +
         sel("not_icp_reason", "Not ICP Reason", opts().not_icp_reasons || []) +
