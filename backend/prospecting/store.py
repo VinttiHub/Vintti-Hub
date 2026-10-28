@@ -341,6 +341,9 @@ def ensure_schema(cur) -> None:
     # Vistas guardadas de la tabla, por persona (views.py).
     from prospecting import views
     views.ensure_schema(cur)
+    # Contactos que llegan de Calendly vía Zapier (inbound.py).
+    from prospecting import inbound
+    inbound.ensure_schema(cur)
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -909,6 +912,7 @@ def seed_dummies(cur, n: int, owners: list[str], today: date) -> list[int]:
 
 
 def delete_dummies(cur) -> int:
+    cur.execute("DELETE FROM prospect_inbound_contacts WHERE is_dummy")
     cur.execute("DELETE FROM prospect_companies WHERE is_dummy")
     return cur.rowcount
 

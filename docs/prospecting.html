@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/prospecting.css?v=19" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=20" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -131,7 +131,23 @@
           </label>
           <label class="pr-filter"><span class="pr-filter__label">Lead Life</span><select class="pr-filter__input" id="prCtLead"></select></label>
           <label class="pr-filter"><span class="pr-filter__label">Contact Owner</span><select class="pr-filter__input" id="prCtOwner"></select></label>
+          <div class="pr-filters__actions">
+            <button type="button" class="pr-btn pr-inbox-btn" id="prInboxBtn" aria-expanded="false">
+              <i class="fa-regular fa-calendar-check"></i> Unassigned from Calendly <span class="pr-inbox__count" id="prInboxCount"></span>
+            </button>
+          </div>
         </div>
+
+        <!-- Bandeja: contactos de Calendly (vía Zapier) sin empresa — backend/prospecting/inbound.py -->
+        <section class="pr-inbox" id="prInbox" hidden>
+          <p class="pr-note">Booked through Calendly, but their email domain did not match exactly one company. Pick the company to link them, or discard.</p>
+          <div class="pr-table-wrap">
+            <table class="pr-table">
+              <thead><tr><th>Name</th><th>Email</th><th>Meeting</th><th>UTM</th><th>Why</th><th>Company</th><th></th></tr></thead>
+              <tbody id="prInboxBody"></tbody>
+            </table>
+          </div>
+        </section>
         <div class="pr-table-wrap">
           <table class="pr-table">
             <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Position</th><th>Lead Life</th><th>Owner</th><th>Meeting</th></tr></thead>
@@ -175,7 +191,7 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20261026-role-access" defer></script>
-  <script src="./assets/js/prospecting.js?v=15" defer></script>
+  <script src="./assets/js/prospecting.js?v=16" defer></script>
   <script src="./assets/js/prospecting-workflows.js?v=19" defer></script>
   <script src="./assets/js/prospecting-contacts.js?v=2" defer></script>
 </body>

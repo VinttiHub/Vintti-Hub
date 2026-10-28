@@ -6,6 +6,8 @@ Tres tipos de caller:
   * Clay — `POST /prospecting/clay/webhook` con `X-Clay-Token` (= env
     CLAY_WEBHOOK_TOKEN). Token propio a propósito: es un tercero, y rotarlo no
     tiene que romper los crons que usan DASHBOARD_AUDIT_TOKEN.
+  * Zapier (Calendly) — `POST /prospecting/zapier/calendly` con `X-Zapier-Token`
+    (= env ZAPIER_WEBHOOK_TOKEN). Ver backend/prospecting/inbound.py.
   * El cron diario de workflows — `X-Audit-Token` (= DASHBOARD_AUDIT_TOKEN), igual
     que el resto de los crons del repo.
 """
@@ -21,6 +23,7 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection
 from prospecting import store
 from prospecting import engine
+from prospecting import inbound
 from prospecting import workflows as wf_store
 from prospecting import views as views_store
 from prospecting.rules import validate_conditions
@@ -416,6 +419,12 @@ def clay_webhook():
                     a["name"] for a in _run_instant(cur, result["id"], kind,
                                                     result.pop("changes_detail", []), "clay")
                 ]
+                attached = inbound.attach_pending_for_company(cur, result["id"])
+                for a in attached:
+                    _run_instant(cur, a["company_id"], a["action"], a.pop("changes"), "calendly",
+                                 obj="contact", record_id=a["contact_id"])
+                if attached:
+                    result["calendly_contacts_attached"] = [a["contact_id"] for a in attached]
                 results.append(result)
                 cur.execute("RELEASE SAVEPOINT clay_item")
             except ValueError as exc:
@@ -423,6 +432,86 @@ def clay_webhook():
                 results.append({"action": "error", "error": str(exc)})
     status = 200 if all(r.get("action") != "error" for r in results) else 207
     return jsonify({"results": results} if batch else results[0]), status
+
+
+# --------------------------------------------------------------------------- #
+# Zapier (Calendly) → contactos
+# --------------------------------------------------------------------------- #
+@bp.post("/zapier/calendly")
+def zapier_calendly():
+    """Un invitado de Calendly por request (Zap "Invitee Created" → Webhooks POST).
+
+    Si el contacto ya existe se actualiza; si el dominio es de una sola empresa se
+    crea ahí; si no, queda en la bandeja "Unassigned". `"is_dummy": true` lo crea
+    como prueba, igual que el webhook de Clay.
+    """
+    if not _token_ok("ZAPIER_WEBHOOK_TOKEN", "X-Zapier-Token"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "El body tiene que ser un objeto JSON."}), 400
+    is_dummy = str(body.pop("is_dummy", "")).strip().lower() in ("true", "1", "yes", "si", "sí")
+    try:
+        with _Db() as cur:
+            result = inbound.ingest(cur, body, is_dummy=is_dummy)
+            changes = result.pop("changes", None)
+            if result.get("contact_id"):
+                result["workflows_applied"] = [
+                    a["name"] for a in _run_instant(cur, result["company_id"], result["action"], changes or [],
+                                                    "calendly", obj="contact", record_id=result["contact_id"])
+                ]
+    except ValueError as exc:
+        return jsonify({"action": "error", "error": str(exc)}), 400
+    result["is_dummy"] = is_dummy
+    return jsonify(_json_safe(result))
+
+
+@bp.get("/inbound")
+def inbound_list():
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        dummy = request.args.get("dummy") or "exclude"
+        if dummy in ("include", "only") and not _sees_dummies(_current_email()):
+            dummy = "exclude"
+        status = request.args.get("status") or "pending"
+        if status not in ("pending", "linked", "discarded"):
+            return jsonify({"error": "status inválido"}), 400
+        data = inbound.list_inbound(cur, status=status, dummy=dummy)
+    return jsonify(_json_safe(data))
+
+
+@bp.post("/inbound/<int:inbound_id>/link")
+def inbound_link(inbound_id: int):
+    body = request.get_json(silent=True) or {}
+    company_id = store._to_int(body.get("company_id"))
+    if not company_id:
+        return jsonify({"error": "Falta company_id."}), 400
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            result = inbound.link(cur, inbound_id, company_id, _current_email())
+            result["workflows_applied"] = _run_instant(
+                cur, result["company_id"], result["action"], result.pop("changes"), _current_email(),
+                obj="contact", record_id=result["contact_id"])
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(result))
+
+
+@bp.post("/inbound/<int:inbound_id>/discard")
+def inbound_discard(inbound_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        ok = inbound.discard(cur, inbound_id, _current_email())
+    return (jsonify({"discarded": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
 
 
 # --------------------------------------------------------------------------- #

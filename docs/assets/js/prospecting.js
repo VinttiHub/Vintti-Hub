@@ -486,6 +486,109 @@
       window.ProspectingContacts.open({ contactId: Number(b.getAttribute("data-ct-open")), companyId: Number(tr.getAttribute("data-co")),
         onSaved: function () { loadContacts(); } });
     });
+    bindInbox();
+  }
+
+  /* ---------- Bandeja: contactos de Calendly (Zapier) sin empresa ----------
+     Los que entran con un dominio que no es de una sola empresa (gmail, ninguna o
+     varias). Se asocian a mano; si Clay después carga la empresa, se asocian solos
+     (backend/prospecting/inbound.py). */
+  var INBOX_WHY = { free_email: "Personal email", no_company: "No company with that domain", multiple_companies: "Several companies with that domain" };
+  var inboxRows = {};
+  function loadInbox() {
+    var q = { status: "pending", dummy: ME.sees_dummies ? $("prFDummy").value : "exclude" };
+    return api("/prospecting/inbound?" + qs(q)).then(function (r) {
+      $("prInboxCount").textContent = r.total ? String(r.total) : "";
+      $("prInboxBtn").classList.toggle("has-items", r.total > 0);
+      inboxRows = {};
+      r.rows.forEach(function (x) { inboxRows[x.id] = x; });
+      $("prInboxBody").innerHTML = r.rows.length ? r.rows.map(inboxRow).join("")
+        : '<tr><td class="pr-empty" colspan="7">Nothing waiting: every Calendly contact is linked to a company.</td></tr>';
+    }).catch(function (err) {
+      $("prInboxBody").innerHTML = '<tr><td class="pr-empty" colspan="7">' + esc(err.message) + "</td></tr>";
+    });
+  }
+  function inboxRow(x) {
+    var d = x.contact_data || {}, ex = x.extra || {};
+    var name = [x.first_name, x.last_name].filter(Boolean).join(" ") || x.email;
+    var utm = ["utm_source", "utm_medium", "utm_campaign"].map(function (k) { return d[k]; }).filter(Boolean);
+    var hint = [ex.event_name, d.company_name, ex.website, ex.questions_and_answers].filter(Boolean).join(" · ");
+    return '<tr data-in="' + x.id + '">' +
+      "<td><strong>" + esc(name) + "</strong>" + (x.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") +
+        (hint ? '<div class="pr-note pr-inbox__hint" title="' + esc(hint) + '">' + esc(hint) + "</div>" : "") + "</td>" +
+      "<td>" + cellText(x.email) + "</td>" +
+      "<td>" + (x.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(x.meeting_datetime)) : "—") + "</td>" +
+      "<td>" + (utm.length ? esc(utm.join(" / ")) : "—") + "</td>" +
+      '<td><span class="pr-note">' + esc(INBOX_WHY[x.reason] || x.reason || "") + (x.domain ? " (" + esc(x.domain) + ")" : "") + "</span></td>" +
+      '<td class="pr-inbox__pick"><input type="text" class="pr-filter__input" data-in-q placeholder="Search company…" autocomplete="off"' +
+        ' value="' + esc(d.company_name || "") + '"><div class="pr-inbox__results" data-in-results hidden></div></td>' +
+      '<td class="pr-inbox__acts"><button type="button" class="pr-btn pr-btn--primary" data-in-link disabled>Link</button>' +
+        '<button type="button" class="pr-btn pr-btn--danger" data-in-discard title="Discard"><i class="fa-regular fa-trash-can"></i></button></td></tr>';
+  }
+  function searchCompanies(tr, text) {
+    var box = tr.querySelector("[data-in-results]");
+    var x = inboxRows[tr.getAttribute("data-in")];
+    if (!text.trim()) { box.hidden = true; return; }
+    api("/prospecting/companies?" + qs({ q: text.trim(), page_size: 10, dummy: x && x.is_dummy ? "only" : "exclude" })).then(function (r) {
+      box.innerHTML = r.rows.length ? r.rows.map(function (c) {
+        return '<button type="button" data-in-co="' + c.id + '" data-in-name="' + esc(c.name) + '"><strong>' + esc(c.name) + "</strong>" +
+          (c.domain ? ' <span class="pr-note">' + esc(c.domain) + "</span>" : "") + "</button>";
+      }).join("") : '<span class="pr-note">No companies match.</span>';
+      box.hidden = false;
+    }).catch(function (err) { box.innerHTML = '<span class="pr-note">' + esc(err.message) + "</span>"; box.hidden = false; });
+  }
+  function bindInbox() {
+    $("prInboxBtn").addEventListener("click", function () {
+      var open = $("prInbox").hidden;
+      $("prInbox").hidden = !open;
+      $("prInboxBtn").setAttribute("aria-expanded", String(open));
+      if (open) loadInbox();
+    });
+    var t = null;
+    $("prInboxBody").addEventListener("input", function (e) {
+      var inp = e.target.closest("[data-in-q]");
+      if (!inp) return;
+      var tr = inp.closest("tr");
+      tr.removeAttribute("data-co");
+      tr.querySelector("[data-in-link]").disabled = true;
+      clearTimeout(t);
+      t = setTimeout(function () { searchCompanies(tr, inp.value); }, 250);
+    });
+    $("prInboxBody").addEventListener("focusin", function (e) {
+      var inp = e.target.closest("[data-in-q]");
+      if (inp && inp.value && !inp.closest("tr").getAttribute("data-co")) searchCompanies(inp.closest("tr"), inp.value);
+    });
+    $("prInboxBody").addEventListener("click", function (e) {
+      var tr = e.target.closest("tr[data-in]");
+      if (!tr) return;
+      var id = tr.getAttribute("data-in");
+      var pick = e.target.closest("[data-in-co]");
+      if (pick) {
+        tr.setAttribute("data-co", pick.getAttribute("data-in-co"));
+        tr.querySelector("[data-in-q]").value = pick.getAttribute("data-in-name");
+        tr.querySelector("[data-in-results]").hidden = true;
+        tr.querySelector("[data-in-link]").disabled = false;
+        return;
+      }
+      var link = e.target.closest("[data-in-link]");
+      if (link && tr.getAttribute("data-co")) {
+        link.disabled = true;
+        api("/prospecting/inbound/" + id + "/link", { method: "POST", body: JSON.stringify({ company_id: Number(tr.getAttribute("data-co")) }) })
+          .then(function (r) {
+            toast('<i class="fa-regular fa-user"></i> Contact ' + (r.action === "created" ? "created" : "updated") + " in <strong>" +
+              esc(tr.querySelector("[data-in-q]").value) + "</strong>.");
+            loadInbox();
+            loadContacts();
+          }).catch(function (err) { link.disabled = false; alert(err.message); });
+        return;
+      }
+      if (e.target.closest("[data-in-discard]")) {
+        var x = inboxRows[id] || {};
+        if (!confirm("Discard " + (x.email || "this contact") + "? It will not be created.")) return;
+        api("/prospecting/inbound/" + id + "/discard", { method: "POST" }).then(function () { loadInbox(); })
+          .catch(function (err) { alert(err.message); });
+      }
+    });
   }
 
   /* ---------- Drawer ---------- */
@@ -1112,7 +1215,7 @@
       showSection(kind);
       renderTabs();
       if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
-      else loadContacts();
+      else { loadContacts(); loadInbox(); }
     });
     // Reordenar pestañas arrastrando.
     $("prViewTabs").addEventListener("dragstart", function (e) {

@@ -1213,6 +1213,19 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   que se filtran seguido son columna propia; el resto vive en **`props` JSONB**, así sumar una no
   requiere ALTER. Su historial va a `prospect_company_events` con `contact_id`, y por eso aparece
   también en la actividad de la empresa.
+- **Contactos desde Calendly vía Zapier (2026-10-28)**: Zapier **empuja**, no se consulta. El
+  Zap *Calendly · Invitee Created* → *Webhooks by Zapier · POST* pega a
+  `POST /prospecting/zapier/calendly` con `X-Zapier-Token` (= env `ZAPIER_WEBHOOK_TOKEN`, propia).
+  Todo en `backend/prospecting/inbound.py`; cada llegada queda en `prospect_inbound_contacts`
+  (autocreada). Email ya existente → se actualiza: **sólo Meeting Date & Time se pisa**, las UTM
+  y el resto sólo se rellenan si están vacíos (el primer canal no se pierde). Dominio (website
+  del form, si no el del mail; nunca `FREE_EMAIL_DOMAINS`) de **una sola** empresa → contacto
+  creado ahí. Si no → bandeja **"Unassigned from Calendly"** de la pestaña Contacts, con
+  **Link** / **Discard**; y cuando Clay carga después una empresa con ese dominio, el webhook de
+  Clay los asocia solo (`attach_pending_for_company`). Es una bandeja aparte y no
+  `company_id` NULL porque de esa columna cuelgan el historial, el motor y los JOINs. Una
+  pregunta del form se mapea en Zapier con la clave exacta de `contact_fields.py`; un valor
+  inválido no frena la llegada, vuelve en `warnings`. `"is_dummy": true` = prueba, como Clay.
 - **Qualified / SQL exigen contacto**: si la empresa queda en esos status sin un contacto con
   `REQUIRED_ON_QUALIFIED` completos, `contact_incomplete = TRUE`. El PATCH responde
   `needs_contact` y la página abre «Completá el contacto». Se recalcula en cada cambio de

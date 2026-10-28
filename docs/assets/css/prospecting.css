@@ -1497,3 +1497,35 @@ a.pr-company__name:hover { color: var(--pr-violet); text-decoration: underline; 
 .pr-cols__head--sub { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--pr-rule); }
 .pr-table th i.fa-solid { margin-left: 2px; }
 .pr-sort-arrow { font-size: 10px; }
+
+/* ---------- Bandeja: contactos de Calendly sin empresa (pestaña Contacts) ---------- */
+.pr-inbox-btn.has-items { border-color: color-mix(in srgb, var(--pr-mag) 45%, transparent); }
+.pr-inbox__count:not(:empty) {
+  display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 2px; border-radius: 999px;
+  background: var(--pr-mag); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.pr-inbox {
+  flex: 0 0 auto;
+  margin: 0 0 16px; padding: 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--pr-mag) 5%, var(--pr-card-soft));
+  border: 1px solid color-mix(in srgb, var(--pr-mag) 22%, transparent);
+}
+.pr-inbox .pr-table-wrap { overflow: visible; max-height: none; }  /* si no, el buscador de empresa queda recortado */
+.pr-inbox__hint { margin: 2px 0 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-inbox__pick { position: relative; min-width: 200px; }
+.pr-inbox__pick .pr-filter__input { width: 100%; }
+.pr-inbox__results {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% - 4px);
+  display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; padding: 4px;
+  background: var(--pr-card); border: 1px solid var(--pr-rule); border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(13, 18, 30, .12);
+}
+.pr-inbox__results button {
+  display: flex; gap: 6px; align-items: baseline; padding: 7px 8px; border: 0; border-radius: 7px;
+  background: none; text-align: left; font: inherit; font-size: 13px; color: var(--pr-ink); cursor: pointer;
+}
+.pr-inbox__results button:hover { background: color-mix(in srgb, var(--pr-violet) 8%, #fff); }
+.pr-inbox__results .pr-note { margin: 0; }
+.pr-inbox__results > .pr-note { padding: 7px 8px; }
+.pr-inbox__acts { white-space: nowrap; }
+.pr-inbox__acts .pr-btn + .pr-btn { margin-left: 6px; }
