@@ -2446,6 +2446,34 @@ textarea,
   color: #0a1f44;
 }
 
+/* "Contacted via" del popup Add Candidate (Apriora / WhatsApp) */
+.contact-channel-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 4px 0 10px;
+  font-size: 0.95rem;
+  color: #0a1f44;
+}
+.contact-channel-title {
+  font-weight: 600;
+}
+.contact-channel-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.popup-content .contact-channel-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #bc84e1;
+  cursor: pointer;
+}
+
 
 .popup-content button {
   background-color: #bc84e1 !important;

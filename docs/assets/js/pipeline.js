@@ -939,6 +939,8 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     country = formatUsCountryValue(stateCode);
   }
   const stage = "Contactado";
+  const contacted_apriora = !!document.getElementById("candidate-contact-apriora")?.checked;
+  const contacted_whatsapp = !!document.getElementById("candidate-contact-whatsapp")?.checked;
 
   if (!opportunityId || opportunityId === '—') {
     alert('Opportunity ID not found');
@@ -952,6 +954,8 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     linkedin,
     country,
     stage,
+    contacted_apriora,
+    contacted_whatsapp,
     created_by: localStorage.getItem('user_email') // ✅ esto lo agrega
   };
 
@@ -995,6 +999,8 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     // Limpiar campos
     ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-country"]
       .forEach(id => document.getElementById(id).value = '');
+    ["candidate-contact-apriora", "candidate-contact-whatsapp"]
+      .forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
 
     loadPipelineCandidates();
   } catch (err) {

@@ -34,6 +34,7 @@ from utils.hire_state import clear_stale_hire_for_opportunity
 from utils.second_interview_refs import SECOND_INTERVIEW_STAGE, start_second_interview_refs_reminder
 from utils.sourcing_slack import SOURCING_STAGE, notify_first_sourcing_async
 from utils.transactional_email import post_transactional_email
+from utils.types import to_bool
 from utils.signoff_email import (
     ensure_signoff_sent_column,
     personalize_signoff_body,
@@ -2566,6 +2567,9 @@ def link_or_create_candidate(opportunity_id):
         salary_range = data.get('salary_range')
         stage = data.get('stage', 'Contactado')
         country = data.get('country')
+        # "Contacted via" del popup del Pipeline (opcional).
+        contacted_apriora = bool(to_bool(data.get('contacted_apriora')))
+        contacted_whatsapp = bool(to_bool(data.get('contacted_whatsapp')))
 
         try:
             conn = get_connection()
@@ -2577,6 +2581,7 @@ def link_or_create_candidate(opportunity_id):
                 _clean_linkedin_for_storage,
                 _normalize_linkedin,
                 _normalize_phone_digits,
+                ensure_contact_channel_columns,
                 find_candidate_conflict,
             )
             conflict = find_candidate_conflict(
@@ -2597,15 +2602,18 @@ def link_or_create_candidate(opportunity_id):
             created_by = data.get('created_by')
             # Insertar en tabla candidates SIN opportunity_id
             created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            ensure_contact_channel_columns(cursor)
             cursor.execute("""
                 INSERT INTO candidates (
                     candidate_id, name, email, phone, linkedin,
-                    red_flags, comments, english_level, salary_range, country, stage, created_by, created_at
+                    red_flags, comments, english_level, salary_range, country, stage, created_by, created_at,
+                    contacted_apriora, contacted_whatsapp
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 new_candidate_id, name, email, phone, linkedin,
-                red_flags, comments, english_level, salary_range, country, stage, created_by, created_at
+                red_flags, comments, english_level, salary_range, country, stage, created_by, created_at,
+                contacted_apriora, contacted_whatsapp
             ))
             # Insertar en tabla intermedia
             cursor.execute("""

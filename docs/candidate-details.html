@@ -586,6 +586,21 @@
                 <span class="txt">All set: resignation letter &amp; references requested and uploaded</span>
               </label>
             </div>
+
+            <!-- Contacted via (contacted_apriora / contacted_whatsapp): se carga al
+                 crear el candidato (Candidates o Pipeline) y se corrige acá. -->
+            <div id="contact-channel-block" class="ov-allset">
+              <label class="pretty-check ov-chip">
+                <input type="checkbox" id="contacted-apriora-check" data-field="contacted_apriora" />
+                <span class="box" aria-hidden="true"></span>
+                <span class="txt">Contacted via Apriora</span>
+              </label>
+              <label class="pretty-check ov-chip">
+                <input type="checkbox" id="contacted-whatsapp-check" data-field="contacted_whatsapp" />
+                <span class="box" aria-hidden="true"></span>
+                <span class="txt">Contacted via WhatsApp</span>
+              </label>
+            </div>
           </section>
 
           <!-- Toast del check de arriba -->
@@ -1452,7 +1467,7 @@
   <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js?v=20261026-patchauth"></script>
   <script defer src="./assets/js/inactive-info-dialog.js"></script>
-  <script defer src="./assets/js/candidate-details.js?v=20261026-cv-clip"></script>
+  <script defer src="./assets/js/candidate-details.js?v=20261028-contact-via"></script>
   <script src="./assets/js/apriora-notifier.js?v=20260723-1" defer></script>
 </body>
 </html>

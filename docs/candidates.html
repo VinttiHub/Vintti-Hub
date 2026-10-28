@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <!-- ====== App CSS (kept path and filename) ====== -->
-  <link rel="stylesheet" href="./assets/css/candidates.css" />
+  <link rel="stylesheet" href="./assets/css/candidates.css?v=20261028-contact-via" />
   <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=14" />
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
 
@@ -319,6 +319,22 @@
           </select>
         </label>
 
+        <!-- "Contacted via": opcional, se pueden marcar las dos. También se edita en
+             la Overview de candidate-details (contacted_apriora / contacted_whatsapp). -->
+        <div class="candidate-field">
+          <span>Contacted via</span>
+          <div class="contact-channel-options">
+            <label class="contact-channel-option">
+              <input type="checkbox" id="candidateContactApriora" name="contacted_apriora" />
+              Apriora
+            </label>
+            <label class="contact-channel-option">
+              <input type="checkbox" id="candidateContactWhatsapp" name="contacted_whatsapp" />
+              WhatsApp
+            </label>
+          </div>
+        </div>
+
         <button type="submit" id="candidateModalSubmit" class="create-btn">Create Candidate</button>
       </form>
     </div>
@@ -336,7 +352,7 @@
   <script src="./assets/js/to-do-chat.js" defer></script>
   <script src="./assets/js/workspace.js?v=20260615-3" defer></script>
   <script src="./assets/js/sticky-shell.js?v=20260811-compact4" defer></script>
-  <script src="./assets/js/candidate.js?v=20261026-role-access" defer></script>
+  <script src="./assets/js/candidate.js?v=20261028-contact-via" defer></script>
   <script src="./assets/js/sidebar.js?v=20261026-role-access" defer></script>
 
   <!-- SFX (kept id/src). Preload left as-is; controls hidden for UX -->

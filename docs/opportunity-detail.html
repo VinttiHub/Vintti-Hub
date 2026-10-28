@@ -25,7 +25,7 @@
   </style>
 
   <!-- ===== Styles ===== -->
-  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20261001-li-link" />
+  <link rel="stylesheet" href="./assets/css/opportunity-detail.css?v=20261028-contact-via" />
   <link rel="stylesheet" href="./assets/css/jd-review.css?v=20260925-7" />
   <link rel="stylesheet" href="./assets/css/opportunity-metrics.css?v=20260811-5" />
   <link rel="stylesheet" href="./assets/css/rich-comments.css" />
@@ -721,6 +721,18 @@
         </div>
 
         <input type="text" id="candidate-linkedin" placeholder="LinkedIn URL *" />
+
+        <!-- "Contacted via": opcional, se pueden marcar las dos (mismo campo que el
+             modal de Candidates; se edita después en candidate-details). -->
+        <div class="contact-channel-field">
+          <span class="contact-channel-title">Contacted via</span>
+          <label class="contact-channel-option">
+            <input type="checkbox" id="candidate-contact-apriora" /> Apriora
+          </label>
+          <label class="contact-channel-option">
+            <input type="checkbox" id="candidate-contact-whatsapp" /> WhatsApp
+          </label>
+        </div>
         <button id="popupcreateCandidateBtn">Create Candidate</button>
       </div>
 
@@ -1133,7 +1145,7 @@
   <!-- Your app bundles -->
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/apriora-notifier.js?v=20260916-qcheck" defer></script>
-  <script src="./assets/js/pipeline.js?v=20261009-dup-check" defer></script>
+  <script src="./assets/js/pipeline.js?v=20261028-contact-via" defer></script>
   <script src="./assets/js/opportunity-detail.js?v=20261026-cv-clip" defer></script>
   <script src="./assets/js/jd-review-opp.js?v=20260925-1" defer></script>
   <script src="./assets/js/opportunity-metrics.js?v=20260811-5" defer></script>

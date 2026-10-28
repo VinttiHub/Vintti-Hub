@@ -3160,6 +3160,11 @@ if (save){
     // References filled (Second Interview): mismo GET, otra columna.
     const refs = document.getElementById('references-filled-check');
     if (refs) refs.checked = row?.references_filled === true;
+
+    // Contacted via (Apriora / WhatsApp): mismo GET.
+    document.querySelectorAll('#contact-channel-block input[data-field]').forEach(el => {
+      el.checked = row?.[el.dataset.field] === true;
+    });
   } catch(e) {
     console.warn('No se pudo leer check_hr_lead inicial', e);
   }
@@ -4689,6 +4694,31 @@ function wireVideoLinkDedupe() {
       check.checked = !val; // revertir si falló
       alert('We could not save this change. Please try again.');
     }
+  });
+})();
+
+// === Contacted via (Apriora / WhatsApp): se marca al crear, se corrige acá ====
+(function wireContactChannelChecks(){
+  const API  = candidatesApiBase();
+  const cid  = new URLSearchParams(window.location.search).get('id');
+
+  document.querySelectorAll('#contact-channel-block input[data-field]').forEach(check => {
+    check.addEventListener('change', async () => {
+      if (!cid) return;
+      const val = !!check.checked;
+      try {
+        const r = await fetch(`${API}/candidates/${cid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [check.dataset.field]: val })
+        });
+        if (!r.ok) throw new Error(await r.text().catch(()=> 'PATCH failed'));
+      } catch (e) {
+        console.error(`❌ Saving ${check.dataset.field} failed`, e);
+        check.checked = !val; // revertir si falló
+        alert('We could not save this change. Please try again.');
+      }
+    });
   });
 })();
 

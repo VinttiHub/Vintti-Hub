@@ -164,6 +164,40 @@ def _candidates_has_process_error_column(cur) -> bool:
     return presente
 
 
+# --------------------------------------------------------------------------- #
+# "Contacted via" (Apriora / WhatsApp): dos tildes opcionales que se cargan al
+# crear el candidato (modal de Candidates y popup del Pipeline) y se editan en la
+# Overview de candidate-details. Se autocrean: se mira el catalogo antes porque
+# ALTER TABLE toma ACCESS EXCLUSIVE sobre `candidates` aunque la columna exista.
+# --------------------------------------------------------------------------- #
+CONTACT_CHANNEL_FIELDS = ('contacted_apriora', 'contacted_whatsapp')
+_CONTACT_CHANNEL_COLUMNS_READY = False
+
+
+def ensure_contact_channel_columns(cur) -> None:
+    """Crea contacted_apriora / contacted_whatsapp si faltan (una vez por proceso)."""
+    global _CONTACT_CHANNEL_COLUMNS_READY
+    if _CONTACT_CHANNEL_COLUMNS_READY:
+        return
+    cur.execute(
+        """
+        SELECT column_name
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'candidates'
+           AND column_name  = ANY(%s)
+        """,
+        (list(CONTACT_CHANNEL_FIELDS),)
+    )
+    presentes = {row[0] if not isinstance(row, dict) else row['column_name'] for row in cur.fetchall()}
+    for col in CONTACT_CHANNEL_FIELDS:
+        if col not in presentes:
+            cur.execute(
+                f"ALTER TABLE candidates ADD COLUMN IF NOT EXISTS {col} BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+    _CONTACT_CHANNEL_COLUMNS_READY = True
+
+
 def _forget_process_error_column() -> None:
     """Suelta los flags tras un rollback del PATCH (el ALTER se va con el)."""
     global _PROCESS_ERROR_COLUMN_READY, _PROCESS_ERROR_COLUMN_PRESENT
@@ -1040,6 +1074,8 @@ def create_candidate_without_opportunity():
     created_by = (data.get('created_by') or '').strip().lower() or None
     candidate_source = (data.get('candidate_source') or '').strip() or None
     candidate_origin = (data.get('candidate_origin') or '').strip() or None
+    contacted_apriora = bool(to_bool(data.get('contacted_apriora')))
+    contacted_whatsapp = bool(to_bool(data.get('contacted_whatsapp')))
 
     if not email or not phone_digits or not linkedin_clean:
         return jsonify({"error": "Missing required fields: email, phone and linkedin"}), 400
@@ -1086,17 +1122,20 @@ def create_candidate_without_opportunity():
         cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) + 1 FROM candidates")
         new_candidate_id = cursor.fetchone()[0]
 
+        ensure_contact_channel_columns(cursor)
         cursor.execute("""
             INSERT INTO candidates (
                 candidate_id, name, email, phone, linkedin,
                 red_flags, comments, english_level, salary_range,
-                country, timezone, stage, created_by, candidate_source, candidate_origin, created_at
+                country, timezone, stage, created_by, candidate_source, candidate_origin,
+                contacted_apriora, contacted_whatsapp, created_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """, (
             new_candidate_id, name_db, email, phone_digits, linkedin_clean,
             red_flags, comments, english_level, salary_range,
-            country, timezone, stage, created_by, candidate_source, candidate_origin
+            country, timezone, stage, created_by, candidate_source, candidate_origin,
+            contacted_apriora, contacted_whatsapp
         ))
 
         conn.commit()
@@ -1467,6 +1506,9 @@ def get_candidate_by_id(candidate_id):
 
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # contacted_apriora / contacted_whatsapp se autocrean (ver el helper).
+        ensure_contact_channel_columns(cursor)
+        conn.commit()
 
         process_error_sql = (
             "c.process_error"
@@ -1504,6 +1546,8 @@ def get_candidate_by_id(candidate_id):
                 c.candidate_succes,
                 c.check_hr_lead,
                 c.references_filled,
+                c.contacted_apriora,
+                c.contacted_whatsapp,
                 c.address,
                 c.dni,
                 c.compu_propia,
@@ -1795,6 +1839,9 @@ def update_candidate_fields(candidate_id):
         # Corta el recordatorio de referencias de Second Interview
         # (utils/second_interview_refs.py). No es check_hr_lead.
         'references_filled',
+        # "Contacted via" del alta (Apriora / WhatsApp).
+        'contacted_apriora',
+        'contacted_whatsapp',
         'address',
         'dni',
         'other_process',
@@ -1826,6 +1873,8 @@ def update_candidate_fields(candidate_id):
             # 👉 fuerza tipos especiales
             if field in ('check_hr_lead', 'references_filled'):
                 val = to_bool(val)
+            if field in CONTACT_CHANNEL_FIELDS:
+                val = bool(to_bool(val))  # NOT NULL
             if field == 'usa_nationality':
                 val = to_bool(val)
             if field == 'quickbooks':
@@ -1847,6 +1896,8 @@ def update_candidate_fields(candidate_id):
         cursor = conn.cursor()
         if 'process_error' in data:
             _ensure_process_error_column(cursor)
+        if any(f in data for f in CONTACT_CHANNEL_FIELDS):
+            ensure_contact_channel_columns(cursor)
         conflict = _patch_identity_conflict(cursor, candidate_id, data)
         if conflict:
             cursor.close()

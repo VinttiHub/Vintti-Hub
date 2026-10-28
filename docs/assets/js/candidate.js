@@ -811,6 +811,8 @@ function setupCandidateModal() {
   candidateModalRefs.linkedinInput = document.getElementById('candidateLinkedin');
   candidateModalRefs.sourceSelect = document.getElementById('candidateSource');
   candidateModalRefs.originSelect = document.getElementById('candidateOrigin');
+  candidateModalRefs.contactAprioraCheck = document.getElementById('candidateContactApriora');
+  candidateModalRefs.contactWhatsappCheck = document.getElementById('candidateContactWhatsapp');
   candidateModalRefs.openExistingBtn = document.getElementById('openExistingCandidateBtn');
 
   const openBtn = document.getElementById('openCandidateModalBtn');
@@ -973,6 +975,8 @@ function gatherCandidateFormValues() {
   const linkedinRaw = linkedinRawInput.trim();
   const candidateSource = candidateModalRefs.sourceSelect?.value || '';
   const candidateOrigin = candidateModalRefs.originSelect?.value || '';
+  const contactedApriora = !!candidateModalRefs.contactAprioraCheck?.checked;
+  const contactedWhatsapp = !!candidateModalRefs.contactWhatsappCheck?.checked;
 
   const phoneDigits = normalizePhoneDigits(rawPhone, phoneCode);
   const linkedinForSubmit = formatLinkedinForSubmit(linkedinRaw);
@@ -992,7 +996,9 @@ function gatherCandidateFormValues() {
     normalizedLinkedin,
     linkedinForSubmit,
     candidateSource,
-    candidateOrigin
+    candidateOrigin,
+    contactedApriora,
+    contactedWhatsapp
   };
 }
 
@@ -1333,6 +1339,8 @@ async function submitCandidate(values) {
     country: formatCountryForSubmit(values.country, values.usStateCode),
     candidate_source: values.candidateSource || null,
     candidate_origin: values.candidateOrigin || null,
+    contacted_apriora: !!values.contactedApriora,
+    contacted_whatsapp: !!values.contactedWhatsapp,
     stage: 'Contactado',
     created_by: localStorage.getItem('user_email')
   };
