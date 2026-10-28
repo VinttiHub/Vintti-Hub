@@ -133,8 +133,8 @@
 
   /* ---------- Filtros ---------- */
   function fillFilters() {
-    // «Me» = quien mira la vista: sirve para compartir una vista de «mis empresas».
-    var owners = [{ value: "__me__", label: "Me" }, { value: "__none__", label: "No owner" }].concat(ownerOptions());
+    // Sin «Me»: para eso está la pestaña My companies (SYS_OVERRIDES sigue usando __me__).
+    var owners = [{ value: "__none__", label: "No owner" }].concat(ownerOptions());
     $("prFOwner").innerHTML = optionsHtml(owners, "", "All");
     $("prFWeek").innerHTML = optionsHtml([{ value: "__none__", label: "No week" }].concat(OPTS.weeks), "", "All");
     $("prFStatus").innerHTML = optionsHtml([{ value: "__none__", label: "No status" }].concat(OPTS.statuses), "", "All");

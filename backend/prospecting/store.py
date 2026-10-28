@@ -366,10 +366,14 @@ def _seed_default_workflows(cur) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Acceso: rol BDR en `users.role` (texto libre) + la owner siempre
+# Acceso: rol BDR en `users.role` (texto libre); la owner entra por ADMIN_EMAILS
 # --------------------------------------------------------------------------- #
 def list_bdrs(cur) -> list[dict]:
-    """BDRs activos + los admins (pgonzales siempre)."""
+    """BDRs activos: los que pueden ser Prospecting Owner.
+
+    Sólo el rol BDR. Los admins entran a la página (has_access) pero no son owners:
+    hasta el 2026-10-28 pgonzales salía en todos los desplegables de owner y el
+    round robin de Clay le podía asignar empresas."""
     cur.execute(
         """
         SELECT u.user_id AS id, LOWER(TRIM(u.email_vintti)) AS email, u.user_name AS name, u.role
@@ -377,11 +381,10 @@ def list_bdrs(cur) -> list[dict]:
           LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
          WHERE COALESCE(aua.is_active, TRUE)
            AND NULLIF(TRIM(u.email_vintti), '') IS NOT NULL
-           AND (UPPER(COALESCE(u.role, '')) LIKE %s
-                OR LOWER(TRIM(u.email_vintti)) = ANY(%s))
+           AND UPPER(COALESCE(u.role, '')) LIKE %s
          ORDER BY LOWER(u.user_name)
         """,
-        (BDR_ROLE_PATTERN, list(ADMIN_EMAILS)),
+        (BDR_ROLE_PATTERN,),
     )
     return [dict(r) for r in cur.fetchall()]
 
