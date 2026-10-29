@@ -131,23 +131,40 @@ def companies():
         denied = _gate(cur)
         if denied:
             return denied
-        filters = request.args.to_dict()
-        if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
-            filters["dummy"] = "exclude"
-        # Filtros avanzados (vistas guardadas): JSON con la forma de las condiciones
-        # de un workflow. Se validan con la misma lista blanca antes de llegar al SQL.
-        raw_adv = filters.pop("advanced", None)
-        if raw_adv:
-            try:
-                adv = json.loads(raw_adv)
-            except ValueError:
-                return jsonify({"error": "Filtros avanzados inválidos."}), 400
-            errors = validate_conditions(adv, "Filtros avanzados", wf_store._ctx(cur), required=False, obj="company")
-            if errors:
-                return jsonify({"error": "Los filtros avanzados tienen errores.", "errors": errors}), 400
-            filters["advanced"] = adv
+        filters, err = _company_filters(cur, request.args.to_dict())
+        if err:
+            return err
         data = store.list_companies(cur, filters)
     return jsonify(_json_safe(data))
+
+
+def _company_filters(cur, raw: dict):
+    """Filtros de la tabla de empresas, listos para store: freno de dummies + avanzados
+    validados. Los usan la lista y la edición masiva «todas las del filtro».
+    Devuelve (filtros, None) o (None, respuesta de error)."""
+    filters = {k: v for k, v in (raw or {}).items() if v is not None}
+    if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
+        filters["dummy"] = "exclude"
+    # Filtros avanzados (vistas guardadas): JSON con la forma de las condiciones
+    # de un workflow. Se validan con la misma lista blanca antes de llegar al SQL.
+    raw_adv = filters.pop("advanced", None)
+    if raw_adv:
+        try:
+            adv = json.loads(raw_adv) if isinstance(raw_adv, str) else raw_adv
+        except ValueError:
+            return None, (jsonify({"error": "Filtros avanzados inválidos."}), 400)
+        errors = validate_conditions(adv, "Filtros avanzados", wf_store._ctx(cur), required=False, obj="company")
+        if errors:
+            return None, (jsonify({"error": "Los filtros avanzados tienen errores.", "errors": errors}), 400)
+        filters["advanced"] = adv
+    return filters, None
+
+
+def _contact_filters(raw: dict) -> dict:
+    filters = {k: v for k, v in (raw or {}).items() if v is not None}
+    if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
+        filters["dummy"] = "exclude"
+    return filters
 
 
 # --------------------------------------------------------------------------- #
@@ -309,10 +326,7 @@ def contacts_list():
         denied = _gate(cur)
         if denied:
             return denied
-        filters = request.args.to_dict()
-        if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
-            filters["dummy"] = "exclude"
-        data = store.list_contacts(cur, filters)
+        data = store.list_contacts(cur, _contact_filters(request.args.to_dict()))
     return jsonify(_json_safe(data))
 
 
@@ -386,6 +400,130 @@ def contact_delete(contact_id: int):
             return denied
         ok = store.delete_contact(cur, contact_id, _current_email())
     return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
+
+
+# --------------------------------------------------------------------------- #
+# Edición masiva (botón «Editar» con varias filas tildadas)
+# --------------------------------------------------------------------------- #
+BULK_MAX = 1000
+# Contactos: todo el catálogo menos el email (es único: no puede ser igual en varios).
+_BULK_CONTACT_SKIP = {"email", "is_primary"}
+
+
+def _bulk_target_ids(cur, body: dict, obj: str):
+    """Ids a editar: los tildados (`ids`) o todos los que cumplen los filtros de la tabla
+    (`filters`, los mismos params del GET). Devuelve (ids, None) o (None, error)."""
+    if isinstance(body.get("ids"), list):
+        ids = sorted({int(x) for x in body["ids"] if str(x).isdigit()})
+    elif isinstance(body.get("filters"), dict):
+        if obj == "company":
+            filters, err = _company_filters(cur, body["filters"])
+            if err:
+                return None, err
+            ids = store.company_ids(cur, filters)
+        else:
+            ids = store.contact_ids(cur, _contact_filters(body["filters"]))
+    else:
+        return None, (jsonify({"error": "Mandá `ids` o `filters`."}), 400)
+    if not ids:
+        return None, (jsonify({"error": "No hay registros seleccionados."}), 400)
+    if len(ids) > BULK_MAX:
+        return None, (jsonify({"error": f"Son {len(ids)} registros: el máximo por vez es {BULK_MAX}. Achicá la selección."}), 400)
+    return ids, None
+
+
+def _bulk_update(obj: str):
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+
+    body = request.get_json(silent=True) or {}
+    field = body.get("field")
+    allowed = set(EDITABLE_FIELDS) if obj == "company" else set(CONTACT_FIELDS_BY_KEY) - _BULK_CONTACT_SKIP
+    if field not in allowed:
+        return jsonify({"error": "Esa propiedad no se puede editar en masa."}), 400
+    value = body.get("value")
+    actor = _current_email()
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        ids, err = _bulk_target_ids(cur, body, obj)
+        if err:
+            return err
+        # Escrituras en lote (engine.BatchCursor): mismas sentencias, menos viajes a la base.
+        cur = engine.batched(cur)
+        cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM prospect_wf_step_log")
+        mark = cur.fetchone()["m"]
+        now = engine.utcnow()
+        updated, unchanged, failed, needs_contact, companies = 0, 0, [], 0, set()
+        for rid in ids:
+            # Un SAVEPOINT por registro: un valor que falla en uno no puede abortar la
+            # transacción entera (y con ella todo lo ya editado del lote).
+            cur.execute("SAVEPOINT bulk_row")
+            try:
+                if obj == "company":
+                    row = store.update_company(cur, rid, {field: value}, actor=actor)
+                    cid = rid
+                else:
+                    row = store.update_contact(cur, rid, {field: value}, actor)
+                    cid = row["company_id"] if row else None
+                if row is None:
+                    cur.execute("ROLLBACK TO SAVEPOINT bulk_row")
+                    failed.append({"id": rid, "error": "No existe."})
+                    continue
+                changes = row.pop("_changes")
+                if changes:
+                    engine.emit_event(cur, obj, rid, "updated", changes, now, actor, row=row)
+                    companies.add(cid)
+                    updated += 1
+                else:
+                    unchanged += 1
+                if obj == "company" and field == "prospecting_status" and row.get("contact_incomplete"):
+                    needs_contact += 1
+                cur.execute("RELEASE SAVEPOINT bulk_row")
+            except (ValueError, LookupError) as exc:
+                cur.execute("ROLLBACK TO SAVEPOINT bulk_row")
+                failed.append({"id": rid, "error": str(exc)})
+        # Lo mismo que _run_instant() de a uno, pero UN tick para todas las empresas tocadas
+        # (engine._company_match: company_id acepta una lista).
+        if companies:
+            engine.tick(cur, now, automatic=True, company_id=sorted(companies), actor=actor)
+        applied = []
+        if companies:
+            cur.execute(
+                """
+                SELECT DISTINCT w.name FROM prospect_wf_step_log l
+                  JOIN prospect_wf_enrollments e ON e.id = l.enrollment_id
+                  JOIN prospect_workflows w ON w.id = e.workflow_id
+                 WHERE l.id > %s AND e.company_id = ANY(%s) AND l.kind = 'action'
+                """,
+                (mark, sorted(companies)),
+            )
+            applied = [r["name"] for r in cur.fetchall()]
+        if failed:
+            if obj == "company":
+                cur.execute("SELECT id, name FROM prospect_companies WHERE id = ANY(%s)", ([f["id"] for f in failed],))
+            else:
+                cur.execute(
+                    "SELECT id, COALESCE(NULLIF(CONCAT_WS(' ', first_name, last_name), ''), email) AS name "
+                    "FROM prospect_contacts WHERE id = ANY(%s)", ([f["id"] for f in failed],))
+            names = {r["id"]: r["name"] for r in cur.fetchall()}
+            for f in failed:
+                f["name"] = names.get(f["id"]) or f"#{f['id']}"
+        cur.flush()  # antes del commit de _Db
+    return jsonify(_json_safe({
+        "total": len(ids), "updated": updated, "unchanged": unchanged, "failed": failed,
+        "needs_contact": needs_contact, "workflows_applied": applied,
+    }))
+
+
+@bp.post("/companies/bulk")
+def companies_bulk():
+    return _bulk_update("company")
+
+
+@bp.post("/contacts/bulk")
+def contacts_bulk():
+    return _bulk_update("contact")
 
 
 # --------------------------------------------------------------------------- #

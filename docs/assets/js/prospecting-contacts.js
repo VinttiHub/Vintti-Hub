@@ -326,5 +326,7 @@
     });
   }
 
-  window.ProspectingContacts = { open: open, completeFlow: completeFlow, close: close, fmtLocal: fmtLocal };
+  // fieldControl / readFieldValue: el mismo input por tipo, para la edición masiva de prospecting.js.
+  window.ProspectingContacts = { open: open, completeFlow: completeFlow, close: close, fmtLocal: fmtLocal,
+    fieldControl: control, readFieldValue: readValue };
 })();

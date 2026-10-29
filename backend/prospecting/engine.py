@@ -67,6 +67,93 @@ PAGE_URL = "https://vinttihub.vintti.com/prospecting.html"
 OPEN_STATUSES = ("active", "waiting")
 
 
+# --------------------------------------------------------------------------- #
+# Escrituras en lote
+# --------------------------------------------------------------------------- #
+class BatchCursor:
+    """Cursor que junta las escrituras sin respuesta y las manda pegadas a la próxima
+    consulta que sí necesita respuesta, en el mismo orden y en un solo viaje.
+
+    Por qué: el motor hace ~17 consultas por registro y la mitad son INSERT/UPDATE que
+    no devuelven nada (registrar el paso, el historial, cerrar la inscripción). Con la
+    base lejos (backend local → RDS, ~70 ms por viaje) 25 empresas tardaban 34 s; cada
+    escritura esperaba su ida y vuelta para nada. Postgres ejecuta exactamente las mismas
+    sentencias en el mismo orden: sólo cambia cuántas veces se cruza la red.
+
+    Se difiere: INSERT / UPDATE / DELETE sin RETURNING, y SAVEPOINT. Todo lo demás
+    (SELECT, RETURNING, RELEASE / ROLLBACK TO SAVEPOINT) se manda en el momento, con lo
+    pendiente adelante. RELEASE manda todo: así un error de un registro salta en SU
+    savepoint y no en el del siguiente. `rowcount` y cualquier otro atributo vacían antes.
+    `cache` vive lo que el cursor (p. ej. la lista de workflows activos de una corrida)."""
+
+    def __init__(self, cur):
+        self._cur = cur
+        self._buf: list[bytes] = []
+        self.cache: dict = {}
+
+    @staticmethod
+    def _deferrable(sql) -> bool:
+        if not isinstance(sql, str):
+            return False
+        s = sql.lstrip().upper()
+        if s.startswith("SAVEPOINT"):
+            return True
+        return s.startswith(("INSERT", "UPDATE", "DELETE")) and "RETURNING" not in s
+
+    def execute(self, sql, params=None):
+        q = self._cur.mogrify(sql, params)
+        if self._deferrable(sql):
+            self._buf.append(q)
+            return None
+        buf, self._buf = self._buf, []
+        # Ya interpolado: sin params, así un % de lo pendiente no se reinterpreta.
+        return self._cur.execute(b";\n".join(buf + [q]))
+
+    def flush(self) -> None:
+        if self._buf:
+            buf, self._buf = self._buf, []
+            self._cur.execute(b";\n".join(buf))
+
+    @property
+    def rowcount(self):
+        self.flush()
+        return self._cur.rowcount
+
+    # Leer el resultado NO vacía lo pendiente: si entre el SELECT y el fetch quedó una
+    # escritura diferida, mandarla acá pisaría el resultado que se está leyendo.
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def fetchmany(self, size=None):
+        return self._cur.fetchmany(size) if size is not None else self._cur.fetchmany()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+    def __getattr__(self, name):
+        self.flush()
+        return getattr(self._cur, name)
+
+
+def batched(cur):
+    """El mismo cursor si ya es un BatchCursor; si no, uno nuevo sobre `cur`."""
+    return cur if isinstance(cur, BatchCursor) else BatchCursor(cur)
+
+
+def enabled_workflows(cur) -> list[dict]:
+    """list_enabled() una sola vez por corrida (BatchCursor.cache); sin lote, como antes."""
+    from prospecting.workflows import list_enabled
+
+    if isinstance(cur, BatchCursor):
+        if "enabled" not in cur.cache:
+            cur.cache["enabled"] = list_enabled(cur)
+        return cur.cache["enabled"]
+    return list_enabled(cur)
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -233,6 +320,62 @@ def enroll(cur, wf: dict, record_id: int, source: str, now: datetime, actor: str
     return eid
 
 
+def enroll_many(cur, wf: dict, record_ids, source: str, now: datetime, actor: str | None) -> list[int]:
+    """enroll() para muchos registros con 3 consultas en vez de 3 por registro. Misma
+    regla: no entra si ya está adentro, ni si ya estuvo y el workflow no reinscribe.
+    Un id repetido entra una vez (como dos enroll() seguidos). Devuelve los ids de las
+    inscripciones nuevas, en el orden de `record_ids`."""
+    from psycopg2.extras import execute_values
+
+    obj = obj_of(wf)
+    col = _rec_col(obj)
+    ids = list(dict.fromkeys(int(x) for x in record_ids))
+    if not ids:
+        return []
+    cur.execute(
+        f"SELECT {col} AS rid, status FROM prospect_wf_enrollments WHERE workflow_id = %s AND {col} = ANY(%s)",
+        (wf["id"], ids),
+    )
+    seen: dict = {}
+    for r in cur.fetchall():
+        seen.setdefault(r["rid"], []).append(r["status"])
+    reenroll = wf.get("reenroll", True)
+    ids = [i for i in ids if not any(s in OPEN_STATUSES for s in seen.get(i, []))
+           and not (seen.get(i) and not reenroll)]
+    if obj == "contact" and ids:
+        cur.execute("SELECT id, company_id FROM prospect_contacts WHERE id = ANY(%s)", (ids,))
+        company_of = {r["id"]: r["company_id"] for r in cur.fetchall()}
+        rows = [(company_of[i], i) for i in ids if i in company_of]
+    else:
+        rows = [(i, None) for i in ids]
+    if not rows:
+        return []
+    start = (wf.get("steps") or {}).get("start")
+    raw = cur._cur if isinstance(cur, BatchCursor) else cur
+    if isinstance(cur, BatchCursor):
+        cur.flush()
+    got = execute_values(
+        raw,
+        """
+        INSERT INTO prospect_wf_enrollments
+            (workflow_id, company_id, contact_id, status, current_node, wake_at, source, enrolled_by, enrolled_at)
+        VALUES %s RETURNING id, company_id, contact_id
+        """,
+        [(wf["id"], co, ct, "active", start, now, source, actor, now) for co, ct in rows],
+        page_size=1000, fetch=True,
+    )
+    by_rec = {(r["contact_id"] if obj == "contact" else r["company_id"]): r["id"] for r in got}
+    new = [by_rec[ct if obj == "contact" else co] for co, ct in rows]
+    text = _source_text(source, actor)
+    execute_values(
+        raw,
+        "INSERT INTO prospect_wf_step_log (enrollment_id, node_id, kind, summary, detail, ok, at) VALUES %s",
+        [(eid, None, "enrolled", text, None, True, now) for eid in new],
+        page_size=1000,
+    )
+    return new
+
+
 def _source_text(source: str, actor: str | None) -> str:
     if source == "manual":
         return f"Inscripto a mano por {actor or 'alguien'}"
@@ -279,16 +422,25 @@ def _dummy_only(automatic: bool, dummy_only: bool) -> bool:
     return dummy_only or (automatic and not AUTOMATION_REAL_DATA)
 
 
-def _scope_sql(obj: str, dummy_only: bool, company_id: int | None) -> tuple[str, list]:
-    """Filtro sobre la tabla del objeto: sólo dummies y/o sólo una empresa (para un
-    contacto, "los de esa empresa")."""
+def _company_match(col: str, company_id) -> tuple[str, list]:
+    """`col = %s` para una empresa o `col = ANY(%s)` para varias (la edición masiva corre
+    un solo tick para todas sus empresas en vez de uno por empresa)."""
+    if isinstance(company_id, (list, tuple, set)):
+        return f"{col} = ANY(%s)", [sorted(int(x) for x in company_id)]
+    return f"{col} = %s", [company_id]
+
+
+def _scope_sql(obj: str, dummy_only: bool, company_id) -> tuple[str, list]:
+    """Filtro sobre la tabla del objeto: sólo dummies y/o sólo una empresa o varias (para
+    un contacto, "los de esa empresa")."""
     t = OBJECTS[obj]["table"]
     parts, params = [], []
     if dummy_only:
         parts.append(f"{t}.is_dummy")
     if company_id is not None:
-        parts.append(f"{t}.{'company_id' if obj == 'contact' else 'id'} = %s")
-        params.append(company_id)
+        sql, p = _company_match(f"{t}.{'company_id' if obj == 'contact' else 'id'}", company_id)
+        parts.append(sql)
+        params += p
     return "".join(" AND " + x for x in parts), params
 
 
@@ -340,7 +492,7 @@ def _sync_filter(cur, wf: dict, now: datetime, dummy_only: bool, company_id: int
             (now, wf["id"], c),
         )
     snapshot_matches(cur, wf, now, newly)
-    return sum(1 for c in newly if enroll(cur, wf, c, "trigger", now, actor))
+    return len(enroll_many(cur, wf, newly, "trigger", now, actor))
 
 
 def last_schedule_slot(sch: dict, now: datetime) -> datetime | None:
@@ -389,23 +541,22 @@ def _fire_schedule(cur, wf: dict, now: datetime, dummy_only: bool, actor) -> int
 
 
 def emit_event(cur, obj: str, record_id: int, kind: str, changes: list[dict], now: datetime | None = None,
-               actor: str | None = None, automatic: bool = True) -> int:
-    """Disparadores por evento del objeto. kind: 'created' | 'updated'. `changes` = [{field, old, new}]."""
-    from prospecting.workflows import list_enabled
-
+               actor: str | None = None, automatic: bool = True, row: dict | None = None) -> int:
+    """Disparadores por evento del objeto. kind: 'created' | 'updated'. `changes` = [{field, old, new}].
+    `row`: el registro ya leído (p. ej. lo que devolvió el UPDATE), para no volver a leerlo."""
     now = now or utcnow()
-    row = load_record(cur, obj, record_id)
+    wfs = [wf for wf in enabled_workflows(cur) if obj_of(wf) == obj and wf["trigger"].get("type") == "event"]
+    if not wfs:
+        return 0  # sin workflows por evento no hace falta ni leer el registro
+    if row is None:
+        row = load_record(cur, obj, record_id)
     if row is None:
         return 0
     if _dummy_only(automatic, False) and not row["is_dummy"]:
         return 0
     enrolled = 0
-    for wf in list_enabled(cur):
-        if obj_of(wf) != obj:
-            continue
+    for wf in wfs:
         t = wf["trigger"]
-        if t.get("type") != "event":
-            continue
         hit = False
         if t.get("event") == "created":
             hit = kind == "created"
@@ -559,13 +710,18 @@ def _apply_edit(cur, ctx: Ctx, row: dict, target: str, key: str, new) -> dict:
     """Escribe el cambio en el registro (o en la empresa asociada) y dispara sus eventos."""
     if target == "company":
         cid = _company_id_of(ctx.obj, row)
-        updated = store.update_company(cur, cid, {key: new}, actor=ctx.actor, source=ctx.source)
-        emit_event(cur, "company", cid, "updated", updated["_changes"], ctx.now, ctx.actor)
+        # Sobre la propia empresa, `row` es la fila ya bloqueada (load_record lock=True) y al
+        # día con los pasos anteriores: no hace falta volver a leerla.
+        updated = store.update_company(cur, cid, {key: new}, actor=ctx.actor, source=ctx.source,
+                                       current=row if ctx.obj == "company" else None)
+        emit_event(cur, "company", cid, "updated", updated["_changes"], ctx.now, ctx.actor,
+                   row={k: v for k, v in updated.items() if not k.startswith("_")})
         if ctx.obj == "company":
             row.update({k: v for k, v in updated.items() if not k.startswith("_")})
     else:
         updated = store.update_contact(cur, row["id"], {key: new}, actor=ctx.actor, source=ctx.source)
-        emit_event(cur, "contact", row["id"], "updated", updated["_changes"], ctx.now, ctx.actor)
+        emit_event(cur, "contact", row["id"], "updated", updated["_changes"], ctx.now, ctx.actor,
+                   row={**row, **{k: v for k, v in updated.items() if not k.startswith("_")}})
         row.update({k: v for k, v in updated.items() if not k.startswith("_")})
     return updated
 
@@ -1005,8 +1161,9 @@ def _close_by_conditions(cur, wfs: dict, now: datetime, dummy_only: bool, compan
         if dummy_only:
             extra += " AND c.is_dummy"
         if company_id is not None:
-            extra += " AND e.company_id = %s"
-            params.append(company_id)
+            sql, p = _company_match("e.company_id", company_id)
+            extra += " AND " + sql
+            params += p
         cur.execute(
             f"""
             SELECT e.id, e.{col} AS rid FROM prospect_wf_enrollments e
@@ -1040,14 +1197,16 @@ def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=
             include_disabled: bool = False) -> dict:
     from prospecting.workflows import get_workflow
 
+    outer, cur = cur, batched(cur)
     stats = {"advanced": 0, "completed": 0, "failed": 0}
     for _ in range(3):  # una acción puede inscribir en otro workflow: otra pasada
         where, params = [], [now]
         if dummy_only:
             where.append("c.is_dummy")
         if company_id is not None:
-            where.append("e.company_id = %s")
-            params.append(company_id)
+            sql, p = _company_match("e.company_id", company_id)
+            where.append(sql)
+            params += p
         if workflow_ids:
             where.append("e.workflow_id = ANY(%s)")
             params.append(list(workflow_ids))
@@ -1088,6 +1247,8 @@ def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=
             stats["advanced"] += 1
             if status in stats:
                 stats[status] += 1
+    if outer is not cur:
+        cur.flush()  # el que llamó sigue con su cursor: que no quede nada pendiente
     return stats
 
 
@@ -1097,7 +1258,7 @@ def tick(cur, now: datetime | None = None, automatic: bool = True, company_id: i
 
     now = now or utcnow()
     dummy_only = _dummy_only(automatic, dummy_only)
-    wfs = {w["id"]: w for w in list_enabled(cur)}
+    wfs = {w["id"]: w for w in enabled_workflows(cur)}
     enrolled = 0
     for wf in wfs.values():
         t = wf["trigger"].get("type")
@@ -1114,6 +1275,7 @@ def enroll_now(cur, wf: dict, now: datetime, actor: str | None, dummy_only: bool
     """«Inscribir las que cumplen ahora» / inscripción manual: inscribe y avanza en el
     momento, aunque el workflow esté apagado (lo pide una persona)."""
     obj = obj_of(wf)
+    cur = batched(cur)
     if record_ids is None:
         conds = wf["trigger"].get("conditions")
         ids = matching_ids(cur, conds, now, dummy_only, None, obj) if has_conditions(conds) else []
@@ -1121,10 +1283,11 @@ def enroll_now(cur, wf: dict, now: datetime, actor: str | None, dummy_only: bool
     else:
         ids = [int(c) for c in record_ids]
         source = "manual"
-    new = [eid for eid in (enroll(cur, wf, c, source, now, actor) for c in ids) if eid]
+    new = enroll_many(cur, wf, ids, source, now, actor)
     if wf["trigger"].get("type") == "filter" and record_ids is None:
         snapshot_matches(cur, wf, now, ids)
     stats = advance(cur, now, False, workflow_ids=[wf["id"]], actor=actor, include_disabled=True) if new else {}
+    cur.flush()
     return {"enrolled": len(new), "candidates": len(ids), **stats}
 
 

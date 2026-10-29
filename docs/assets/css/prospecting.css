@@ -27,6 +27,9 @@
 .pr-page [hidden], .pr-drawer [hidden] { display: none !important; }
 .pr-page *, .pr-page *::before, .pr-page *::after,
 .pr-drawer *, .pr-drawer *::before, .pr-drawer *::after { box-sizing: border-box; }
+/* Los modales (.pr-modal) cuelgan de <body>, fuera de .pr-page: sin esto un input con
+   width: 100% + padding se sale del recuadro (pasó en la edición masiva). */
+.pr-modal *, .pr-modal *::before, .pr-modal *::after { box-sizing: border-box; }
 
 /* ---------- Encabezado ---------- */
 .pr-head {
@@ -388,7 +391,8 @@
 .pr-filter--wide { flex: 1 1 240px; }
 
 .pr-page .pr-filter__input,
-.pr-drawer .pr-filter__input {
+.pr-drawer .pr-filter__input,
+.pr-modal .pr-filter__input {
   -webkit-appearance: none;
   appearance: none;
   height: 38px;
@@ -404,7 +408,8 @@
   transition: border-color .14s ease, box-shadow .14s ease;
 }
 .pr-page select.pr-filter__input,
-.pr-drawer select.pr-filter__input {
+.pr-drawer select.pr-filter__input,
+.pr-modal select.pr-filter__input {
   padding-right: 32px;
   background-image: var(--pr-chevron);
   background-repeat: no-repeat;
@@ -412,9 +417,11 @@
   cursor: pointer;
 }
 .pr-page .pr-filter__input:hover,
-.pr-drawer .pr-filter__input:hover { border-color: rgba(108, 56, 255, .35); }
+.pr-drawer .pr-filter__input:hover,
+.pr-modal .pr-filter__input:hover { border-color: rgba(108, 56, 255, .35); }
 .pr-page .pr-filter__input:focus,
-.pr-drawer .pr-filter__input:focus {
+.pr-drawer .pr-filter__input:focus,
+.pr-modal .pr-filter__input:focus {
   outline: none;
   border-color: var(--pr-violet);
   box-shadow: 0 0 0 3px rgba(108, 56, 255, .14);
@@ -1214,6 +1221,22 @@
   background: color-mix(in srgb, var(--pr-violet) 6%, #fff); font-size: 13px;
 }
 .pr-bulk .pr-filter__input { width: 260px; }
+.pr-bulk .pr-bulk__all { color: var(--pr-violet); font-weight: 600; }
+/* Modal de edición masiva */
+.pr-bulkedit { width: min(480px, 100%); }
+/* .pr-filter trae flex: 0 1 180px (pensado para la fila de filtros): en la columna del modal lo estiraba a 180px de alto. */
+.pr-bulkedit .pr-filter { display: flex; flex-direction: column; gap: 4px; flex: none; min-width: 0; }
+.pr-bulkedit .pr-filter__input { width: 100%; }
+.pr-bulkedit__value:empty { display: none; }
+.pr-bulkedit__value { display: flex; flex-direction: column; gap: 4px; }
+.pr-bulkedit__value.is-off { opacity: .35; pointer-events: none; }
+.pr-bulkedit__err { margin: 0; color: #a3108d; font-size: 12.5px; font-weight: 600; }
+.pr-toast__warn { color: #ffd1f5; }
+.pr-toast__secs { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-variant-numeric: tabular-nums; }
+.pr-toast__hint { display: inline-block; margin-top: 4px; font-size: 12px; opacity: .75; }
+/* Mientras corre: la barra y el modal no aceptan otro click. */
+.pr-bulk.is-busy { opacity: .55; pointer-events: none; }
+.pr-modal.is-busy { cursor: progress; }
 .pr-events__note { color: var(--pr-ink); font-style: italic; }
 
 @media (max-width: 720px) {

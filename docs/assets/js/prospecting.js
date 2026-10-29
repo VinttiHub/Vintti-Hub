@@ -172,6 +172,9 @@
   var loadSeq = 0;
   function load() {
     var seq = ++loadSeq;
+    // Otros filtros u otra página = otra lista: la selección (y «todas las del filtro») se suelta.
+    var key = qs(currentFilters());
+    if (key !== lastLoadKey) { selected = {}; selAll = null; lastLoadKey = key; }
     renderViewBar();
     $("prBody").innerHTML = '<tr><td class="pr-empty" colspan="' + colspan() + '">Loading…</td></tr>';
     return api("/prospecting/companies?" + qs(currentFilters())).then(function (data) {
@@ -279,13 +282,16 @@
     return m ? { key: m[1], dir: m[2] } : null;
   }
 
-  /* Selección para «Inscribir en workflow» (sólo quien edita workflows). */
-  var selected = {};
+  /* Selección de filas: «Editar» en masa lo puede usar cualquiera con acceso (como la
+     edición de a uno); «Inscribir en workflow», sólo quien edita workflows.
+     `selAll` = «todas las que coinciden con los filtros» (guarda esos filtros). */
+  var selected = {}, selAll = null, lastLoadKey = "";
+  function canSelect() { return true; }
   function canEnroll() { return !!ME.can_edit_workflows; }
-  function colspan() { return activeColumns().length + (canEnroll() ? 1 : 0); }
+  function colspan() { return activeColumns().length + (canSelect() ? 1 : 0); }
 
   function renderHead() {
-    $("prHead").innerHTML = (canEnroll()
+    $("prHead").innerHTML = (canSelect()
       ? '<th class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" id="prSelAll" title="Seleccionar la página"></label></th>' : "") +
       activeColumns().map(function (c) {
       var cur = parseSort(state.sort);
@@ -335,7 +341,7 @@
     }
     $("prBody").innerHTML = rows.map(function (r) {
       return '<tr data-id="' + r.id + '"' + (selected[r.id] ? ' class="is-selected"' : "") + ">" +
-        (canEnroll() ? '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-sel="' + r.id + '"' + (selected[r.id] ? " checked" : "") + "></label></td>" : "") +
+        (canSelect() ? '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-sel="' + r.id + '"' + (selected[r.id] ? " checked" : "") + "></label></td>" : "") +
         cols.map(function (c) {
         return "<td" + (c.num ? ' class="pr-num"' : "") + ">" + c.render(r) + "</td>";
       }).join("") + "</tr>";
@@ -343,20 +349,31 @@
     renderBulk();
   }
 
-  /* Barra de «N seleccionadas → Inscribir en workflow». */
+  /* Barra de «N seleccionadas → Editar / Inscribir en workflow». */
   var wfChoices = null;
+  function selectionHead(n, allMode, pageAll, total, noun) {
+    return "<strong>" + (allMode ? "Todas las " + total.toLocaleString() : n) + "</strong> " + noun + (n === 1 && !allMode ? "" : "s") +
+      " seleccionada" + (n === 1 && !allMode ? "" : "s") +
+      (pageAll && !allMode && total > n
+        ? '<button type="button" class="pr-wf-link pr-bulk__all" data-bulk-all="1">Seleccionar las ' + total.toLocaleString() + " que coinciden con los filtros</button>" : "") +
+      '<button type="button" class="pr-btn pr-btn--primary" data-bulk-edit="1"><i class="fa-solid fa-pen"></i> Editar</button>';
+  }
   function renderBulk() {
     var bar = $("prBulk");
     var ids = Object.keys(selected);
-    if (!canEnroll() || !ids.length) { bar.hidden = true; return; }
+    if (!canSelect() || (!ids.length && !selAll)) { bar.hidden = true; return; }
+    var pageAll = lastRows.length > 0 && lastRows.every(function (r) { return selected[r.id]; });
     var opts = (wfChoices || []).map(function (w) {
       return '<option value="' + w.id + '">' + esc(w.name) + (w.enabled ? "" : " (inactivo)") + "</option>";
     }).join("");
     bar.hidden = false;
-    bar.innerHTML = "<strong>" + ids.length + "</strong> seleccionada" + (ids.length === 1 ? "" : "s") +
-      '<select class="pr-filter__input" id="prBulkWf">' + (wfChoices ? '<option value="">Elegir workflow…</option>' + opts : "<option>Cargando…</option>") + "</select>" +
-      '<button type="button" class="pr-btn pr-btn--primary" id="prBulkGo"><i class="fa-solid fa-diagram-project"></i> Inscribir en workflow</button>' +
+    // Inscribir trabaja con ids: en «todas las del filtro» no se ofrece.
+    var enroll = canEnroll() && !selAll;
+    bar.innerHTML = selectionHead(ids.length, !!selAll, pageAll, state.total, "empresa") +
+      (enroll ? '<select class="pr-filter__input" id="prBulkWf">' + (wfChoices ? '<option value="">Elegir workflow…</option>' + opts : "<option>Cargando…</option>") + "</select>" +
+        '<button type="button" class="pr-btn" id="prBulkGo"><i class="fa-solid fa-diagram-project"></i> Inscribir en workflow</button>' : "") +
       '<button type="button" class="pr-btn" id="prBulkClear">Deseleccionar</button>';
+    if (!enroll) return;
     if (!wfChoices && window.ProspectingWorkflows) {
       window.ProspectingWorkflows.workflows().then(function (r) {
         wfChoices = r.workflows.filter(function (w) { return (w.object || "company") === "company"; });
@@ -364,16 +381,130 @@
       });
     }
   }
+  var enrolling = false;
   function bulkEnroll() {
+    if (enrolling) return;  // un segundo click mientras corre inscribía todo dos veces
     var wfId = $("prBulkWf").value;
     if (!wfId) { alert("Elegí un workflow."); return; }
     var ids = Object.keys(selected).map(Number);
+    var wfName = $("prBulkWf").selectedOptions[0].textContent;
+    enrolling = true;
+    $("prBulk").classList.add("is-busy");
+    var done = progress("Inscribiendo " + ids.length + " empresa" + (ids.length === 1 ? "" : "s") + " en <strong>" + esc(wfName) + "</strong>…");
     window.ProspectingWorkflows.enrollCompanies(wfId, ids).then(function (r) {
+      enrolling = false;
+      $("prBulk").classList.remove("is-busy");
       toast('<i class="fa-solid fa-diagram-project"></i> Se inscribieron <strong>' + r.enrolled + "</strong> de " + ids.length +
-        (r.enrolled < ids.length ? " (las demás ya estaban adentro o el workflow no reinscribe)" : "") + ".");
+        (r.enrolled < ids.length ? " (las demás ya estaban adentro o el workflow no reinscribe)" : "") +
+        (r.completed ? " · " + r.completed + " ya terminaron el workflow" : "") + ".");
       selected = {};
       load();
-    }).catch(function (err) { alert(err.errors ? err.errors.join("\n") : err.message); });
+    }).catch(function (err) {
+      enrolling = false;
+      $("prBulk").classList.remove("is-busy");
+      done();
+      alert(err.errors ? err.errors.join("\n") : err.message);
+    });
+  }
+
+  /* ---------- Edición masiva (botón «Editar» de la barra) ----------
+     Una propiedad, un valor, todos los seleccionados: POST /prospecting/<companies|contacts>/bulk.
+     El backend la aplica registro por registro (historial + workflows, como de a uno). */
+  function bulkFields(kind) {
+    var o = (OPTS.objects || {})[kind] || {};
+    return (o.fields || []).filter(function (f) {
+      return kind === "company" ? f.editable : f.key !== "email" && f.key !== "is_primary";
+    });
+  }
+  function bulkValueLabel(f, v) {
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return "(vacío)";
+    if (f.type === "owner" || f.type === "user") return ownerName(v) || v;
+    if (f.type === "bool") return v ? "Sí" : "No";
+    if (Array.isArray(v)) return v.join(", ");
+    return String(v);
+  }
+  function openBulkEdit(kind) {
+    var isCo = kind === "company";
+    var sel = isCo ? selected : ctSelected, all = isCo ? selAll : ctSelAll;
+    var ids = Object.keys(sel).map(Number);
+    var n = all ? all.total : ids.length;
+    var noun = isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos");
+    var fields = bulkFields(kind);
+    var PC = window.ProspectingContacts;
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit" role="dialog" aria-modal="true">' +
+      "<h3>Editar " + n.toLocaleString() + " " + noun + "</h3>" +
+      '<label class="pr-filter"><span class="pr-filter__label">Propiedad</span>' +
+        '<select class="pr-filter__input" id="prBkField"><option value="">Elegí una propiedad…</option>' +
+        fields.map(function (f) { return '<option value="' + esc(f.key) + '">' + esc(f.label) + "</option>"; }).join("") + "</select></label>" +
+      '<div class="pr-bulkedit__value" id="prBkValue"></div>' +
+      '<label class="pr-check" id="prBkClearWrap" hidden><input type="checkbox" id="prBkClear"> Dejarla vacía en todos</label>' +
+      '<p class="pr-note">Se cambia en todos los seleccionados. Queda en el historial de cada uno y corre los workflows igual que si lo editaras de a uno.</p>' +
+      '<p class="pr-bulkedit__err" id="prBkErr" hidden></p>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-bk="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-bk="apply"><i class="fa-solid fa-check"></i> Aplicar</button></div></div>';
+    document.body.appendChild(box);
+    var q = function (id) { return box.querySelector("#" + id); };
+    var fieldOf = function () { var k = q("prBkField").value; return fields.filter(function (f) { return f.key === k; })[0] || null; };
+    var err = function (msg) { q("prBkErr").hidden = !msg; q("prBkErr").innerHTML = msg || ""; };
+    var running = false;  // mientras corre no se cierra: cerrar y volver a aplicar lo haría dos veces
+    var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    q("prBkField").addEventListener("change", function () {
+      var f = fieldOf();
+      q("prBkValue").innerHTML = f ? '<span class="pr-filter__label">Nuevo valor</span>' + PC.fieldControl(f, null) : "";
+      q("prBkClearWrap").hidden = !f;
+      q("prBkClear").checked = false;
+      err("");
+    });
+    q("prBkClear").addEventListener("change", function () { q("prBkValue").classList.toggle("is-off", this.checked); });
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var chip = e.target.closest(".pr-wf-chip");
+      if (chip && chip.closest("#prBkValue [data-k]")) {
+        chip.classList.toggle("is-on");
+        chip.innerHTML = (chip.classList.contains("is-on") ? '<i class="fa-solid fa-check"></i> ' : "") + esc(chip.getAttribute("data-chip"));
+        return;
+      }
+      var b = e.target.closest("[data-bk]");
+      if (!b) return;
+      if (b.getAttribute("data-bk") === "cancel") return close();
+      var f = fieldOf();
+      if (!f) return err("Elegí qué propiedad cambiar.");
+      var clear = q("prBkClear").checked;
+      var el = q("prBkValue").querySelector("[data-k]");
+      var value = clear ? null : PC.readFieldValue(el);
+      if (!clear && (value == null || (Array.isArray(value) && !value.length))) return err("Elegí un valor, o tildá «Dejarla vacía en todos».");
+      if (!confirm("Vas a cambiar «" + f.label + "» a «" + bulkValueLabel(f, value) + "» en " + n.toLocaleString() + " " + noun + ". ¿Seguir?")) return;
+      var body = Object.assign(all ? { filters: all.filters } : { ids: ids }, { field: f.key, value: value });
+      running = true;
+      box.classList.add("is-busy");
+      box.querySelectorAll("button, select, input, textarea").forEach(function (x) { x.disabled = true; });
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Aplicando…';
+      var done = progress("Cambiando <strong>" + esc(f.label) + "</strong> en " + n.toLocaleString() + " " + noun + "…");
+      err("");
+      api("/prospecting/" + (isCo ? "companies" : "contacts") + "/bulk", { method: "POST", body: JSON.stringify(body) }).then(function (r) {
+        running = false;
+        close();
+        var parts = ["<strong>" + esc(f.label) + "</strong>: " + r.updated + " actualizad" + (isCo ? "a" : "o") + (r.updated === 1 ? "" : "s")];
+        if (r.unchanged) parts.push(r.unchanged + " ya tenía" + (r.unchanged === 1 ? "" : "n") + " ese valor");
+        if (r.failed.length) parts.push('<span class="pr-toast__warn">' + r.failed.length + " no se pudo: " +
+          r.failed.slice(0, 3).map(function (x) { return esc(x.name) + " (" + esc(x.error) + ")"; }).join(", ") + (r.failed.length > 3 ? "…" : "") + "</span>");
+        if (r.needs_contact) parts.push(r.needs_contact + " quedaron sin contacto completo");
+        if (r.workflows_applied.length) parts.push("corrieron " + r.workflows_applied.map(function (w) { return "<strong>" + esc(w) + "</strong>"; }).join(", "));
+        toast('<i class="fa-solid fa-pen"></i> ' + parts.join(" · ") + ".");
+        if (isCo) { selected = {}; selAll = null; load(); } else { ctSelected = {}; ctSelAll = null; loadContacts(); }
+      }).catch(function (e2) {
+        running = false;
+        done();
+        box.classList.remove("is-busy");
+        box.querySelectorAll("button, select, input, textarea").forEach(function (x) { x.disabled = false; });
+        b.innerHTML = '<i class="fa-solid fa-check"></i> Aplicar';
+        err(esc(e2.message) + (e2.errors ? "<br>" + e2.errors.map(esc).join("<br>") : ""));
+      });
+    });
   }
 
   // Si la fila tiene un valor que ya no está en la lista (dato viejo), igual se muestra.
@@ -400,10 +531,31 @@
   var toastTimer = null;
   function toast(html) {
     var el = $("prToast");
+    stopProgress();
     el.innerHTML = html;
     el.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.hidden = true; }, 6000);
+  }
+  /* Aviso fijo mientras corre algo largo (inscribir, editar en masa): con la base lejos
+     (backend local → RDS) cada registro son ~20 consultas y 75 empresas tardaban más de
+     un minuto sin que la pantalla dijera nada; se volvía a apretar y se inscribía dos veces.
+     Muestra los segundos para que se vea que sigue trabajando. toast() lo reemplaza. */
+  var progressTimer = null;
+  function stopProgress() { clearInterval(progressTimer); progressTimer = null; }
+  function progress(text) {
+    var el = $("prToast"), t0 = Date.now();
+    clearTimeout(toastTimer);
+    stopProgress();
+    var draw = function () {
+      var secs = Math.floor((Date.now() - t0) / 1000);
+      el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + text + (secs >= 2 ? ' <span class="pr-toast__secs">' + secs + " s</span>" : "") +
+        (secs >= 10 ? '<br><span class="pr-toast__hint">Sigue trabajando, no cierres ni recargues la página.</span>' : "");
+    };
+    el.hidden = false;
+    draw();
+    progressTimer = setInterval(draw, 1000);
+    return function () { stopProgress(); el.hidden = true; };
   }
   function announceWorkflows(row) {
     var applied = (row && row.workflows_applied) || [];
@@ -442,16 +594,36 @@
 
   /* ---------- Pestaña Contacts ---------- */
   var ctState = { page: 1, total: 0 };
-  function loadContacts() {
-    var q = {
+  var ctSelected = {}, ctSelAll = null, ctRows = [], ctLastKey = "";
+  function ctFilters() {
+    return {
       q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
-      dummy: ME.sees_dummies ? $("prFDummy").value : "exclude", page: ctState.page, page_size: 25,
+      dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
     };
-    $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="7">Loading…</td></tr>';
+  }
+  function renderCtBulk() {
+    var bar = $("prCtBulk");
+    var ids = Object.keys(ctSelected);
+    if (!ids.length && !ctSelAll) { bar.hidden = true; return; }
+    var pageAll = ctRows.length > 0 && ctRows.every(function (c) { return ctSelected[c.id]; });
+    bar.hidden = false;
+    bar.innerHTML = selectionHead(ids.length, !!ctSelAll, pageAll, ctState.total, "contacto")
+      .replace(/seleccionada/g, "seleccionado").replace(/Todas las/, "Todos los").replace(/Seleccionar las/, "Seleccionar los") +
+      '<button type="button" class="pr-btn" data-ct-clear="1">Deseleccionar</button>';
+    var all = $("prCtSelAll");
+    if (all) all.checked = pageAll;
+  }
+  function loadContacts() {
+    var q = Object.assign(ctFilters(), { page: ctState.page, page_size: 25 });
+    var key = qs(q);
+    if (key !== ctLastKey) { ctSelected = {}; ctSelAll = null; ctLastKey = key; }
+    $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="8">Loading…</td></tr>';
     api("/prospecting/contacts?" + qs(q)).then(function (r) {
       ctState.total = r.total;
+      ctRows = r.rows;
       $("prCtBody").innerHTML = r.rows.length ? r.rows.map(function (c) {
-        return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '">' +
+        return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
+          '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-ct-sel="' + c.id + '"' + (ctSelected[c.id] ? " checked" : "") + "></label></td>" +
           '<td><button type="button" class="pr-company__name" data-ct-open="' + c.id + '">' + esc(c.name) + "</button>" +
             (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") + "</td>" +
           '<td><a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.company_name) + "</a></td>" +
@@ -460,14 +632,15 @@
           "<td>" + (c.lead_life ? '<span class="pr-wf-stat">' + esc(c.lead_life) + "</span>" : "—") + "</td>" +
           "<td>" + cellText(ownerName(c.owner_email)) + "</td>" +
           "<td>" + (c.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(c.meeting_datetime)) : "—") + "</td></tr>";
-      }).join("") : '<tr><td class="pr-empty" colspan="7">No contacts match these filters.</td></tr>';
+      }).join("") : '<tr><td class="pr-empty" colspan="8">No contacts match these filters.</td></tr>';
+      renderCtBulk();
       var pages = Math.max(1, Math.ceil(r.total / 25));
       $("prCtCount").textContent = r.total.toLocaleString() + " contact" + (r.total === 1 ? "" : "s");
       $("prCtPage").textContent = ctState.page + " / " + pages;
       $("prCtPrev").disabled = ctState.page <= 1;
       $("prCtNext").disabled = ctState.page >= pages;
     }).catch(function (err) {
-      $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="7">' + esc(err.message) + "</td></tr>";
+      $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="8">' + esc(err.message) + "</td></tr>";
     });
   }
   function bindContacts() {
@@ -479,6 +652,33 @@
     $("prCtQ").addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { ctState.page = 1; loadContacts(); }, 300); });
     $("prCtPrev").addEventListener("click", function () { if (ctState.page > 1) { ctState.page--; loadContacts(); } });
     $("prCtNext").addEventListener("click", function () { ctState.page++; loadContacts(); });
+    $("prCtBody").addEventListener("change", function (e) {
+      var id = e.target.getAttribute && e.target.getAttribute("data-ct-sel");
+      if (!id) return;
+      if (e.target.checked) ctSelected[id] = true; else { delete ctSelected[id]; ctSelAll = null; }
+      e.target.closest("tr").classList.toggle("is-selected", e.target.checked);
+      renderCtBulk();
+    });
+    $("prCtSelAll").addEventListener("change", function (e) {
+      ctRows.forEach(function (c) { if (e.target.checked) ctSelected[c.id] = true; else delete ctSelected[c.id]; });
+      if (!e.target.checked) ctSelAll = null;
+      document.querySelectorAll("#prCtBody [data-ct-sel]").forEach(function (cb) {
+        cb.checked = e.target.checked;
+        cb.closest("tr").classList.toggle("is-selected", e.target.checked);
+      });
+      renderCtBulk();
+    });
+    $("prCtBulk").addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (!b) return;
+      if (b.hasAttribute("data-bulk-edit")) openBulkEdit("contact");
+      if (b.hasAttribute("data-bulk-all")) { ctSelAll = { filters: ctFilters(), total: ctState.total }; renderCtBulk(); }
+      if (b.hasAttribute("data-ct-clear")) {
+        ctSelected = {}; ctSelAll = null;
+        document.querySelectorAll("#prCtBody [data-ct-sel]").forEach(function (cb) { cb.checked = false; cb.closest("tr").classList.remove("is-selected"); });
+        renderCtBulk();
+      }
+    });
     $("prCtBody").addEventListener("click", function (e) {
       var b = e.target.closest("[data-ct-open]");
       if (!b) return;
@@ -950,6 +1150,7 @@
     }
     state.page = 1;
     selected = {};
+    selAll = null;
     baseline = canon(snapshot());
     showSection("table");
     renderTabs();
@@ -1383,6 +1584,7 @@
       var sel = e.target.getAttribute && e.target.getAttribute("data-sel");
       if (sel) {
         if (e.target.checked) selected[sel] = true; else delete selected[sel];
+        if (!e.target.checked) selAll = null;  // destildar una saca del modo «todas»
         e.target.closest("tr").classList.toggle("is-selected", e.target.checked);
         renderBulk();
         return;
@@ -1392,13 +1594,21 @@
     $("prHead").addEventListener("change", function (e) {
       if (e.target.id !== "prSelAll") return;
       lastRows.forEach(function (r) { if (e.target.checked) selected[r.id] = true; else delete selected[r.id]; });
+      if (!e.target.checked) selAll = null;
       renderRows(lastRows);
     });
     $("prBulk").addEventListener("click", function (e) {
       var b = e.target.closest("button");
       if (!b) return;
       if (b.id === "prBulkGo") bulkEnroll();
-      if (b.id === "prBulkClear") { selected = {}; renderRows(lastRows); }
+      if (b.id === "prBulkClear") { selected = {}; selAll = null; renderRows(lastRows); }
+      if (b.hasAttribute("data-bulk-edit")) openBulkEdit("company");
+      if (b.hasAttribute("data-bulk-all")) {
+        var f = currentFilters();
+        delete f.page; delete f.page_size; delete f.sort;
+        selAll = { filters: f, total: state.total };
+        renderBulk();
+      }
     });
     $("prBody").addEventListener("click", function (e) {
       var inc = e.target.closest("[data-complete]");

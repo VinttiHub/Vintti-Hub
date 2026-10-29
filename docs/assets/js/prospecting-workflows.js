@@ -1669,21 +1669,41 @@
     }).catch(function (err) { out.innerHTML = ""; showErrors(err); });
   }
 
+  var applying = false;
   function applyNow() {
+    if (applying) return;  // un segundo click mientras corre inscribía todo dos veces
     var onlyDummy = $("prWfOnlyDummy").checked;
     if (!onlyDummy && !confirm("¿Inscribir también empresas REALES que cumplen hoy?")) return;
-    saveThen(function () {
+    applying = true;
+    var btn = root.querySelector('[data-act="apply"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Inscribiendo…'; }
+    var t0 = Date.now(), timer = null;
+    var stop = function () {
+      applying = false;
+      clearInterval(timer);
+      var b2 = root.querySelector('[data-act="apply"]');
+      if (b2) { b2.disabled = false; b2.innerHTML = '<i class="fa-solid fa-play"></i> Inscribir las que cumplen ahora'; }
+    };
+    // Como saveThen(), pero si el guardado falla suelta el bloqueo (si no, quedaba trabado).
+    (dirty || !draft.id ? save() : Promise.resolve()).then(function () {
       var out = $("prWfPreviewOut");
-      if (out) out.innerHTML = '<p class="pr-note">Inscribiendo…</p>';
+      var tickOut = function () {
+        var o = $("prWfPreviewOut"), secs = Math.floor((Date.now() - t0) / 1000);
+        if (o) o.innerHTML = '<p class="pr-note"><i class="fa-solid fa-spinner fa-spin"></i> Inscribiendo y corriendo los pasos…' +
+          (secs >= 2 ? " " + secs + " s" : "") + (secs >= 10 ? " · sigue trabajando, no cierres ni recargues la página." : "") + "</p>";
+      };
+      if (out) tickOut();
+      timer = setInterval(tickOut, 1000);
       return P.api("/prospecting/workflows/" + draft.id + "/enroll", {
         method: "POST", body: JSON.stringify({ only_dummy: onlyDummy }),
       }).then(function (r) {
+        stop();
         $("prWfPreviewOut").innerHTML = '<div class="pr-result"><h4>' + r.enrolled + " inscripta" + (r.enrolled === 1 ? "" : "s") + "</h4>" +
           '<p class="pr-note" style="margin:0">De ' + r.candidates + " que cumplían (las que ya estaban adentro no se repiten). " +
           (r.completed || 0) + " ya terminaron el workflow; el resto está esperando. Mirá el Historial.</p></div>";
         P.reloadTable();
-      }).catch(function (err) { showErrors(err); });
-    });
+      }).catch(function (err) { stop(); var o = $("prWfPreviewOut"); if (o) o.innerHTML = ""; showErrors(err); });
+    }, stop);
   }
 
   function runTest(companyId) {

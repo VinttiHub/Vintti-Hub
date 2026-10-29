@@ -660,13 +660,18 @@ def resolve_owner(cur, data: dict) -> str | None:
     return None
 
 
-def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user") -> dict | None:
+def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user",
+                   current: dict | None = None) -> dict | None:
     """Aplica `patch` (ya filtrado a columnas editables) y deja un evento por campo.
 
     La fila devuelta trae `_changes` ([{field, old, new}]): con eso se disparan los
-    workflows "cuando cambia una propiedad" (engine.emit_event)."""
-    cur.execute("SELECT * FROM prospect_companies WHERE id = %s FOR UPDATE", (company_id,))
-    row = cur.fetchone()
+    workflows "cuando cambia una propiedad" (engine.emit_event).
+    `current`: la fila ya leída con FOR UPDATE por quien llama (el motor), para no releerla."""
+    if current is not None:
+        row = current
+    else:
+        cur.execute("SELECT * FROM prospect_companies WHERE id = %s FOR UPDATE", (company_id,))
+        row = cur.fetchone()
     if row is None:
         return None
     sets, vals, changes = [], [], []
@@ -688,7 +693,7 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
         log_event(cur, company_id, source, actor, col, old, new)
     out = dict(updated)
     if "prospecting_status" in patch:
-        out["contact_incomplete"] = recompute_contact_incomplete(cur, company_id)
+        out["contact_incomplete"] = recompute_contact_incomplete(cur, company_id, status=out["prospecting_status"])
     return {**out, "_changes": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
 
 
@@ -727,7 +732,9 @@ def _order_sql(sort) -> str:
     return f"{expr} {d.upper()} NULLS LAST, id {d.upper()}"
 
 
-def list_companies(cur, f: dict) -> dict:
+def _company_where(f: dict) -> tuple[str, list]:
+    """WHERE de la tabla de empresas (filtros de la página + avanzados ya validados).
+    Lo usan la lista y la edición masiva «todas las del filtro»: tienen que dar lo mismo."""
     where, params = [], []
 
     dummy = f.get("dummy") or "exclude"
@@ -782,7 +789,18 @@ def list_companies(cur, f: dict) -> dict:
         where.append(adv_sql)
         params += adv_params
 
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    return (("WHERE " + " AND ".join(where)) if where else ""), params
+
+
+def company_ids(cur, f: dict) -> list[int]:
+    """Todas las empresas que cumplen los filtros de la tabla, sin paginar."""
+    where_sql, params = _company_where(f)
+    cur.execute(f"SELECT id FROM prospect_companies {where_sql} ORDER BY id", params)
+    return [r["id"] for r in cur.fetchall()]
+
+
+def list_companies(cur, f: dict) -> dict:
+    where_sql, params = _company_where(f)
     order = _order_sql(f.get("sort"))
     page = max(1, _to_int(f.get("page")) or 1)
     size = min(200, max(10, _to_int(f.get("page_size")) or 50))
@@ -1051,13 +1069,17 @@ def contact_missing(contact: dict) -> list[str]:
     return [k for k in REQUIRED_ON_QUALIFIED if contact.get(k) in (None, "", [])]
 
 
-def recompute_contact_incomplete(cur, company_id: int) -> bool:
-    """Empresa en Qualified / SQL sin ningún contacto con los obligatorios completos."""
-    cur.execute("SELECT prospecting_status FROM prospect_companies WHERE id = %s", (company_id,))
-    r = cur.fetchone()
-    if r is None:
-        return False
-    needs = r["prospecting_status"] in (STATUS_QUALIFIED, STATUS_SQL)
+def recompute_contact_incomplete(cur, company_id: int, status: str | None = None) -> bool:
+    """Empresa en Qualified / SQL sin ningún contacto con los obligatorios completos.
+    `status`: el Prospecting Status si quien llama ya lo tiene (no hace falta releerlo).
+    Sólo se leen los contactos cuando está en Qualified / SQL."""
+    if status is None:
+        cur.execute("SELECT prospecting_status FROM prospect_companies WHERE id = %s", (company_id,))
+        r = cur.fetchone()
+        if r is None:
+            return False
+        status = r["prospecting_status"]
+    needs = status in (STATUS_QUALIFIED, STATUS_SQL)
     incomplete = needs and not any(not contact_missing(c) for c in company_contacts(cur, company_id))
     cur.execute("UPDATE prospect_companies SET contact_incomplete = %s WHERE id = %s", (incomplete, company_id))
     return incomplete
@@ -1202,7 +1224,8 @@ def get_contact(cur, contact_id: int) -> dict | None:
     return out
 
 
-def list_contacts(cur, f: dict) -> dict:
+def _contact_where(f: dict) -> tuple[str, list]:
+    """WHERE de la pestaña Contacts (sobre `ct` JOIN `c`). Lo usan la lista y la edición masiva."""
     where, params = [], []
     dummy = f.get("dummy") or "exclude"
     if dummy == "only":
@@ -1224,7 +1247,18 @@ def list_contacts(cur, f: dict) -> dict:
     if q:
         where.append("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s OR c.name ILIKE %s)")
         params += [f"%{q}%"] * 3
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    return (("WHERE " + " AND ".join(where)) if where else ""), params
+
+
+def contact_ids(cur, f: dict) -> list[int]:
+    """Todos los contactos que cumplen los filtros de la pestaña, sin paginar."""
+    where_sql, params = _contact_where(f)
+    cur.execute(f"SELECT ct.id FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql} ORDER BY ct.id", params)
+    return [r["id"] for r in cur.fetchall()]
+
+
+def list_contacts(cur, f: dict) -> dict:
+    where_sql, params = _contact_where(f)
     page = max(1, _to_int(f.get("page")) or 1)
     size = min(200, max(10, _to_int(f.get("page_size")) or 25))
     base = f"FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql}"

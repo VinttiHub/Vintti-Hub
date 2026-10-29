@@ -1243,6 +1243,27 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.
 - Las listas cerradas (status, Not ICP reasons, sizes) viven sólo en `constants.py`.
+- **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
+  sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
+  respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el
+  savepoint de SU registro. Lo usan `enroll_now()`, `advance()` y la edición masiva. Además:
+  `enroll_many()` inscribe N registros en 3 consultas, `enabled_workflows()` lee los activos una
+  vez por corrida, `emit_event()` no lee el registro si no hay workflows por evento, y `tick()`
+  acepta una lista de empresas (`_company_match()`). Inscribir 25 empresas pasó de 34 s a 9 s
+  desde el backend local (cada viaje a la RDS son ~70 ms). Verificado con foto antes/después:
+  la base queda idéntica. **Si agregás una escritura cuyo resultado leés (rowcount, fetch),
+  ponele RETURNING o leé `rowcount` del BatchCursor (vacía antes)**; un `fetch` no vacía lo
+  pendiente a propósito.
+- **Edición masiva (2026-10-29)**: tildar empresas (tabla) o contactos (pestaña Contacts) →
+  **Editar** → una propiedad y un valor para todos. `POST /prospecting/companies/bulk` y
+  `/contacts/bulk` con `ids` o con `filters` (los mismos params del GET: «Seleccionar las N que
+  coinciden con los filtros» manda los filtros, no los ids). Filtran con `_company_where()` /
+  `_contact_where()` de `store.py`, los mismos de las listas: no armar otro WHERE. Cada registro
+  va por `update_company()` / `update_contact()` (historial por campo, igual que de a uno) dentro
+  de un **SAVEPOINT**: un valor inválido salta ese registro sin abortar el lote. Workflows: un
+  `emit_event()` por registro y un `tick()` por empresa. Lo usa cualquiera con acceso (como la
+  edición de a uno); inscribir en workflow sigue siendo de `WORKFLOW_EDITORS`. Empresas: sólo
+  `EDITABLE_FIELDS`; contactos: todo el catálogo menos `email` (único). Tope `BULK_MAX` = 1000.
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas
