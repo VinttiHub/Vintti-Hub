@@ -815,11 +815,12 @@
   background: var(--pr-card-soft);
 }
 .pr-wf-rule__row { display: flex; gap: 8px; align-items: center; }
-.pr-wf-rule__row { flex-wrap: wrap; }
-/* Propiedad y operador con ancho propio: si no entran, el operador baja de línea en vez de
-   cortarse («Es igual a» se leía «Es igual», «Alguna vez fue igual a cualquiera de»…). */
-.pr-wf-rule__row .pr-filter__input { flex: 1 1 180px; min-width: 0; }
-.pr-wf-rule__row [data-rop] { flex: 1 1 230px; }
+/* Propiedad y operador van juntos en .pr-wf-rule__sel: si no entran en una línea, el
+   operador baja debajo de la propiedad en vez de cortarse («Es igual a» se leía «Es igual»),
+   y los botones (?, duplicar, quitar) se quedan arriba a la derecha. */
+.pr-wf-rule__sel { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.pr-wf-rule__sel .pr-filter__input { flex: 1 1 180px; min-width: 0; }
+.pr-wf-rule__sel [data-rop] { flex: 1 1 230px; }
 .pr-wf-joiner {
   margin: 6px 0 6px 10px;
   font-size: 12px;
@@ -883,6 +884,12 @@
   cursor: pointer;
 }
 .pr-wf-link:hover { color: #a3108d; text-decoration: underline; }
+/* Duplicar (condición, grupo, workflow): violeta, no el magenta de quitar. */
+.pr-wf-x[data-rdup]:hover, .pr-wf-dup:hover { background: color-mix(in srgb, var(--pr-violet) 10%, #fff); color: var(--pr-violet); }
+.pr-wf-link[data-gdup] { margin-left: auto; margin-right: 10px; }
+.pr-wf-link[data-gdup]:hover { color: var(--pr-violet); }
+.pr-wf-card__acts { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.pr-wf-table__name .pr-wf-dup { float: right; margin: -4px -4px 0 6px; }
 .pr-wf-add {
   appearance: none;
   border: 1px dashed rgba(108, 56, 255, .35);
@@ -975,7 +982,6 @@
 }
 @media (max-width: 720px) {
   .pr-wf-action { grid-template-columns: 1fr; }
-  .pr-wf-rule__row { flex-wrap: wrap; }
   .pr-wf-grid { grid-template-columns: 1fr; }
 }
 /* En una columna, el flex-basis de .pr-filter se volvía alto. */

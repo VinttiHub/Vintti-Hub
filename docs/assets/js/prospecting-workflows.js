@@ -275,13 +275,18 @@
   }
   function totalIn(stats) { return Object.keys(stats || {}).reduce(function (a, k) { return a + stats[k]; }, 0); }
 
+  function dupListBtn(w) {
+    return canEdit ? '<button type="button" class="pr-wf-x pr-wf-dup" data-wfdup="' + w.id + '" title="Duplicar workflow"><i class="fa-regular fa-copy"></i></button>' : "";
+  }
+
   function renderCards(rows) {
     return '<div class="pr-wf-grid">' + rows.map(function (w) {
       var tt = (S().triggers || {})[w.trigger.type] || {};
       curObj = w.object || "company";
       return '<article class="pr-wf-card' + (w.enabled ? " is-on" : "") + '" data-wf="' + w.id + '" tabindex="0">' +
         '<header class="pr-wf-card__head"><div>' + objBadge(curObj) +
-          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3></div>" + switchHtml(w) + "</header>" +
+          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3></div>" +
+          '<div class="pr-wf-card__acts">' + dupListBtn(w) + switchHtml(w) + "</div></header>" +
         (w.description ? '<p class="pr-wf-card__desc pr-clamp-2" title="' + esc(w.description) + '">' + esc(w.description) + "</p>" : "") +
         '<div class="pr-wf-card__rule"><span class="pr-wf-card__tag">Si</span><div class="pr-clamp-3">' + triggerText(w.trigger) + "</div></div>" +
         '<div class="pr-wf-card__meta"><span>' + esc(tt.label || "") + "</span><span>" + nodeCount(w.steps) + " paso" + (nodeCount(w.steps) === 1 ? "" : "s") + "</span>" +
@@ -301,7 +306,7 @@
         var n = totalIn(w.stats);
         return '<tr data-wf="' + w.id + '" tabindex="0"' + (w.enabled ? ' class="is-on"' : "") + ">" +
           '<td class="pr-wf-table__on">' + switchHtml(w) + "</td>" +
-          '<td class="pr-wf-table__name"><strong>' + esc(w.name) + "</strong>" +
+          '<td class="pr-wf-table__name">' + dupListBtn(w) + "<strong>" + esc(w.name) + "</strong>" +
             (w.description ? '<span class="pr-note" title="' + esc(w.description) + '">' + esc(w.description) + "</span>" : "") + "</td>" +
           "<td>" + objBadge(curObj) + "</td>" +
           '<td class="pr-wf-table__trig" title="' + esc(trig) + '"><span class="pr-note">' + esc(tt.label || "") + "</span>" + esc(trig) + "</td>" +
@@ -353,6 +358,13 @@
         var w = list.filter(function (x) { return x.id === id; })[0];
         toggle(w, cb.checked).then(function (ok) { if (!ok) cb.checked = !cb.checked; });
       });
+    });
+    root.querySelectorAll("[data-wfdup]").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        duplicateWorkflow(list.filter(function (x) { return x.id === Number(b.getAttribute("data-wfdup")); })[0]);
+      });
+      b.addEventListener("keydown", function (e) { e.stopPropagation(); });
     });
     root.querySelectorAll("[data-wf]").forEach(function (card) {
       var open = function (e) {
@@ -465,6 +477,24 @@
     testState = { q: "", results: [], company: null, result: null };
     centerNext = true;
     render();
+  }
+
+  /* Copia de un workflow (de la lista, o el que está abierto con sus cambios). No se guarda
+     sola: al apretar Guardar hace el POST de siempre y nace inactiva, sin inscriptos ni
+     historial. */
+  function duplicateWorkflow(src) {
+    if (!src) {
+      if (dirty && !confirm("Hay cambios sin guardar. ¿Duplicar el workflow con esos cambios?")) return;
+      src = draft;
+    }
+    var name = src.name || "workflow";
+    openEditor(src);
+    draft.id = null;
+    draft.enabled = false;
+    draft.name = "Copia de " + name;
+    dirty = true;
+    render();
+    P.toast('<i class="fa-regular fa-copy"></i> Copia de <strong>' + esc(name) + "</strong> lista: revisala y guardala. Arranca inactiva.");
   }
 
   function closeEditor() {
@@ -648,7 +678,8 @@
       "</div>" +
       '<span class="pr-wf-ebar__state" id="prWfSaveState">' + (dirty ? "Cambios sin guardar" : "") + "</span>" +
       (canEdit
-        ? (d.id ? '<button type="button" class="pr-btn pr-btn--danger" data-act="delete" title="Borrar"><i class="fa-regular fa-trash-can"></i></button>' : "") +
+        ? (d.id ? '<button type="button" class="pr-btn" data-act="duplicate" title="Duplicar: abre una copia para editar y guardar"><i class="fa-regular fa-copy"></i> Duplicar</button>' : "") +
+          (d.id ? '<button type="button" class="pr-btn pr-btn--danger" data-act="delete" title="Borrar"><i class="fa-regular fa-trash-can"></i></button>' : "") +
           '<button type="button" class="pr-btn" data-act="save"><i class="fa-regular fa-floppy-disk"></i> Guardar</button>' +
           (d.id ? '<button type="button" class="pr-btn pr-btn--primary" data-act="toggle">' +
             (d.enabled ? '<i class="fa-solid fa-pause"></i> Desactivar' : '<i class="fa-solid fa-play"></i> Activar') + "</button>" : "")
@@ -876,6 +907,28 @@
   });
   window.addEventListener("scroll", function () { if (helpTipFor) hideHelpTip(); }, true);
 
+  /* Topes de rules.py (MAX_RULES / MAX_GROUPS): duplicar no puede pasarlos. */
+  var MAX_RULES = 20, MAX_GROUPS = 10;
+  /* Duplicar una condición (queda debajo, es un «y») o un grupo (queda después, es un «o»).
+     Lo usan el editor de workflows y Advanced filters. true = era un botón de duplicar. */
+  function duplicateCond(b) {
+    var v, p, ref;
+    if ((v = b.getAttribute("data-rdup")) !== null) {
+      p = v.split("|");
+      ref = condRef(p[0], false);
+      var rules = ref.conds.groups[Number(p[1])].rules;
+      if (rules.length < MAX_RULES) rules.splice(Number(p[2]) + 1, 0, clone(rules[Number(p[2])]));
+      return true;
+    }
+    if ((v = b.getAttribute("data-gdup")) !== null) {
+      p = v.split("|");
+      ref = condRef(p[0], false);
+      if (ref.conds.groups.length < MAX_GROUPS) ref.conds.groups.splice(Number(p[1]) + 1, 0, clone(ref.conds.groups[Number(p[1])]));
+      return true;
+    }
+    return false;
+  }
+
   /* ---------- Editor de condiciones (reusado en todos lados) ---------- */
   function conditionsEditor(key, conds, compact) {
     conds = conds || { groups: [] };
@@ -888,16 +941,18 @@
         }).join("");
         var path = key + "|" + gi + "|" + ri;
         return (ri ? '<div class="pr-wf-joiner">y</div>' : "") +
-          '<div class="pr-wf-rule"><div class="pr-wf-rule__row">' +
+          '<div class="pr-wf-rule"><div class="pr-wf-rule__row"><div class="pr-wf-rule__sel">' +
             '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true) + "</select>" +
-            '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + opOptions + "</select>" +
+            '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + opOptions + "</select></div>" +
             helpBadge(r.op, f) +
+            (canEdit && g.rules.length < MAX_RULES ? '<button type="button" class="pr-wf-x" data-rdup="' + path + '" title="Duplicar condición"><i class="fa-regular fa-copy"></i></button>' : "") +
             (canEdit ? '<button type="button" class="pr-wf-x" data-rdel="' + path + '" title="Quitar condición"><i class="fa-solid fa-xmark"></i></button>' : "") +
           "</div>" + ruleValue(r, path) + "</div>";
       }).join("");
       return (gi ? '<div class="pr-wf-or-sep"><span>o</span></div>' : "") +
         '<div class="pr-wf-group' + (compact ? " pr-wf-group--compact" : "") + '">' +
           '<div class="pr-wf-group__head">Grupo ' + (gi + 1) +
+            (canEdit && conds.groups.length < MAX_GROUPS ? '<button type="button" class="pr-wf-link" data-gdup="' + key + "|" + gi + '"><i class="fa-regular fa-copy"></i> Duplicar grupo</button>' : "") +
             (canEdit && conds.groups.length > 1 ? '<button type="button" class="pr-wf-link" data-gdel="' + key + "|" + gi + '">Quitar grupo</button>' : "") +
           "</div>" + rules +
           (canEdit ? '<button type="button" class="pr-wf-add" data-radd="' + key + "|" + gi + '"><i class="fa-solid fa-plus"></i> Agregar condición (y)</button>' : "") +
@@ -1449,6 +1504,7 @@
     if (act === "back") return closeEditor();
     if (act === "save") return save().catch(function () {});
     if (act === "delete") return remove();
+    if (act === "duplicate") return duplicateWorkflow(null);
     if (act === "toggle") return saveThen(function () { return toggle(draft, !draft.enabled); });
     if (act === "preview") return preview();
     if (act === "apply") return applyNow();
@@ -1497,6 +1553,8 @@
       p = v.split("|");
       draft.steps.nodes[p[0]].branch.paths.splice(Number(p[1]), 1);
       prune();
+    } else if (duplicateCond(b)) {
+      // ya hecho
     } else if ((v = b.getAttribute("data-radd")) !== null) {
       p = v.split("|");
       condRef(p[0], true).conds.groups[Number(p[1])].rules.push(blankRule());
@@ -1702,6 +1760,8 @@
       if ((v = b.getAttribute("data-rchip")) !== null) {
         var x = ruleAt(v);
         x.rule.value = toggleIn(Array.isArray(x.rule.value) ? x.rule.value : [], b.getAttribute("data-chip"));
+      } else if (duplicateCond(b)) {
+        // ya hecho
       } else if ((v = b.getAttribute("data-radd")) !== null) {
         p = v.split("|");
         condRef("ext", true).conds.groups[Number(p[1])].rules.push(blankRule());
