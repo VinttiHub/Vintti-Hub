@@ -964,6 +964,7 @@ def options(cur) -> dict:
         "sizes": SIZES,
         "bdrs": bdrs,
         "weeks": list_weeks(cur),
+        "export_fields": {"company": export_fields("company"), "contact": export_fields("contact")},
         # Lo que necesita el constructor de workflows de la página.
         "workflow_schema": {
             "fields": [
@@ -1255,6 +1256,40 @@ def contact_ids(cur, f: dict) -> list[int]:
     where_sql, params = _contact_where(f)
     cur.execute(f"SELECT ct.id FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql} ORDER BY ct.id", params)
     return [r["id"] for r in cur.fetchall()]
+
+
+# Exportar a CSV: el catálogo de cada objeto + las calculadas que muestra la tabla.
+_EXPORT_EXTRA = {
+    "company": [{"key": "domain", "label": "Dominio", "type": "text"},
+                {"key": "contacts_count", "label": "Contactos", "type": "number"},
+                {"key": "id", "label": "Id (Hub)", "type": "number"}],
+    # `company_name` ya es una propiedad del contacto (lo que dijo él): la del Hub va aparte.
+    "contact": [{"key": "hub_company", "label": "Empresa (en el Hub)", "type": "text"},
+                {"key": "id", "label": "Id (Hub)", "type": "number"}],
+}
+
+
+def export_fields(obj: str) -> list[dict]:
+    from prospecting.contact_fields import CONTACT_FIELDS
+
+    src = FIELDS if obj == "company" else CONTACT_FIELDS
+    return [{"key": f["key"], "label": f["label"], "type": f["type"], "group": f.get("group")} for f in src] + _EXPORT_EXTRA[obj]
+
+
+def export_rows(cur, obj: str, ids: list[int], sort=None) -> list[dict]:
+    """Los registros a exportar, en el orden de la tabla."""
+    if obj == "company":
+        cur.execute(f"SELECT {LIST_COLUMNS} FROM prospect_companies WHERE id = ANY(%s) ORDER BY {_order_sql(sort)}", (ids,))
+        return [dict(r) for r in cur.fetchall()]
+    cur.execute(
+        """
+        SELECT ct.*, c.name AS hub_company FROM prospect_contacts ct
+          JOIN prospect_companies c ON c.id = ct.company_id
+         WHERE ct.id = ANY(%s) ORDER BY ct.created_at DESC, ct.id DESC
+        """,
+        (ids,),
+    )
+    return [_flatten_contact(r) for r in cur.fetchall()]
 
 
 def list_contacts(cur, f: dict) -> dict:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
@@ -410,7 +410,7 @@ BULK_MAX = 1000
 _BULK_CONTACT_SKIP = {"email", "is_primary"}
 
 
-def _bulk_target_ids(cur, body: dict, obj: str):
+def _bulk_target_ids(cur, body: dict, obj: str, limit: int = BULK_MAX):
     """Ids a editar: los tildados (`ids`) o todos los que cumplen los filtros de la tabla
     (`filters`, los mismos params del GET). Devuelve (ids, None) o (None, error)."""
     if isinstance(body.get("ids"), list):
@@ -427,8 +427,8 @@ def _bulk_target_ids(cur, body: dict, obj: str):
         return None, (jsonify({"error": "Mandá `ids` o `filters`."}), 400)
     if not ids:
         return None, (jsonify({"error": "No hay registros seleccionados."}), 400)
-    if len(ids) > BULK_MAX:
-        return None, (jsonify({"error": f"Son {len(ids)} registros: el máximo por vez es {BULK_MAX}. Achicá la selección."}), 400)
+    if len(ids) > limit:
+        return None, (jsonify({"error": f"Son {len(ids)} registros: el máximo por vez es {limit}. Achicá la selección."}), 400)
     return ids, None
 
 
@@ -524,6 +524,70 @@ def companies_bulk():
 @bp.post("/contacts/bulk")
 def contacts_bulk():
     return _bulk_update("contact")
+
+
+# --------------------------------------------------------------------------- #
+# Exportar a CSV (Acciones → «Exportar a CSV»): los tildados o todos los del filtro,
+# con las columnas que elige la persona. Leer no toca nada, por eso el tope es más alto.
+# --------------------------------------------------------------------------- #
+EXPORT_MAX = 20000
+
+
+def _csv_cell(field: dict, v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "Sí" if v else "No"
+    if isinstance(v, (list, tuple)):
+        return "; ".join(str(x) for x in v)
+    if isinstance(v, datetime):
+        if v.tzinfo:  # hora Argentina (UTC−3, sin horario de verano); zoneinfo no está en el 3.8 de App Runner
+            v = v.astimezone(timezone(timedelta(hours=-3)))
+        return v.strftime("%Y-%m-%d %H:%M")
+    if isinstance(v, date):
+        return v.isoformat()
+    return str(v)
+
+
+def _export(obj: str):
+    import csv
+    import io
+    from flask import Response
+
+    body = request.get_json(silent=True) or {}
+    catalog = store.export_fields(obj)
+    by_key = {f["key"]: f for f in catalog}
+    cols = [k for k in (body.get("columns") or []) if k in by_key]
+    if not cols:
+        return jsonify({"error": "Elegí al menos una columna."}), 400
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        ids, err = _bulk_target_ids(cur, body, obj, limit=EXPORT_MAX)
+        if err:
+            return err
+        sort = body.get("sort") or (body.get("filters") or {}).get("sort")
+        rows = store.export_rows(cur, obj, ids, sort)
+    buf = io.StringIO()
+    buf.write("\ufeff")  # BOM: sin él Excel abre los acentos rotos
+    w = csv.writer(buf)
+    w.writerow([by_key[k]["label"] for k in cols])
+    for r in rows:
+        w.writerow([_csv_cell(by_key[k], r.get(k)) for k in cols])
+    name = f"prospecting-{'empresas' if obj == 'company' else 'contactos'}-{date.today().isoformat()}.csv"
+    return Response(buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@bp.post("/companies/export")
+def companies_export():
+    return _export("company")
+
+
+@bp.post("/contacts/export")
+def contacts_export():
+    return _export("contact")
 
 
 # --------------------------------------------------------------------------- #

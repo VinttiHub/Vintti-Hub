@@ -1264,6 +1264,12 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `emit_event()` por registro y un `tick()` por empresa. Lo usa cualquiera con acceso (como la
   edición de a uno); inscribir en workflow sigue siendo de `WORKFLOW_EDITORS`. Empresas: sólo
   `EDITABLE_FIELDS`; contactos: todo el catálogo menos `email` (único). Tope `BULK_MAX` = 1000.
+- **Exportar a CSV (2026-10-29)**: Acciones → «Exportar a CSV», con las columnas que se elijan
+  (arranca con las de la tabla). `POST /prospecting/companies/export` y `/contacts/export`, mismos
+  `ids` / `filters` que la edición masiva (`_bulk_target_ids()`), tope `EXPORT_MAX` = 20000. El
+  catálogo de columnas lo da `store.export_fields()` (también en `/options` → `export_fields`);
+  en contactos la empresa del Hub sale como `hub_company`, porque `company_name` ya es una
+  propiedad del contacto. CSV con BOM (acentos en Excel), fechas con hora en hora Argentina.
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas

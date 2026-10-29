@@ -389,6 +389,7 @@
     };
     openPop(anchor, '<div class="pr-pop__head">Acciones</div>' +
       item("edit", "fa-pen", "Editar propiedad") +
+      item("export", "fa-file-csv", "Exportar a CSV") +
       (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : ""));
     $("prViewPop").classList.add("pr-pop--actions");
   }
@@ -461,6 +462,123 @@
       bar.classList.remove("is-busy");
       done();
       alert(err.errors ? err.errors.join("\n") : err.message);
+    });
+  }
+
+  /* ---------- Exportar a CSV (Acciones → «Exportar a CSV») ----------
+     Los tildados o todos los del filtro, con las columnas que se elijan. Arranca con las
+     columnas que se ven en la tabla; el CSV lo arma el backend (POST /<obj>/export). */
+  var CT_TABLE_COLS = ["first_name", "last_name", "hub_company", "email", "position", "lead_life", "owner_email", "meeting_datetime"];
+  function download(path, body, filename) {
+    var send = function (base) {
+      return fetch(base + path, { method: "POST", body: JSON.stringify(body),
+        headers: { "X-User-Email": userEmail(), "Content-Type": "application/json" } });
+    };
+    return send(API).catch(function () { if (!canFallBack) throw new Error("Could not reach " + API + "."); canFallBack = false; API = PROD; return send(API); })
+      .then(function (res) {
+        if (!res.ok) return res.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.error || ("HTTP " + res.status)); });
+        return res.blob().then(function (blob) {
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        });
+      });
+  }
+  function openExport(kind) {
+    var isCo = kind === "company";
+    var sel = isCo ? selected : ctSelected, all = isCo ? selAll : ctSelAll;
+    var ids = Object.keys(sel).map(Number);
+    var n = all ? all.total : ids.length;
+    var noun = isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos");
+    var fields = ((OPTS.export_fields || {})[kind]) || [];
+    var tableCols = isCo ? visibleCols.slice() : CT_TABLE_COLS;
+    // Las de la tabla primero y en su orden; después el resto del catálogo.
+    var rank = function (k) { var i = tableCols.indexOf(k); return i === -1 ? 1000 + fields.findIndex(function (f) { return f.key === k; }) : i; };
+    var groups = [];
+    fields.forEach(function (f) {
+      var g = f.group || (isCo ? "" : "Otros");
+      var hit = groups.filter(function (x) { return x.name === g; })[0];
+      if (!hit) groups.push(hit = { name: g, fields: [] });
+      hit.fields.push(f);
+    });
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit pr-export" role="dialog" aria-modal="true">' +
+      "<h3>Exportar " + n.toLocaleString() + " " + noun + " a CSV</h3>" +
+      '<div class="pr-export__tools"><input type="search" class="pr-filter__input" id="prExQ" placeholder="Buscar columna…">' +
+        '<button type="button" class="pr-wf-link" data-ex="table">Las de la tabla</button>' +
+        '<button type="button" class="pr-wf-link" data-ex="all">Todas</button>' +
+        '<button type="button" class="pr-wf-link" data-ex="none">Ninguna</button></div>' +
+      '<div class="pr-export__list" id="prExList">' + groups.map(function (g) {
+        return '<div class="pr-export__group">' + (g.name ? '<div class="pr-export__gname">' + esc(g.name) + "</div>" : "") +
+          g.fields.map(function (f) {
+            return '<label class="pr-check" data-exname="' + esc((f.label + " " + f.key).toLowerCase()) + '"><input type="checkbox" value="' + esc(f.key) + '"' +
+              (tableCols.indexOf(f.key) !== -1 ? " checked" : "") + "> " + esc(f.label) + "</label>";
+          }).join("") + "</div>";
+      }).join("") + "</div>" +
+      '<p class="pr-note" id="prExCount"></p>' +
+      '<p class="pr-bulkedit__err" id="prExErr" hidden></p>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-ex="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-ex="go"><i class="fa-solid fa-download"></i> Descargar CSV</button></div></div>';
+    document.body.appendChild(box);
+    var q = function (id) { return box.querySelector("#" + id); };
+    var boxes = function () { return Array.prototype.slice.call(box.querySelectorAll("#prExList input")); };
+    var count = function () {
+      var c = boxes().filter(function (x) { return x.checked; }).length;
+      q("prExCount").textContent = c + " de " + fields.length + " columnas · las de la tabla salen en su orden, las demás después.";
+    };
+    var running = false;
+    var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    count();
+    q("prExList").addEventListener("change", count);
+    q("prExQ").addEventListener("input", function () {
+      var t = this.value.trim().toLowerCase();
+      box.querySelectorAll("#prExList [data-exname]").forEach(function (l) { l.hidden = !!t && l.getAttribute("data-exname").indexOf(t) === -1; });
+      box.querySelectorAll(".pr-export__group").forEach(function (g) { g.hidden = !g.querySelector("[data-exname]:not([hidden])"); });
+    });
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var b = e.target.closest("[data-ex]");
+      if (!b) return;
+      var act = b.getAttribute("data-ex");
+      if (act === "cancel") return close();
+      if (act === "table" || act === "all" || act === "none") {
+        // «Todas» / «Ninguna» respetan la búsqueda: tildan sólo las que se ven.
+        boxes().forEach(function (x) {
+          if (act === "table") x.checked = tableCols.indexOf(x.value) !== -1;
+          else if (!x.closest("[data-exname]").hidden) x.checked = act === "all";
+        });
+        return count();
+      }
+      var cols = boxes().filter(function (x) { return x.checked; }).map(function (x) { return x.value; })
+        .sort(function (a, b2) { return rank(a) - rank(b2); });
+      if (!cols.length) { q("prExErr").hidden = false; q("prExErr").textContent = "Elegí al menos una columna."; return; }
+      q("prExErr").hidden = true;
+      // El orden de las filas es el de la tabla (en «todas las del filtro» el sort no viaja en los filtros).
+      var body = Object.assign(all ? { filters: all.filters } : { ids: ids }, { columns: cols, sort: isCo ? state.sort : null });
+      running = true;
+      box.classList.add("is-busy");
+      b.disabled = true;
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Armando el CSV…';
+      var day = new Date().toLocaleDateString("sv-SE");  // AAAA-MM-DD, hora local
+      download("/prospecting/" + (isCo ? "companies" : "contacts") + "/export", body,
+        "prospecting-" + (isCo ? "empresas" : "contactos") + "-" + day + ".csv").then(function () {
+        running = false;
+        close();
+        toast('<i class="fa-solid fa-file-csv"></i> Se descargó el CSV con ' + n.toLocaleString() + " " + noun + " y " + cols.length + " columnas.");
+      }).catch(function (err) {
+        running = false;
+        box.classList.remove("is-busy");
+        b.disabled = false;
+        b.innerHTML = '<i class="fa-solid fa-download"></i> Descargar CSV';
+        q("prExErr").hidden = false;
+        q("prExErr").textContent = err.message;
+      });
     });
   }
 
@@ -1505,7 +1623,8 @@
         if (ba.disabled) return;
         closePop();
         var kind = ba.getAttribute("data-kind");
-        if (ba.getAttribute("data-bact") === "edit") openBulkEdit(kind); else openEnrollModal(kind);
+        var act = ba.getAttribute("data-bact");
+        if (act === "edit") openBulkEdit(kind); else if (act === "export") openExport(kind); else openEnrollModal(kind);
         return;
       }
       var b = e.target.closest("[data-vact]");

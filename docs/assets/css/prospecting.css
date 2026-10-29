@@ -1240,6 +1240,24 @@
 .pr-bulkedit__value:empty { display: none; }
 .pr-bulkedit__value { display: flex; flex-direction: column; gap: 4px; }
 .pr-bulkedit__value.is-off { opacity: .35; pointer-events: none; }
+/* Exportar a CSV: lista de columnas con scroll propio */
+.pr-export { width: min(560px, 100%); }
+.pr-export__tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pr-export__tools .pr-filter__input { flex: 1 1 180px; width: auto; }
+.pr-export__list {
+  max-height: min(48vh, 420px); overflow-y: auto; padding: 6px 8px;
+  border: 1px solid var(--pr-rule); border-radius: 10px;
+  display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px;
+}
+.pr-export__group { display: contents; }
+.pr-export__group[hidden], .pr-export__list .pr-check[hidden] { display: none; }
+.pr-export__gname {
+  grid-column: 1 / -1; margin: 8px 4px 2px; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--pr-ink-3);
+}
+.pr-export__group:first-child .pr-export__gname { margin-top: 2px; }
+.pr-export__list .pr-check { min-width: 0; }
+@media (max-width: 520px) { .pr-export__list { grid-template-columns: 1fr; } }
 .pr-bulkedit__err { margin: 0; color: #a3108d; font-size: 12.5px; font-weight: 600; }
 .pr-toast__warn { color: #ffd1f5; }
 .pr-toast__secs { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-variant-numeric: tabular-nums; }
