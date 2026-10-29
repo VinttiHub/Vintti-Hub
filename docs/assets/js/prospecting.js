@@ -349,59 +349,116 @@
     renderBulk();
   }
 
-  /* Barra de «N seleccionadas → Editar / Inscribir en workflow». */
-  var wfChoices = null;
-  function selectionHead(n, allMode, pageAll, total, noun) {
+  /* Barra: «N seleccionadas · [Seleccionar las N del filtro] · Acciones ▾ · Deseleccionar». */
+  function selectionHead(n, allMode, pageAll, total, noun, kind) {
     return "<strong>" + (allMode ? "Todas las " + total.toLocaleString() : n) + "</strong> " + noun + (n === 1 && !allMode ? "" : "s") +
       " seleccionada" + (n === 1 && !allMode ? "" : "s") +
       (pageAll && !allMode && total > n
         ? '<button type="button" class="pr-wf-link pr-bulk__all" data-bulk-all="1">Seleccionar las ' + total.toLocaleString() + " que coinciden con los filtros</button>" : "") +
-      '<button type="button" class="pr-btn pr-btn--primary" data-bulk-edit="1"><i class="fa-solid fa-pen"></i> Editar</button>';
+      '<button type="button" class="pr-btn pr-btn--primary pr-bulk__actions" data-bulk-actions="' + kind + '" aria-haspopup="menu">' +
+        'Acciones <i class="fa-solid fa-chevron-down"></i></button>';
+  }
+  /* Tilde del encabezado: marcado si está toda la página, «parcial» si sólo algunas.
+     Se sincroniza en cada redibujo: si no, después de editar quedaba tildado con la
+     selección ya vacía y había que destildarlo y volver a tildarlo. */
+  function syncHeadCheck(el, rows, sel) {
+    if (!el) return;
+    var on = rows.filter(function (r) { return sel[r.id]; }).length;
+    el.checked = rows.length > 0 && on === rows.length;
+    el.indeterminate = on > 0 && on < rows.length;
   }
   function renderBulk() {
     var bar = $("prBulk");
     var ids = Object.keys(selected);
+    syncHeadCheck($("prSelAll"), lastRows, selected);
     if (!canSelect() || (!ids.length && !selAll)) { bar.hidden = true; return; }
     var pageAll = lastRows.length > 0 && lastRows.every(function (r) { return selected[r.id]; });
-    var opts = (wfChoices || []).map(function (w) {
-      return '<option value="' + w.id + '">' + esc(w.name) + (w.enabled ? "" : " (inactivo)") + "</option>";
-    }).join("");
     bar.hidden = false;
-    // Inscribir trabaja con ids: en «todas las del filtro» no se ofrece.
-    var enroll = canEnroll() && !selAll;
-    bar.innerHTML = selectionHead(ids.length, !!selAll, pageAll, state.total, "empresa") +
-      (enroll ? '<select class="pr-filter__input" id="prBulkWf">' + (wfChoices ? '<option value="">Elegir workflow…</option>' + opts : "<option>Cargando…</option>") + "</select>" +
-        '<button type="button" class="pr-btn" id="prBulkGo"><i class="fa-solid fa-diagram-project"></i> Inscribir en workflow</button>' : "") +
+    bar.innerHTML = selectionHead(ids.length, !!selAll, pageAll, state.total, "empresa", "company") +
       '<button type="button" class="pr-btn" id="prBulkClear">Deseleccionar</button>';
-    if (!enroll) return;
-    if (!wfChoices && window.ProspectingWorkflows) {
-      window.ProspectingWorkflows.workflows().then(function (r) {
-        wfChoices = r.workflows.filter(function (w) { return (w.object || "company") === "company"; });
-        renderBulk();
-      });
-    }
   }
+
+  /* Menú «Acciones»: editar una propiedad o inscribir en un workflow (este, sólo quien
+     edita workflows y con filas tildadas: inscribir trabaja con ids). */
+  function bulkActionsMenu(anchor, kind) {
+    var all = kind === "company" ? selAll : ctSelAll;
+    var item = function (act, icon, label, disabled, note) {
+      return '<button type="button" class="pr-pop__item' + (disabled ? " is-disabled" : "") + '" data-bact="' + act + '" data-kind="' + kind + '"' +
+        (disabled ? ' disabled' : "") + '><i class="fa-solid ' + icon + '"></i> ' + label +
+        (note ? '<span class="pr-pop__sub">' + note + "</span>" : "") + "</button>";
+    };
+    openPop(anchor, '<div class="pr-pop__head">Acciones</div>' +
+      item("edit", "fa-pen", "Editar propiedad") +
+      (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : ""));
+    $("prViewPop").classList.add("pr-pop--actions");
+  }
+
+  var wfChoicesByObj = {};
+  function workflowChoices(kind) {
+    if (wfChoicesByObj[kind]) return Promise.resolve(wfChoicesByObj[kind]);
+    return window.ProspectingWorkflows.workflows().then(function (r) {
+      wfChoicesByObj.company = r.workflows.filter(function (w) { return (w.object || "company") === "company"; });
+      wfChoicesByObj.contact = r.workflows.filter(function (w) { return w.object === "contact"; });
+      return wfChoicesByObj[kind];
+    });
+  }
+  function openEnrollModal(kind) {
+    var isCo = kind === "company";
+    var n = Object.keys(isCo ? selected : ctSelected).length;
+    var noun = isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos");
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit" role="dialog" aria-modal="true">' +
+      "<h3>Inscribir " + n + " " + noun + " en un workflow</h3>" +
+      '<label class="pr-filter"><span class="pr-filter__label">Workflow</span>' +
+        '<select class="pr-filter__input" id="prEnWf"><option value="">Cargando…</option></select></label>' +
+      '<p class="pr-note">Corre en el momento aunque el workflow esté inactivo. Las que ya están adentro no se repiten.</p>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-en="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-en="go"><i class="fa-solid fa-diagram-project"></i> Inscribir</button></div></div>';
+    document.body.appendChild(box);
+    var close = function () { box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    workflowChoices(kind).then(function (list) {
+      box.querySelector("#prEnWf").innerHTML = list.length
+        ? '<option value="">Elegí un workflow…</option>' + list.map(function (w) {
+            return '<option value="' + w.id + '">' + esc(w.name) + (w.enabled ? "" : " (inactivo)") + "</option>";
+          }).join("")
+        : '<option value="">No hay workflows de ' + (isCo ? "empresas" : "contactos") + "</option>";
+    });
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var b = e.target.closest("[data-en]");
+      if (!b) return;
+      if (b.getAttribute("data-en") === "cancel") return close();
+      var sel = box.querySelector("#prEnWf");
+      if (!sel.value) { alert("Elegí un workflow."); return; }
+      var wfId = sel.value, wfName = sel.selectedOptions[0].textContent;
+      close();
+      bulkEnroll(kind, wfId, wfName);
+    });
+  }
+
   var enrolling = false;
-  function bulkEnroll() {
+  function bulkEnroll(kind, wfId, wfName) {
     if (enrolling) return;  // un segundo click mientras corre inscribía todo dos veces
-    var wfId = $("prBulkWf").value;
-    if (!wfId) { alert("Elegí un workflow."); return; }
-    var ids = Object.keys(selected).map(Number);
-    var wfName = $("prBulkWf").selectedOptions[0].textContent;
+    var isCo = kind === "company";
+    var ids = Object.keys(isCo ? selected : ctSelected).map(Number);
+    var bar = $(isCo ? "prBulk" : "prCtBulk");
+    var noun = isCo ? (ids.length === 1 ? "empresa" : "empresas") : (ids.length === 1 ? "contacto" : "contactos");
     enrolling = true;
-    $("prBulk").classList.add("is-busy");
-    var done = progress("Inscribiendo " + ids.length + " empresa" + (ids.length === 1 ? "" : "s") + " en <strong>" + esc(wfName) + "</strong>…");
+    bar.classList.add("is-busy");
+    var done = progress("Inscribiendo " + ids.length + " " + noun + " en <strong>" + esc(wfName) + "</strong>…");
     window.ProspectingWorkflows.enrollCompanies(wfId, ids).then(function (r) {
       enrolling = false;
-      $("prBulk").classList.remove("is-busy");
+      bar.classList.remove("is-busy");
       toast('<i class="fa-solid fa-diagram-project"></i> Se inscribieron <strong>' + r.enrolled + "</strong> de " + ids.length +
-        (r.enrolled < ids.length ? " (las demás ya estaban adentro o el workflow no reinscribe)" : "") +
+        (r.enrolled < ids.length ? " (" + (isCo ? "las demás ya estaban adentro" : "los demás ya estaban adentro") + " o el workflow no reinscribe)" : "") +
         (r.completed ? " · " + r.completed + " ya terminaron el workflow" : "") + ".");
-      selected = {};
-      load();
+      if (isCo) { selected = {}; selAll = null; load(); } else { ctSelected = {}; ctSelAll = null; loadContacts(); }
     }).catch(function (err) {
       enrolling = false;
-      $("prBulk").classList.remove("is-busy");
+      bar.classList.remove("is-busy");
       done();
       alert(err.errors ? err.errors.join("\n") : err.message);
     });
@@ -604,14 +661,13 @@
   function renderCtBulk() {
     var bar = $("prCtBulk");
     var ids = Object.keys(ctSelected);
+    syncHeadCheck($("prCtSelAll"), ctRows, ctSelected);
     if (!ids.length && !ctSelAll) { bar.hidden = true; return; }
     var pageAll = ctRows.length > 0 && ctRows.every(function (c) { return ctSelected[c.id]; });
     bar.hidden = false;
-    bar.innerHTML = selectionHead(ids.length, !!ctSelAll, pageAll, ctState.total, "contacto")
+    bar.innerHTML = selectionHead(ids.length, !!ctSelAll, pageAll, ctState.total, "contacto", "contact")
       .replace(/seleccionada/g, "seleccionado").replace(/Todas las/, "Todos los").replace(/Seleccionar las/, "Seleccionar los") +
       '<button type="button" class="pr-btn" data-ct-clear="1">Deseleccionar</button>';
-    var all = $("prCtSelAll");
-    if (all) all.checked = pageAll;
   }
   function loadContacts() {
     var q = Object.assign(ctFilters(), { page: ctState.page, page_size: 25 });
@@ -671,7 +727,7 @@
     $("prCtBulk").addEventListener("click", function (e) {
       var b = e.target.closest("button");
       if (!b) return;
-      if (b.hasAttribute("data-bulk-edit")) openBulkEdit("contact");
+      if (b.hasAttribute("data-bulk-actions")) { e.stopPropagation(); bulkActionsMenu(b, "contact"); }
       if (b.hasAttribute("data-bulk-all")) { ctSelAll = { filters: ctFilters(), total: ctState.total }; renderCtBulk(); }
       if (b.hasAttribute("data-ct-clear")) {
         ctSelected = {}; ctSelAll = null;
@@ -1253,7 +1309,7 @@
   }
 
   /* ---------- Popover (menú de una pestaña / «+») ---------- */
-  function closePop() { $("prViewPop").hidden = true; $("prViewPop").innerHTML = ""; }
+  function closePop() { $("prViewPop").hidden = true; $("prViewPop").innerHTML = ""; $("prViewPop").classList.remove("pr-pop--actions"); }
   function openPop(anchor, html) {
     var pop = $("prViewPop");
     pop.innerHTML = html;
@@ -1444,6 +1500,14 @@
     });
     $("prViewPop").addEventListener("click", function (e) {
       e.stopPropagation();
+      var ba = e.target.closest("[data-bact]");
+      if (ba) {
+        if (ba.disabled) return;
+        closePop();
+        var kind = ba.getAttribute("data-kind");
+        if (ba.getAttribute("data-bact") === "edit") openBulkEdit(kind); else openEnrollModal(kind);
+        return;
+      }
       var b = e.target.closest("[data-vact]");
       if (b) onViewAction(b.getAttribute("data-vact"), b.getAttribute("data-key"));
     });
@@ -1600,9 +1664,8 @@
     $("prBulk").addEventListener("click", function (e) {
       var b = e.target.closest("button");
       if (!b) return;
-      if (b.id === "prBulkGo") bulkEnroll();
       if (b.id === "prBulkClear") { selected = {}; selAll = null; renderRows(lastRows); }
-      if (b.hasAttribute("data-bulk-edit")) openBulkEdit("company");
+      if (b.hasAttribute("data-bulk-actions")) { e.stopPropagation(); bulkActionsMenu(b, "company"); }
       if (b.hasAttribute("data-bulk-all")) {
         var f = currentFilters();
         delete f.page; delete f.page_size; delete f.sort;
