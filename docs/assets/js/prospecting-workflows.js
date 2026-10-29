@@ -803,20 +803,95 @@
     return canEdit ? '<button type="button" class="pr-wf-add" data-cond-add="' + key + '"><i class="fa-solid fa-filter"></i> ' + esc(label) + "</button>" : "";
   }
 
+  /* «?» del operador: la columna «Qué comprueba» del doc de la owner (constants.OPERATOR_HELP).
+     En selección, «No contiene ninguno de» tiene su propia frase (help_select). */
+  function opHelp(op, f) {
+    var od = opDef(op);
+    var sel = f && ["enum", "owner", "user", "multi"].indexOf(f.type) !== -1;
+    return (sel && od.help_select) || od.help || "";
+  }
+  function helpBadge(op, f) {
+    var tip = opHelp(op, f);
+    if (!tip) return "";
+    var od = opDef(op);
+    tip += od.help_src === "hub" ? " (no está en el doc)" : "";
+    return '<span class="pr-wf-help" tabindex="0" role="button" aria-label="¿Qué hace «' + esc(od.label) + '»?" ' +
+      'data-help-label="' + esc(od.label) + '" data-help-tip="' + esc(tip) + '">?</span>';
+  }
+
+  /* Globo del «?»: un elemento en <body> con position: fixed, así no lo recorta el drawer
+     de Advanced filters (overflow) ni el lienzo del workflow. Click lo fija; hover lo
+     muestra; click afuera, Esc, scroll o redibujo lo cierran. */
+  var helpTipEl = null, helpTipFor = null, helpTipPinned = false;
+  function hideHelpTip() {
+    if (helpTipEl) helpTipEl.hidden = true;
+    helpTipFor = null;
+    helpTipPinned = false;
+  }
+  function showHelpTip(badge, pin) {
+    if (!helpTipEl) {
+      helpTipEl = document.createElement("div");
+      helpTipEl.className = "pr-wf-tip";
+      helpTipEl.setAttribute("role", "tooltip");
+      document.body.appendChild(helpTipEl);
+    }
+    helpTipEl.innerHTML = "";
+    var b = document.createElement("strong");
+    b.textContent = badge.getAttribute("data-help-label");
+    var t = document.createElement("span");
+    t.textContent = badge.getAttribute("data-help-tip");
+    helpTipEl.appendChild(b);
+    helpTipEl.appendChild(t);
+    helpTipEl.hidden = false;
+    var r = badge.getBoundingClientRect(), w = helpTipEl.offsetWidth, h = helpTipEl.offsetHeight;
+    var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    var top = r.bottom + 8 + h > window.innerHeight - 8 ? r.top - h - 8 : r.bottom + 8;
+    helpTipEl.style.left = left + "px";
+    helpTipEl.style.top = Math.max(8, top) + "px";
+    helpTipFor = badge;
+    helpTipPinned = !!pin;
+  }
+  document.addEventListener("click", function (e) {
+    var badge = e.target.closest && e.target.closest(".pr-wf-help");
+    if (!badge) { if (helpTipFor) hideHelpTip(); return; }
+    e.stopPropagation();
+    if (helpTipFor === badge && helpTipPinned) hideHelpTip();
+    else showHelpTip(badge, true);
+  }, true);
+  document.addEventListener("mouseover", function (e) {
+    var badge = e.target.closest && e.target.closest(".pr-wf-help");
+    if (badge && !helpTipPinned) showHelpTip(badge, false);
+  });
+  document.addEventListener("mouseout", function (e) {
+    var badge = e.target.closest && e.target.closest(".pr-wf-help");
+    if (badge && !helpTipPinned && !badge.contains(e.relatedTarget)) hideHelpTip();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { hideHelpTip(); return; }
+    var badge = document.activeElement;
+    if ((e.key === "Enter" || e.key === " ") && badge && badge.classList && badge.classList.contains("pr-wf-help")) {
+      e.preventDefault();
+      if (helpTipFor === badge && helpTipPinned) hideHelpTip(); else showHelpTip(badge, true);
+    }
+  });
+  window.addEventListener("scroll", function () { if (helpTipFor) hideHelpTip(); }, true);
+
   /* ---------- Editor de condiciones (reusado en todos lados) ---------- */
   function conditionsEditor(key, conds, compact) {
     conds = conds || { groups: [] };
     var groups = (conds.groups || []).map(function (g, gi) {
       var rules = (g.rules || []).map(function (r, ri) {
         var f = field(r.field);
-        var ops = ((S().operators_by_type || {})[f ? f.type : "text"] || []).map(function (o) {
-          return { value: o, label: opDef(o).label };
-        });
+        var opOptions = ((S().operators_by_type || {})[f ? f.type : "text"] || []).map(function (o) {
+          return '<option value="' + esc(o) + '"' + (o === r.op ? " selected" : "") + ">" +
+            esc(opDef(o).label) + "</option>";
+        }).join("");
         var path = key + "|" + gi + "|" + ri;
         return (ri ? '<div class="pr-wf-joiner">y</div>' : "") +
           '<div class="pr-wf-rule"><div class="pr-wf-rule__row">' +
             '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true) + "</select>" +
-            '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + optionTags(ops, r.op) + "</select>" +
+            '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + opOptions + "</select>" +
+            helpBadge(r.op, f) +
             (canEdit ? '<button type="button" class="pr-wf-x" data-rdel="' + path + '" title="Quitar condición"><i class="fa-solid fa-xmark"></i></button>' : "") +
           "</div>" + ruleValue(r, path) + "</div>";
       }).join("");

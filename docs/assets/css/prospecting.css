@@ -1011,6 +1011,16 @@
 .pr-wf-dur, .pr-wf-range { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pr-ink-2); margin-top: 8px; }
 .pr-wf-dur .pr-filter__input { width: 80px; }
 .pr-wf-range .pr-filter__input { flex: 1; }
+/* «?» del operador. El globo es .pr-wf-tip, en <body> (prospecting-workflows.js → showHelpTip). */
+.pr-wf-help { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--pr-violet); color: var(--pr-violet);
+  font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer; user-select: none; }
+.pr-wf-help:hover, .pr-wf-help:focus-visible { background: var(--pr-violet); color: #fff; outline: none; }
+.pr-wf-tip { position: fixed; z-index: 1300; max-width: 280px; padding: 10px 12px; border-radius: 10px;
+  background: #fff; color: var(--pr-ink-2); border: 1px solid color-mix(in srgb, var(--pr-violet) 30%, #fff);
+  box-shadow: 0 10px 28px rgba(14, 17, 23, .16); font-family: "Onest", system-ui, sans-serif; font-size: 12.5px; line-height: 1.5; }
+.pr-wf-tip[hidden] { display: none; }
+.pr-wf-tip strong { display: block; margin-bottom: 3px; color: var(--pr-violet); font-size: 13px; }
 .pr-wf-rule-hint { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--pr-ink-2); }
 .pr-wf-rule-hint strong { color: var(--pr-violet); }
 .pr-wf-rule-hint em { font-style: normal; font-weight: 600; color: var(--pr-ink); }

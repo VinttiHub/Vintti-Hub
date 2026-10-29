@@ -199,6 +199,79 @@ OPERATORS = {
 }
 LEGACY_OPERATORS = {"has_any", "has_none", "is_today"}
 
+# Explicación del «?» de cada operador: columna «Qué comprueba» del doc, LITERAL. Un par
+# que el doc agrupa en una fila («Es igual a / No es igual a») lleva la misma frase.
+_UPDATED_NOTE = (" La actualización refiere a la fecha en la que la propiedad fue editada, ya sea "
+                 "manualmente por alguien del equipo o de forma automática por medio de un workflow.")
+OPERATOR_HELP = {
+    "equals": "Coincidencia exacta con el valor completo.",
+    "not_equals": "Coincidencia exacta con el valor completo.",
+    "equals_any": "Coincidencia exacta con alguno de los textos indicados, o su exclusión.",
+    "not_equals_any": "Coincidencia exacta con alguno de los textos indicados, o su exclusión.",
+    "contains": "El texto aparece dentro del valor, incluso como parte de una palabra.",
+    "not_contains": "El valor no contiene ninguno de los textos indicados.",
+    "contains_exactly": "Busca palabras completas dentro del valor, sin exigir que todo el campo sea idéntico.",
+    "not_contains_exactly": "Excluye los registros que contienen esas palabras completas.",
+    "starts_with": "El valor empieza con alguno de los textos indicados.",
+    "ends_with": "El valor termina con alguno de los textos indicados.",
+    "is_any": "Tiene al menos uno de los valores seleccionados.",
+    "is_none_of": "No coincide con ninguno de los valores seleccionados.",
+    "contains_all": "Tiene todos los valores seleccionados, aunque tenga otros más.",
+    "not_contains_all": "Excluye los registros que tienen todos los valores seleccionados juntos.",
+    "equals_all": "Compara los valores de la propiedad con el conjunto exacto de valores indicados.",
+    "not_equals_all": "Compara los valores de la propiedad con el conjunto exacto de valores indicados.",
+    "eq": "El número coincide o no con el valor indicado.",
+    "not_eq": "El número coincide o no con el valor indicado.",
+    "gt": "El número supera (o iguala) el valor indicado.",
+    "gte": "El número supera (o iguala) el valor indicado.",
+    "lt": "El número está por debajo (o iguala) el valor indicado.",
+    "lte": "El número está por debajo (o iguala) el valor indicado.",
+    "gt_field": "Compara contra otra propiedad numérica del mismo registro.",
+    "lt_field": "Compara contra otra propiedad numérica del mismo registro.",
+    "is_period": "Un período relativo: hoy, la semana pasada, este año hasta la fecha, etc.",
+    "before": "Una fecha anterior a la indicada.",
+    "after": "Una fecha posterior a la indicada.",
+    "between_dates": "Una fecha dentro de un intervalo, incluidos los extremos.",
+    "not_between_dates": "Una fecha fuera del intervalo.",
+    "ever_was": "Tuvo alguno de los valores seleccionados.",
+    "never_was": "Nunca tuvo esos valores.",
+    "ever_equals": "Tuvo, o nunca tuvo, un valor exacto.",
+    "never_equals": "Tuvo, o nunca tuvo, un valor exacto.",
+    "ever_equals_any": "Compara los valores históricos completos con los indicados.",
+    "never_equals_any": "Compara los valores históricos completos con los indicados.",
+    "ever_contained_exactly": "Busca coincidencias históricas con el texto indicado.",
+    "never_contained_exactly": "Busca coincidencias históricas con el texto indicado.",
+    "known": "La propiedad tiene un valor.",
+    "unknown": "La propiedad está vacía.",
+    "changed_in_last_days": "La propiedad cambió dentro de la cantidad de días indicada." + _UPDATED_NOTE,
+    "not_changed_in_days": "La propiedad no cambió en ese período." + _UPDATED_NOTE,
+    "updated_after_field": "Su última actualización es posterior a la de otra propiedad.",
+    "updated_before_field": "Su última actualización es anterior a la de otra propiedad.",
+}
+# En selección, «No contiene ninguno de» tiene su propia fila en el doc.
+OPERATOR_HELP_SELECT = {
+    "not_contains": "Excluye los registros que tienen cualquiera de los valores seleccionados.",
+}
+# Sin texto en el doc: «Hace más de / Dentro de más de» (su fila está desarmada) y los
+# sobrantes del hub. Redacción nuestra; el «?» lo marca como «no está en el doc».
+OPERATOR_HELP_HUB = {
+    "older_than_days": "La fecha es de hace más de la cantidad de días indicada.",
+    "more_than_days_ahead": "La fecha es dentro de más de la cantidad de días indicada.",
+    "is_on": "La fecha es exactamente el día indicado.",
+    "between": "El número está entre los dos valores indicados, incluidos los extremos.",
+    "within_last_days": "La fecha cae entre hoy y la cantidad de días indicada hacia atrás.",
+    "in_next_days": "La fecha cae entre hoy y la cantidad de días indicada hacia adelante.",
+    "is_true": "La casilla está marcada.",
+    "is_false": "La casilla no está marcada (o está vacía).",
+}
+for _k, _op in OPERATORS.items():
+    if _k in OPERATOR_HELP:
+        _op["help"] = OPERATOR_HELP[_k]
+    elif _k in OPERATOR_HELP_HUB:
+        _op["help"], _op["help_src"] = OPERATOR_HELP_HUB[_k], "hub"
+    if _k in OPERATOR_HELP_SELECT:
+        _op["help_select"] = OPERATOR_HELP_SELECT[_k]
+
 # «Es» de fechas: período relativo a hoy (hora Argentina). Semana = lunes a domingo.
 # Los límites los calcula rules.period_bounds(), el mismo para SQL y Python.
 PERIODS = {
