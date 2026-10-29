@@ -158,6 +158,7 @@
     Object.assign(f, SYS_OVERRIDES[state.view] || {});
     if (f.owner === "__me__") f.owner = ME.email;
     if (hasAdvanced(state.advanced)) f.advanced = JSON.stringify(state.advanced);
+    if (segmentOf(state.view)) f.segment = viewOf(state.view).id;
     return f;
   }
 
@@ -298,9 +299,53 @@
       var on = cur && cur.key === c.key;
       var cls = [c.num ? "pr-num" : "", on ? "is-sorted" : ""].filter(Boolean).join(" ");
       var arrow = on ? ' <i class="fa-solid fa-arrow-' + (cur.dir === "asc" ? "up" : "down") + ' pr-sort-arrow"></i>' : "";
-      return "<th" + (sortable(c) ? ' data-sort="' + c.key + '" title="Sort"' : "") + (cls ? ' class="' + cls + '"' : "") + ">" + esc(c.label) + arrow + "</th>";
+      return "<th" + (sortable(c) ? ' data-sort="' + c.key + '" title="Sort · drag to move"' : "") + (cls ? ' class="' + cls + '"' : "") +
+        (c.fixed ? "" : ' draggable="true" data-col-drag="' + c.key + '"') + ">" + esc(c.label) + arrow + "</th>";
     }).join("");
     $("prColsCount").textContent = activeColumns().length + "/" + COLUMNS.length;
+  }
+
+  /* Arrastrar una columna desde el encabezado de la tabla y soltarla a la izquierda o a la
+     derecha de otra (además del menú Columns). Empresas y contactos. Las fijas (el nombre)
+     no se mueven: los <th> movibles llevan data-col-drag. */
+  function bindHeaderDrag(tr, getCols, setCols) {
+    var drag = null, side = "before";
+    var clear = function () {
+      Array.prototype.forEach.call(tr.querySelectorAll(".is-drop-before, .is-drop-after, .is-dragging"), function (x) {
+        x.classList.remove("is-drop-before", "is-drop-after", "is-dragging");
+      });
+    };
+    tr.addEventListener("dragstart", function (e) {
+      var th = e.target.closest && e.target.closest("th[data-col-drag]");
+      if (!th) return;
+      drag = th.getAttribute("data-col-drag");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", drag); } catch (err) {}
+      th.classList.add("is-dragging");
+    });
+    tr.addEventListener("dragover", function (e) {
+      var th = drag && e.target.closest("th[data-col-drag]");
+      if (!th) return;
+      e.preventDefault();
+      var r = th.getBoundingClientRect();
+      side = e.clientX > r.left + r.width / 2 ? "after" : "before";
+      Array.prototype.forEach.call(tr.querySelectorAll(".is-drop-before, .is-drop-after"), function (x) { x.classList.remove("is-drop-before", "is-drop-after"); });
+      if (th.getAttribute("data-col-drag") !== drag) th.classList.add("is-drop-" + side);
+    });
+    tr.addEventListener("drop", function (e) {
+      var th = drag && e.target.closest("th[data-col-drag]");
+      if (!th) return;
+      e.preventDefault();
+      var target = th.getAttribute("data-col-drag");
+      var moving = drag;
+      drag = null;
+      clear();
+      if (target === moving) return;
+      var next = getCols().filter(function (k) { return k !== moving; });
+      next.splice(next.indexOf(target) + (side === "after" ? 1 : 0), 0, moving);
+      setCols(next);
+    });
+    tr.addEventListener("dragend", function () { drag = null; clear(); });
   }
 
   /* Visibles arriba, en su orden y arrastrables; las ocultas abajo. */
@@ -390,6 +435,7 @@
     openPop(anchor, '<div class="pr-pop__head">Acciones</div>' +
       item("edit", "fa-pen", "Editar propiedad") +
       item("export", "fa-file-csv", "Exportar a CSV") +
+      item("segment", "fa-layer-group", "Por segmento", false, "Vista nueva sólo con estas filas") +
       (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : ""));
     $("prViewPop").classList.add("pr-pop--actions");
   }
@@ -468,7 +514,6 @@
   /* ---------- Exportar a CSV (Acciones → «Exportar a CSV») ----------
      Los tildados o todos los del filtro, con las columnas que se elijan. Arranca con las
      columnas que se ven en la tabla; el CSV lo arma el backend (POST /<obj>/export). */
-  var CT_TABLE_COLS = ["first_name", "last_name", "hub_company", "email", "position", "lead_life", "owner_email", "meeting_datetime"];
   function download(path, body, filename) {
     var send = function (base) {
       return fetch(base + path, { method: "POST", body: JSON.stringify(body),
@@ -487,19 +532,16 @@
         });
       });
   }
-  function openExport(kind) {
-    var isCo = kind === "company";
-    var sel = isCo ? selected : ctSelected, all = isCo ? selAll : ctSelAll;
-    var ids = Object.keys(sel).map(Number);
-    var n = all ? all.total : ids.length;
-    var noun = isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos");
-    var fields = ((OPTS.export_fields || {})[kind]) || [];
-    var tableCols = isCo ? visibleCols.slice() : CT_TABLE_COLS;
-    // Las de la tabla primero y en su orden; después el resto del catálogo.
+  /* Modal con la lista de columnas: buscador, «Las de la tabla · Todas · Ninguna», grupos.
+     Lo usan Exportar, Por segmento y «Editar columnas» de una vista de contactos.
+     o = { title, fields: [{key, label, group, fixed}], tableCols, top, bottom, goIcon, goLabel,
+           busyLabel, onGo(cols, box) → Promise }. Las de la tabla salen primero y en su orden. */
+  function columnsModal(o) {
+    var fields = o.fields, tableCols = o.tableCols;
     var rank = function (k) { var i = tableCols.indexOf(k); return i === -1 ? 1000 + fields.findIndex(function (f) { return f.key === k; }) : i; };
     var groups = [];
     fields.forEach(function (f) {
-      var g = f.group || (isCo ? "" : "Otros");
+      var g = f.group || "";
       var hit = groups.filter(function (x) { return x.name === g; })[0];
       if (!hit) groups.push(hit = { name: g, fields: [] });
       hit.fields.push(f);
@@ -507,7 +549,7 @@
     var box = document.createElement("div");
     box.className = "pr-modal";
     box.innerHTML = '<div class="pr-modal__card pr-bulkedit pr-export" role="dialog" aria-modal="true">' +
-      "<h3>Exportar " + n.toLocaleString() + " " + noun + " a CSV</h3>" +
+      "<h3>" + o.title + "</h3>" + (o.top || "") +
       '<div class="pr-export__tools"><input type="search" class="pr-filter__input" id="prExQ" placeholder="Buscar columna…">' +
         '<button type="button" class="pr-wf-link" data-ex="table">Las de la tabla</button>' +
         '<button type="button" class="pr-wf-link" data-ex="all">Todas</button>' +
@@ -515,22 +557,24 @@
       '<div class="pr-export__list" id="prExList">' + groups.map(function (g) {
         return '<div class="pr-export__group">' + (g.name ? '<div class="pr-export__gname">' + esc(g.name) + "</div>" : "") +
           g.fields.map(function (f) {
-            return '<label class="pr-check" data-exname="' + esc((f.label + " " + f.key).toLowerCase()) + '"><input type="checkbox" value="' + esc(f.key) + '"' +
-              (tableCols.indexOf(f.key) !== -1 ? " checked" : "") + "> " + esc(f.label) + "</label>";
+            return '<label class="pr-check" data-exname="' + esc((f.label + " " + f.key).toLowerCase()) + '"' + (f.fixed ? ' title="Va siempre"' : "") +
+              '><input type="checkbox" value="' + esc(f.key) + '"' + (f.fixed || tableCols.indexOf(f.key) !== -1 ? " checked" : "") +
+              (f.fixed ? " disabled" : "") + "> " + esc(f.label) + "</label>";
           }).join("") + "</div>";
       }).join("") + "</div>" +
-      '<p class="pr-note" id="prExCount"></p>' +
+      '<p class="pr-note" id="prExCount"></p>' + (o.bottom || "") +
       '<p class="pr-bulkedit__err" id="prExErr" hidden></p>' +
       '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-ex="cancel">Cancelar</button>' +
-        '<button type="button" class="pr-btn pr-btn--primary" data-ex="go"><i class="fa-solid fa-download"></i> Descargar CSV</button></div></div>';
+        '<button type="button" class="pr-btn pr-btn--primary" data-ex="go"><i class="fa-solid ' + o.goIcon + '"></i> ' + o.goLabel + "</button></div></div>";
     document.body.appendChild(box);
     var q = function (id) { return box.querySelector("#" + id); };
     var boxes = function () { return Array.prototype.slice.call(box.querySelectorAll("#prExList input")); };
     var count = function () {
       var c = boxes().filter(function (x) { return x.checked; }).length;
-      q("prExCount").textContent = c + " de " + fields.length + " columnas · las de la tabla salen en su orden, las demás después.";
+      q("prExCount").textContent = c + " de " + fields.length + " columnas · las de la tabla van en su orden, las demás después.";
     };
-    var running = false;
+    var err = function (msg) { q("prExErr").hidden = !msg; q("prExErr").textContent = msg || ""; };
+    var running = false;  // mientras corre no se cierra: cerrar y volver a apretar lo haría dos veces
     var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
     var onKey = function (e) { if (e.key === "Escape") close(); };
     document.addEventListener("keydown", onKey);
@@ -550,6 +594,7 @@
       if (act === "table" || act === "all" || act === "none") {
         // «Todas» / «Ninguna» respetan la búsqueda: tildan sólo las que se ven.
         boxes().forEach(function (x) {
+          if (x.disabled) return;
           if (act === "table") x.checked = tableCols.indexOf(x.value) !== -1;
           else if (!x.closest("[data-exname]").hidden) x.checked = act === "all";
         });
@@ -557,29 +602,103 @@
       }
       var cols = boxes().filter(function (x) { return x.checked; }).map(function (x) { return x.value; })
         .sort(function (a, b2) { return rank(a) - rank(b2); });
-      if (!cols.length) { q("prExErr").hidden = false; q("prExErr").textContent = "Elegí al menos una columna."; return; }
-      q("prExErr").hidden = true;
-      // El orden de las filas es el de la tabla (en «todas las del filtro» el sort no viaja en los filtros).
-      var body = Object.assign(all ? { filters: all.filters } : { ids: ids }, { columns: cols, sort: isCo ? state.sort : null });
+      if (!cols.filter(function (k) { return !fields.filter(function (f) { return f.key === k && f.fixed; }).length; }).length &&
+          !fields.some(function (f) { return f.fixed; })) return err("Elegí al menos una columna.");
+      err("");
+      var label = b.innerHTML;
       running = true;
       box.classList.add("is-busy");
       b.disabled = true;
-      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Armando el CSV…';
-      var day = new Date().toLocaleDateString("sv-SE");  // AAAA-MM-DD, hora local
-      download("/prospecting/" + (isCo ? "companies" : "contacts") + "/export", body,
-        "prospecting-" + (isCo ? "empresas" : "contactos") + "-" + day + ".csv").then(function () {
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + o.busyLabel;
+      Promise.resolve().then(function () { return o.onGo(cols, box); }).then(function () {
         running = false;
         close();
-        toast('<i class="fa-solid fa-file-csv"></i> Se descargó el CSV con ' + n.toLocaleString() + " " + noun + " y " + cols.length + " columnas.");
-      }).catch(function (err) {
+      }).catch(function (e2) {
         running = false;
         box.classList.remove("is-busy");
         b.disabled = false;
-        b.innerHTML = '<i class="fa-solid fa-download"></i> Descargar CSV';
-        q("prExErr").hidden = false;
-        q("prExErr").textContent = err.message;
+        b.innerHTML = label;
+        err(e2.errors ? e2.errors.join(" · ") : e2.message);
       });
     });
+    return box;
+  }
+  function selectionInfo(kind) {
+    var isCo = kind === "company";
+    var all = isCo ? selAll : ctSelAll;
+    var ids = Object.keys(isCo ? selected : ctSelected).map(Number);
+    var n = all ? all.total : ids.length;
+    return { isCo: isCo, all: all, ids: ids, n: n,
+      noun: isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos"),
+      target: all ? { filters: all.filters } : { ids: ids } };
+  }
+  function openExport(kind) {
+    var si = selectionInfo(kind);
+    var fields = (((OPTS.export_fields || {})[kind]) || []).map(function (f) {
+      return { key: f.key, label: f.label, group: f.group || (si.isCo ? "" : "Otros") };
+    });
+    // En contactos la tabla tiene «Name»; el CSV lo parte en nombre y apellido.
+    var tableCols = si.isCo ? visibleCols.slice() : ctColumns().reduce(function (out, k) {
+      return out.concat(k === "name" ? ["first_name", "last_name"] : [k]);
+    }, []);
+    columnsModal({
+      title: "Exportar " + si.n.toLocaleString() + " " + si.noun + " a CSV",
+      fields: fields, tableCols: tableCols,
+      goIcon: "fa-download", goLabel: "Descargar CSV", busyLabel: "Armando el CSV…",
+      onGo: function (cols) {
+        // El orden de las filas es el de la tabla (en «todas las del filtro» el sort no viaja en los filtros).
+        var body = Object.assign({}, si.target, { columns: cols, sort: si.isCo ? state.sort : null });
+        var day = new Date().toLocaleDateString("sv-SE");  // AAAA-MM-DD, hora local
+        return download("/prospecting/" + (si.isCo ? "companies" : "contacts") + "/export", body,
+          "prospecting-" + (si.isCo ? "empresas" : "contactos") + "-" + day + ".csv").then(function () {
+          toast('<i class="fa-solid fa-file-csv"></i> Se descargó el CSV con ' + si.n.toLocaleString() + " " + si.noun + " y " + cols.length + " columnas.");
+        });
+      },
+    });
+  }
+
+  /* ---------- Acciones → «Por segmento» ----------
+     Vista nueva con SÓLO lo seleccionado (POST /prospecting/views/segment). La lista queda
+     fija: con «todas las del filtro» se guardan las de este momento, como un segmento
+     estático de HubSpot. Las columnas se eligen acá. */
+  function openSegment(kind) {
+    var si = selectionInfo(kind);
+    var fields = si.isCo
+      ? COLUMNS.map(function (c) { return { key: c.key, label: c.label, fixed: !!c.fixed }; })
+      : ctCatalog();
+    var box = columnsModal({
+      title: "Nueva vista con " + si.n.toLocaleString() + " " + si.noun,
+      top: '<label class="pr-filter"><span class="pr-filter__label">Nombre de la vista</span>' +
+        '<input class="pr-filter__input" id="prSegName" maxlength="60" autocomplete="off" value="' +
+        esc("Segmento · " + si.n.toLocaleString() + " " + si.noun) + '"></label>' +
+        '<span class="pr-filter__label">Columnas</span>',
+      bottom: '<label class="pr-check"><input type="checkbox" id="prSegShared"> Compartir con el equipo</label>' +
+        '<p class="pr-note">La vista muestra sólo ' + (si.isCo ? "estas " : "estos ") + si.n.toLocaleString() + " " + si.noun +
+        ": lo que entre después a los filtros no se suma solo.</p>",
+      fields: fields, tableCols: si.isCo ? visibleCols.slice() : ctColumns(),
+      goIcon: "fa-layer-group", goLabel: "Crear vista", busyLabel: "Creando…",
+      onGo: function (cols) {
+        var name = box.querySelector("#prSegName").value.trim();
+        if (!name) return Promise.reject(new Error("Ponele un nombre a la vista."));
+        var body = Object.assign({}, si.target, { object: kind, name: name, columns: cols,
+          shared: box.querySelector("#prSegShared").checked, page_size: si.isCo ? state.pageSize : 25 });
+        return api("/prospecting/views/segment", { method: "POST", body: JSON.stringify(body) }).then(function (v) {
+          var n = (v.config.segment_ids || []).length;
+          if (si.isCo) {
+            VIEWS.views.push(v);
+            if (VIEWS.tabs.indexOf("v:" + v.id) === -1) VIEWS.tabs.push("v:" + v.id);
+            applyTab("v:" + v.id);
+          } else {
+            CT_VIEWS.push(v);
+            applyCtView(v.id);
+          }
+          toast('<i class="fa-solid fa-layer-group"></i> Vista <strong>' + esc(v.name) + "</strong> creada con " + n.toLocaleString() + " " +
+            (si.isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos")) +
+            (v.shared ? ", compartida con el equipo." : ". Sólo la ves vos."));
+        });
+      },
+    });
+    setTimeout(function () { var i = box.querySelector("#prSegName"); i.focus(); i.select(); }, 0);
   }
 
   /* ---------- Edición masiva (botón «Editar» de la barra) ----------
@@ -770,11 +889,247 @@
   /* ---------- Pestaña Contacts ---------- */
   var ctState = { page: 1, total: 0 };
   var ctSelected = {}, ctSelAll = null, ctRows = [], ctLastKey = "";
-  function ctFilters() {
-    return {
-      q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
-      dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
+  /* Vistas de contactos (la tira de arriba de la pestaña): `null` = «Todos los contactos».
+     Las crea «Por segmento» o «Duplicar»; guardan columnas y, si es segmento, los ids. */
+  var CT_VIEWS = [], ctView = null, CT_VIEW_KEY = "prospecting_ct_view";
+  var CT_DEFAULT_COLS = ["name", "hub_company", "email", "position", "lead_life", "owner_email", "meeting_datetime"];
+  var CT_SHORT = { name: "Name", hub_company: "Company", owner_email: "Owner", meeting_datetime: "Meeting" };
+  function ctViewObj() { return CT_VIEWS.filter(function (v) { return v.id === ctView; })[0] || null; }
+  function ctCatalog() {
+    return [{ key: "name", label: "Name", group: "Contacto", fixed: true },
+            { key: "hub_company", label: "Empresa (en el Hub)", group: "Contacto" }]
+      .concat((((OPTS.objects || {}).contact || {}).fields || []).map(function (f) {
+        return { key: f.key, label: f.label, group: f.group || "Otros", type: f.type };
+      }));
+  }
+  /* Columnas que se ven ahora (`ctCols`): las de la vista, o en «Todos los contactos» las de
+     este navegador (como las pestañas fijas de empresas). Arrastrarlas en el encabezado en una
+     vista la deja con cambios sin guardar. */
+  var ctCols = null, CT_COLS_KEY = "prospecting_ct_columns_v1";
+  var ctCatMemo = null;
+  function ctCatMap() {
+    if (!ctCatMemo || ctCatMemo.opts !== OPTS) {
+      ctCatMemo = { opts: OPTS, map: {} };
+      ctCatalog().forEach(function (f) { ctCatMemo.map[f.key] = f; });
+    }
+    return ctCatMemo.map;
+  }
+  function normCtCols(keys) {
+    var cat = ctCatMap();
+    var cols = (keys && keys.length ? keys : CT_DEFAULT_COLS).filter(function (k, i, a) { return cat[k] && a.indexOf(k) === i; });
+    return ["name"].concat(cols.filter(function (k) { return k !== "name"; }));
+  }
+  function localCtCols() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(CT_COLS_KEY) || "null");
+      if (Array.isArray(saved) && saved.length) return saved;
+    } catch (e) {}
+    return CT_DEFAULT_COLS;
+  }
+  function ctColumns() {
+    var v = ctViewObj();
+    return normCtCols(ctCols || (v && v.config && v.config.columns) || localCtCols());
+  }
+  function setCtCols(keys) {
+    ctCols = normCtCols(keys);
+    if (!ctViewObj()) { try { localStorage.setItem(CT_COLS_KEY, JSON.stringify(ctCols)); } catch (e) {} }
+    renderCtHead();
+    renderCtRows();
+    renderCtViewBar();
+  }
+  function ctFieldOf(key) { return ctCatMap()[key] || { key: key, label: key }; }
+  function ctCell(key, c) {
+    var f = ctFieldOf(key), v = key === "company_name" ? c.contact_company_name : c[key];
+    if (key === "name") {
+      return '<button type="button" class="pr-company__name" data-ct-open="' + c.id + '">' + esc(c.name) + "</button>" +
+        (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "");
+    }
+    if (key === "hub_company") return '<a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.hub_company || c.company_name) + "</a>";
+    if (key === "lead_life") return v ? '<span class="pr-wf-stat">' + esc(v) + "</span>" : "—";
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return "—";
+    if (f.type === "owner" || f.type === "user") return cellText(ownerName(v) || v);
+    if (f.type === "datetime") return esc(window.ProspectingContacts.fmtLocal(v));
+    if (f.type === "date") return fmtDate(v);
+    if (f.type === "bool") return v ? "Sí" : "No";
+    if (Array.isArray(v)) return cellLong(v.join(", "));
+    if (f.type === "url") return cellLink(v);
+    if (f.type === "longtext") return cellLong(v);
+    return cellText(v);
+  }
+  function renderCtHead() {
+    $("prCtHead").innerHTML = '<th class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" id="prCtSelAll" title="Seleccionar la página"></label></th>' +
+      ctColumns().map(function (k) {
+        return "<th" + (k === "name" ? "" : ' draggable="true" data-col-drag="' + k + '" title="Drag to move"') + ">" + esc(CT_SHORT[k] || ctFieldOf(k).label) + "</th>";
+      }).join("");
+  }
+  function renderCtTabs() {
+    var tab = function (id, label, v) {
+      var active = id === ctView;
+      return '<button type="button" class="pr-tab pr-tab--view' + (active ? " is-active" : "") + '" data-ctv="' + (id == null ? "" : id) + '"' +
+        (id == null ? "" : ' draggable="true"') + ">" +
+        '<i class="fa-solid ' + (v && v.config && v.config.segment_ids ? "fa-layer-group" : "fa-address-book") + ' pr-tab__icon"></i>' + esc(label) +
+        (v && v.shared ? ' <i class="fa-solid fa-user-group pr-tab__shared" title="' + esc(v.mine ? "Shared with the team" : "Shared by " + (v.owner_name || v.owner_email)) + '"></i>' : "") +
+        (active && v ? '<span class="pr-tab__more" data-ctv-menu="' + id + '" title="View options" role="button"><i class="fa-solid fa-ellipsis"></i></span>' : "") +
+        "</button>";
     };
+    // Igual que las pestañas de empresas: «Todos» + las primeras vistas hasta MAX_TABS; la
+    // activa, si está más atrás, toma el último lugar; el resto va a «⋯ N more».
+    var shown = ctShownViews();
+    var hiddenN = CT_VIEWS.length - shown.length;
+    $("prCtTabs").innerHTML = tab(null, "Todos los contactos", null) + shown.map(function (v) { return tab(v.id, v.name, v); }).join("") +
+      (hiddenN > 0 ? '<button type="button" class="pr-tab pr-tab--overflow" id="prCtTabsMore" title="More views" aria-haspopup="menu">' +
+        '<i class="fa-solid fa-ellipsis"></i> ' + hiddenN + " more</button>" : "");
+  }
+  function ctShownViews() {
+    var shown = CT_VIEWS.slice(0, MAX_TABS - 1);
+    var i = CT_VIEWS.findIndex(function (v) { return v.id === ctView; });
+    if (i >= MAX_TABS - 1) shown[shown.length - 1] = CT_VIEWS[i];
+    return shown;
+  }
+  function ctMoreMenu(anchor) {
+    var shown = ctShownViews();
+    openPop(anchor, '<div class="pr-pop__head">More views</div>' + CT_VIEWS.filter(function (v) { return shown.indexOf(v) === -1; }).map(function (v) {
+      return '<button type="button" class="pr-pop__item" data-ctv-go="' + v.id + '"><i class="fa-solid ' +
+        (v.config && v.config.segment_ids ? "fa-layer-group" : "fa-address-book") + '"></i> ' + esc(v.name) + "</button>";
+    }).join("") + '<p class="pr-pop__note">Drag a tab to reorder. Opening one brings it to the bar.</p>');
+  }
+  /* Cambiar de vista de contactos, avisando si la actual tiene cambios sin guardar. */
+  function switchCtView(id) {
+    if (id === ctView) return;
+    var cur = ctViewObj();
+    if (cur && cur.mine && ctIsDirty() && !confirm("La vista «" + cur.name + "» tiene cambios sin guardar. ¿Descartarlos?")) return;
+    applyCtView(id);
+  }
+  function applyCtView(id) {
+    ctView = CT_VIEWS.some(function (v) { return v.id === id; }) ? id : null;
+    ctCols = null;
+    try { localStorage.setItem(CT_VIEW_KEY, ctView == null ? "" : String(ctView)); } catch (e) {}
+    var f = ((ctViewObj() || {}).config || {}).filters || {};
+    $("prCtQ").value = f.q || "";
+    $("prCtLead").value = f.lead_life || "";
+    $("prCtOwner").value = f.owner || "";
+    ctState.page = 1;
+    ctSelected = {};
+    ctSelAll = null;
+    renderSegNote($("prCtSegNote"), ((ctViewObj() || {}).config || {}).segment_ids || null, "contactos");
+    renderCtTabs();
+    renderCtHead();
+    renderCtViewBar();
+    if (!$("prContactsView").hidden) loadContacts();
+  }
+  function ctViewMenu(anchor, id) {
+    var v = CT_VIEWS.filter(function (x) { return x.id === id; })[0];
+    if (!v) return;
+    var item = function (act, icon, label, danger) {
+      return '<button type="button" class="pr-pop__item' + (danger ? " is-danger" : "") + '" data-ctvact="' + act + '" data-id="' + id + '">' +
+        '<i class="fa-solid ' + icon + '"></i> ' + esc(label) + "</button>";
+    };
+    openPop(anchor, '<div class="pr-pop__head">' + esc(v.name) + "</div>" + (v.mine
+      ? item("columns", "fa-table-columns", "Edit columns") + item("rename", "fa-pen", "Rename") + item("duplicate", "fa-copy", "Duplicate") +
+        item("share", v.shared ? "fa-lock" : "fa-user-group", v.shared ? "Make private" : "Share with the team") +
+        item("delete", "fa-trash", "Delete view", true)
+      : '<p class="pr-pop__note">Shared by ' + esc(v.owner_name || v.owner_email) + ". Only they can edit it; duplicate it to have your own.</p>" +
+        item("duplicate", "fa-copy", "Duplicate")));
+  }
+  function onCtViewAction(act, id) {
+    var v = CT_VIEWS.filter(function (x) { return x.id === id; })[0];
+    if (!v) return;
+    if (act === "duplicate") {
+      var name = prompt("Name for the new view:", v.name + " (copy)");
+      if (!name || !name.trim()) return;
+      api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name.trim(), object: "contact", config: v.config, shared: false }) })
+        .then(function (nv) { CT_VIEWS.push(nv); applyCtView(nv.id); }).catch(viewError);
+      return;
+    }
+    if (!v.mine) return;
+    if (act === "columns") {
+      columnsModal({
+        title: "Columnas de «" + esc(v.name) + "»", fields: ctCatalog(), tableCols: ctColumns(),
+        goIcon: "fa-check", goLabel: "Guardar", busyLabel: "Guardando…",
+        onGo: function (cols) {
+          return patchView(v, { config: Object.assign({}, v.config, { columns: cols }) }).then(function () { applyCtView(v.id); });
+        },
+      });
+    } else if (act === "rename") {
+      var nn = prompt("New name:", v.name);
+      if (nn && nn.trim() && nn.trim() !== v.name) patchView(v, { name: nn.trim() }).then(renderCtTabs).catch(viewError);
+    } else if (act === "share") {
+      patchView(v, { shared: !v.shared }).then(renderCtTabs).catch(viewError);
+    } else if (act === "delete") {
+      if (!confirm("Delete the view «" + v.name + "»?" + (v.shared ? " Teammates will lose it too." : "") + " This cannot be undone.")) return;
+      api("/prospecting/views/" + v.id, { method: "DELETE" }).then(function () {
+        CT_VIEWS = CT_VIEWS.filter(function (x) { return x.id !== v.id; });
+        applyCtView(null);
+      }).catch(viewError);
+    }
+  }
+  /* Filtros de la pestaña (búsqueda, Lead Life, Owner): se guardan en la vista de contactos
+     igual que en las de empresas — barra «Cambios sin guardar» con Guardar / Descartar. */
+  function ctFilterInputs() {
+    var f = { q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value };
+    Object.keys(f).forEach(function (k) { if (!f[k]) delete f[k]; });
+    return f;
+  }
+  function ctSavedFilters(v) {
+    var f = Object.assign({}, ((v || {}).config || {}).filters || {});
+    delete f.dummy;  // lo fija el segmento, no se edita desde la pestaña
+    return f;
+  }
+  function ctIsDirty() {
+    var v = ctViewObj();
+    return canon(ctFilterInputs()) !== canon(ctSavedFilters(v)) ||
+      (!!v && canon(ctColumns()) !== canon(normCtCols(v.config && v.config.columns)));
+  }
+  function renderCtViewBar() {
+    var bar = $("prCtViewBar");
+    if (!ctIsDirty()) { bar.hidden = true; bar.innerHTML = ""; return; }
+    var v = ctViewObj();
+    bar.hidden = false;
+    bar.innerHTML = v && v.mine
+      ? '<span><i class="fa-solid fa-pen"></i> Unsaved changes to <strong>' + esc(v.name) + "</strong></span>" +
+        '<button type="button" class="pr-btn pr-btn--primary" data-ctvb="save"><i class="fa-solid fa-floppy-disk"></i> Save view</button>' +
+        '<button type="button" class="pr-btn" data-ctvb="saveas">Save as new view</button>' +
+        '<button type="button" class="pr-btn" data-ctvb="reset">Discard</button>'
+      : '<span><i class="fa-solid fa-filter"></i> You changed <strong>' + esc(v ? v.name : "Todos los contactos") + "</strong>" +
+        (v ? " (shared by " + esc(v.owner_name || v.owner_email) + ")" : "") + "</span>" +
+        '<button type="button" class="pr-btn pr-btn--primary" data-ctvb="saveas"><i class="fa-solid fa-plus"></i> Save as new view</button>' +
+        '<button type="button" class="pr-btn" data-ctvb="reset">Reset</button>';
+  }
+  function onCtViewBar(act) {
+    var v = ctViewObj();
+    var filters = Object.assign(ctFilterInputs(), (((v || {}).config || {}).filters || {}).dummy ? { dummy: v.config.filters.dummy } : {});
+    if (act === "reset") { applyCtView(ctView); return; }
+    if (act === "save" && v && v.mine) {
+      patchView(v, { config: Object.assign({}, v.config, { filters: filters, columns: ctColumns() }) }).then(function () {
+        ctCols = null;
+        renderCtViewBar();
+        toast('<i class="fa-solid fa-floppy-disk"></i> Saved <strong>' + esc(v.name) + "</strong>.");
+      }).catch(viewError);
+      return;
+    }
+    if (act === "saveas") {
+      var name = prompt("Name for the new view:", v ? v.name + " (copy)" : "");
+      if (!name || !name.trim()) return;
+      var config = { filters: filters, columns: ctColumns(), page_size: 25 };
+      if (v && v.config && Array.isArray(v.config.segment_ids)) config.segment_ids = v.config.segment_ids;
+      api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name.trim(), object: "contact", config: config, shared: false }) })
+        .then(function (nv) {
+          CT_VIEWS.push(nv);
+          applyCtView(nv.id);
+          toast('<i class="fa-solid fa-table-list"></i> View <strong>' + esc(nv.name) + "</strong> created. Only you can see it.");
+        }).catch(viewError);
+    }
+  }
+  function ctFilters() {
+    var v = ctViewObj();
+    var vf = ((v || {}).config || {}).filters || {};
+    var f = {
+      q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
+      // Un segmento con dummies se guarda con dummy=include (si no, se vería vacío).
+      dummy: vf.dummy || (ME.sees_dummies ? $("prFDummy").value : "exclude"),
+    };
+    if (v && v.config && Array.isArray(v.config.segment_ids)) f.segment = v.id;
+    return f;
   }
   function renderCtBulk() {
     var bar = $("prCtBulk");
@@ -787,40 +1142,46 @@
       .replace(/seleccionada/g, "seleccionado").replace(/Todas las/, "Todos los").replace(/Seleccionar las/, "Seleccionar los") +
       '<button type="button" class="pr-btn" data-ct-clear="1">Deseleccionar</button>';
   }
+  function renderCtRows() {
+    var cols = ctColumns(), span = cols.length + 1;
+    $("prCtBody").innerHTML = ctRows.length ? ctRows.map(function (c) {
+      return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
+        '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-ct-sel="' + c.id + '"' + (ctSelected[c.id] ? " checked" : "") + "></label></td>" +
+        cols.map(function (k) { return "<td>" + ctCell(k, c) + "</td>"; }).join("") + "</tr>";
+    }).join("") : '<tr><td class="pr-empty" colspan="' + span + '">No contacts match these filters.</td></tr>';
+    renderCtBulk();
+  }
   function loadContacts() {
     var q = Object.assign(ctFilters(), { page: ctState.page, page_size: 25 });
+    renderCtViewBar();
     var key = qs(q);
     if (key !== ctLastKey) { ctSelected = {}; ctSelAll = null; ctLastKey = key; }
-    $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="8">Loading…</td></tr>';
+    var cols = ctColumns(), span = cols.length + 1;
+    $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="' + span + '">Loading…</td></tr>';
     api("/prospecting/contacts?" + qs(q)).then(function (r) {
       ctState.total = r.total;
       ctRows = r.rows;
-      $("prCtBody").innerHTML = r.rows.length ? r.rows.map(function (c) {
-        return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
-          '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-ct-sel="' + c.id + '"' + (ctSelected[c.id] ? " checked" : "") + "></label></td>" +
-          '<td><button type="button" class="pr-company__name" data-ct-open="' + c.id + '">' + esc(c.name) + "</button>" +
-            (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") + "</td>" +
-          '<td><a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.company_name) + "</a></td>" +
-          "<td>" + cellText(c.email) + "</td>" +
-          "<td>" + cellText(c.position) + "</td>" +
-          "<td>" + (c.lead_life ? '<span class="pr-wf-stat">' + esc(c.lead_life) + "</span>" : "—") + "</td>" +
-          "<td>" + cellText(ownerName(c.owner_email)) + "</td>" +
-          "<td>" + (c.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(c.meeting_datetime)) : "—") + "</td></tr>";
-      }).join("") : '<tr><td class="pr-empty" colspan="8">No contacts match these filters.</td></tr>';
-      renderCtBulk();
+      renderCtRows();
       var pages = Math.max(1, Math.ceil(r.total / 25));
       $("prCtCount").textContent = r.total.toLocaleString() + " contact" + (r.total === 1 ? "" : "s");
       $("prCtPage").textContent = ctState.page + " / " + pages;
       $("prCtPrev").disabled = ctState.page <= 1;
       $("prCtNext").disabled = ctState.page >= pages;
     }).catch(function (err) {
-      $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="8">' + esc(err.message) + "</td></tr>";
+      $("prCtBody").innerHTML = '<tr><td class="pr-empty" colspan="' + span + '">' + esc(err.message) + "</td></tr>";
     });
   }
-  function bindContacts() {
+  /* Opciones de Lead Life / Owner: se llenan cuando llegan las opciones (refreshOptions).
+     Antes se llenaban en bindContacts(), que corre ANTES de cargarlas: quedaban sólo en «All». */
+  function fillContactFilters() {
+    var keep = { lead: $("prCtLead").value, owner: $("prCtOwner").value };
     var LEAD = (((OPTS.objects || {}).contact || {}).fields || []).filter(function (f) { return f.key === "lead_life"; })[0];
     $("prCtLead").innerHTML = optionsHtml((LEAD && LEAD.options) || [], "", "All");
     $("prCtOwner").innerHTML = optionsHtml([{ value: "__none__", label: "No owner" }].concat(ownerOptions()), "", "All");
+    $("prCtLead").value = keep.lead;
+    $("prCtOwner").value = keep.owner;
+  }
+  function bindContacts() {
     ["prCtLead", "prCtOwner"].forEach(function (id) { $(id).addEventListener("change", function () { ctState.page = 1; loadContacts(); }); });
     var t = null;
     $("prCtQ").addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { ctState.page = 1; loadContacts(); }, 300); });
@@ -833,7 +1194,52 @@
       e.target.closest("tr").classList.toggle("is-selected", e.target.checked);
       renderCtBulk();
     });
-    $("prCtSelAll").addEventListener("change", function (e) {
+    $("prCtViewBar").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-ctvb]");
+      if (b) onCtViewBar(b.getAttribute("data-ctvb"));
+    });
+    // Reordenar la tira de vistas de contactos arrastrando («Todos los contactos» queda primera).
+    var dragCtv = null;
+    $("prCtTabs").addEventListener("dragstart", function (e) {
+      var t = e.target.closest("[data-ctv]");
+      if (!t || !t.getAttribute("data-ctv")) return;
+      dragCtv = Number(t.getAttribute("data-ctv"));
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", String(dragCtv)); } catch (err) {}
+    });
+    $("prCtTabs").addEventListener("dragover", function (e) {
+      var t = dragCtv && e.target.closest("[data-ctv]");
+      if (t && t.getAttribute("data-ctv")) e.preventDefault();
+    });
+    $("prCtTabs").addEventListener("drop", function (e) {
+      var t = dragCtv && e.target.closest("[data-ctv]");
+      if (!t || !t.getAttribute("data-ctv")) return;
+      e.preventDefault();
+      var target = Number(t.getAttribute("data-ctv")), moving = dragCtv;
+      dragCtv = null;
+      if (target === moving) return;
+      var ids = CT_VIEWS.map(function (v) { return v.id; });
+      var from = ids.indexOf(moving), to = ids.indexOf(target);
+      ids.splice(from, 1);
+      ids.splice(ids.indexOf(target) + (from < to ? 1 : 0), 0, moving);
+      CT_VIEWS.sort(function (a, b) { return ids.indexOf(a.id) - ids.indexOf(b.id); });
+      renderCtTabs();
+      api("/prospecting/views/tabs", { method: "PUT", body: JSON.stringify({ object: "contact", tabs: ids }) })
+        .catch(function (err) { alert("Could not save the order: " + err.message); });
+    });
+    $("prCtTabs").addEventListener("dragend", function () { dragCtv = null; });
+    bindHeaderDrag($("prCtHead"), ctColumns, setCtCols);
+    $("prCtTabs").addEventListener("click", function (e) {
+      if (e.target.closest("#prCtTabsMore")) { e.stopPropagation(); ctMoreMenu($("prCtTabsMore")); return; }
+      var more = e.target.closest("[data-ctv-menu]");
+      if (more) { e.stopPropagation(); ctViewMenu(more, Number(more.getAttribute("data-ctv-menu"))); return; }
+      var t = e.target.closest("[data-ctv]");
+      if (!t) return;
+      switchCtView(t.getAttribute("data-ctv") ? Number(t.getAttribute("data-ctv")) : null);
+    });
+    // El encabezado se redibuja con las columnas de la vista: el tilde se escucha delegado.
+    $("prCtHead").addEventListener("change", function (e) {
+      if (e.target.id !== "prCtSelAll") return;
       ctRows.forEach(function (c) { if (e.target.checked) ctSelected[c.id] = true; else delete ctSelected[c.id]; });
       if (!e.target.checked) ctSelAll = null;
       document.querySelectorAll("#prCtBody [data-ct-sel]").forEach(function (cb) {
@@ -1225,6 +1631,19 @@
   var advPanel = null;
 
   function isSys(key) { return String(key || "").indexOf("sys:") === 0; }
+  /* Ids de una vista segmento (Acciones → «Por segmento»), o null. */
+  function segmentOf(key) {
+    var v = isSys(key) ? null : viewOf(key);
+    return v && v.config && Array.isArray(v.config.segment_ids) ? v.config.segment_ids : null;
+  }
+  function renderSegNote(el, ids, noun) {
+    if (!el) return;
+    el.hidden = !ids;
+    var fem = noun === "empresas", one = ids && ids.length === 1;
+    var what = one ? (fem ? "la empresa que se eligió" : "el contacto que se eligió")
+      : (fem ? "las " : "los ") + (ids ? ids.length.toLocaleString() : "") + " " + noun + " que se eligieron";
+    el.innerHTML = ids ? '<i class="fa-solid fa-layer-group"></i> <span><strong>Segmento fijo</strong> · muestra sólo ' + what + " al crear la vista. Los filtros de arriba se aplican dentro de ese grupo.</span>" : "";
+  }
   function viewOf(key) {
     if (isSys(key)) return null;
     var id = Number(String(key).slice(2));
@@ -1251,7 +1670,6 @@
       owner: $("prFOwner").value, week: $("prFWeek").value, status: $("prFStatus").value,
       start_from: $("prFStartFrom").value, start_to: $("prFStartTo").value, q: $("prFQ").value.trim(),
       contact_incomplete: $("prFIncomplete").checked ? "1" : "",
-      dummy: ME.sees_dummies && $("prFDummy").value !== "exclude" ? $("prFDummy").value : "",
     };
     Object.keys(f).forEach(function (k) { if (!f[k]) delete f[k]; });
     return f;
@@ -1270,7 +1688,11 @@
     $("prFStartTo").value = f.start_to || "";
     $("prFQ").value = f.q || "";
     $("prFIncomplete").checked = f.contact_incomplete === "1";
-    if (ME.sees_dummies) $("prFDummy").value = f.dummy || "exclude";
+    // «Dummy data» es un interruptor de prueba de quien mira, no un filtro de la vista: se
+    // mantiene al cambiar de pestaña (antes volvía a «Hide» y una pestaña como Recycled
+    // parecía no tener las dummies que se acababan de pasar ahí). Sólo lo pisa una vista que
+    // lo guardó.
+    if (ME.sees_dummies && f.dummy) $("prFDummy").value = f.dummy;
   }
 
   /* Lo que se compara contra lo guardado. En una fija no cuentan columnas ni tamaño de
@@ -1283,11 +1705,14 @@
       columns: sys ? null : visibleCols.slice(),
       sort: state.sort === "created_desc" ? null : state.sort,
       page_size: sys ? null : state.pageSize,
+      segment_ids: segmentOf(state.view),  // guardar o duplicar no le saca el segmento
     };
   }
   /* Lo que se guarda: en una fija, su atajo pasa a ser un filtro de verdad. */
   function configToSave() {
     var snap = snapshot();
+    // «Dummy data» no cuenta como cambio de la vista, pero si está prendido se guarda con ella.
+    if (ME.sees_dummies && $("prFDummy").value !== "exclude") snap.filters.dummy = $("prFDummy").value;
     Object.assign(snap.filters, SYS_OVERRIDES[state.view] || {});
     snap.columns = visibleCols.slice();
     snap.page_size = state.pageSize;
@@ -1297,7 +1722,12 @@
 
   function loadViews() {
     return api("/prospecting/views").then(function (r) {
-      VIEWS = { views: r.views || [], tabs: r.tabs || Object.keys(SYS_TABS) };
+      var all = r.views || [];
+      VIEWS = { views: all.filter(function (v) { return (v.object || "company") === "company"; }), tabs: r.tabs || Object.keys(SYS_TABS) };
+      // Orden de la tira de contactos: el que guardó la persona; las que no están, al final.
+      var order = r.contact_tabs || [];
+      var rank = function (v) { var i = order.indexOf(v.id); return i === -1 ? 1e6 + v.id : i; };
+      CT_VIEWS = all.filter(function (v) { return v.object === "contact"; }).sort(function (a, b) { return rank(a) - rank(b); });
     }).catch(function () { /* sin vistas igual anda la tabla con las fijas */ });
   }
 
@@ -1326,6 +1756,7 @@
     selected = {};
     selAll = null;
     baseline = canon(snapshot());
+    renderSegNote($("prSegNote"), segmentOf(key), "empresas");
     showSection("table");
     renderTabs();
     renderHead();
@@ -1342,18 +1773,38 @@
     applyTab(key);
   }
 
+  /* Pestañas a la vista: las primeras MAX_TABS; la activa, si está más atrás, toma el último
+     lugar. Las demás van al botón «⋯ N más» (como HubSpot), así la tira no se hace eterna. */
+  var MAX_TABS = 4;
+  function shownTabs(onTable) {
+    var tabs = VIEWS.tabs.slice(0, MAX_TABS);
+    if (onTable && VIEWS.tabs.indexOf(state.view) >= MAX_TABS) tabs[MAX_TABS - 1] = state.view;
+    return tabs;
+  }
+  function moreTabsMenu(anchor) {
+    var shown = shownTabs(!$("prTableCard").hidden);
+    var rest = VIEWS.tabs.filter(function (k) { return shown.indexOf(k) === -1; });
+    openPop(anchor, '<div class="pr-pop__head">More views</div>' + rest.map(function (key) {
+      return '<button type="button" class="pr-pop__item" data-tab-go="' + esc(key) + '"><i class="fa-solid ' +
+        (segmentOf(key) ? "fa-layer-group" : "fa-table-list") + '"></i> ' + esc(tabLabel(key)) + "</button>";
+    }).join("") + '<p class="pr-pop__note">Drag a tab to reorder. Opening one brings it to the bar.</p>');
+  }
   function renderTabs() {
     var onTable = !$("prTableCard").hidden;
-    $("prViewTabs").innerHTML = VIEWS.tabs.map(function (key) {
+    var shown = shownTabs(onTable);
+    var hiddenN = VIEWS.tabs.length - shown.length;
+    $("prViewTabs").innerHTML = shown.map(function (key) {
       var v = viewOf(key);
       var active = onTable && key === state.view;
       var icon = v && v.shared ? ' <i class="fa-solid fa-user-group pr-tab__shared" title="' +
         esc(v.mine ? "Shared with the team" : "Shared by " + (v.owner_name || v.owner_email)) + '"></i>' : "";
       return '<button type="button" class="pr-tab pr-tab--view' + (active ? " is-active" : "") + '" role="tab" draggable="true" data-tab="' + esc(key) + '">' +
-        '<i class="fa-solid fa-table-list pr-tab__icon"></i>' + esc(tabLabel(key)) + icon +
+        '<i class="fa-solid ' + (segmentOf(key) ? "fa-layer-group" : "fa-table-list") + ' pr-tab__icon"></i>' + esc(tabLabel(key)) + icon +
         (active ? '<span class="pr-tab__more" data-tab-menu="' + esc(key) + '" title="View options" role="button"><i class="fa-solid fa-ellipsis"></i></span>' : "") +
         "</button>";
-    }).join("");
+    }).join("") + (hiddenN > 0
+      ? '<button type="button" class="pr-tab pr-tab--overflow" id="prTabsMore" title="More views" aria-haspopup="menu">' +
+        '<i class="fa-solid fa-ellipsis"></i> ' + hiddenN + " more</button>" : "");
     document.querySelectorAll('.pr-tab[data-view]').forEach(function (t) {
       t.classList.toggle("is-active", !onTable && t.getAttribute("data-view") === (!$("prWorkflows").hidden ? "workflows" : "contacts"));
     });
@@ -1582,6 +2033,7 @@
       var more = e.target.closest("[data-tab-menu]");
       if (more) { e.stopPropagation(); tabMenu(more, more.getAttribute("data-tab-menu")); return; }
       if (e.target.closest("#prViewAdd")) { e.stopPropagation(); addMenu($("prViewAdd")); return; }
+      if (e.target.closest("#prTabsMore")) { e.stopPropagation(); moreTabsMenu($("prTabsMore")); return; }
       var tab = e.target.closest(".pr-tab");
       if (!tab) return;
       if (tab.hasAttribute("data-tab")) { switchTab(tab.getAttribute("data-tab")); return; }
@@ -1624,7 +2076,20 @@
         closePop();
         var kind = ba.getAttribute("data-kind");
         var act = ba.getAttribute("data-bact");
-        if (act === "edit") openBulkEdit(kind); else if (act === "export") openExport(kind); else openEnrollModal(kind);
+        if (act === "edit") openBulkEdit(kind);
+        else if (act === "export") openExport(kind);
+        else if (act === "segment") openSegment(kind);
+        else openEnrollModal(kind);
+        return;
+      }
+      var go = e.target.closest("[data-tab-go]");
+      if (go) { closePop(); switchTab(go.getAttribute("data-tab-go")); return; }
+      var ctGo = e.target.closest("[data-ctv-go]");
+      if (ctGo) { closePop(); switchCtView(Number(ctGo.getAttribute("data-ctv-go"))); return; }
+      var cva = e.target.closest("[data-ctvact]");
+      if (cva) {
+        closePop();
+        onCtViewAction(cva.getAttribute("data-ctvact"), Number(cva.getAttribute("data-id")));
         return;
       }
       var b = e.target.closest("[data-vact]");
@@ -1665,6 +2130,7 @@
       OPTS = o;
       var keep = { owner: $("prFOwner").value, week: $("prFWeek").value, status: $("prFStatus").value };
       fillFilters();
+      fillContactFilters();
       $("prFOwner").value = keep.owner;
       $("prFWeek").value = keep.week;
       $("prFStatus").value = keep.status;
@@ -1732,6 +2198,7 @@
         ? visibleCols.concat(COLUMNS.map(function (c) { return c.key; }))
         : defaultCols());
     });
+    bindHeaderDrag($("prHead"), function () { return visibleCols.slice(); }, setVisibleCols);
     // Reordenar columnas arrastrando dentro del menú.
     var dragCol = null;
     $("prColsMenu").addEventListener("dragstart", function (e) {
@@ -1833,6 +2300,9 @@
         try { saved = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
         var tabs = VIEWS.tabs;
         applyTab(tabs.indexOf(saved) !== -1 ? saved : (tabs[0] || "sys:all"));
+        var ctSaved = null;
+        try { ctSaved = Number(localStorage.getItem(CT_VIEW_KEY)) || null; } catch (e) {}
+        applyCtView(ctSaved);
       });
     }).catch(function (err) {
       $("prDenied").hidden = false;

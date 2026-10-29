@@ -1270,6 +1270,20 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   catálogo de columnas lo da `store.export_fields()` (también en `/options` → `export_fields`);
   en contactos la empresa del Hub sale como `hub_company`, porque `company_name` ya es una
   propiedad del contacto. CSV con BOM (acentos en Excel), fechas con hora en hora Argentina.
+- **«Por segmento» + vistas de contactos (2026-10-29)**: Acciones → «Por segmento» crea una vista
+  nueva sólo con lo seleccionado (`POST /prospecting/views/segment`), con las columnas que se
+  elijan. Es **fija**: `config.segment_ids` guarda los ids de ese momento, también con «todas las
+  del filtro». La tabla la pide con `segment=<view id>` y `_company_filters()` /
+  `_contact_filters()` lo traducen a `ids` vía `views.segment_ids_of()` (sólo vistas propias o
+  compartidas; si no, vacío). Los demás filtros y la edición/export funcionan dentro del segmento.
+  Guardar la vista sin `segment_ids` no lo borra (`views.update()` lo conserva). Las vistas tienen
+  `object` (`company` | `contact`): las de contacto van en la tira de la pestaña Contacts (columnas
+  elegibles y filtros búsqueda / Lead Life / Owner guardados con la barra «Unsaved changes»; el
+  orden de esa tira va en `prospect_view_prefs.contact_tabs`, `PUT /views/tabs` con
+  `object: "contact"`). Las columnas también se mueven arrastrando el encabezado de la tabla
+  (`bindHeaderDrag()`, empresas y contactos); en «Todos los contactos» quedan en el navegador y no entran en las pestañas de empresas. En `/contacts`,
+  `company_name` sigue siendo la empresa del Hub (la leen workflows y fichas); la propiedad del
+  contacto viaja como `contact_company_name` y la del Hub también como `hub_company`.
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas

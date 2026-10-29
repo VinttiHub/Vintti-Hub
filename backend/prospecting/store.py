@@ -773,6 +773,9 @@ def _company_where(f: dict) -> tuple[str, list]:
 
     if f.get("contact_incomplete") in ("1", "true"):
         where.append("contact_incomplete")
+    if isinstance(f.get("ids"), list):  # vista segmento (lo resuelve el route, nunca el query string)
+        where.append("id = ANY(%s)")
+        params.append(f["ids"])
     q = (f.get("q") or "").strip()
     if q:
         where.append("(name ILIKE %s OR domain ILIKE %s OR hubspot_company_id = %s)")
@@ -1241,6 +1244,9 @@ def _contact_where(f: dict) -> tuple[str, list]:
     elif f.get("owner"):
         where.append("ct.owner_email = %s")
         params.append(f["owner"].lower())
+    if isinstance(f.get("ids"), list):  # vista segmento
+        where.append("ct.id = ANY(%s)")
+        params.append(f["ids"])
     if f.get("company_id"):
         where.append("ct.company_id = %s")
         params.append(_to_int(f["company_id"]))
@@ -1301,11 +1307,14 @@ def list_contacts(cur, f: dict) -> dict:
     total = cur.fetchone()["n"]
     cur.execute(
         f"""
-        SELECT ct.*, c.name AS company_name, c.prospecting_status AS company_status {base}
+        SELECT ct.*, c.name AS company_name, c.name AS hub_company, c.prospecting_status AS company_status,
+               ct.props->>'company_name' AS contact_company_name {base}
          ORDER BY ct.created_at DESC, ct.id DESC LIMIT %s OFFSET %s
         """,
         params + [size, (page - 1) * size],
     )
+    # `company_name` acá es la empresa del Hub (lo leen workflows y fichas); la propiedad del
+    # contacto con ese nombre viaja como `contact_company_name` para las columnas de las vistas.
     return {"total": total, "page": page, "page_size": size, "rows": [_flatten_contact(r) for r in cur.fetchall()]}
 
 

@@ -143,8 +143,12 @@ def _company_filters(cur, raw: dict):
     validados. Los usan la lista y la edición masiva «todas las del filtro».
     Devuelve (filtros, None) o (None, respuesta de error)."""
     filters = {k: v for k, v in (raw or {}).items() if v is not None}
+    filters.pop("ids", None)
     if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
         filters["dummy"] = "exclude"
+    # Vista segmento: sólo los registros que se guardaron al crearla.
+    if filters.get("segment"):
+        filters["ids"] = views_store.segment_ids_of(cur, _current_email(), filters["segment"], "company")
     # Filtros avanzados (vistas guardadas): JSON con la forma de las condiciones
     # de un workflow. Se validan con la misma lista blanca antes de llegar al SQL.
     raw_adv = filters.pop("advanced", None)
@@ -160,10 +164,13 @@ def _company_filters(cur, raw: dict):
     return filters, None
 
 
-def _contact_filters(raw: dict) -> dict:
+def _contact_filters(cur, raw: dict) -> dict:
     filters = {k: v for k, v in (raw or {}).items() if v is not None}
+    filters.pop("ids", None)
     if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
         filters["dummy"] = "exclude"
+    if filters.get("segment"):
+        filters["ids"] = views_store.segment_ids_of(cur, _current_email(), filters["segment"], "contact")
     return filters
 
 
@@ -194,6 +201,36 @@ def view_create():
     return jsonify(_json_safe(view)), 201
 
 
+@bp.post("/views/segment")
+def view_segment():
+    """Acciones → «Por segmento»: vista nueva con SÓLO los registros elegidos (los tildados o
+    todos los del filtro en este momento: la lista queda fija, como un segmento estático)."""
+    body = request.get_json(silent=True) or {}
+    obj = body.get("object") or "company"
+    if obj not in views_store.OBJECTS:
+        return jsonify({"error": "Objeto inválido."}), 400
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            ids, err = _bulk_target_ids(cur, body, obj, limit=views_store.SEGMENT_MAX)
+            if err:
+                return err
+            table = "prospect_companies" if obj == "company" else "prospect_contacts"
+            cur.execute(f"SELECT COUNT(*) FILTER (WHERE is_dummy) AS d FROM {table} WHERE id = ANY(%s)", (ids,))
+            # Con dummies adentro, el freno de dummies de la tabla los escondería: la vista sale vacía.
+            filters = {"dummy": "include"} if cur.fetchone()["d"] else {}
+            view = views_store.create(cur, _current_email(), {
+                "name": body.get("name"), "object": obj, "shared": body.get("shared"),
+                "config": {"filters": filters, "columns": body.get("columns") or [], "segment_ids": ids,
+                           "page_size": body.get("page_size")},
+            }, wf_store._ctx(cur))
+    except InvalidWorkflow as exc:
+        return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
+    return jsonify(_json_safe(view)), 201
+
+
 @bp.patch("/views/<int:view_id>")
 def view_update(view_id: int):
     body = request.get_json(silent=True) or {}
@@ -208,7 +245,7 @@ def view_update(view_id: int):
                 return jsonify({"error": "La vista no existe."}), 404
             if existing["owner_email"] != email:
                 return jsonify({"error": "Sólo quien creó la vista la puede editar. Duplicala para tener la tuya."}), 403
-            view = views_store.update(cur, email, view_id, body, wf_store._ctx(cur))
+            view = views_store.update(cur, email, view_id, body, wf_store._ctx(cur), existing)
     except InvalidWorkflow as exc:
         return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
     return jsonify(_json_safe(view))
@@ -238,6 +275,8 @@ def view_tabs():
             denied = _gate(cur)
             if denied:
                 return denied
+            if body.get("object") == "contact":
+                return jsonify({"contact_tabs": views_store.set_contact_tabs(cur, _current_email(), body.get("tabs"))})
             tabs = views_store.set_tabs(cur, _current_email(), body.get("tabs"))
     except InvalidWorkflow as exc:
         return jsonify({"error": exc.errors[0], "errors": exc.errors}), 400
@@ -326,7 +365,7 @@ def contacts_list():
         denied = _gate(cur)
         if denied:
             return denied
-        data = store.list_contacts(cur, _contact_filters(request.args.to_dict()))
+        data = store.list_contacts(cur, _contact_filters(cur, request.args.to_dict()))
     return jsonify(_json_safe(data))
 
 
@@ -422,7 +461,7 @@ def _bulk_target_ids(cur, body: dict, obj: str, limit: int = BULK_MAX):
                 return None, err
             ids = store.company_ids(cur, filters)
         else:
-            ids = store.contact_ids(cur, _contact_filters(body["filters"]))
+            ids = store.contact_ids(cur, _contact_filters(cur, body["filters"]))
     else:
         return None, (jsonify({"error": "Mandá `ids` o `filters`."}), 400)
     if not ids:
