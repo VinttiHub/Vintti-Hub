@@ -1270,6 +1270,14 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   catálogo de columnas lo da `store.export_fields()` (también en `/options` → `export_fields`);
   en contactos la empresa del Hub sale como `hub_company`, porque `company_name` ya es una
   propiedad del contacto. CSV con BOM (acentos en Excel), fechas con hora en hora Argentina.
+- **Historial por propiedad (2026-10-29)**: el reloj junto a la etiqueta de cada campo (ficha de
+  la empresa, vista rápida, panel del contacto) abre quién la cambió, cuándo y de qué a qué
+  (`GET /prospecting/<companies|contacts>/<id>/history?field=` → `store.property_history()`,
+  sobre el mismo `prospect_company_events` de la actividad, sin su tope de 300). Clay no registra
+  campo por campo al crear una empresa: el «valor al crearse» es el `old_value` del cambio más
+  viejo o el actual. Front compartido en `prospecting-history.js` (botón `data-hist`).
+  La edición masiva escribe sus eventos con `source = "bulk:<n registros>"` (y el `actor` de
+  siempre): historiales y actividad la muestran con la etiqueta «Edición masiva · n».
 - **«Por segmento» + vistas de contactos (2026-10-29)**: Acciones → «Por segmento» crea una vista
   nueva sólo con lo seleccionado (`POST /prospecting/views/segment`), con las columnas que se
   elijan. Es **fija**: `config.segment_ids` guarda los ids de ese momento, también con «todas las

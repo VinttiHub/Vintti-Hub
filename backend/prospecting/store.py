@@ -842,6 +842,49 @@ def get_company(cur, company_id: int) -> dict | None:
     return row
 
 
+def property_history(cur, obj: str, record_id: int, field: str) -> dict | None:
+    """Historial de UNA propiedad (el «ver historial» de HubSpot): cada cambio con quién y
+    cuándo, el más nuevo primero, más el valor con el que nació el registro. Sale de
+    prospect_company_events, el mismo log de la actividad, sin su tope de 300 eventos.
+    Clay al crear una empresa no registra campo por campo: por eso el valor inicial es el
+    `old_value` del cambio más viejo, o el actual si la propiedad nunca cambió."""
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+
+    catalog = FIELDS_BY_KEY if obj == "company" else CONTACT_FIELDS_BY_KEY
+    if field not in catalog:
+        raise ValueError("Esa propiedad no existe.")
+    if obj == "company":
+        cur.execute(f"SELECT id, created_at, {field} AS value FROM prospect_companies WHERE id = %s", (record_id,))
+        rec = cur.fetchone()
+        where, created_ev = "company_id = %s AND contact_id IS NULL", "created"
+    else:
+        rec = get_contact(cur, record_id)
+        if rec is not None:
+            rec = {"id": rec["id"], "created_at": rec.get("created_at"), "value": rec.get(field)}
+        where, created_ev = "contact_id = %s", "contact_created"
+    if rec is None:
+        return None
+    cur.execute(
+        f"""
+        SELECT actor, source, old_value, new_value, at FROM prospect_company_events
+         WHERE {where} AND field = %s ORDER BY at DESC, id DESC LIMIT 500
+        """,
+        (record_id, field),
+    )
+    changes = [dict(r) for r in cur.fetchall()]
+    cur.execute(
+        f"SELECT actor, source, at FROM prospect_company_events WHERE {where} AND field IS NULL "
+        "AND new_value = %s ORDER BY at, id LIMIT 1",
+        (record_id, created_ev),
+    )
+    created = cur.fetchone()
+    created = dict(created) if created else {"actor": None, "source": None, "at": rec.get("created_at")}
+    # Un contacto creado con valores los registra como cambio desde vacío: ese ES el valor inicial.
+    initial = changes[-1]["old_value"] if changes else _fmt(rec.get("value"))
+    created["value"] = initial
+    return {"field": field, "current": _fmt(rec.get("value")), "changes": changes, "created": created}
+
+
 def list_weeks(cur) -> list[str]:
     cur.execute(
         """

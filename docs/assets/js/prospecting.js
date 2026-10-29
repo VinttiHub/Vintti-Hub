@@ -1385,12 +1385,14 @@
     drawerSave = null;
   }
 
-  function kv(label, value, isLink) {
+  /* `hist` = [id, campo]: suma el reloj «ver historial» (prospecting-history.js). */
+  function kv(label, value, isLink, hist) {
     var v = value == null || value === "" ? "—"
       : isLink ? '<a href="' + esc(value) + '" target="_blank" rel="noopener">' + esc(value) + "</a>"
       : esc(value);
-    return "<dt>" + esc(label) + "</dt><dd>" + v + "</dd>";
+    return "<dt>" + esc(label) + (hist ? histBtn(hist[0], hist[1]) : "") + "</dt><dd>" + v + "</dd>";
   }
+  function histBtn(id, field) { return window.ProspectingHistory ? window.ProspectingHistory.button("company", id, field) : ""; }
 
   var FIELD_LABELS = {
     prospecting_status: "Prospecting Status",
@@ -1400,6 +1402,11 @@
     week_label: "Week",
     lead_source: "Lead Source",
   };
+
+  function bulkTag(src) {
+    var m = /^bulk:(\d+)$/.exec(String(src || ""));
+    return m ? ' <span class="pr-bulk-tag" title="Cambio hecho con Editar en masa"><i class="fa-solid fa-layer-group"></i> Edición masiva · ' + m[1] + "</span>" : "";
+  }
 
   function eventsHtml(events) {
     if (!events || !events.length) return '<p class="pr-note">No changes yet.</p>';
@@ -1414,7 +1421,7 @@
         : esc(ev.new_value === "created" ? "created the company" : ev.new_value === "contact_created" ? "added the contact" : (ev.new_value || ""));
       var subject = ev.contact_id ? '<span class="pr-co-ev__contact"><i class="fa-regular fa-user"></i> ' + esc(ev.contact_name || "Contacto") + "</span> · " : "";
       return '<li><span class="pr-events__when">' + fmtDateTime(ev.at) + "</span>" +
-        '<span class="pr-events__src' + (isWf ? " pr-events__src--wf" : "") + '">' + esc(who) + "</span> · " + subject + what + "</li>";
+        '<span class="pr-events__src' + (isWf ? " pr-events__src--wf" : "") + '">' + esc(who) + "</span>" + bulkTag(ev.source) + " · " + subject + what + "</li>";
     }).join("") + "</ul>";
   }
 
@@ -1445,8 +1452,9 @@
       $("prDrawerSub").textContent = [c.domain, c.industry, [c.city, c.state, c.country].filter(Boolean).join(", ")]
         .filter(Boolean).join(" · ");
       var f = function (field, label, inner) {
-        return '<label class="pr-filter"><span class="pr-filter__label">' + esc(label) + "</span>" + inner + "</label>";
+        return '<label class="pr-filter"><span class="pr-filter__label">' + esc(label) + histBtn(c.id, field) + "</span>" + inner + "</label>";
       };
+      var H = function (field) { return [c.id, field]; };
       $("prDrawerBody").innerHTML =
         '<section class="pr-section"><h3 class="pr-section__title">Prospecting</h3><div class="pr-grid">' +
           f("prospecting_status", "Prospecting Status",
@@ -1461,19 +1469,19 @@
             '<input class="pr-filter__input" data-edit="week_label" placeholder="Semana 40" value="' + esc(c.week_label || "") + '">') +
         "</div></section>" +
         '<section class="pr-section"><h3 class="pr-section__title">From Clay</h3><dl class="pr-kv">' +
-          kv("Website", c.website, true) +
-          kv("LinkedIn", c.linkedin_url, true) +
-          kv("Lead Source", c.lead_source) +
-          kv("Industry", c.industry) +
-          kv("Size", c.size) +
-          kv("Founded Year", c.founded_year) +
-          kv("Open jobs", c.open_jobs) +
-          kv("Job types", c.job_types) +
-          kv("Technologies", c.technologies) +
-          kv("Keywords", c.keywords) +
+          kv("Website", c.website, true, H("website")) +
+          kv("LinkedIn", c.linkedin_url, true, H("linkedin_url")) +
+          kv("Lead Source", c.lead_source, false, H("lead_source")) +
+          kv("Industry", c.industry, false, H("industry")) +
+          kv("Size", c.size, false, H("size")) +
+          kv("Founded Year", c.founded_year, false, H("founded_year")) +
+          kv("Open jobs", c.open_jobs, false, H("open_jobs")) +
+          kv("Job types", c.job_types, false, H("job_types")) +
+          kv("Technologies", c.technologies, false, H("technologies")) +
+          kv("Keywords", c.keywords, false, H("keywords")) +
           kv("Location", [c.city, c.state, c.country].filter(Boolean).join(", ")) +
-          kv("Description", c.description) +
-          kv("Id de la empresa (HubSpot)", c.hubspot_company_id) +
+          kv("Description", c.description, false, H("description")) +
+          kv("Id de la empresa (HubSpot)", c.hubspot_company_id, false, H("hubspot_company_id")) +
           kv("Hub ID", c.id) +
           kv("Clay record", c.clay_record_id) +
         "</dl></section>" +

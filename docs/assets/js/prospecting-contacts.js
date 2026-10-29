@@ -198,7 +198,8 @@
           var wide = f.type === "longtext" || f.type === "multi";
           return '<label class="pc-field' + (isReq ? " is-required" : "") + (wide ? " pc-field--wide" : "") + '"' +
             (f.description ? ' title="' + esc(f.description) + '"' : "") + ">" +
-            '<span class="pr-filter__label">' + esc(f.label) + (isReq ? ' <span class="pc-req">*</span>' : "") + "</span>" +
+            '<span class="pr-filter__label">' + esc(f.label) + (isReq ? ' <span class="pc-req">*</span>' : "") +
+              (!isNew && window.ProspectingHistory ? window.ProspectingHistory.button("contact", c.id, f.key) : "") + "</span>" +
             control(f, c[f.key]) + "</label>";
         }).join("") + "</div></details>";
     });
@@ -244,6 +245,11 @@
     return v;
   }
 
+  function bulkTag(src) {
+    var m = /^bulk:(\d+)$/.exec(String(src || ""));
+    return m ? ' <span class="pr-bulk-tag" title="Cambio hecho con Editar en masa"><i class="fa-solid fa-layer-group"></i> Edición masiva · ' + m[1] + "</span>" : "";
+  }
+
   function historyHtml(events) {
     if (!events.length) return '<p class="pr-note">Sin cambios todavía.</p>';
     return '<ul class="pr-events">' + events.map(function (ev) {
@@ -252,7 +258,7 @@
       var what = ev.field === "__note__" ? "Nota: " + esc(ev.new_value)
         : ev.field ? esc(label(ev.field)) + ": " + esc(fmtEv(ev.field, ev.old_value)) + " → " + esc(fmtEv(ev.field, ev.new_value))
         : esc(ev.new_value === "contact_created" ? "creó el contacto" : ev.new_value || "");
-      return '<li><span class="pr-events__when">' + P().fmtDateTime(ev.at) + '</span><span class="pr-events__src">' + esc(who) + "</span> · " + what + "</li>";
+      return '<li><span class="pr-events__when">' + P().fmtDateTime(ev.at) + '</span><span class="pr-events__src">' + esc(who) + "</span>" + bulkTag(ev.source) + " · " + what + "</li>";
     }).join("") + "</ul>";
   }
 

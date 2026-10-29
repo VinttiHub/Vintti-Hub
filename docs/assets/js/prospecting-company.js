@@ -37,6 +37,8 @@
       return '<option value="' + esc(v) + '"' + (String(v) === String(selected || "") ? " selected" : "") + ">" + esc(l) + "</option>";
     }).join("");
   }
+  /* Reloj «ver historial» junto a la etiqueta (prospecting-history.js). */
+  function hist(obj, id, field) { return window.ProspectingHistory ? window.ProspectingHistory.button(obj, id, field) : ""; }
   function ownerOptions() { return (opts().bdrs || []).map(function (b) { return { value: b.email, label: b.name || b.email }; }); }
 
   /* ---------- Carga ---------- */
@@ -66,13 +68,13 @@
   function leftCard(c) {
     var url = c.website || (c.domain ? "https://" + c.domain : "");
     var sel = function (key, label, items) {
-      return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + "</span>" +
+      return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + hist("company", c.id, key) + "</span>" +
         '<select class="pr-filter__input" data-edit="' + key + '"><option value="">—</option>' + optionTags(items, c[key]) + "</select></label>";
     };
     var inp = function (key, label, type) {
       var v = c[key] || "";
       if (type === "date") v = String(v).slice(0, 10);
-      return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + "</span>" +
+      return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + hist("company", c.id, key) + "</span>" +
         '<input type="' + (type || "text") + '" class="pr-filter__input" data-edit="' + key + '" value="' + esc(v) + '"></label>';
     };
     var clay = companyFields().filter(function (f) {
@@ -90,6 +92,7 @@
           ' <button type="button" class="pr-wf-link" data-act="complete">Completar</button></div>' : "") +
       "</div>" +
       '<div class="pr-co-card"><h3 class="pr-section__title">Prospecting</h3>' +
+        '<span class="pr-filter__label">Prospecting Status' + hist("company", c.id, "prospecting_status") + "</span>" +
         '<div class="pr-co-status">' +
           '<select class="pr-cell-select pr-status" data-edit="prospecting_status" data-status="' + esc(c.prospecting_status || "") + '">' +
             '<option value="">—</option>' + optionTags(opts().statuses || [], c.prospecting_status) + "</select></div>" +
@@ -100,16 +103,16 @@
         '<p class="pr-drawer__status" id="prCoStatus"></p>' +
       "</div>" +
       '<details class="pr-co-card pr-co-more" open><summary><h3 class="pr-section__title">Datos de Clay</h3></summary><dl class="pr-kv">' +
-        clay.map(function (f) { return kv(f, c[f.key]); }).join("") + "</dl></details>";
+        clay.map(function (f) { return kv(f, c[f.key], c.id); }).join("") + "</dl></details>";
   }
 
-  function kv(f, v) {
+  function kv(f, v, id) {
     var val;
     if (v == null || v === "") val = "—";
     else if (f.type === "url") val = '<a href="' + esc(v) + '" target="_blank" rel="noopener">' + esc(v) + "</a>";
     else if (f.type === "date") val = P.fmtDate(v);
     else val = esc(v);
-    return "<dt>" + esc(f.label) + "</dt><dd>" + val + "</dd>";
+    return "<dt>" + esc(f.label) + (id ? hist("company", id, f.key) : "") + "</dt><dd>" + val + "</dd>";
   }
 
   function mainCard(c) {
@@ -118,7 +121,7 @@
         '<button type="button" class="pr-co-tab' + (tab === "activity" ? " is-active" : "") + '" data-tab="activity">Actividad</button>' +
         '<button type="button" class="pr-co-tab' + (tab === "info" ? " is-active" : "") + '" data-tab="info">Información</button>' +
       "</div>" +
-      (tab === "activity" ? activityHtml(c) : '<dl class="pr-kv pr-kv--wide">' + companyFields().map(function (f) { return kv(f, c[f.key]); }).join("") + "</dl>") +
+      (tab === "activity" ? activityHtml(c) : '<dl class="pr-kv pr-kv--wide">' + companyFields().map(function (f) { return kv(f, c[f.key], c.id); }).join("") + "</dl>") +
       "</div>";
   }
 
@@ -131,6 +134,11 @@
     if (f.type === "bool") return v === "true" ? "Sí" : v === "false" ? "No" : v;
     if (f.type === "owner" || f.type === "user") return P.ownerName(v) || v;
     return v;
+  }
+
+  function bulkTag(src) {
+    var m = /^bulk:(\d+)$/.exec(String(src || ""));
+    return m ? ' <span class="pr-bulk-tag" title="Cambio hecho con Editar en masa"><i class="fa-solid fa-layer-group"></i> Edición masiva · ' + m[1] + "</span>" : "";
   }
 
   function eventText(ev) {
@@ -163,7 +171,7 @@
       var t = eventText(ev);
       html += '<div class="pr-co-ev"><span class="pr-co-ev__icon' + (t.wf ? " is-wf" : "") + '"><i class="' + t.icon + '"></i></span>' +
         '<div class="pr-co-ev__body"><div>' + t.html + "</div>" +
-        '<span class="pr-co-ev__meta">' + esc(t.who) + " · " + P.fmtDateTime(ev.at) + "</span></div></div>";
+        '<span class="pr-co-ev__meta">' + esc(t.who) + bulkTag(ev.source) + " · " + P.fmtDateTime(ev.at) + "</span></div></div>";
     });
     return '<div class="pr-co-timeline">' + html + "</div>";
   }

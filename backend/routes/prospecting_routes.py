@@ -299,6 +299,31 @@ def company(company_id: int):
     return jsonify(_json_safe(row))
 
 
+def _history(obj: str, record_id: int):
+    """Historial de una propiedad: GET /prospecting/<companies|contacts>/<id>/history?field=."""
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        try:
+            data = store.property_history(cur, obj, record_id, request.args.get("field") or "")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    if data is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(data))
+
+
+@bp.get("/companies/<int:company_id>/history")
+def company_history(company_id: int):
+    return _history("company", company_id)
+
+
+@bp.get("/contacts/<int:contact_id>/history")
+def contact_history(contact_id: int):
+    return _history("contact", contact_id)
+
+
 @bp.patch("/companies/<int:company_id>")
 def patch_company(company_id: int):
     body = request.get_json(silent=True) or {}
@@ -494,16 +519,18 @@ def _bulk_update(obj: str):
         mark = cur.fetchone()["m"]
         now = engine.utcnow()
         updated, unchanged, failed, needs_contact, companies = 0, 0, [], 0, set()
+        # En el historial se distingue de una edición de a uno: `bulk:<cuántos registros>`.
+        source = f"bulk:{len(ids)}"
         for rid in ids:
             # Un SAVEPOINT por registro: un valor que falla en uno no puede abortar la
             # transacción entera (y con ella todo lo ya editado del lote).
             cur.execute("SAVEPOINT bulk_row")
             try:
                 if obj == "company":
-                    row = store.update_company(cur, rid, {field: value}, actor=actor)
+                    row = store.update_company(cur, rid, {field: value}, actor=actor, source=source)
                     cid = rid
                 else:
-                    row = store.update_contact(cur, rid, {field: value}, actor)
+                    row = store.update_contact(cur, rid, {field: value}, actor, source=source)
                     cid = row["company_id"] if row else None
                 if row is None:
                     cur.execute("ROLLBACK TO SAVEPOINT bulk_row")
