@@ -1658,3 +1658,37 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 
 /* Menú de orden del encabezado: la opción activa */
 .pr-pop__item.is-on, .pr-pop__item.is-on i { color: var(--pr-violet); font-weight: 600; }
+
+/* ---------- Editar en la celda (tablas) ---------- */
+.pr-table td.pr-cell-edit { cursor: text; position: relative; }
+.pr-table td.pr-cell-edit:hover { background: color-mix(in srgb, var(--pr-violet) 5%, #fff); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pr-violet) 22%, #fff); }
+.pr-table td.pr-cell-edit:hover::after {
+  content: "\f303"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 10px;
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--pr-violet); opacity: .7;
+}
+.pr-table td.pr-cell-edit.is-editing { background: #fff; box-shadow: inset 0 0 0 2px var(--pr-violet); padding: 4px 6px; }
+.pr-table td.pr-cell-edit.is-editing::after { display: none; }
+.pr-table td.pr-cell-edit.is-saving { opacity: .45; pointer-events: none; }
+.pr-cell-editor { min-width: 150px; }
+.pr-cell-editor .pr-filter__input { width: 100%; box-sizing: border-box; padding: 5px 8px; font-size: 13px; min-height: 0; }
+.pr-cell-pop {
+  position: fixed; z-index: 3000; width: min(360px, calc(100vw - 24px)); box-sizing: border-box; padding: 12px;
+  border-radius: 12px; background: #fff; border: 1px solid var(--pr-rule, #e6e8ef); box-shadow: 0 12px 32px rgba(13, 18, 30, .16);
+  display: flex; flex-direction: column; gap: 8px; font-size: 13px;
+}
+.pr-cell-pop * { box-sizing: border-box; }
+.pr-cell-pop__label { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--pr-ink-3, #8a90a0); }
+.pr-cell-pop .pr-filter__input { width: 100%; }
+.pr-cell-pop textarea.pr-filter__input { min-height: 90px; }
+.pr-cell-pop__foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Ayuda mientras se edita una celda: cómo guardar y cómo cancelar */
+.pr-cell-tip {
+  position: fixed; z-index: 3001; padding: 5px 9px; border-radius: 8px; background: #1b1d29; color: #fff;
+  font-size: 11.5px; line-height: 1.3; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 16px rgba(13, 18, 30, .18);
+}
+.pr-cell-tip kbd, .pr-cell-pop__hint kbd {
+  font: inherit; font-weight: 600; padding: 0 5px; border-radius: 4px; background: rgba(255, 255, 255, .16);
+}
+.pr-cell-pop__hint { margin-right: auto; align-self: center; font-size: 11.5px; color: var(--pr-ink-3, #8a90a0); }
+.pr-cell-pop__hint kbd { background: var(--pr-card-soft, #f3f4f8); color: var(--pr-ink-2, #3b4152); border: 1px solid var(--pr-rule, #e6e8ef); }

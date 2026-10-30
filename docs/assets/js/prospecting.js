@@ -419,6 +419,9 @@
     renderViewBar();
   }
 
+  /* Campos del BDR que se editan haciendo click en la celda (Owner, Status y Not ICP ya son
+     <select>). Los de Clay quedan de lectura: los pisa Clay en cada envío. */
+  var CO_INLINE = { prospecting_start_date: true, week_label: true, lead_source: true };
   var lastRows = [];
   function renderRows(rows) {
     var cols = activeColumns();
@@ -431,7 +434,9 @@
       return '<tr data-id="' + r.id + '"' + (selected[r.id] ? ' class="is-selected"' : "") + ">" +
         (canSelect() ? '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-sel="' + r.id + '"' + (selected[r.id] ? " checked" : "") + "></label></td>" : "") +
         cols.map(function (c) {
-        return "<td" + (c.num ? ' class="pr-num"' : "") + ">" + c.render(r) + "</td>";
+        var cls = [c.num ? "pr-num" : "", CO_INLINE[c.key] ? "pr-cell-edit" : ""].filter(Boolean).join(" ");
+        return "<td" + (cls ? ' class="' + cls + '"' : "") + (CO_INLINE[c.key] ? ' data-co-edit="' + c.key + '" title="Click para editar"' : "") + ">" +
+          c.render(r) + "</td>";
       }).join("") + "</tr>";
     }).join("");
     renderBulk();
@@ -902,6 +907,103 @@
     load();
   }
 
+  /* ---------- Editar en la celda (tablas de empresas y contactos) ----------
+     Click en una celda editable → el control del tipo del campo (los mismos del panel del
+     contacto y de la edición masiva: ProspectingContacts.fieldControl / readFieldValue).
+     Enter o salir guarda, Esc cancela; listas / owner / Sí-No guardan al elegir. Casillas
+     múltiples y textos largos van en un recuadro flotante con Guardar. `save(valor)` devuelve
+     una Promise; si falla, la celda vuelve a como estaba. Sin cambios no se manda nada. */
+  var inlineOpen = null;
+  function inlineEdit(td, f, value, save) {
+    if (inlineOpen) inlineOpen.cancel();
+    var PC = window.ProspectingContacts;
+    var big = f.type === "multi" || f.type === "longtext";
+    var pick = ["enum", "owner", "user", "bool"].indexOf(f.type) !== -1;
+    var original = td.innerHTML, box = null, tip = null, done = false;
+    var html = PC.fieldControl(f, value);
+    if (big) {
+      box = document.createElement("div");
+      box.className = "pr-cell-pop";
+      box.innerHTML = '<div class="pr-cell-pop__label">' + esc(f.label) + "</div>" + html +
+        '<div class="pr-cell-pop__foot"><span class="pr-cell-pop__hint"><kbd>Esc</kbd> para cancelar</span>' +
+        '<button type="button" class="pr-btn" data-ce="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-ce="save">Guardar</button></div>';
+      document.body.appendChild(box);
+      var r = td.getBoundingClientRect();
+      box.style.left = Math.max(12, Math.min(r.left, window.innerWidth - box.offsetWidth - 12)) + "px";
+      box.style.top = Math.min(r.bottom + 4, window.innerHeight - box.offsetHeight - 12) + "px";
+      td.classList.add("is-editing");
+    } else {
+      td.classList.add("is-editing");
+      td.innerHTML = '<div class="pr-cell-editor">' + html + "</div>";
+      // Cómo se guarda y cómo se cancela, debajo de la celda mientras se edita.
+      tip = document.createElement("div");
+      tip.className = "pr-cell-tip";
+      tip.innerHTML = (pick ? "Elegí una opción para guardar" : "<kbd>Enter</kbd> o click afuera para guardar") +
+        " · <kbd>Esc</kbd> para cancelar";
+      document.body.appendChild(tip);
+      var tr = td.getBoundingClientRect();
+      tip.style.left = Math.max(12, Math.min(tr.left, window.innerWidth - tip.offsetWidth - 12)) + "px";
+      tip.style.top = (tr.bottom + 4 + tip.offsetHeight > window.innerHeight ? tr.top - tip.offsetHeight - 4 : tr.bottom + 4) + "px";
+    }
+    var host = box || td;
+    var el = host.querySelector("[data-k]");
+    var initial = JSON.stringify(PC.readFieldValue(el));
+    var finish = function () {
+      done = true;
+      inlineOpen = null;
+      td.classList.remove("is-editing");
+      if (box) box.remove();
+      if (tip) tip.remove();
+      document.removeEventListener("mousedown", outside, true);
+    };
+    var cancel = function () {
+      if (done) return;
+      finish();
+      td.innerHTML = original;
+    };
+    var commit = function () {
+      if (done) return;
+      var v = PC.readFieldValue(el);
+      if (JSON.stringify(v) === initial) return cancel();
+      finish();
+      td.innerHTML = original;
+      td.classList.add("is-saving");
+      Promise.resolve(save(v)).catch(function (err) {
+        td.innerHTML = original;
+        toast('<span class="pr-toast__warn"><i class="fa-solid fa-triangle-exclamation"></i> No se guardó «' + esc(f.label) + "»: " +
+          esc(err.errors ? err.errors.join(" · ") : err.message) + "</span>");
+      }).then(function () { td.classList.remove("is-saving"); });
+    };
+    // Click afuera: en la celda guarda (como salir de un input); el recuadro flotante cancela.
+    var outside = function (e) {
+      if (host.contains(e.target)) return;
+      if (box) cancel(); else commit();
+    };
+    document.addEventListener("mousedown", outside, true);
+    host.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancel(); }
+      else if (e.key === "Enter" && !big) { e.preventDefault(); commit(); }
+    });
+    if (pick) el.addEventListener("change", commit);
+    else if (!big) el.addEventListener("blur", function () { setTimeout(commit, 0); });
+    if (box) {
+      box.addEventListener("click", function (e) {
+        var chip = e.target.closest(".pr-wf-chip");
+        if (chip) {
+          chip.classList.toggle("is-on");
+          chip.innerHTML = (chip.classList.contains("is-on") ? '<i class="fa-solid fa-check"></i> ' : "") + esc(chip.getAttribute("data-chip"));
+          return;
+        }
+        var b = e.target.closest("[data-ce]");
+        if (b) (b.getAttribute("data-ce") === "save" ? commit : cancel)();
+      });
+    }
+    inlineOpen = { cancel: cancel };
+    if (el.focus) el.focus();
+    if (el.showPicker && pick && el.tagName === "SELECT") { try { el.showPicker(); } catch (e) {} }
+  }
+
   /* Pasó a Qualified / SQL sin un contacto completo: formulario «Completá el contacto». */
   function askContact(row) {
     if (!row || !row.needs_contact || !window.ProspectingContacts) return;
@@ -1207,7 +1309,10 @@
     $("prCtBody").innerHTML = ctRows.length ? ctRows.map(function (c) {
       return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
         '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-ct-sel="' + c.id + '"' + (ctSelected[c.id] ? " checked" : "") + "></label></td>" +
-        cols.map(function (k) { return "<td>" + ctCell(k, c) + "</td>"; }).join("") + "</tr>";
+        cols.map(function (k) {
+          var editable = k !== "name" && k !== "hub_company";
+          return "<td" + (editable ? ' class="pr-cell-edit" data-ct-edit="' + k + '" title="Click para editar"' : "") + ">" + ctCell(k, c) + "</td>";
+        }).join("") + "</tr>";
     }).join("") : '<tr><td class="pr-empty" colspan="' + span + '">No contacts match these filters.</td></tr>';
     renderCtBulk();
   }
@@ -1326,6 +1431,31 @@
       }
     });
     $("prCtBody").addEventListener("click", function (e) {
+      var ce = e.target.closest("td[data-ct-edit]");
+      if (ce && !ce.classList.contains("is-editing") && !e.target.closest("a")) {
+        var tr0 = ce.closest("tr"), id = Number(tr0.getAttribute("data-ct")), key = ce.getAttribute("data-ct-edit");
+        var row = ctRows.filter(function (x) { return x.id === id; })[0];
+        if (!row) return;
+        var f = ctFieldOf(key);
+        inlineEdit(ce, f, key === "company_name" ? row.contact_company_name : row[key], function (v) {
+          var patch = {};
+          patch[key] = v;
+          return api("/prospecting/contacts/" + id, { method: "PATCH", body: JSON.stringify(patch) }).then(function (resp) {
+            // En la respuesta `company_name` es la empresa del Hub; la propiedad del contacto va aparte.
+            var keepProp = row.contact_company_name;
+            Object.assign(row, resp);
+            row.hub_company = resp.company_name;
+            row.contact_company_name = key === "company_name" ? v : keepProp;
+            renderCtRows();
+            var applied = resp.workflows_applied || [];
+            if (applied.length) {
+              toast('<i class="fa-solid fa-diagram-project"></i> El workflow ' + applied.map(function (a) { return "<strong>" + esc(a.name) + "</strong>"; }).join(", ") + " actualizó este contacto.");
+              loadContacts();
+            }
+          });
+        });
+        return;
+      }
       var b = e.target.closest("[data-ct-open]");
       if (!b) return;
       var tr = b.closest("tr");
@@ -2354,7 +2484,22 @@
         return;
       }
       var btn = e.target.closest("[data-open]");
-      if (btn) showCompany(Number(btn.getAttribute("data-open")));
+      if (btn) { showCompany(Number(btn.getAttribute("data-open"))); return; }
+      var ce = e.target.closest("td[data-co-edit]");
+      if (ce && !ce.classList.contains("is-editing") && !e.target.closest("a")) {
+        var cid2 = Number(ce.closest("tr").getAttribute("data-id")), key = ce.getAttribute("data-co-edit");
+        var fdef = ((((OPTS.objects || {}).company || {}).fields) || []).filter(function (x) { return x.key === key; })[0] || { key: key, label: key, type: "text" };
+        var cur = rowsById[cid2][key];
+        inlineEdit(ce, fdef, fdef.type === "date" && cur ? String(cur).slice(0, 10) : cur, function (v) {
+          var patch = {};
+          patch[key] = v;
+          return patchCompany(cid2, patch).then(function (row) {
+            Object.assign(rowsById[cid2], row);
+            renderRows(lastRows);
+            announceWorkflows(row);
+          });
+        });
+      }
     });
     document.querySelectorAll("[data-drawer-close]").forEach(function (el) {
       el.addEventListener("click", closeDrawer);

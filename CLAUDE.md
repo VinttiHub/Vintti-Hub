@@ -1270,6 +1270,11 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   catálogo de columnas lo da `store.export_fields()` (también en `/options` → `export_fields`);
   en contactos la empresa del Hub sale como `hub_company`, porque `company_name` ya es una
   propiedad del contacto. CSV con BOM (acentos en Excel), fechas con hora en hora Argentina.
+- **Editar en la celda (2026-10-30)**: en Contactos todas las propiedades se editan con un click
+  en la tabla (menos Name, que abre el panel, y Company, que es el link); en Empresas además de
+  Owner/Status/Not ICP, Start Date, Semana y Lead Source. Lo de Clay sigue de lectura (decisión de
+  la owner). Un solo `inlineEdit()` en `prospecting.js`, con los controles de
+  `ProspectingContacts.fieldControl()`; guarda por los PATCH de siempre (historial y workflows).
 - **Orden por columna (2026-10-30)**: click en el título → menú con las formas según el tipo
   (A→Z, menor→mayor, más recientes, **orden de la lista** para Size/Status/Lead Life, owner por
   **nombre**, Sí/No primero). Un solo `store.order_sql(obj, sort)` para empresas y contactos;
