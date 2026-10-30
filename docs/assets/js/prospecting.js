@@ -277,10 +277,52 @@
     return visibleCols.map(function (k) { return COL_BY_KEY[k]; }).filter(Boolean);
   }
   /* Se ordena por cualquier columna que sea un campo (contacts_count es calculada). */
-  function sortable(c) { return c.key !== "contacts_count"; }
+  function sortable() { return true; }
+  /* `<campo>:<modo>` (backend: store.order_sql). asc/desc = A→Z, menor→mayor, antigua→reciente
+     según el tipo; list_asc/list_desc = el orden de las opciones de la lista. */
   function parseSort(s) {
-    var m = /^([a-z0-9_]+):(asc|desc)$/.exec(s || "");
-    return m ? { key: m[1], dir: m[2] } : null;
+    var m = /^([a-z0-9_]+):(asc|desc|list_asc|list_desc)$/.exec(s || "");
+    return m ? { key: m[1], mode: m[2], dir: m[2] === "asc" || m[2] === "list_asc" ? "asc" : "desc" } : null;
+  }
+  /* Las formas de ordenar según el tipo de la columna. */
+  function sortOptions(f) {
+    var t = f.type, o = f.options || [];
+    var az = [{ mode: "asc", label: "A → Z" }, { mode: "desc", label: "Z → A" }];
+    if (t === "number") return [{ mode: "asc", label: "Menor a mayor" }, { mode: "desc", label: "Mayor a menor" }];
+    if (t === "date" || t === "datetime") return [{ mode: "desc", label: "Más recientes primero" }, { mode: "asc", label: "Más antiguas primero" }];
+    if (t === "bool") return [{ mode: "desc", label: "Sí primero" }, { mode: "asc", label: "No primero" }];
+    if (t === "owner" || t === "user") return [{ mode: "asc", label: "Nombre A → Z" }, { mode: "desc", label: "Nombre Z → A" }];
+    if (t === "enum" && o.length) {
+      return [{ mode: "list_asc", label: "Orden de la lista (" + o[0] + " → " + o[o.length - 1] + ")" },
+              { mode: "list_desc", label: "Orden de la lista, al revés (" + o[o.length - 1] + " → " + o[0] + ")" }].concat(az);
+    }
+    return az;
+  }
+  function sortLabel(f, mode) {
+    var hit = sortOptions(f).filter(function (x) { return x.mode === mode; })[0];
+    return hit ? hit.label : "";
+  }
+  /* Menú del encabezado: elegir cómo ordenar esa columna (o quitar el orden). */
+  function sortMenu(th, obj, f, current) {
+    var cur = parseSort(current);
+    var on = cur && cur.key === f.key;
+    openPop(th, '<div class="pr-pop__head">Ordenar por ' + esc(f.label) + "</div>" +
+      sortOptions(f).map(function (x) {
+        var active = on && cur.mode === x.mode;
+        return '<button type="button" class="pr-pop__item' + (active ? " is-on" : "") + '" data-sortpick="' + esc(f.key + ":" + x.mode) + '" data-sortobj="' + obj + '">' +
+          '<i class="fa-solid ' + (active ? "fa-check" : /desc/.test(x.mode) ? "fa-arrow-down-wide-short" : "fa-arrow-up-short-wide") + '"></i> ' + esc(x.label) + "</button>";
+      }).join("") +
+      (on ? '<button type="button" class="pr-pop__item" data-sortpick="" data-sortobj="' + obj + '"><i class="fa-solid fa-xmark"></i> Quitar orden</button>' : "") +
+      '<p class="pr-pop__note">Los vacíos van siempre al final.</p>');
+    $("prViewPop").classList.add("pr-pop--actions");
+  }
+  function sortArrow(on, cur) {
+    return on ? ' <i class="fa-solid fa-arrow-' + (cur.dir === "asc" ? "up" : "down") + ' pr-sort-arrow"></i>' : "";
+  }
+  function companyFieldOf(key) {
+    var c = COL_BY_KEY[key] || { key: key, label: key };
+    var f = ((((OPTS.objects || {}).company || {}).fields) || []).filter(function (x) { return x.key === key; })[0] || {};
+    return { key: key, label: c.label, type: key === "contacts_count" ? "number" : f.type, options: f.options };
   }
 
   /* Selección de filas: «Editar» en masa lo puede usar cualquiera con acceso (como la
@@ -298,8 +340,9 @@
       var cur = parseSort(state.sort);
       var on = cur && cur.key === c.key;
       var cls = [c.num ? "pr-num" : "", on ? "is-sorted" : ""].filter(Boolean).join(" ");
-      var arrow = on ? ' <i class="fa-solid fa-arrow-' + (cur.dir === "asc" ? "up" : "down") + ' pr-sort-arrow"></i>' : "";
-      return "<th" + (sortable(c) ? ' data-sort="' + c.key + '" title="Sort · drag to move"' : "") + (cls ? ' class="' + cls + '"' : "") +
+      var arrow = sortArrow(on, cur);
+      var tip = on ? "Ordenado: " + sortLabel(companyFieldOf(c.key), cur.mode) : "Ordenar · arrastrar para mover";
+      return "<th" + (sortable(c) ? ' data-sort="' + c.key + '" title="' + esc(tip) + '"' : "") + (cls ? ' class="' + cls + '"' : "") +
         (c.fixed ? "" : ' draggable="true" data-col-drag="' + c.key + '"') + ">" + esc(c.label) + arrow + "</th>";
     }).join("");
     $("prColsCount").textContent = activeColumns().length + "/" + COLUMNS.length;
@@ -647,7 +690,7 @@
       goIcon: "fa-download", goLabel: "Descargar CSV", busyLabel: "Armando el CSV…",
       onGo: function (cols) {
         // El orden de las filas es el de la tabla (en «todas las del filtro» el sort no viaja en los filtros).
-        var body = Object.assign({}, si.target, { columns: cols, sort: si.isCo ? state.sort : null });
+        var body = Object.assign({}, si.target, { columns: cols, sort: si.isCo ? state.sort : (ctSort || null) });
         var day = new Date().toLocaleDateString("sv-SE");  // AAAA-MM-DD, hora local
         return download("/prospecting/" + (si.isCo ? "companies" : "contacts") + "/export", body,
           "prospecting-" + (si.isCo ? "empresas" : "contactos") + "-" + day + ".csv").then(function () {
@@ -899,13 +942,23 @@
     return [{ key: "name", label: "Name", group: "Contacto", fixed: true },
             { key: "hub_company", label: "Empresa (en el Hub)", group: "Contacto" }]
       .concat((((OPTS.objects || {}).contact || {}).fields || []).map(function (f) {
-        return { key: f.key, label: f.label, group: f.group || "Otros", type: f.type };
+        return { key: f.key, label: f.label, group: f.group || "Otros", type: f.type, options: f.options };
       }));
   }
   /* Columnas que se ven ahora (`ctCols`): las de la vista, o en «Todos los contactos» las de
      este navegador (como las pestañas fijas de empresas). Arrastrarlas en el encabezado en una
      vista la deja con cambios sin guardar. */
   var ctCols = null, CT_COLS_KEY = "prospecting_ct_columns_v1";
+  /* Orden de la tabla de contactos ("" = los más nuevos primero). En una vista se guarda con
+     ella; en «Todos los contactos», en este navegador. */
+  var ctSort = "", CT_SORT_KEY = "prospecting_ct_sort_v1";
+  function setCtSort(s) {
+    ctSort = s || "";
+    if (!ctViewObj()) { try { localStorage.setItem(CT_SORT_KEY, ctSort); } catch (e) {} }
+    ctState.page = 1;
+    renderCtHead();
+    loadContacts();
+  }
   var ctCatMemo = null;
   function ctCatMap() {
     if (!ctCatMemo || ctCatMemo.opts !== OPTS) {
@@ -959,7 +1012,10 @@
   function renderCtHead() {
     $("prCtHead").innerHTML = '<th class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" id="prCtSelAll" title="Seleccionar la página"></label></th>' +
       ctColumns().map(function (k) {
-        return "<th" + (k === "name" ? "" : ' draggable="true" data-col-drag="' + k + '" title="Drag to move"') + ">" + esc(CT_SHORT[k] || ctFieldOf(k).label) + "</th>";
+        var cur = parseSort(ctSort), on = !!cur && cur.key === k;
+        var tip = on ? "Ordenado: " + sortLabel(ctFieldOf(k), cur.mode) : "Ordenar" + (k === "name" ? "" : " · arrastrar para mover");
+        return "<th" + (k === "name" ? "" : ' draggable="true" data-col-drag="' + k + '"') + ' data-sort="' + k + '" title="' + esc(tip) + '"' +
+          (on ? ' class="is-sorted"' : "") + ">" + esc(CT_SHORT[k] || ctFieldOf(k).label) + sortArrow(on, cur) + "</th>";
       }).join("");
   }
   function renderCtTabs() {
@@ -1003,6 +1059,9 @@
   function applyCtView(id) {
     ctView = CT_VIEWS.some(function (v) { return v.id === id; }) ? id : null;
     ctCols = null;
+    var vSort = ((ctViewObj() || {}).config || {}).sort;
+    if (ctViewObj()) ctSort = vSort || "";
+    else { try { ctSort = localStorage.getItem(CT_SORT_KEY) || ""; } catch (e) { ctSort = ""; } }
     try { localStorage.setItem(CT_VIEW_KEY, ctView == null ? "" : String(ctView)); } catch (e) {}
     var f = ((ctViewObj() || {}).config || {}).filters || {};
     $("prCtQ").value = f.q || "";
@@ -1078,7 +1137,8 @@
   function ctIsDirty() {
     var v = ctViewObj();
     return canon(ctFilterInputs()) !== canon(ctSavedFilters(v)) ||
-      (!!v && canon(ctColumns()) !== canon(normCtCols(v.config && v.config.columns)));
+      (!!v && canon(ctColumns()) !== canon(normCtCols(v.config && v.config.columns))) ||
+      (!!v && ctSort !== ((v.config && v.config.sort) || ""));
   }
   function renderCtViewBar() {
     var bar = $("prCtViewBar");
@@ -1100,7 +1160,7 @@
     var filters = Object.assign(ctFilterInputs(), (((v || {}).config || {}).filters || {}).dummy ? { dummy: v.config.filters.dummy } : {});
     if (act === "reset") { applyCtView(ctView); return; }
     if (act === "save" && v && v.mine) {
-      patchView(v, { config: Object.assign({}, v.config, { filters: filters, columns: ctColumns() }) }).then(function () {
+      patchView(v, { config: Object.assign({}, v.config, { filters: filters, columns: ctColumns(), sort: ctSort || null }) }).then(function () {
         ctCols = null;
         renderCtViewBar();
         toast('<i class="fa-solid fa-floppy-disk"></i> Saved <strong>' + esc(v.name) + "</strong>.");
@@ -1110,7 +1170,7 @@
     if (act === "saveas") {
       var name = prompt("Name for the new view:", v ? v.name + " (copy)" : "");
       if (!name || !name.trim()) return;
-      var config = { filters: filters, columns: ctColumns(), page_size: 25 };
+      var config = { filters: filters, columns: ctColumns(), page_size: 25, sort: ctSort || null };
       if (v && v.config && Array.isArray(v.config.segment_ids)) config.segment_ids = v.config.segment_ids;
       api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name.trim(), object: "contact", config: config, shared: false }) })
         .then(function (nv) {
@@ -1152,7 +1212,7 @@
     renderCtBulk();
   }
   function loadContacts() {
-    var q = Object.assign(ctFilters(), { page: ctState.page, page_size: 25 });
+    var q = Object.assign(ctFilters(), { page: ctState.page, page_size: 25, sort: ctSort });
     renderCtViewBar();
     var key = qs(q);
     if (key !== ctLastKey) { ctSelected = {}; ctSelAll = null; ctLastKey = key; }
@@ -1229,6 +1289,12 @@
     });
     $("prCtTabs").addEventListener("dragend", function () { dragCtv = null; });
     bindHeaderDrag($("prCtHead"), ctColumns, setCtCols);
+    $("prCtHead").addEventListener("click", function (e) {
+      var th = e.target.closest("th[data-sort]");
+      if (!th || e.target.closest(".pr-check")) return;
+      e.stopPropagation();
+      sortMenu(th, "contact", ctFieldOf(th.getAttribute("data-sort")), ctSort);
+    });
     $("prCtTabs").addEventListener("click", function (e) {
       if (e.target.closest("#prCtTabsMore")) { e.stopPropagation(); ctMoreMenu($("prCtTabsMore")); return; }
       var more = e.target.closest("[data-ctv-menu]");
@@ -2090,6 +2156,20 @@
         else openEnrollModal(kind);
         return;
       }
+      var sp = e.target.closest("[data-sortpick]");
+      if (sp) {
+        closePop();
+        var pick = sp.getAttribute("data-sortpick");
+        if (sp.getAttribute("data-sortobj") === "company") {
+          state.sort = pick || "created_desc";
+          state.page = 1;
+          renderHead();
+          load();
+        } else {
+          setCtSort(pick);
+        }
+        return;
+      }
       var go = e.target.closest("[data-tab-go]");
       if (go) { closePop(); switchTab(go.getAttribute("data-tab-go")); return; }
       var ctGo = e.target.closest("[data-ctv-go]");
@@ -2171,15 +2251,12 @@
     $("prPrev").addEventListener("click", function () { if (state.page > 1) { state.page--; load(); } });
     $("prNext").addEventListener("click", function () { state.page++; load(); });
     // Los <th> se regeneran al cambiar columnas: delegación sobre el <tr>.
-    // Click en el encabezado: ascendente → descendente → sin orden.
+    // Click en el encabezado: menú con las formas de ordenar esa columna según su tipo.
     $("prHead").addEventListener("click", function (e) {
       var th = e.target.closest("th[data-sort]");
       if (!th) return;
-      var key = th.getAttribute("data-sort"), cur = parseSort(state.sort);
-      state.sort = !cur || cur.key !== key ? key + ":asc" : cur.dir === "asc" ? key + ":desc" : "created_desc";
-      state.page = 1;
-      renderHead();
-      load();
+      e.stopPropagation();
+      sortMenu(th, "company", companyFieldOf(th.getAttribute("data-sort")), state.sort);
     });
     $("prColsBtn").addEventListener("click", function (e) {
       e.stopPropagation();

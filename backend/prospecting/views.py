@@ -69,12 +69,24 @@ def ensure_schema(cur) -> None:
     )
 
 
-def parse_sort(raw) -> tuple[str, str] | None:
-    """`<campo>:<asc|desc>` con un campo del catálogo, o None."""
+# Cómo se ordena una columna (store.order_sql): `asc` / `desc` = A→Z, menor→mayor, más
+# antiguo→reciente según el tipo; `list_asc` / `list_desc` = el orden de las opciones de una
+# lista (Size 1-10 → 10001+, Status en el orden del pipeline).
+SORT_MODES = ("asc", "desc", "list_asc", "list_desc")
+SORT_EXTRA = {"company": {"contacts_count"}, "contact": {"name", "hub_company"}}
+
+
+def parse_sort(raw, obj: str = "company") -> tuple[str, str] | None:
+    """`<campo>:<modo>` con un campo del catálogo del objeto (o una calculada), o None."""
     if not isinstance(raw, str) or ":" not in raw:
         return None
     key, d = raw.rsplit(":", 1)
-    if key in FIELDS_BY_KEY and d in ("asc", "desc"):
+    if obj == "company":
+        ok = key in FIELDS_BY_KEY
+    else:
+        from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+        ok = key in CONTACT_FIELDS_BY_KEY
+    if (ok or key in SORT_EXTRA[obj]) and d in SORT_MODES:
         return key, d
     return None
 
@@ -107,7 +119,8 @@ def _clean_contact_config(cfg) -> dict:
         page_size = int(cfg.get("page_size") or 25)
     except (TypeError, ValueError):
         page_size = 25
-    return {"filters": filters, "columns": cols, "page_size": page_size if page_size in PAGE_SIZES else 25}
+    sort = cfg.get("sort") if parse_sort(cfg.get("sort"), "contact") else None
+    return {"filters": filters, "columns": cols, "page_size": page_size if page_size in PAGE_SIZES else 25, "sort": sort}
 
 
 def clean_config(cfg, ctx, obj: str = "company") -> dict:

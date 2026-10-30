@@ -720,16 +720,76 @@ SORTS = {
 
 
 def _order_sql(sort) -> str:
-    """Las claves viejas de SORTS, o `<campo>:<asc|desc>` con un campo del catálogo."""
-    if sort in SORTS:
-        return SORTS[sort]
+    return order_sql("company", sort)
+
+
+def _sql_lit(v: str) -> str:
+    """Literal SQL de una constante del catálogo (opciones de una lista): nunca entra texto del usuario."""
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def _sort_value(obj: str, field: dict) -> str:
+    """El campo como valor ordenable. En contactos las propiedades viven en `props` (texto):
+    el cast se protege con un patrón, así un valor mal cargado queda vacío en vez de romper la lista."""
+    key, ty = field["key"], field["type"]
+    if obj == "company" or field.get("storage") == "col":
+        return ("" if obj == "company" else "ct.") + key
+    raw = f"NULLIF(ct.props->>'{key}', '')"
+    if ty == "number":
+        return f"(CASE WHEN {raw} ~ '^-?[0-9]+([.][0-9]+)?$' THEN ({raw})::numeric END)"
+    if ty == "date":
+        return f"(CASE WHEN {raw} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN LEFT({raw}, 10)::date END)"
+    if ty == "datetime":
+        return f"(CASE WHEN {raw} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}' THEN ({raw})::timestamptz END)"
+    if ty == "bool":
+        return f"(CASE WHEN {raw} IN ('true', 'false') THEN ({raw})::boolean END)"
+    if ty == "multi":
+        return f"(ct.props->'{key}')"
+    return raw
+
+
+def order_sql(obj: str, sort) -> str:
+    """ORDER BY de la tabla de empresas o de contactos. `sort` = `<campo>:<modo>` (ver
+    views.SORT_MODES) o, en empresas, una clave vieja de SORTS. Vacíos siempre al final."""
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
     from prospecting.views import parse_sort
-    parsed = parse_sort(sort)
+
+    idcol = "id" if obj == "company" else "ct.id"
+    if obj == "company" and sort in SORTS:
+        return SORTS[sort]
+    parsed = parse_sort(sort, obj)
     if not parsed:
-        return SORTS["created_desc"]
-    key, d = parsed
-    expr = f"LOWER({key})" if FIELDS_BY_KEY[key]["type"] in ("text", "longtext", "url", "owner", "enum") else key
-    return f"{expr} {d.upper()} NULLS LAST, id {d.upper()}"
+        return SORTS["created_desc"] if obj == "company" else "ct.created_at DESC, ct.id DESC"
+    key, mode = parsed
+    d = "ASC" if mode in ("asc", "list_asc") else "DESC"
+    # Orden alfabético en español (ICU): «Agustin Penna» antes que «Agustina», «ábaco» con la a.
+    # La intercalación de la base (en_US) ignora los espacios y daba el orden al revés.
+    text = lambda e: f'LOWER(NULLIF(TRIM(({e})::text), \'\')) COLLATE "es-x-icu"'
+    if key == "contacts_count":
+        expr = "(SELECT COUNT(*) FROM prospect_contacts x WHERE x.company_id = prospect_companies.id)"
+    elif key == "name" and obj == "contact":
+        expr = text("CONCAT_WS(' ', ct.first_name, ct.last_name)")
+    elif key == "hub_company":
+        expr = text("c.name")
+    else:
+        field = (FIELDS_BY_KEY if obj == "company" else CONTACT_FIELDS_BY_KEY)[key]
+        ty, e = field["type"], _sort_value(obj, field)
+        if mode.startswith("list") and field.get("options"):
+            expr = f"array_position(ARRAY[{', '.join(_sql_lit(o) for o in field['options'])}]::text[], ({e})::text)"
+        elif ty in ("owner", "user"):
+            # Por el nombre de la persona, no por su email.
+            expr = text(f"COALESCE((SELECT u.user_name FROM users u WHERE LOWER(TRIM(u.email_vintti)) = LOWER(TRIM({e})) LIMIT 1), {e})")
+        elif ty == "multi":
+            expr = (f"(SELECT LOWER(string_agg(v, ', ' ORDER BY v)) FROM jsonb_array_elements_text("
+                    f"CASE WHEN jsonb_typeof({e}) = 'array' THEN {e} ELSE '[]'::jsonb END) v) COLLATE \"es-x-icu\"")
+        elif key == "week_label":
+            # «Semana 9» antes que «Semana 10»: por el número, después por el texto.
+            expr = f"NULLIF(REGEXP_REPLACE({e}, '[^0-9]', '', 'g'), '')::bigint {d} NULLS LAST, {text(e)}"
+        elif ty in ("number", "date", "datetime", "bool"):
+            expr = e
+        else:
+            expr = text(e)
+    return f"{expr} {d} NULLS LAST, {idcol} {d}"
 
 
 def _company_where(f: dict) -> tuple[str, list]:
@@ -1328,13 +1388,13 @@ def export_fields(obj: str) -> list[dict]:
 def export_rows(cur, obj: str, ids: list[int], sort=None) -> list[dict]:
     """Los registros a exportar, en el orden de la tabla."""
     if obj == "company":
-        cur.execute(f"SELECT {LIST_COLUMNS} FROM prospect_companies WHERE id = ANY(%s) ORDER BY {_order_sql(sort)}", (ids,))
+        cur.execute(f"SELECT {LIST_COLUMNS} FROM prospect_companies WHERE id = ANY(%s) ORDER BY {order_sql('company', sort)}", (ids,))
         return [dict(r) for r in cur.fetchall()]
     cur.execute(
-        """
+        f"""
         SELECT ct.*, c.name AS hub_company FROM prospect_contacts ct
           JOIN prospect_companies c ON c.id = ct.company_id
-         WHERE ct.id = ANY(%s) ORDER BY ct.created_at DESC, ct.id DESC
+         WHERE ct.id = ANY(%s) ORDER BY {order_sql('contact', sort)}
         """,
         (ids,),
     )
@@ -1352,7 +1412,7 @@ def list_contacts(cur, f: dict) -> dict:
         f"""
         SELECT ct.*, c.name AS company_name, c.name AS hub_company, c.prospecting_status AS company_status,
                ct.props->>'company_name' AS contact_company_name {base}
-         ORDER BY ct.created_at DESC, ct.id DESC LIMIT %s OFFSET %s
+         ORDER BY {order_sql('contact', f.get('sort'))} LIMIT %s OFFSET %s
         """,
         params + [size, (page - 1) * size],
     )
