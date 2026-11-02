@@ -245,7 +245,11 @@ Cinco cosas que no son obvias:
   tarjeta en los dos drawers. Consecuencia: `mrr_inicial` del mes M **ya no** es el GMRR
   del cierre de M−1, le faltan justo los `buyouts`. El CRR sigue contando el buyout como
   churn: no se cambió ahí. Las etiquetas `audit` de los 4 detalles excluyen el flag `buyout`.
-- **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Sin ella se
+- **El tile muestra la FECHA de esa base** (campo `base_fecha`, "23-ago"). Desde el
+  2026-11-02 rotula el **primer día de la ventana** ("01-oct"), no `D_INI` ("30-sep"): es la
+  misma foto (cierre de `D_INI` sin sus bajas = quien sigue al empezar el 1-oct), pero
+  "30-sep" se leía como base de septiembre. Sólo cambió el texto; `win_ini` del summary
+  sigue devolviendo `D_INI`. Sin ella se
   lee como si fuera el MRR de hoy y no cuadra con el tile de al lado: con corte
   22-sep, GMRR · AM daba $237,4K y la base del NRR $208,1K, que era el GMRR · AM del
   23-ago (ejemplo de cuando el NRR · AM era sobre GMRR; desde el 2026-10-26 se compara

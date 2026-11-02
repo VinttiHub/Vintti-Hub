@@ -48,7 +48,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
         SELECT
           TO_CHAR({D_INI}, 'YYYY-MM-DD') AS win_ini,
-          {base_label_sql(D_INI)}        AS base_fecha,
+          -- Rotulo de la base: el primer dia de la ventana. La foto es el cierre de D_INI
+          -- SIN sus bajas, o sea quien sigue al empezar win_ini; "30-sep" se leia como
+          -- septiembre (2026-11-02).
+          {base_label_sql('%(win_ini)s::date')} AS base_fecha,
           TO_CHAR({D_FIN}, 'YYYY-MM-DD') AS win_fin,
           {summary_columns()}
         FROM nrr_rows;
