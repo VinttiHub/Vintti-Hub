@@ -231,6 +231,7 @@ CHURN_EMAIL_RECIPIENTS = [
     'agustin@vintti.com',
     'lara@vintti.com',
     'agostina@vintti.com',
+    'pilar@vintti.com',
 ]
 _REFERENCE_CANDIDATE_FIELDS = [
     'references_notes',

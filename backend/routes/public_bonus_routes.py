@@ -12,7 +12,7 @@ from sendgrid.helpers.mail import Mail, Email
 
 bp = Blueprint("public_bonus", __name__, url_prefix="/public/bonus_request")
 
-BONUS_EMAIL_FALLBACK_RECIPIENTS = ["agustin@vintti.com", "lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com"]
+BONUS_EMAIL_FALLBACK_RECIPIENTS = ["agustin@vintti.com", "lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com", "pilar@vintti.com"]
 BONUS_EMAIL_RECIPIENT_USER_IDS = [1, 2, 6, 12]
 
 def _safe_date(s):
