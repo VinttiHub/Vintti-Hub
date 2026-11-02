@@ -22,6 +22,8 @@ los JOINs de la página. El contacto de verdad se crea recién cuando tiene empr
 """
 from __future__ import annotations
 
+import re
+
 from psycopg2.extras import Json
 
 from prospecting import store
@@ -55,6 +57,18 @@ _FULL_NAME = {"name", "invitee_name", "full_name"}
 _WEBSITE = {"website", "company_website", "domain", "company_domain"}
 _EVENT_NAME = {"event_name", "event_type_name", "event_type"}
 _QA = {"questions_and_answers", "questions", "answers"}
+
+# Formatter "Extract Email Address" de Zapier devuelve ", ana@acme.io, ," (una lista
+# con huecos aplanada): se toma el primer mail que aparezca.
+_EMAIL_IN_TEXT = re.compile(r"[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+")
+
+
+def _first_email(v):
+    if isinstance(v, (list, tuple)):
+        v = " ".join(str(x) for x in v if x not in (None, ""))
+    m = _EMAIL_IN_TEXT.search(str(v or ""))
+    return m.group(0) if m else v
+
 
 # Lo único que una re-agenda pisa; el resto sólo se rellena si está vacío.
 OVERWRITE_FIELDS = {"meeting_datetime"}
@@ -134,6 +148,8 @@ def map_payload(payload: dict) -> tuple[dict, dict]:
         key = _ALIAS_TO_FIELD.get(nk) or (nk if nk in CONTACT_FIELDS_BY_KEY else None)
         if not key or key in data or key == "owner_email":
             continue
+        if CONTACT_FIELDS_BY_KEY[key]["type"] == "email":
+            v = _first_email(v)
         try:
             val = store.clean_contact_value(CONTACT_FIELDS_BY_KEY[key], v)
         except ValueError as exc:
