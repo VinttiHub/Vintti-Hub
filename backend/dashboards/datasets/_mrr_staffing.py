@@ -35,6 +35,10 @@ HIRES_FULL_CTE = """
               WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
               ELSE ho.end_date::date
             END AS end_d,
+            -- Fecha de salida del NRR: el ULTIMO DIA real (`end_date`) antes que el dia en
+            -- que se marco inactivo en el hub (decision de la owner, 2026-11-02). Solo la
+            -- usa el NRR; GMRR/MRR y Churn de contractors siguen con `end_d`.
+            COALESCE(NULLIF(ho.end_date::text, '')::date, ho.carga_inactive::date) AS exit_d,
             COALESCE(ho.salary, 0)::numeric AS salary,
             COALESCE(ho.fee,    0)::numeric AS fee,
             -- Mes del buyout (Staffing -> Recruiting). El NRR lo usa para netearlo: misma
@@ -60,7 +64,8 @@ HIRES_FULL_CTE = """
 
 
 def unit_snapshot(
-    name: str, dexpr: str, where_extra: str | None = None, exclude_end_day: bool = False
+    name: str, dexpr: str, where_extra: str | None = None, exclude_end_day: bool = False,
+    exit_col: str = "end_d",
 ) -> str:
     """CTE de MRR efectivo por (candidato, cuenta) a la fecha `dexpr`.
 
@@ -68,10 +73,11 @@ def unit_snapshot(
     `exclude_end_day=True` deja afuera a quien termina justo en `dexpr` (`end_d >`): la
     baja es su ultimo dia, asi que despues de ese dia ya no esta. Lo usa el NRR en sus dos
     bordes para que una baja del 30-sep caiga en septiembre y no en la base de octubre.
+    `exit_col` es la fecha de salida: el NRR pasa `exit_d` (end_date primero).
     """
     op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
-        f"h.start_d <= {dexpr} AND (h.end_d IS NULL OR h.end_d {op} {dexpr})"
+        f"h.start_d <= {dexpr} AND (h.{exit_col} IS NULL OR h.{exit_col} {op} {dexpr})"
     )
     return f"""
         {name}_opps AS (
@@ -127,7 +133,8 @@ def unit_snapshot(
 
 
 def unit_snapshot_monthly(
-    name: str, dcol: str, where_extra: str | None = None, exclude_end_day: bool = False
+    name: str, dcol: str, where_extra: str | None = None, exclude_end_day: bool = False,
+    exit_col: str = "end_d",
 ) -> str:
     """`unit_snapshot()` pero para una serie: un snapshot por cada fila de `meses`.
 
@@ -135,11 +142,11 @@ def unit_snapshot_monthly(
     `meses` que hace de fecha del snapshot (`prev_end` para el inicio de la ventana del
     mes, `fin_mes` para el cierre). Termina en
     `{name}(mes, candidate_id, account_id, opportunity_id, salary, fee)`.
-    `exclude_end_day` como en `unit_snapshot()`.
+    `exclude_end_day` y `exit_col` como en `unit_snapshot()`.
     """
     op = ">" if exclude_end_day else ">="
     poblacion = where_extra or (
-        f"h.start_d <= m.{dcol} AND (h.end_d IS NULL OR h.end_d {op} m.{dcol})"
+        f"h.start_d <= m.{dcol} AND (h.{exit_col} IS NULL OR h.{exit_col} {op} m.{dcol})"
     )
     return f"""
         {name}_opps AS (

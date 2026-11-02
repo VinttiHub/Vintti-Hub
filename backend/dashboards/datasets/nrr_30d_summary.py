@@ -42,8 +42,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # este mismo numero por construccion.
     sql = f"""
         WITH {HIRES_FULL_CTE},
-        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
-        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
+        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True, exit_col='exit_d')},
+        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True, exit_col='exit_d')},
         {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
         SELECT

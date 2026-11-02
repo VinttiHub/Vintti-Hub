@@ -24,7 +24,7 @@ def unit_info_cte(src: str = "hires_full", close_col: str = "opp_close_d") -> st
     return f"""
         unit_info AS (
           SELECT DISTINCT ON (h.candidate_id, h.account_id)
-            h.candidate_id, h.account_id, h.start_d, h.end_d, h.inactive_reason,
+            h.candidate_id, h.account_id, h.start_d, h.exit_d AS end_d, h.inactive_reason,
             h.{close_col} AS close_d,
             (h.{close_col} + INTERVAL '3 months')::date AS m3_d
           FROM {src} h
@@ -91,8 +91,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = f"""
         WITH {HIRES_FULL_CTE},
         {unit_info_cte()},
-        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
-        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
+        {unit_snapshot('unit_ini', D_INI, exclude_end_day=True, exit_col='exit_d')},
+        {unit_snapshot('unit_fin', D_FIN, exclude_end_day=True, exit_col='exit_d')},
         {unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires_full', D_INI, D_FIN)}
         {DETAIL_SELECT.format(mes=D_FIN)}
@@ -111,9 +111,9 @@ DATASET = {
     # El NRR mide unidades (candidato, cuenta) que estaban en la base: no puede perder a
     # quien arrancó en el mes ni a quien sigue en la cuenta con otro hire.
     "audit": [{
-        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "fact": "contractor_baja_end", "entity": ["candidate_name", "client_name"],
         "match": {"componente": "^(churn_no_recorte|downgrades_recorte)$"}, "date_col": "end_d",
-        "excluye": ["nuevo_en_mes", "sigue_en_cuenta", "buyout"],
+        "excluye": ["sigue_en_cuenta", "buyout", "cuenta_nueva"],
     }],
     "query": query,
 }

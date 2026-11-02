@@ -40,7 +40,9 @@ _HIRES = """
              ELSE NULLIF(ho.start_date::text, '')::date END AS start_d,
         CASE WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
              WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
-             ELSE ho.end_date::date END AS end_d
+             ELSE ho.end_date::date END AS end_d,
+        -- Fecha de salida del NRR: end_date primero (ver `_mrr_staffing.HIRES_FULL_CTE`).
+        COALESCE(NULLIF(ho.end_date::text, '')::date, ho.carga_inactive::date) AS exit_d
       FROM hire_opportunity ho
       JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
       LEFT JOIN account a ON a.account_id = ho.account_id
@@ -116,6 +118,7 @@ FLAGS = {
     "volvio_en_mes": "volvio a contratar antes de que cerrara el mes",
     "buyout": "fue un buyout (el cliente se quedo con el contractor)",
     "sigue_en_cuenta": "sigue trabajando para el mismo cliente en otra vacante",
+    "cuenta_nueva": "la cuenta no era cliente al inicio del mes (new business)",
 }
 
 
@@ -135,44 +138,62 @@ def client_bajas(conn, ini: date, fin: date) -> list:
     return out
 
 
-# Baja de contractor = cada hire (candidato, cuenta) con end_d. Mismo universo que
-# los datasets de churn de contractors: Staffing, cuentas no internas.
-_CONTRACTOR_BAJAS_SQL = f"""
-    WITH {_HIRES}
+# Baja de contractor = cada hire (candidato, cuenta) con fecha de salida. Mismo universo
+# que los datasets de churn de contractors: Staffing, cuentas no internas. `{d}` es la
+# fecha de salida: `end_d` (carga_inactive primero) para Churn de contractors y el resto,
+# `exit_d` (end_date primero) para el NRR, que la usa desde el 2026-11-02.
+_CONTRACTOR_BAJAS_TPL = """
+    WITH {hires}
     SELECT DISTINCT
       c.name AS candidate_name,
       a.client_name,
-      h.end_d,
+      h.{d},
       -- Buyout: el contractor pasa a ser del cliente.
-      COALESCE(h.buyout_d >= DATE_TRUNC('month', h.end_d)::date, FALSE) AS buyout,
+      COALESCE(h.buyout_d >= DATE_TRUNC('month', h.{d})::date, FALSE) AS buyout,
       -- Arranco y se fue en el mismo mes: no estaba en ninguna base de inicio.
-      h.start_d >= DATE_TRUNC('month', h.end_d)::date AS nuevo_en_mes,
+      h.start_d >= DATE_TRUNC('month', h.{d})::date AS nuevo_en_mes,
       -- Sigue trabajando para la misma cuenta al dia siguiente (otro hire): la
       -- unidad (candidato, cuenta) no se perdio, sólo cambio de vacante.
       EXISTS (
         SELECT 1 FROM hires h2
         WHERE h2.candidate_id = h.candidate_id AND h2.account_id = h.account_id
-          AND h2.start_d <= h.end_d + 1
-          AND (h2.end_d IS NULL OR h2.end_d >= h.end_d + 1)
-      ) AS sigue_en_cuenta
+          AND h2.start_d <= h.{d} + 1
+          AND (h2.{d} IS NULL OR h2.{d} >= h.{d} + 1)
+      ) AS sigue_en_cuenta,
+      -- La cuenta no tenia a nadie activo al cierre del mes anterior: es new business,
+      -- y el NRR (que mira solo las cuentas que ya eran clientes) no la cuenta.
+      NOT EXISTS (
+        SELECT 1 FROM hires h3
+        WHERE h3.account_id = h.account_id
+          AND h3.start_d <= DATE_TRUNC('month', h.{d})::date - 1
+          AND (h3.{d} IS NULL OR h3.{d} >= DATE_TRUNC('month', h.{d})::date)
+      ) AS cuenta_nueva
     FROM hires h
     JOIN candidates c ON c.candidate_id = h.candidate_id
     JOIN account a ON a.account_id = h.account_id
-    WHERE h.end_d BETWEEN %(ini)s AND %(fin)s
+    WHERE h.{d} BETWEEN %(ini)s AND %(fin)s
 """
+_CONTRACTOR_BAJAS_SQL = _CONTRACTOR_BAJAS_TPL.format(hires=_HIRES, d="end_d")
+_CONTRACTOR_BAJAS_END_SQL = _CONTRACTOR_BAJAS_TPL.format(hires=_HIRES, d="exit_d")
 
 
-def contractor_bajas(conn, ini: date, fin: date) -> list:
-    """Bajas de contractor entre `ini` y `fin`. Clave: candidato @ cliente."""
+def contractor_bajas(conn, ini: date, fin: date, use_end_date: bool = False) -> list:
+    """Bajas de contractor entre `ini` y `fin`. Clave: candidato @ cliente.
+
+    `use_end_date=True` fecha la baja por `end_date` (hecho `contractor_baja_end`, el
+    que usa el NRR); por defecto, por `carga_inactive` (`contractor_baja`).
+    """
+    sql = _CONTRACTOR_BAJAS_END_SQL if use_end_date else _CONTRACTOR_BAJAS_SQL
+    fact = "contractor_baja_end" if use_end_date else "contractor_baja"
     with conn.cursor() as cur:
-        cur.execute(_CONTRACTOR_BAJAS_SQL, {"ini": ini, "fin": fin})
+        cur.execute(sql, {"ini": ini, "fin": fin})
         rows = cur.fetchall()
     out = []
-    for cand, client, fecha, buyout, nuevo, sigue in rows:
+    for cand, client, fecha, buyout, nuevo, sigue, nueva in rows:
         flags = {k for k, v in (("buyout", buyout), ("nuevo_en_mes", nuevo),
-                                ("sigue_en_cuenta", sigue)) if v}
+                                ("sigue_en_cuenta", sigue), ("cuenta_nueva", nueva)) if v}
         out.append({
-            "fact": "contractor_baja", "entity": entity_key(cand, client),
+            "fact": fact, "entity": entity_key(cand, client),
             "label": f"{cand} ({client})",
             "month": month_key(fecha), "date": fecha.isoformat(), "flags": flags,
         })
@@ -187,4 +208,5 @@ def entity_key(*parts) -> str:
 CANON = {
     "cliente_baja": client_bajas,
     "contractor_baja": contractor_bajas,
+    "contractor_baja_end": lambda conn, ini, fin: contractor_bajas(conn, ini, fin, use_end_date=True),
 }

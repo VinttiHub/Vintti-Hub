@@ -26,8 +26,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = f"""
         WITH {HIRES_CTE},
         {unit_info_cte('hires', close_col='close_d')},
-        {am_unit_snapshot('unit_ini', D_INI, exclude_end_day=True)},
-        {am_unit_snapshot('unit_fin', D_FIN, exclude_end_day=True)},
+        {am_unit_snapshot('unit_ini', D_INI, exclude_end_day=True, exit_col='exit_d')},
+        {am_unit_snapshot('unit_fin', D_FIN, exclude_end_day=True, exit_col='exit_d')},
         {am_unit_snapshot('unit_ups', D_FIN, upsell_population(D_INI, D_FIN, col='close_d'))},
         {decomp_cte('unit_ini', 'unit_fin', 'unit_ups', 'hires',
                     D_INI, D_FIN, owned=True)}
@@ -52,9 +52,9 @@ DATASET = {
     # Libro de hechos de la auditoria (dashboards/audit/ledger.py).
     # Sólo la cartera del AM (sin M3): se le chequea el mes, no lo que le falta.
     "audit": [{
-        "fact": "contractor_baja", "entity": ["candidate_name", "client_name"],
+        "fact": "contractor_baja_end", "entity": ["candidate_name", "client_name"],
         "match": {"componente": "^(churn_no_recorte|downgrades_recorte)$"}, "date_col": "end_d",
-        "excluye": ["nuevo_en_mes", "sigue_en_cuenta", "buyout"], "scope": "subset",
+        "excluye": ["sigue_en_cuenta", "buyout", "cuenta_nueva"], "scope": "subset",
     }],
     "query": query,
 }

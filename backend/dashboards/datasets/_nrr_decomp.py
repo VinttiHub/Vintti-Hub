@@ -23,6 +23,17 @@ Salida: el CTE `nrr_rows(componente, candidate_id, account_id, opportunity_id, m
     NRR = (mrr_inicial + upsells + expansion_precio
            - contraccion - downgrades_recorte - churn_no_recorte) / mrr_inicial
 
+La fecha de salida es `exit_d` (`end_date` primero, despues `carga_inactive`; decision de
+la owner, 2026-11-02): los snapshots `ini`/`fin` del NRR se piden con `exit_col='exit_d'` y
+aca las ventanas de la baja tambien la usan. GMRR/MRR y Churn de contractors siguen con
+`end_d` (`carga_inactive` primero), asi que una misma baja puede caer en meses distintos en
+el NRR y en Churn de contractors: es a proposito.
+
+Un upsell que ya se fue dentro de la misma ventana (entro y salio en el mes: Diana Ortiz,
+Bravura, 5 al 30-oct-2026) suma como upsell y TAMBIEN resta como churn, con el mismo monto:
+neto cero, y el drawer muestra que se fue. Antes sumaba +$500 y no restaba nada, porque el
+churn solo miraba a quien estaba en la base.
+
 `entradas_m3` queda FUERA del cociente a proposito (decision de la owner): lo que entra
 al libro del AM porque vencio el M3 del AE no es expansion del AM, es un traspaso.
 
@@ -97,7 +108,7 @@ def decomp_cte(
 
     `key` particiona todo por una columna extra (la serie mensual pasa `"mes"`), y en ese
     caso `reason_join` trae el CTE de meses al LATERAL de la baja para poder acotar
-    `end_d` a la ventana de cada mes.
+    `exit_d` a la ventana de cada mes.
     """
     vi, vf, vu = _val("i"), _val("f"), _val("u")
     # `am_owned` solo se enciende (el reloj de 3 meses avanza, nunca retrocede), asi que
@@ -115,6 +126,7 @@ def decomp_cte(
     coh_k = f"i.{key}, " if key else ""
     coh_j = f"c.{key} = u.{key} AND " if key else ""
     j_bi = f" AND b.{key} = i.{key}" if key else ""
+    j_i0 = f" AND i0.{key} = i.{key}" if key else ""
 
     # Unidad que se fue por buyout en la ventana: sale de la base y del churn.
     no_buyout_i = (
@@ -169,9 +181,9 @@ def decomp_cte(
               FROM {hires} h{reason_join}
               WHERE h.candidate_id = i.candidate_id
                 AND h.account_id = i.account_id
-                AND h.end_d IS NOT NULL
-                AND h.end_d > {win_ini} AND h.end_d <= {win_fin}
-                AND h.buyout_d >= DATE_TRUNC('month', h.end_d)::date
+                AND h.exit_d IS NOT NULL
+                AND h.exit_d > {win_ini} AND h.exit_d <= {win_fin}
+                AND h.buyout_d >= DATE_TRUNC('month', h.exit_d)::date
             )
         ),
         nrr_rows AS (
@@ -240,15 +252,47 @@ def decomp_cte(
             FROM {hires} h{reason_join}
             WHERE h.candidate_id = i.candidate_id
               AND h.account_id = i.account_id
-              AND h.end_d IS NOT NULL
-              AND h.end_d > {win_ini} AND h.end_d <= {win_fin}
-            ORDER BY h.end_d DESC LIMIT 1
+              AND h.exit_d IS NOT NULL
+              AND h.exit_d > {win_ini} AND h.exit_d <= {win_fin}
+            ORDER BY h.exit_d DESC LIMIT 1
           ) r ON TRUE
           WHERE NOT EXISTS (
             SELECT 1 FROM {fin} f
             WHERE f.candidate_id = i.candidate_id
               AND f.account_id = i.account_id{j_fi}
           ){owned_ini}{no_buyout_i}
+
+          UNION ALL
+          -- 5b. Upsells que ya se fueron: entraron y salieron dentro de la ventana. No
+          -- estaban en la base (el bloque 5 no los ve), asi que se restan aca con el mismo
+          -- monto con que sumaron como upsell: neto cero. El alias es `i` para reusar
+          -- `reason_join` y las claves de la particion. Un buyout no resta, como en la base.
+          SELECT
+            CASE WHEN COALESCE(r.reason, '') ~* '{RECORTE_RE}'
+                 THEN 'downgrades_recorte' ELSE 'churn_no_recorte' END,
+            {k_i}i.candidate_id, i.account_id, i.opportunity_id,
+            {vi}::numeric, NULL::numeric, NULL::numeric
+          FROM nrr_ups i
+          JOIN LATERAL (
+            SELECT h.inactive_reason AS reason,
+                   COALESCE(h.buyout_d >= DATE_TRUNC('month', h.exit_d)::date, FALSE) AS buyout
+            FROM {hires} h{reason_join}
+            WHERE h.candidate_id = i.candidate_id
+              AND h.account_id = i.account_id
+              AND h.exit_d IS NOT NULL
+              AND h.exit_d > {win_ini} AND h.exit_d <= {win_fin}
+            ORDER BY h.exit_d DESC LIMIT 1
+          ) r ON NOT r.buyout
+          WHERE NOT EXISTS (
+            SELECT 1 FROM {ini} i0
+            WHERE i0.candidate_id = i.candidate_id
+              AND i0.account_id = i.account_id{j_i0}
+          )
+            AND NOT EXISTS (
+            SELECT 1 FROM {fin} f
+            WHERE f.candidate_id = i.candidate_id
+              AND f.account_id = i.account_id{j_fi}
+          )
 
           UNION ALL
           -- 7. Buyouts: lo que se saco de la base y del churn, a su MRR del inicio.

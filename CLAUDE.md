@@ -101,8 +101,9 @@ Cada detalle declara una etiqueta `"audit"` en su `DATASET` (hecho, columna del 
 qué filas, y qué flags de `canon.FLAGS` **excluye por criterio decidido**: replacement
 vivo, buyout, alta y baja en el mismo mes…). Sumar una card al cruce = ponerle la
 etiqueta; una familia nueva = una función en `canon.CANON`. Hoy cubre
-`cliente_baja` (Client churn + CRR) y `contractor_baja` (churn de contractors, NRR
-global/AM, motivos de baja, Churn → Replacement, inactivos de Growth); el resto de los
+`cliente_baja` (Client churn + CRR), `contractor_baja` (churn de contractors, motivos de
+baja, Churn → Replacement, inactivos de Growth) y `contractor_baja_end` (NRR global/AM, que
+fecha la baja por `end_date`); el resto de los
 detalles sale como "sin etiqueta". Los hallazgos se agrupan: uno por card y regla, con
 los casos adentro.
 `python -m dashboards.audit --ledger-only` corre sólo esto en segundos.
@@ -215,6 +216,26 @@ Cinco cosas que no son obvias:
   octubre en el CRR — la AM lo leyó como contarlo dos veces, y tenía razón en el mes.
   Ahora la baja cae en su propio mes, como en Client churn. El default `False` de los
   snapshots queda para GMRR/MRR: no lo cambies ahí.
+- **En el NRR la fecha de baja es `end_date`, no `carga_inactive`** (2026-11-02, pedido de
+  la owner). Columna `exit_d` = `COALESCE(end_date, carga_inactive)` en `hires_full` y en
+  `hires` del AM; los 8 datasets piden `unit_ini`/`unit_fin` con `exit_col='exit_d'` y
+  `decomp_cte()` mide las ventanas de la baja con `exit_d`. Tiene que ser en los snapshots y
+  no sólo en el componente churn: churn = "en `ini` y no en `fin`", y con fechas mezcladas
+  Sergio Cano (end 15-oct, inactive 2-nov) salía churn dos veces y Denise Bianchi (inactive
+  30-sep, end 6-oct) ninguna. **GMRR/MRR, Churn de contractors y el canon siguen con
+  `carga_inactive`**: una misma baja puede caer en meses distintos en el NRR y en Churn de
+  contractors, a propósito. Por eso las etiquetas `audit` del NRR declaran el hecho
+  `contractor_baja_end` (`canon.contractor_bajas(use_end_date=True)`), no `contractor_baja`.
+  Efecto lateral: si la end_date deja a la cuenta sin nadie al cierre del mes y el reemplazo
+  se cierra al mes siguiente (Engenious y Green House, jul/ago-2026), la cuenta no está en la
+  cohorte y el reemplazo ya no cuenta como upsell.
+- **Un upsell que se va dentro de la misma ventana también resta** (bloque 5b de
+  `decomp_cte()`, 2026-11-02): Diana Ortiz (Bravura) entró el 5-oct y se fue el 30-oct, y
+  sumaba +$500 de upsell sin restar nada porque el churn sólo mira la base. Ahora suma y
+  resta el mismo monto (neto cero) y se ve en el drawer. Por eso el NRR ya no excluye
+  `nuevo_en_mes` en el auditor; sí excluye `cuenta_nueva` (new business, fuera de la
+  cohorte). Hueco conocido: vendido un mes y arrancado y dado de baja en otro posterior suma
+  como upsell y no resta nunca (4 casos, todos de 2025 o antes).
 - **Los buyouts se netean, no son churn** (2026-10-05, en los dos NRR). Si una unidad se
   va dentro de la ventana por buyout (`buyout_d >= mes de la baja`, el criterio de Client
   churn y de `canon.py`), sale **de la base y del churn a la vez**: el NRR arranca como si
