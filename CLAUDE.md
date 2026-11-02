@@ -249,7 +249,16 @@ Cinco cosas que no son obvias:
   2026-11-02 rotula el **primer día de la ventana** ("01-oct"), no `D_INI` ("30-sep"): es la
   misma foto (cierre de `D_INI` sin sus bajas = quien sigue al empezar el 1-oct), pero
   "30-sep" se leía como base de septiembre. Sólo cambió el texto; `win_ini` del summary
-  sigue devolviendo `D_INI`. Sin ella se
+  sigue devolviendo `D_INI`.
+- **El NRR va con 2 decimales** (`data-fmt="percent2"` en todo `nrr_pct`) y **los 3
+  drawers abren con "Cómo se calcula"** (2026-11-02): base + upsells + salary updates ↑ −
+  ↓ − downgrades − churn = `quedo`, y `quedo ÷ base = NRR`, en dólares exactos. `quedo`
+  es el numerador que arma `summary_columns()`; con el entero, octubre se veía "100%"
+  siendo 100,32% y parecía un número clavado. El del AM suma "De acá al período siguiente":
+  `quedo + entradas_m3 = pasa_siguiente`, que es la base del período que sigue (sep-2026:
+  $61.425 + $6.627 = $68.052 = base de octubre). Sin ese renglón, la base del mes siguiente
+  parecía no cuadrar con lo que quedó. No cierra exacto sólo con un upsell sin arrancar, un
+  buyout o una cuenta nueva. Sin ella se
   lee como si fuera el MRR de hoy y no cuadra con el tile de al lado: con corte
   22-sep, GMRR · AM daba $237,4K y la base del NRR $208,1K, que era el GMRR · AM del
   23-ago (ejemplo de cuando el NRR · AM era sobre GMRR; desde el 2026-10-26 se compara

@@ -345,6 +345,18 @@ def summary_columns(group: str = "", owned: bool = False) -> str:
     sub = " + ".join(
         f"COALESCE(SUM(monto) FILTER (WHERE componente = '{c}'), 0)" for c in _NEGATIVOS
     )
+    # Numerador del cociente: lo que quedo al final. El drawer muestra la cuenta entera
+    # (base + sumas - restas = quedo; quedo / base = NRR) y necesita este total.
+    cols.append(f"(({num}) - ({sub}))::float AS quedo")
+    if owned:
+        # Puente al mes siguiente: lo que quedo + lo que entro del AE es la base con la
+        # que arranca el proximo periodo (salvo upsells sin arrancar, buyouts o cuentas
+        # nuevas). Sin esto, la base del mes siguiente parece salir de la nada.
+        cols.append(
+            f"((({num}) - ({sub}))"
+            " + COALESCE(SUM(monto) FILTER (WHERE componente = 'entradas_m3'), 0))::float"
+            " AS pasa_siguiente"
+        )
     cols.append(
         f"ROUND(100.0 * (({num}) - ({sub})) / {den}, 2)::float AS nrr_pct"
     )
@@ -360,10 +372,12 @@ MEASURES = [
     {"key": "downgrades_recorte", "label": "Downgrades", "type": "currency"},
     {"key": "churn_no_recorte", "label": "Churn", "type": "currency"},
     {"key": "buyouts", "label": "Buyouts (neteados)", "type": "currency"},
+    {"key": "quedo", "label": "Quedó al final", "type": "currency"},
     {"key": "nrr_pct", "label": "NRR %", "type": "percent"},
 ]
 
 MEASURES_AM = MEASURES[:-1] + [
     {"key": "entradas_m3", "label": "Entró del AE", "type": "currency"},
+    {"key": "pasa_siguiente", "label": "Pasa al período siguiente", "type": "currency"},
     MEASURES[-1],
 ]
