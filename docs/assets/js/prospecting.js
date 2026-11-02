@@ -202,8 +202,14 @@
   function cellLong(v) {
     return v == null || v === "" ? "—" : '<span class="pr-long" title="' + esc(v) + '">' + esc(v) + "</span>";
   }
+  // Clay guarda el website sin protocolo ("ror.com"): sin esto el href es relativo y abre
+  // vinttihub.vintti.com/ror.com (404 de GitHub Pages).
+  function extUrl(v) {
+    var s = String(v || "").trim();
+    return !s ? "" : /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : "https://" + s.replace(/^\/+/, "");
+  }
   function cellLink(v) {
-    return v ? '<a class="pr-link" href="' + esc(v) + '" target="_blank" rel="noopener" title="' + esc(v) + '">' + esc(String(v).replace(/^https?:\/\/(www\.)?/, "")) + "</a>" : "—";
+    return v ? '<a class="pr-link" href="' + esc(extUrl(v)) + '" target="_blank" rel="noopener" title="' + esc(v) + '">' + esc(String(v).replace(/^https?:\/\/(www\.)?/, "")) + "</a>" : "—";
   }
   function cellSelect(field, list, value, extraClass) {
     return '<select class="pr-cell-select' + (extraClass || "") + '" data-field="' + field + '"' +
@@ -214,7 +220,7 @@
   var COLUMNS = [
     { key: "name", label: "Nombre de la empresa", sort: "name", fixed: true, render: function (r) {
         var domain = r.domain
-          ? '<a class="pr-company__domain" href="' + esc(r.website || ("https://" + r.domain)) + '" target="_blank" rel="noopener">' + esc(r.domain) + "</a>"
+          ? '<a class="pr-company__domain" href="' + esc(extUrl(r.website || r.domain)) + '" target="_blank" rel="noopener">' + esc(r.domain) + "</a>"
           : "";
         var dummy = r.is_dummy ? '<span class="pr-dummy-tag">DUMMY</span>' : "";
         return '<div class="pr-company"><div class="pr-company__line">' +

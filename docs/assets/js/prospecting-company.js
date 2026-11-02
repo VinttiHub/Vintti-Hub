@@ -18,6 +18,11 @@
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return P.esc(v); }
+  // Clay guarda el website sin protocolo: sin esto el href es relativo (404 de GitHub Pages).
+  function extUrl(v) {
+    var s = String(v || "").trim();
+    return !s ? "" : /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : "https://" + s.replace(/^\/+/, "");
+  }
   function opts() { return P.options(); }
   function companyFields() { return ((opts().objects || {}).company || {}).fields || []; }
   function contactField(key) {
@@ -66,7 +71,7 @@
   }
 
   function leftCard(c) {
-    var url = c.website || (c.domain ? "https://" + c.domain : "");
+    var url = extUrl(c.website || c.domain);
     var sel = function (key, label, items) {
       return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + hist("company", c.id, key) + "</span>" +
         '<select class="pr-filter__input" data-edit="' + key + '"><option value="">—</option>' + optionTags(items, c[key]) + "</select></label>";
@@ -109,7 +114,7 @@
   function kv(f, v, id) {
     var val;
     if (v == null || v === "") val = "—";
-    else if (f.type === "url") val = '<a href="' + esc(v) + '" target="_blank" rel="noopener">' + esc(v) + "</a>";
+    else if (f.type === "url") val = '<a href="' + esc(extUrl(v)) + '" target="_blank" rel="noopener">' + esc(v) + "</a>";
     else if (f.type === "date") val = P.fmtDate(v);
     else val = esc(v);
     return "<dt>" + esc(f.label) + (id ? hist("company", id, f.key) : "") + "</dt><dd>" + val + "</dd>";
