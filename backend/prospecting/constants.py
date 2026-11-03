@@ -81,12 +81,12 @@ WORKFLOW_EDITORS = {
     "mia@vintti.com",
 }
 
-# Freno de la fase de prueba. Mientras sea False, lo AUTOMÁTICO (al editar una
-# empresa, al llegar de Clay y el cron diario) sólo toca empresas dummy; sobre
-# datos reales un workflow corre únicamente con el botón Apply. Se pasa a True
-# con el OK de la owner, junto con descomentar el schedule de
-# .github/workflows/prospecting-workflows.yml.
-AUTOMATION_REAL_DATA = False
+# Freno de la fase de prueba. Con False, lo AUTOMÁTICO (al editar una empresa, al
+# llegar de Clay y el cron horario) sólo toca empresas dummy; sobre datos reales un
+# workflow corre únicamente a mano. Prendido el 2026-11-03 a pedido de la owner (las
+# empresas reales de Clay no disparaban los workflows activos), junto con el
+# schedule de .github/workflows/prospecting-workflows.yml.
+AUTOMATION_REAL_DATA = True
 
 # Campos que se pueden usar en un workflow, con su tipo. El tipo decide qué
 # operadores admite la condición y qué valor acepta una acción.

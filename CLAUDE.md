@@ -1238,11 +1238,15 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `prospect_wf_step_log` (pestaña Historial). El disparador por condiciones inscribe sólo en la
   **transición no cumple → cumple** (`prospect_wf_match_state`), que es como reinscribe HubSpot.
   `tick()` corre al instante (PATCH de una empresa y webhook de Clay, acotado a esa empresa), en
-  el cron horario `.github/workflows/prospecting-workflows.yml` (**schedule comentado**) y en
+  el cron horario `.github/workflows/prospecting-workflows.yml` (**prendido desde el 2026-11-03**) y en
   "Avanzar el reloj" del Test panel (hora simulada, sólo dummies). Tope de 50 pasos por corrida
   contra loops de "ir a".
-- **Dos frenos de la fase de prueba**: con `AUTOMATION_REAL_DATA = False`, todo lo automático
-  sólo toca dummies (sobre reales, únicamente "Inscribir" a mano). Y SIEMPRE, sobre una dummy,
+- **Fin de la fase de prueba (2026-11-03)**: `AUTOMATION_REAL_DATA = True` + cron prendido. Con
+  `False` todo lo automático sólo tocaba dummies, y por eso las empresas reales de Clay no
+  disparaban el workflow 2: había que inscribirlas a mano. Además, al crear una empresa Clay
+  registra **cada campo con valor** como cambio desde vacío (como hacen los contactos y HubSpot):
+  sin eso «actualizado hoy» / «cambia una propiedad» nunca veían a una empresa recién llegada.
+  Y SIEMPRE, sobre una dummy,
   mail / To-Do van a `TEST_EMAIL` y Slack a `TEST_SLACK_CHANNEL` con `[TEST]`, y el webhook se
   registra sin mandarse: una dummy nunca le escribe a una persona real.
 - **Contactos (2026-10-07)**: `prospect_contacts`, N por empresa, los carga el BDR desde la ficha

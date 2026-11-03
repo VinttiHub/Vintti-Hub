@@ -642,7 +642,20 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
         )
         new_id = cur.fetchone()["id"]
         log_event(cur, new_id, "clay", None, None, None, "created")
-        return _with_warning({"id": new_id, "action": "created"}, owner_warning)
+        # Cada propiedad que nace con valor cuenta como actualizada (como en HubSpot):
+        # sin esto «actualizado hoy» / «cambia una propiedad» nunca veían a una empresa
+        # recién llegada de Clay (el workflow 2 no la agarraba). Igual que los contactos.
+        created_changes = [
+            (c, None, v) for c, v in zip(cols, vals)
+            if c not in ("clay_record_id", "domain", "is_dummy", "raw_payload") and v not in (None, "")
+        ]
+        for field, old, new in created_changes:
+            log_event(cur, new_id, "clay", None, field, old, new)
+        return _with_warning(
+            {"id": new_id, "action": "created",
+             "changes_detail": [{"field": f, "old": o, "new": n} for f, o, n in created_changes]},
+            owner_warning,
+        )
 
     sets, vals, changes = [], [], []
     for c in CLAY_FIELDS:
@@ -960,8 +973,9 @@ def property_history(cur, obj: str, record_id: int, field: str) -> dict | None:
     """Historial de UNA propiedad (el «ver historial» de HubSpot): cada cambio con quién y
     cuándo, el más nuevo primero, más el valor con el que nació el registro. Sale de
     prospect_company_events, el mismo log de la actividad, sin su tope de 300 eventos.
-    Clay al crear una empresa no registra campo por campo: por eso el valor inicial es el
-    `old_value` del cambio más viejo, o el actual si la propiedad nunca cambió."""
+    Desde el 2026-11-03 Clay registra al crear cada campo con valor (cambio desde vacío);
+    para las empresas anteriores el valor inicial es el `old_value` del cambio más viejo, o
+    el actual si la propiedad nunca cambió."""
     from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
 
     catalog = FIELDS_BY_KEY if obj == "company" else CONTACT_FIELDS_BY_KEY

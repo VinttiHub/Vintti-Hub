@@ -9,12 +9,11 @@ name: Prospecting workflows
 # Cada hora porque las esperas pueden ser de horas y los horarios tienen hora.
 # El atraso de GitHub (~4 h) sólo corre ese momento: la próxima corrida lo agarra.
 #
-# El schedule está APAGADO a propósito (fase de prueba con datos dummy, decisión
-# de la owner). Aun prendido, mientras AUTOMATION_REAL_DATA = False en
-# backend/prospecting/constants.py el cron sólo toca empresas dummy.
+# Prendido el 2026-11-03 junto con AUTOMATION_REAL_DATA = True en
+# backend/prospecting/constants.py (fin de la fase de prueba, pedido de la owner).
 on:
-  # schedule:
-  #   - cron: "15 * * * *"
+  schedule:
+    - cron: "15 * * * *"
   workflow_dispatch:
 
 jobs:
