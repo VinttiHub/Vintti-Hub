@@ -248,6 +248,8 @@
     { key: "technologies", label: "Technologies", render: function (r) { return cellLong(r.technologies); } },
     { key: "job_types", label: "Tipo de vacantes", render: function (r) { return cellLong(r.job_types); } },
     { key: "industry", label: "Industria", render: function (r) { return cellLong(r.industry); } },
+    { key: "tier", label: "Tier", render: function (r) { return cellText(r.tier); } },
+    { key: "remote_jobs", label: "Remote?", render: function (r) { return cellText(r.remote_jobs); } },
     { key: "founded_year", label: "Founded Year", num: true, render: function (r) { return cellText(r.founded_year); } },
     { key: "website", label: "URL del sitio web", render: function (r) { return cellLink(r.website); } },
     { key: "linkedin_url", label: "Pagina Corporativa de LinkedIn", render: function (r) { return cellLink(r.linkedin_url); } },
@@ -1678,6 +1680,8 @@
           kv("Size", c.size, false, H("size")) +
           kv("Founded Year", c.founded_year, false, H("founded_year")) +
           kv("Open jobs", c.open_jobs, false, H("open_jobs")) +
+          kv("Tier", c.tier, false, H("tier")) +
+          kv("Remote?", c.remote_jobs, false, H("remote_jobs")) +
           kv("Job types", c.job_types, false, H("job_types")) +
           kv("Technologies", c.technologies, false, H("technologies")) +
           kv("Keywords", c.keywords, false, H("keywords")) +

@@ -60,6 +60,8 @@ CLAY_FIELDS = (
     "state",
     "country",
     "lead_source",
+    "tier",
+    "remote_jobs",
 )
 
 # Lo que se puede editar desde la página.
@@ -106,6 +108,8 @@ FIELDS = [
     {"key": "technologies", "label": "Technologies", "type": "longtext"},
     {"key": "job_types", "label": "Tipo de vacantes", "type": "longtext"},
     {"key": "open_jobs", "label": "Numero de vacantes abiertas", "type": "number"},
+    {"key": "tier", "label": "Tier", "type": "text"},
+    {"key": "remote_jobs", "label": "Remote?", "type": "text"},
     {"key": "industry", "label": "Industria", "type": "longtext"},
     {"key": "founded_year", "label": "Founded Year", "type": "number"},
     {"key": "website", "label": "URL del sitio web", "type": "url"},

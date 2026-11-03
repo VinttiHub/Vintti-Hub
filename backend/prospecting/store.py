@@ -177,6 +177,9 @@ def ensure_schema(cur) -> None:
     # "Id de la empresa" de la planilla es el id de HubSpot: se guarda para la
     # migración (cruzar lo importado con HubSpot), no es la clave del Hub.
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
+    # Tier y Remote? (2026-11-03): los mandaba Clay a HubSpot y no tenían dónde caer.
+    cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS tier TEXT")
+    cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS remote_jobs TEXT")
 
     # Workflows editables desde la página (ver prospecting/rules.py).
     cur.execute(
@@ -462,13 +465,16 @@ _ALIASES = {
     "keywords": ["keywords", "keywords_of_the_company"],
     "technologies": ["technologies", "tech_stack"],
     "job_types": ["job_types", "tipo_de_vacantes"],
-    "open_jobs": ["open_jobs", "numero_de_vacantes_abiertas", "job_openings"],
+    "open_jobs": ["open_jobs", "numero_de_vacantes_abiertas", "job_openings", "totaljobsfound", "total_jobs_found"],
     "founded_year": ["founded_year", "founded"],
     "size": ["size", "company_size", "employee_count_range"],
     "city": ["city", "ciudad"],
     "state": ["state", "estado"],
     "country": ["country", "pais"],
     "lead_source": ["lead_source"],
+    "tier": ["tier"],
+    # Clay lo manda como checkbox ("Remote Jobs"); en HubSpot era "Remote?".
+    "remote_jobs": ["remote_jobs", "remote", "is_remote"],
     "week_label": ["week_label", "semana", "week"],
     "prospecting_status": ["prospecting_status"],
     "prospecting_owner_email": ["prospecting_owner_email", "prospecting_owner", "prospecting_owner_hubspot", "owner_email"],
@@ -529,6 +535,16 @@ def clean_value(col: str, v):
     if col in ("prospecting_owner_email", "prospecting_owner_id"):
         s = _clean_text(v)
         return s.lower() if s else None
+    if col == "remote_jobs":
+        # El checkbox de Clay llega como true/false: se guarda Yes/No, como en HubSpot.
+        if isinstance(v, bool):
+            return "Yes" if v else "No"
+        s = _clean_text(v)
+        if s and s.lower() in ("true", "1", "yes", "si", "sí"):
+            return "Yes"
+        if s and s.lower() in ("false", "0", "no"):
+            return "No"
+        return s
     if col == "week_label":
         s = _clean_text(v)
         # "39" -> "Semana 39", igual que lo cargaban en HubSpot.
@@ -741,7 +757,7 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
 LIST_COLUMNS = """
     id, hubspot_company_id, name, domain, website, linkedin_url, description, industry,
     keywords, technologies, job_types, size, city, state, country,
-    open_jobs, founded_year, lead_source, week_label, prospecting_status,
+    open_jobs, founded_year, lead_source, tier, remote_jobs, week_label, prospecting_status,
     prospecting_owner_email, prospecting_start_date,
     not_icp_reason, is_dummy, created_at, updated_at, contact_incomplete,
     (SELECT COUNT(*) FROM prospect_contacts ct WHERE ct.company_id = prospect_companies.id) AS contacts_count
@@ -1063,6 +1079,8 @@ def seed_dummies(cur, n: int, owners: list[str], today: date) -> list[int]:
             "state": state,
             "country": "United States",
             "lead_source": "Clay",
+            "tier": rnd.choice(["Tier 1", "Tier 2", "Tier 3"]),
+            "remote_jobs": rnd.choice([True, False]),
             "semana": week,
             "prospecting_status": status,
             "prospecting_owner_email": owner,

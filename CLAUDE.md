@@ -1201,6 +1201,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   fila de Clay mandada del otro lado se rechaza con un mensaje en vez de convertirse. El
   simulador (`scripts/clay_webhook_simulator.py`) manda dummies por defecto (`--real` lo apaga).
   Ojo: el backend local de la owner escribe en la RDS de producción.
+  **Body de Clay = el mapeo que iba a HubSpot** (2026-11-03): además de los básicos manda
+  `lead_source`, `open_jobs` (columna `Totaljobsfound`), `tier`, `remote_jobs` (checkbox
+  "Remote Jobs" → se guarda `Yes`/`No`, el "Remote?" de HubSpot) y `prospecting_owner_id`
+  (columna `Value` del round robin). `tier` y `remote_jobs` son columnas autocreadas y CLAY_FIELDS.
 - **El owner llega como ID del Hub** (2026-10-28): igual que con HubSpot, Clay reparte las
   empresas con un **round robin** de IDs, que ahora son `users.user_id` del BDR, mandados
   en `prospecting_owner_id`. `resolve_owner()` (`store.py`) los convierte en el email del
