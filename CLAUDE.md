@@ -1355,6 +1355,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   o sobre un tramo de la ruta de arriba («Workflows» = sin carpeta); va por las mismas rutas que
   «Mover a…» (`doMoveWorkflows()` / `doMoveFolder()`) y `canDrop()` rechaza la carpeta actual y
   las descendientes.
+- **Lienzo con zoom y movimiento libre (2026-11-03)**: el viewport `.pr-wf-canvas` no
+  scrollea; `.pr-wf-flow` va con `transform: translate(panX, panY) scale(zoom)` (`applyView()`
+  en `prospecting-workflows.js`). Rueda / dos dedos = mover, Ctrl/⌘ + rueda o pinch = zoom en el
+  puntero, arrastrar el fondo (mouse o dedo) = mover, barra − / % / + / Ajustar, Ctrl/⌘ + / − / 0.
+  **No volver a CSS `zoom`**: con el tamaño mínimo de letra del navegador las tarjetas se
+  angostaban y el texto quedaba grande (captura de la owner a 25 %). Pan y zoom sobreviven a los
+  redibujos (variables del módulo); el zoom se recuerda por navegador (`pr_wf_zoom`).
 - **Panel «Elegir una acción» (2026-11-03)**, el de HubSpot: el «+» del lienzo ya no abre un
   desplegable, abre un panel en la columna derecha (`pickerPanel()` en
   `prospecting-workflows.js`; en <1100px es un drawer) con buscador, 4 tarjetas (Retraso,

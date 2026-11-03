@@ -2063,3 +2063,41 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
   font: 600 13px 'Onest', sans-serif; white-space: nowrap;
   box-shadow: 0 8px 20px rgba(108, 56, 255, .3);
 }
+
+/* =====================================================================
+   Zoom del lienzo de workflows
+   ===================================================================== */
+.pr-wf-canvaswrap { position: relative; min-width: 0; }
+/* El viewport no scrollea: el dibujo se mueve con transform (applyView() en el JS). */
+.pr-wf-canvas {
+  position: relative; display: block; overflow: hidden; padding: 0;
+  height: calc(100vh - 210px); min-height: 480px; max-height: none;
+  overscroll-behavior: contain; touch-action: none;
+}
+.pr-wf-canvas > .pr-wf-flow {
+  position: absolute; top: 0; left: 0; margin: 0;
+  min-width: 0; width: max-content; padding: 24px;
+  transform-origin: 0 0; will-change: transform;
+}
+.pr-wf-canvas { cursor: grab; }
+.pr-wf-canvas .pr-wf-node, .pr-wf-canvas .pr-wf-extras, .pr-wf-canvas .pr-wf-desc,
+.pr-wf-canvas button, .pr-wf-canvas input, .pr-wf-canvas select, .pr-wf-canvas textarea { cursor: auto; }
+.pr-wf-canvas button { cursor: pointer; }
+.pr-wf-canvas.is-panning { cursor: grabbing; user-select: none; }
+.pr-wf-zoombar {
+  position: absolute; right: 14px; bottom: 14px; z-index: 5;
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 4px; border-radius: 999px;
+  background: #fff; border: 1px solid var(--pr-rule);
+  box-shadow: 0 6px 18px rgba(13, 18, 30, .12);
+}
+.pr-wf-zoombar button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  min-width: 32px; height: 32px; padding: 0 8px; border-radius: 999px;
+  font: 600 12.5px 'Onest', sans-serif; color: var(--pr-ink);
+}
+.pr-wf-zoombar button:hover:not(:disabled) { background: color-mix(in srgb, var(--pr-violet) 10%, #fff); color: var(--pr-violet); }
+.pr-wf-zoombar button:disabled { color: var(--pr-ink-3); cursor: not-allowed; }
+.pr-wf-zoombar__pct { min-width: 52px !important; font-variant-numeric: tabular-nums; }
+.pr-wf-zoombar__fit i { margin-right: 4px; }
+.pr-wf-zoombar__sep { width: 1px; height: 18px; background: var(--pr-rule); margin: 0 2px; }

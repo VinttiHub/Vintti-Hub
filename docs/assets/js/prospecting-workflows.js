@@ -1018,29 +1018,160 @@
      página) y se restaura, para no volver al principio en cada click. Al abrir un
      workflow (`centerNext`) arranca centrado en el disparador. */
   var centerNext = false;
+
+  /* ---------- Lienzo: zoom + mover ----------
+     El viewport (.pr-wf-canvas) no scrollea: el dibujo (.pr-wf-flow) se ubica con
+     transform: translate(pan) scale(zoom). `transform` achica como una foto (letra,
+     tarjetas y conectores juntos) y no lo toca el tamaño mínimo de letra del navegador,
+     que con CSS `zoom` dejaba las tarjetas angostas y el texto grande. */
+  var ZOOM_KEY = "pr_wf_zoom", ZOOM_MIN = 0.25, ZOOM_MAX = 2, ZOOM_STEP = 0.1, KEEP_VISIBLE = 120;
+  var zoom = (function () {
+    try { var z = parseFloat(localStorage.getItem(ZOOM_KEY)); return z >= ZOOM_MIN && z <= ZOOM_MAX ? z : 1; } catch (e) { return 1; }
+  })();
+  var panX = null, panY = null;
+  function zoomBar() {
+    return '<div class="pr-wf-zoombar" role="toolbar" aria-label="Zoom">' +
+      '<button type="button" data-zoom="out" title="Alejar (Ctrl/⌘ −)"' + (zoom <= ZOOM_MIN + 0.001 ? " disabled" : "") + '><i class="fa-solid fa-minus"></i></button>' +
+      '<button type="button" class="pr-wf-zoombar__pct" data-zoom="reset" title="Volver a 100% (Ctrl/⌘ 0)">' + Math.round(zoom * 100) + "%</button>" +
+      '<button type="button" data-zoom="in" title="Acercar (Ctrl/⌘ +)"' + (zoom >= ZOOM_MAX - 0.001 ? " disabled" : "") + '><i class="fa-solid fa-plus"></i></button>' +
+      '<span class="pr-wf-zoombar__sep"></span>' +
+      '<button type="button" class="pr-wf-zoombar__fit" data-zoom="fit" title="Que entre el workflow entero"><i class="fa-solid fa-expand"></i> Ajustar</button>' +
+      "</div>";
+  }
+  function stageEls() {
+    var cv = root && root.querySelector(".pr-wf-canvas");
+    return cv ? { cv: cv, flow: cv.querySelector(".pr-wf-flow") } : null;
+  }
+  /* Aplica pan + zoom. El dibujo nunca sale entero de la vista: quedan KEEP_VISIBLE px. */
+  function applyView() {
+    var el = stageEls();
+    if (!el || !el.flow) return;
+    var w = el.flow.offsetWidth * zoom, h = el.flow.offsetHeight * zoom;
+    var vw = el.cv.clientWidth, vh = el.cv.clientHeight;
+    var kx = Math.min(KEEP_VISIBLE, w), ky = Math.min(KEEP_VISIBLE, h);
+    panX = Math.min(vw - kx, Math.max(kx - w, panX));
+    panY = Math.min(vh - ky, Math.max(ky - h, panY));
+    el.flow.style.transform = "translate(" + panX + "px," + panY + "px) scale(" + zoom + ")";
+    // El punteado del fondo acompaña: se siente un lienzo infinito.
+    var dot = 18 * zoom;
+    while (dot < 12) dot *= 2;  // alejado, los puntos no se amontonan en una mancha gris
+    el.cv.style.backgroundSize = dot + "px " + dot + "px";
+    el.cv.style.backgroundPosition = panX + "px " + panY + "px";
+  }
+  /* Centra el dibujo a lo ancho y lo pega arriba (al abrir un workflow). */
+  function centerView() {
+    var el = stageEls();
+    if (!el || !el.flow) return;
+    panX = (el.cv.clientWidth - el.flow.offsetWidth * zoom) / 2;
+    panY = 16;
+    applyView();
+  }
+  /* Cambia el zoom dejando quieto el punto bajo `anchor` ({x, y} de pantalla; por defecto
+     el centro del lienzo). No redibuja. */
+  function setZoom(z, anchor) {
+    var el = stageEls();
+    z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+    if (!el || Math.abs(z - zoom) < 0.001) return;
+    var r = el.cv.getBoundingClientRect();
+    var ax = anchor ? anchor.x - r.left : el.cv.clientWidth / 2;
+    var ay = anchor ? anchor.y - r.top : el.cv.clientHeight / 2;
+    var cx = (ax - panX) / zoom, cy = (ay - panY) / zoom;
+    zoom = z;
+    panX = ax - cx * z;
+    panY = ay - cy * z;
+    applyView();
+    try { localStorage.setItem(ZOOM_KEY, String(z)); } catch (e) {}
+    var bar = root.querySelector(".pr-wf-zoombar");
+    if (bar) bar.outerHTML = zoomBar();
+  }
+  function stepZoom(dir) {
+    var z = dir > 0 ? Math.floor(zoom / ZOOM_STEP + 1e-6) * ZOOM_STEP + ZOOM_STEP
+                    : Math.ceil(zoom / ZOOM_STEP - 1e-6) * ZOOM_STEP - ZOOM_STEP;
+    setZoom(z);
+  }
+  /* Que entre entero (ancho y alto) y centrado. */
+  function fitZoom() {
+    var el = stageEls();
+    if (!el || !el.flow) return;
+    var w = el.flow.offsetWidth, h = el.flow.offsetHeight;
+    var z = Math.min((el.cv.clientWidth - 48) / w, (el.cv.clientHeight - 48) / h, 1);
+    setZoom(z);
+    panX = (el.cv.clientWidth - w * zoom) / 2;
+    panY = Math.max(16, (el.cv.clientHeight - h * zoom) / 2);
+    applyView();
+  }
+  function bindZoom() {
+    var el = stageEls();
+    if (!el) return;
+    var cv = el.cv;
+    // Rueda / dos dedos = mover; Ctrl/⌘ + rueda o pinch (llega como wheel + ctrlKey) = zoom.
+    cv.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        setZoom(zoom * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
+        return;
+      }
+      var k = e.deltaMode === 1 ? 16 : 1;
+      var dx = e.deltaX * k, dy = e.deltaY * k;
+      if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+      panX -= dx;
+      panY -= dy;
+      applyView();
+    }, { passive: false });
+    // Un overflow:hidden igual scrollea solo si el foco cae en un campo fuera de vista:
+    // ese scroll se pasa al pan y se vuelve a 0, para que nunca se desfase.
+    cv.addEventListener("scroll", function () {
+      if (!cv.scrollLeft && !cv.scrollTop) return;
+      panX -= cv.scrollLeft;
+      panY -= cv.scrollTop;
+      cv.scrollLeft = 0;
+      cv.scrollTop = 0;
+      applyView();
+    });
+    // Arrastrar el fondo (mouse o dedo) para moverse.
+    cv.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      if (e.target.closest("button, input, select, textarea, label, a, .pr-wf-node, .pr-wf-extras, .pr-wf-desc, .pr-wf-goto, .pr-wf-end, .pr-wf-zoombar")) return;
+      e.preventDefault();
+      var sx = e.clientX, sy = e.clientY, px = panX, py = panY;
+      cv.classList.add("is-panning");
+      var move = function (ev) { panX = px + (ev.clientX - sx); panY = py + (ev.clientY - sy); applyView(); };
+      var up = function () {
+        cv.classList.remove("is-panning");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    });
+  }
+  window.addEventListener("resize", function () { if (draft && tab === "editor") applyView(); });
+  document.addEventListener("keydown", function (e) {
+    if (!draft || tab !== "editor" || !(e.ctrlKey || e.metaKey) || !root || !root.querySelector(".pr-wf-canvas")) return;
+    if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); stepZoom(1); }
+    else if (e.key === "-" || e.key === "_") { e.preventDefault(); stepZoom(-1); }
+    else if (e.key === "0") { e.preventDefault(); setZoom(1); }
+  });
+
   function render() {
     if (!draft) return;
-    var cv = root.querySelector(".pr-wf-canvas");
-    var keep = cv ? { left: cv.scrollLeft, top: cv.scrollTop } : null;
     var pageTop = root.scrollTop;
     root.innerHTML =
       '<div class="pr-wf-editor">' + topBar() +
         '<div class="pr-wf-errors" id="prWfErrors" hidden></div>' +
         (tab === "editor"
-          ? '<div class="pr-wf-body' + (openMenu ? " is-picking" : "") + '"><div class="pr-wf-canvas">' + canvas() + "</div>" +
+          ? '<div class="pr-wf-body' + (openMenu ? " is-picking" : "") + '"><div class="pr-wf-canvaswrap">' +
+              '<div class="pr-wf-canvas">' + canvas() + "</div>" + zoomBar() + "</div>" +
             (openMenu ? '<div class="pr-pick__veil" data-pick-cancel="1"></div>' + pickerPanel() : sidePanel()) + "</div>"
           : historyView()) +
       "</div>";
     bind();
-    var ncv = root.querySelector(".pr-wf-canvas");
-    if (ncv) {
-      if (centerNext || !keep) {
-        ncv.scrollLeft = Math.max(0, (ncv.scrollWidth - ncv.clientWidth) / 2);
-        centerNext = false;
-      } else {
-        ncv.scrollLeft = keep.left;
-        ncv.scrollTop = keep.top;
-      }
+    if (root.querySelector(".pr-wf-canvas")) {
+      if (centerNext || panX == null) { centerView(); centerNext = false; }
+      else applyView();
     }
     root.scrollTop = pageTop;
   }
@@ -1900,6 +2031,7 @@
     body.addEventListener("click", onClick);
     body.addEventListener("change", onChange);
     body.addEventListener("input", onInput);
+    bindZoom();
     bindFit();
     fitPicker();
     var pq = $("prWfPickQ");
@@ -2102,6 +2234,10 @@
     if ((v = b.getAttribute("data-hstatus")) !== null) { historyState.status = v; historyState.detail = null; return loadHistory(); }
     if ((v = b.getAttribute("data-unenroll")) !== null) return unenroll(Number(v));
     if ((v = b.getAttribute("data-test-co")) !== null) return runTest(Number(v));
+    if ((v = b.getAttribute("data-zoom")) !== null) {
+      if (v === "in") stepZoom(1); else if (v === "out") stepZoom(-1); else if (v === "fit") fitZoom(); else setZoom(1);
+      return;
+    }
     if ((v = b.getAttribute("data-plus")) !== null) { openMenu = openMenu === v ? null : v; pickerView = "home"; return render(); }
     if (b.getAttribute("data-pick-cancel") !== null) return closePicker();
     if ((v = b.getAttribute("data-pick-view")) !== null) { pickerView = v; return render(); }
