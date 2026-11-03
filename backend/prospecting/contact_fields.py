@@ -103,6 +103,10 @@ CONTACT_FIELDS = [
     _f("model", "Model", "enum", G[1], ["Staffing", "Recruiting"], "Sólo para active clients."),
     # ---- Empresa (según el contacto) -------------------------------------- #
     _f("company_name", "Company name", "text", G[2]),
+    # La de HubSpot (2026-11-03): la usa el workflow «freelance/independent en LatAm → DQL».
+    # No es el «Pais» de la empresa (Clay manda el país, no el continente).
+    _f("country_continent", "Country/Continent", "enum", G[2],
+       ["Latin America", "North America", "Europe", "Asia", "Africa", "Oceania", "Middle East"]),
     _f("company_type", "Company Type", "enum", G[2], ["Firm", "SMB", "Startup", "NA"]),
     _f("industria", "Industria", "enum", G[2], _INDUSTRIES),
     _f("exact_company_size", "Exact Company Size", "number", G[2]),

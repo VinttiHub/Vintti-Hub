@@ -1254,7 +1254,9 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   propiedades salen de **`backend/prospecting/contact_fields.py`** (única definición). Sólo las
   que se filtran seguido son columna propia; el resto vive en **`props` JSONB**, así sumar una no
   requiere ALTER. Su historial va a `prospect_company_events` con `contact_id`, y por eso aparece
-  también en la actividad de la empresa.
+  también en la actividad de la empresa. **Country/Continent** (`country_continent`, enum,
+  2026-11-03) es la de HubSpot, para el workflow «freelance/independent en LatAm → Lead Life
+  DQL»: no es el «Pais» de la empresa, que Clay manda con el nombre del país.
 - **Contactos desde Calendly vía Zapier (2026-10-28)**: Zapier **empuja**, no se consulta. El
   Zap *Calendly · Invitee Created* → *Webhooks by Zapier · POST* pega a
   `POST /prospecting/zapier/calendly` con `X-Zapier-Token` (= env `ZAPIER_WEBHOOK_TOKEN`, propia).
