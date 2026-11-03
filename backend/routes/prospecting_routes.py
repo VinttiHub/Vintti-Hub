@@ -24,6 +24,7 @@ from db import get_connection
 from prospecting import store
 from prospecting import engine
 from prospecting import inbound
+from prospecting import folders as wf_folders
 from prospecting import workflows as wf_store
 from prospecting import views as views_store
 from prospecting.rules import validate_conditions
@@ -817,7 +818,8 @@ def workflows_list():
         if denied:
             return denied
         rows = wf_store.list_workflows(cur)
-    return jsonify(_json_safe({"workflows": rows, "can_edit": _is_wf_editor(_current_email())}))
+        folders = wf_folders.list_folders(cur)
+    return jsonify(_json_safe({"workflows": rows, "folders": folders, "can_edit": _is_wf_editor(_current_email())}))
 
 
 @bp.get("/workflows/<int:wf_id>")
@@ -843,7 +845,50 @@ def workflow_create():
             row = wf_store.create_workflow(cur, body, _current_email())
     except InvalidWorkflow as exc:
         return _invalid(exc)
+    except wf_folders.FolderError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify(_json_safe(row)), 201
+
+
+# --------------------------------------------------------------------------- #
+# Carpetas de workflows (prospecting/folders.py)
+# --------------------------------------------------------------------------- #
+def _folder_call(fn, status: int = 200):
+    denied = _editor_only()
+    if denied:
+        return denied
+    try:
+        with _Db() as cur:
+            out = fn(cur)
+    except wf_folders.FolderError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if out is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(out)), status
+
+
+@bp.post("/workflow-folders")
+def workflow_folder_create():
+    body = request.get_json(silent=True) or {}
+    return _folder_call(lambda cur: wf_folders.create_folder(cur, body.get("name"), body.get("parent_id"),
+                                                             _current_email()), 201)
+
+
+@bp.patch("/workflow-folders/<int:folder_id>")
+def workflow_folder_update(folder_id: int):
+    body = request.get_json(silent=True) or {}
+    return _folder_call(lambda cur: wf_folders.update_folder(cur, folder_id, body))
+
+
+@bp.delete("/workflow-folders/<int:folder_id>")
+def workflow_folder_delete(folder_id: int):
+    return _folder_call(lambda cur: wf_folders.delete_folder(cur, folder_id))
+
+
+@bp.post("/workflows/move")
+def workflows_move():
+    body = request.get_json(silent=True) or {}
+    return _folder_call(lambda cur: {"moved": wf_folders.move_workflows(cur, body.get("ids"), body.get("folder_id"))})
 
 
 @bp.put("/workflows/<int:wf_id>")

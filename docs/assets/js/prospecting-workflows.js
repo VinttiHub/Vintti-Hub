@@ -230,6 +230,7 @@
     root.innerHTML = '<p class="pr-note">Cargando workflows…</p>';
     return P.api("/prospecting/workflows").then(function (r) {
       list = r.workflows;
+      folders = r.folders || [];
       canEdit = !!r.can_edit;
       renderList();
     }).catch(function (err) {
@@ -265,6 +266,43 @@
   var listView = (function () { try { return localStorage.getItem(LIST_VIEW_KEY) || "table"; } catch (e) { return "table"; } })();
   var listFilter = "all";
 
+  /* Carpetas (anidadas). curFolder = la abierta (null = raíz), recordada por navegador. */
+  var FOLDER_KEY = "pr_wf_folder";
+  var folders = [];
+  var curFolder = (function () { try { var v = localStorage.getItem(FOLDER_KEY); return v ? Number(v) : null; } catch (e) { return null; } })();
+  var listQ = "";
+  var selected = {};
+  function setFolder(id) {
+    curFolder = id == null ? null : Number(id);
+    selected = {};
+    try { if (curFolder == null) localStorage.removeItem(FOLDER_KEY); else localStorage.setItem(FOLDER_KEY, String(curFolder)); } catch (e) {}
+  }
+  function folderById(id) { return folders.filter(function (f) { return f.id === id; })[0] || null; }
+  function childFolders(id) {
+    return folders.filter(function (f) { return (f.parent_id == null ? null : f.parent_id) === id; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, "es"); });
+  }
+  function folderPath(id) {
+    var out = [], guard = 0, f = folderById(id);
+    while (f && guard++ < 50) { out.unshift(f); f = f.parent_id == null ? null : folderById(f.parent_id); }
+    return out;
+  }
+  function descendantIds(id) {
+    var out = [id], i = 0;
+    while (i < out.length) { childFolders(out[i++]).forEach(function (c) { out.push(c.id); }); }
+    return out;
+  }
+  function wfFolder(w) { return w.folder_id == null ? null : Number(w.folder_id); }
+  function matchesFilter(w) { return listFilter === "all" || (w.object || "company") === listFilter; }
+  /* Workflows dentro de la carpeta y sus subcarpetas, con el filtro Empresas/Contactos. */
+  function deepCount(id) {
+    var ids = descendantIds(id);
+    return list.filter(function (w) { return ids.indexOf(wfFolder(w)) !== -1 && matchesFilter(w); }).length;
+  }
+  function pathText(id) {
+    return ["Workflows"].concat(folderPath(id).map(function (f) { return f.name; })).join(" › ");
+  }
+
   function plain(html) {
     var d = document.createElement("div");
     d.innerHTML = html;
@@ -282,37 +320,70 @@
   function totalIn(stats) { return Object.keys(stats || {}).reduce(function (a, k) { return a + stats[k]; }, 0); }
 
   function dupListBtn(w) {
-    return canEdit ? '<button type="button" class="pr-wf-x pr-wf-dup" data-wfdup="' + w.id + '" title="Duplicar workflow"><i class="fa-regular fa-copy"></i></button>' : "";
+    return canEdit ? '<span class="pr-wf-rowacts">' +
+      '<button type="button" class="pr-wf-x pr-wf-dup" data-wfmove="' + w.id + '" title="Mover a otra carpeta"><i class="fa-regular fa-folder-open"></i></button>' +
+      '<button type="button" class="pr-wf-x pr-wf-dup" data-wfdup="' + w.id + '" title="Duplicar workflow"><i class="fa-regular fa-copy"></i></button></span>' : "";
+  }
+  function selBox(w) {
+    return canEdit ? '<input type="checkbox" class="pr-wf-sel" data-wfsel="' + w.id + '"' + (selected[w.id] ? " checked" : "") + ' title="Seleccionar">' : "";
+  }
+  function folderActs(f) {
+    return canEdit ? '<span class="pr-wf-rowacts">' +
+      '<button type="button" class="pr-wf-x pr-wf-dup" data-fren="' + f.id + '" title="Renombrar"><i class="fa-regular fa-pen-to-square"></i></button>' +
+      '<button type="button" class="pr-wf-x pr-wf-dup" data-fmove="' + f.id + '" title="Mover a otra carpeta"><i class="fa-regular fa-folder-open"></i></button>' +
+      '<button type="button" class="pr-wf-x pr-wf-dup pr-wf-fdel" data-fdel="' + f.id + '" title="Eliminar carpeta"><i class="fa-regular fa-trash-can"></i></button></span>' : "";
+  }
+  function folderMeta(f) {
+    var n = deepCount(f.id), subs = childFolders(f.id).length;
+    return n + " workflow" + (n === 1 ? "" : "s") + (subs ? " · " + subs + " carpeta" + (subs === 1 ? "" : "s") : "");
+  }
+  function pathNote(w) {
+    return listQ ? '<span class="pr-wf-path-note"><i class="fa-regular fa-folder"></i> ' + esc(pathText(wfFolder(w))) + "</span>" : "";
   }
 
-  function renderCards(rows) {
-    return '<div class="pr-wf-grid">' + rows.map(function (w) {
+  function renderCards(rows, subs) {
+    var fol = (subs || []).length ? '<div class="pr-wf-grid pr-wf-grid--folders">' + subs.map(function (f) {
+      return '<article class="pr-wf-card pr-wf-folder" data-folder="' + f.id + '" tabindex="0">' +
+        '<span class="pr-wf-folder__icon"><i class="fa-solid fa-folder"></i></span>' +
+        '<div class="pr-wf-folder__text"><h3 class="pr-wf-card__name">' + esc(f.name) + "</h3>" +
+        '<span class="pr-note">' + folderMeta(f) + "</span></div>" + folderActs(f) + "</article>";
+    }).join("") + "</div>" : "";
+    return fol + (rows.length ? '<div class="pr-wf-grid">' : "") + rows.map(function (w) {
       var tt = (S().triggers || {})[w.trigger.type] || {};
       curObj = w.object || "company";
       return '<article class="pr-wf-card' + (w.enabled ? " is-on" : "") + '" data-wf="' + w.id + '" tabindex="0">' +
-        '<header class="pr-wf-card__head"><div>' + objBadge(curObj) +
-          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3></div>" +
+        '<header class="pr-wf-card__head"><div>' + selBox(w) + objBadge(curObj) +
+          '<h3 class="pr-wf-card__name">' + esc(w.name) + "</h3>" + pathNote(w) + "</div>" +
           '<div class="pr-wf-card__acts">' + dupListBtn(w) + switchHtml(w) + "</div></header>" +
         (w.description ? '<p class="pr-wf-card__desc pr-clamp-2" title="' + esc(w.description) + '">' + esc(w.description) + "</p>" : "") +
         '<div class="pr-wf-card__rule"><span class="pr-wf-card__tag">Si</span><div class="pr-clamp-3">' + triggerText(w.trigger) + "</div></div>" +
         '<div class="pr-wf-card__meta"><span>' + esc(tt.label || "") + "</span><span>" + nodeCount(w.steps) + " paso" + (nodeCount(w.steps) === 1 ? "" : "s") + "</span>" +
           '<span class="pr-wf-card__stats">' + statsChips(w.stats) + "</span></div>" +
         "</article>";
-    }).join("") + "</div>";
+    }).join("") + (rows.length ? "</div>" : "");
   }
 
-  function renderTable(rows) {
+  function renderTable(rows, subs) {
+    var allSel = canEdit && rows.length && rows.every(function (w) { return selected[w.id]; });
     return '<div class="pr-wf-tablewrap"><table class="pr-table pr-wf-table"><thead><tr>' +
+      (canEdit ? '<th class="pr-wf-table__sel"><input type="checkbox" class="pr-wf-sel" data-wfselall="1"' + (allSel ? " checked" : "") + ' title="Seleccionar todos"></th>' : "") +
       '<th class="pr-wf-table__on">Activo</th><th>Workflow</th><th>Objeto</th><th>Disparador</th>' +
       '<th class="pr-num">Pasos</th><th>Inscriptos</th><th>Editado</th></tr></thead><tbody>' +
+      (subs || []).map(function (f) {
+        return '<tr class="pr-wf-frow" data-folder="' + f.id + '" tabindex="0">' + (canEdit ? "<td></td>" : "") +
+          '<td class="pr-wf-table__on"><span class="pr-wf-folder__icon pr-wf-folder__icon--sm"><i class="fa-solid fa-folder"></i></span></td>' +
+          '<td class="pr-wf-table__name" colspan="6">' + folderActs(f) + "<strong>" + esc(f.name) + "</strong>" +
+            '<span class="pr-note">' + folderMeta(f) + "</span></td></tr>";
+      }).join("") +
       rows.map(function (w) {
         curObj = w.object || "company";
         var tt = (S().triggers || {})[w.trigger.type] || {};
         var trig = plain(triggerText(w.trigger));
         var n = totalIn(w.stats);
         return '<tr data-wf="' + w.id + '" tabindex="0"' + (w.enabled ? ' class="is-on"' : "") + ">" +
+          (canEdit ? '<td class="pr-wf-table__sel">' + selBox(w) + "</td>" : "") +
           '<td class="pr-wf-table__on">' + switchHtml(w) + "</td>" +
-          '<td class="pr-wf-table__name">' + dupListBtn(w) + "<strong>" + esc(w.name) + "</strong>" +
+          '<td class="pr-wf-table__name">' + dupListBtn(w) + "<strong>" + esc(w.name) + "</strong>" + pathNote(w) +
             (w.description ? '<span class="pr-note" title="' + esc(w.description) + '">' + esc(w.description) + "</span>" : "") + "</td>" +
           "<td>" + objBadge(curObj) + "</td>" +
           '<td class="pr-wf-table__trig" title="' + esc(trig) + '"><span class="pr-note">' + esc(tt.label || "") + "</span>" + esc(trig) + "</td>" +
@@ -324,27 +395,54 @@
   }
 
   function renderList() {
-    var rows = list.filter(function (w) { return listFilter === "all" || (w.object || "company") === listFilter; });
-    var counts = { all: list.length, company: 0, contact: 0 };
-    list.forEach(function (w) { counts[w.object || "company"]++; });
+    if (curFolder != null && !folderById(curFolder)) setFolder(null);
+    var q = listQ.trim().toLowerCase();
+    var subs = q ? [] : childFolders(curFolder);
+    var rows = list.filter(function (w) {
+      if (!matchesFilter(w)) return false;
+      if (q) return (w.name + " " + (w.description || "")).toLowerCase().indexOf(q) !== -1;
+      return wfFolder(w) === curFolder;
+    });
+    // Conteos de los chips: lo que hay en la carpeta abierta y sus subcarpetas.
+    var scope = q ? list : list.filter(function (w) { return descendantIds(curFolder).indexOf(wfFolder(w)) !== -1 || curFolder == null; });
+    var counts = { all: scope.length, company: 0, contact: 0 };
+    scope.forEach(function (w) { counts[w.object || "company"]++; });
     var chip = function (k, label) {
       return '<button type="button" class="pr-wf-hf' + (listFilter === k ? " is-on" : "") + '" data-lfilter="' + k + '">' + label + " <span>" + counts[k] + "</span></button>";
     };
+    var crumbs = '<nav class="pr-wf-crumbs" aria-label="Carpeta">' +
+      '<button type="button" data-crumb=""' + (curFolder == null ? ' aria-current="true"' : "") + '><i class="fa-solid fa-house"></i> Workflows</button>' +
+      folderPath(curFolder).map(function (f, i, arr) {
+        return '<i class="fa-solid fa-chevron-right"></i><button type="button" data-crumb="' + f.id + '"' + (i === arr.length - 1 ? ' aria-current="true"' : "") + ">" +
+          (i === arr.length - 1 ? '<i class="fa-regular fa-folder-open"></i> ' : "") + esc(f.name) + "</button>";
+      }).join("") + "</nav>";
+    var nSel = Object.keys(selected).filter(function (k) { return selected[k]; }).length;
+    var empty = q ? "Ningún workflow coincide con «" + esc(listQ.trim()) + "»."
+      : curFolder != null ? "Esta carpeta está vacía." + (canEdit ? " Creá un workflow acá o mové uno con <i class=\"fa-regular fa-folder-open\"></i>." : "")
+      : list.length ? "No hay workflows de este tipo." : "Todavía no hay workflows." + (canEdit ? " Creá el primero." : "");
     root.innerHTML =
       '<div class="pr-wf-top">' +
         '<div><h2 class="pr-wf-title">Workflows</h2>' +
         '<p class="pr-note" style="margin:0">Reglas que trabajan las empresas y los contactos solos, como los workflows de HubSpot.' +
         (canEdit ? "" : " Sólo pgonzales, manuela y mia pueden editarlos.") + "</p></div>" +
-        (canEdit ? '<button type="button" class="pr-btn pr-btn--primary" id="prWfNew"><i class="fa-solid fa-plus"></i> Crear workflow</button>' : "") +
+        (canEdit ? '<div class="pr-wf-top__acts"><button type="button" class="pr-btn" id="prWfNewFolder"><i class="fa-solid fa-folder-plus"></i> Nueva carpeta</button>' +
+          '<button type="button" class="pr-btn pr-btn--primary" id="prWfNew"><i class="fa-solid fa-plus"></i> Crear workflow</button></div>' : "") +
       "</div>" + testBanner() +
+      (q ? '<div class="pr-wf-crumbs"><span><i class="fa-solid fa-magnifying-glass"></i> Buscando en todas las carpetas</span></div>' : crumbs) +
       '<div class="pr-wf-bar"><div class="pr-wf-hfilters">' + chip("all", "Todos") + chip("company", "Empresas") + chip("contact", "Contactos") + "</div>" +
+        '<div class="pr-wf-bar__right"><div class="pr-wf-search"><i class="fa-solid fa-magnifying-glass"></i>' +
+          '<input type="search" id="prWfListQ" class="pr-filter__input" placeholder="Buscar workflows" value="' + esc(listQ) + '"></div>' +
         '<div class="pr-wf-viewtoggle" role="tablist">' +
           '<button type="button" class="pr-wf-subtab' + (listView === "table" ? " is-active" : "") + '" data-lview="table"><i class="fa-solid fa-list"></i> Tabla</button>' +
           '<button type="button" class="pr-wf-subtab' + (listView === "cards" ? " is-active" : "") + '" data-lview="cards"><i class="fa-solid fa-grip"></i> Tarjetas</button>' +
-        "</div></div>" +
-      (rows.length ? (listView === "cards" ? renderCards(rows) : renderTable(rows))
-        : '<div class="pr-wf-empty">' + (list.length ? "No hay workflows de este tipo." : "Todavía no hay workflows." + (canEdit ? " Creá el primero." : "")) + "</div>");
+        "</div></div></div>" +
+      (nSel ? '<div class="pr-wf-selbar"><strong>' + nSel + " seleccionado" + (nSel === 1 ? "" : "s") + "</strong>" +
+        '<button type="button" class="pr-btn" id="prWfSelMove"><i class="fa-regular fa-folder-open"></i> Mover a…</button>' +
+        '<button type="button" class="pr-btn" id="prWfSelClear">Quitar selección</button></div>' : "") +
+      (rows.length || subs.length ? (listView === "cards" ? renderCards(rows, subs) : renderTable(rows, subs))
+        : '<div class="pr-wf-empty">' + empty + "</div>");
 
+    bindFolders(rows);
     var nb = $("prWfNew");
     if (nb) nb.onclick = function () { askObject().then(function (obj) { if (obj) openEditor(null, obj); }); };
     root.querySelectorAll("[data-lview]").forEach(function (b) {
@@ -379,6 +477,259 @@
       };
       card.addEventListener("click", open);
       card.addEventListener("keydown", function (e) { if (e.key === "Enter") open(e); });
+    });
+  }
+
+  /* ---------- Carpetas: eventos y acciones ---------- */
+  function bindFolders(rows) {
+    var stop = function (el, fn) {
+      el.addEventListener("click", function (e) { e.stopPropagation(); fn(e); });
+      el.addEventListener("keydown", function (e) { e.stopPropagation(); });
+    };
+    var nf = $("prWfNewFolder");
+    if (nf) nf.onclick = function () { newFolder(curFolder); };
+    root.querySelectorAll("[data-crumb]").forEach(function (b) {
+      b.onclick = function () { var v = b.getAttribute("data-crumb"); setFolder(v ? Number(v) : null); renderList(); };
+    });
+    root.querySelectorAll("[data-folder]").forEach(function (el) {
+      var open = function (e) {
+        if (e.target.closest("button")) return;
+        setFolder(Number(el.getAttribute("data-folder")));
+        renderList();
+      };
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", function (e) { if (e.key === "Enter") open(e); });
+    });
+    root.querySelectorAll("[data-fren]").forEach(function (b) { stop(b, function () { renameFolder(folderById(Number(b.getAttribute("data-fren")))); }); });
+    root.querySelectorAll("[data-fmove]").forEach(function (b) { stop(b, function () { moveFolder(folderById(Number(b.getAttribute("data-fmove")))); }); });
+    root.querySelectorAll("[data-fdel]").forEach(function (b) { stop(b, function () { deleteFolder(folderById(Number(b.getAttribute("data-fdel")))); }); });
+    root.querySelectorAll("[data-wfmove]").forEach(function (b) { stop(b, function () { moveWorkflows([Number(b.getAttribute("data-wfmove"))]); }); });
+    root.querySelectorAll("[data-wfsel]").forEach(function (cb) {
+      cb.addEventListener("click", function (e) { e.stopPropagation(); });
+      cb.addEventListener("change", function () { selected[cb.getAttribute("data-wfsel")] = cb.checked; renderList(); });
+    });
+    var all = root.querySelector("[data-wfselall]");
+    if (all) all.addEventListener("change", function () {
+      rows.forEach(function (w) { selected[w.id] = all.checked; });
+      renderList();
+    });
+    var sm = $("prWfSelMove");
+    if (sm) sm.onclick = function () {
+      moveWorkflows(Object.keys(selected).filter(function (k) { return selected[k]; }).map(Number));
+    };
+    var sc = $("prWfSelClear");
+    if (sc) sc.onclick = function () { selected = {}; renderList(); };
+    bindDrag();
+    var lq = $("prWfListQ");
+    if (lq) {
+      var t = null;
+      lq.addEventListener("input", function () {
+        clearTimeout(t);
+        t = setTimeout(function () {
+          listQ = lq.value;
+          var pos = lq.selectionStart;
+          renderList();
+          var again = $("prWfListQ");
+          if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+        }, 150);
+      });
+    }
+  }
+
+  function folderApi(path, method, body) {
+    return P.api(path, { method: method, body: body ? JSON.stringify(body) : undefined });
+  }
+  function newFolder(parentId) {
+    var name = prompt("Nombre de la carpeta nueva" + (parentId != null ? " (dentro de «" + folderById(parentId).name + "»)" : "") + ":");
+    if (!name || !name.trim()) return Promise.resolve(null);
+    return folderApi("/prospecting/workflow-folders", "POST", { name: name, parent_id: parentId }).then(function (f) {
+      folders.push(f);
+      renderList();
+      P.toast('<i class="fa-solid fa-folder-plus"></i> Carpeta <strong>' + esc(f.name) + "</strong> creada.");
+      return f;
+    }).catch(function (err) { alert(errorText(err)); return null; });
+  }
+  function renameFolder(f) {
+    var name = prompt("Nuevo nombre de la carpeta:", f.name);
+    if (!name || !name.trim() || name.trim() === f.name) return;
+    folderApi("/prospecting/workflow-folders/" + f.id, "PATCH", { name: name }).then(function (r) {
+      f.name = r.name;
+      renderList();
+    }).catch(function (err) { alert(errorText(err)); });
+  }
+  function moveFolder(f) {
+    askFolder("Mover la carpeta «" + f.name + "» a…", descendantIds(f.id), f.parent_id == null ? null : f.parent_id).then(function (dest) {
+      if (dest !== undefined) doMoveFolder(f, dest);
+    });
+  }
+  function doMoveFolder(f, dest) {
+    if ((f.parent_id == null ? null : f.parent_id) === dest) return;
+    folderApi("/prospecting/workflow-folders/" + f.id, "PATCH", { parent_id: dest }).then(function (r) {
+      f.parent_id = r.parent_id;
+      renderList();
+      P.toast('<i class="fa-regular fa-folder-open"></i> <strong>' + esc(f.name) + "</strong> ahora está en " + esc(pathText(dest)) + ".");
+    }).catch(function (err) { alert(errorText(err)); });
+  }
+  function deleteFolder(f) {
+    var nw = list.filter(function (w) { return wfFolder(w) === f.id; }).length;
+    var nf = childFolders(f.id).length;
+    var dest = pathText(f.parent_id == null ? null : f.parent_id);
+    var what = [nw ? nw + " workflow" + (nw === 1 ? "" : "s") : "", nf ? nf + " carpeta" + (nf === 1 ? "" : "s") : ""].filter(Boolean).join(" y ");
+    if (!confirm("¿Eliminar la carpeta «" + f.name + "»?" + (what ? "\n\nLo que tiene adentro (" + what + ") pasa a «" + dest + "». No se borra ningún workflow." : ""))) return;
+    folderApi("/prospecting/workflow-folders/" + f.id, "DELETE").then(function () {
+      if (curFolder === f.id) setFolder(f.parent_id);
+      P.toast('<i class="fa-regular fa-trash-can"></i> Carpeta <strong>' + esc(f.name) + "</strong> eliminada." + (what ? " Su contenido pasó a " + esc(dest) + "." : ""));
+      return loadList();
+    }).catch(function (err) { alert(errorText(err)); });
+  }
+  function moveWorkflows(ids) {
+    if (!ids.length) return;
+    var one = ids.length === 1 ? list.filter(function (w) { return w.id === ids[0]; })[0] : null;
+    var from = one ? wfFolder(one) : curFolder;
+    askFolder(one ? "Mover «" + one.name + "» a…" : "Mover " + ids.length + " workflows a…", [], from).then(function (dest) {
+      if (dest !== undefined) doMoveWorkflows(ids, dest);
+    });
+  }
+  function doMoveWorkflows(ids, dest) {
+    ids = ids.filter(function (id) { var w = list.filter(function (x) { return x.id === id; })[0]; return w && wfFolder(w) !== dest; });
+    if (!ids.length) return;
+    var one = ids.length === 1 ? list.filter(function (w) { return w.id === ids[0]; })[0] : null;
+    folderApi("/prospecting/workflows/move", "POST", { ids: ids, folder_id: dest }).then(function () {
+      list.forEach(function (w) { if (ids.indexOf(w.id) !== -1) w.folder_id = dest; });
+      selected = {};
+      renderList();
+      P.toast('<i class="fa-regular fa-folder-open"></i> ' + (one ? "<strong>" + esc(one.name) + "</strong> movido" : ids.length + " workflows movidos") + " a " + esc(pathText(dest)) + ".");
+    }).catch(function (err) { alert(errorText(err)); });
+  }
+
+  /* ---------- Arrastrar y soltar ---------- */
+  /* Se arrastra un workflow (o todos los seleccionados, si es uno de ellos) o una carpeta,
+     y se suelta sobre una carpeta o sobre un tramo de la ruta de arriba («Workflows» = sin
+     carpeta). Usa las mismas rutas que «Mover a…». */
+  var drag = null;  // { wf: [ids] } | { folder: id }
+  function dropTarget(el) {
+    if (el.hasAttribute("data-crumb")) { var v = el.getAttribute("data-crumb"); return v ? Number(v) : null; }
+    return Number(el.getAttribute("data-folder"));
+  }
+  function canDrop(dest) {
+    if (!drag) return false;
+    if (drag.folder != null) {
+      if (descendantIds(drag.folder).indexOf(dest) !== -1) return false;
+      var f = folderById(drag.folder);
+      return !!f && (f.parent_id == null ? null : f.parent_id) !== dest;
+    }
+    return drag.wf.some(function (id) { var w = list.filter(function (x) { return x.id === id; })[0]; return w && wfFolder(w) !== dest; });
+  }
+  function dragGhost(e, text) {
+    var g = document.createElement("div");
+    g.className = "pr-wf-dragghost";
+    g.innerHTML = text;
+    document.body.appendChild(g);
+    try { e.dataTransfer.setDragImage(g, 14, 14); } catch (err) {}
+    setTimeout(function () { g.remove(); }, 0);
+  }
+  function bindDrag() {
+    if (!canEdit) return;
+    var clear = function () {
+      drag = null;
+      root.querySelectorAll(".is-drop, .is-dragging").forEach(function (x) { x.classList.remove("is-drop", "is-dragging"); });
+      root.classList.remove("pr-wf-dragmode");
+    };
+    root.querySelectorAll("[data-wf], [data-folder]").forEach(function (el) {
+      el.setAttribute("draggable", "true");
+      el.addEventListener("dragstart", function (e) {
+        if (e.target.closest && e.target.closest("input, .pr-switch")) { e.preventDefault(); return; }
+        if (el.hasAttribute("data-folder")) {
+          var f = folderById(Number(el.getAttribute("data-folder")));
+          drag = { folder: f.id };
+          dragGhost(e, '<i class="fa-solid fa-folder"></i> ' + esc(f.name));
+        } else {
+          var id = Number(el.getAttribute("data-wf"));
+          var sel = Object.keys(selected).filter(function (k) { return selected[k]; }).map(Number);
+          drag = { wf: sel.indexOf(id) !== -1 ? sel : [id] };
+          var w = list.filter(function (x) { return x.id === id; })[0];
+          dragGhost(e, '<i class="fa-solid fa-diagram-project"></i> ' + (drag.wf.length > 1 ? drag.wf.length + " workflows" : esc(w ? w.name : "")));
+          if (drag.wf.length > 1) root.querySelectorAll("[data-wf]").forEach(function (x) {
+            if (drag.wf.indexOf(Number(x.getAttribute("data-wf"))) !== -1) x.classList.add("is-dragging");
+          });
+        }
+        el.classList.add("is-dragging");
+        root.classList.add("pr-wf-dragmode");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", JSON.stringify(drag)); } catch (err) {}
+      });
+      el.addEventListener("dragend", clear);
+    });
+    root.querySelectorAll("[data-folder], [data-crumb]").forEach(function (el) {
+      el.addEventListener("dragover", function (e) {
+        if (!canDrop(dropTarget(el))) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        el.classList.add("is-drop");
+      });
+      el.addEventListener("dragleave", function (e) {
+        if (!el.contains(e.relatedTarget)) el.classList.remove("is-drop");
+      });
+      el.addEventListener("drop", function (e) {
+        e.preventDefault();
+        var dest = dropTarget(el), d = drag;
+        if (!canDrop(dest)) return clear();
+        clear();
+        if (d.folder != null) doMoveFolder(folderById(d.folder), dest);
+        else doMoveWorkflows(d.wf, dest);
+      });
+    });
+  }
+
+  /* Elegir carpeta de destino: árbol indentado, con la raíz arriba. Resuelve el id (null =
+     raíz) o undefined si se cancela. `disabled` = carpetas que no se pueden elegir. */
+  function askFolder(title, disabled, current) {
+    return new Promise(function (resolve) {
+      var pick = current == null ? null : current;
+      var box = document.createElement("div");
+      box.className = "pr-modal";
+      var draw = function () {
+        var rowsHtml = [];
+        var walk = function (parent, depth) {
+          childFolders(parent).forEach(function (f) {
+            var off = disabled.indexOf(f.id) !== -1;
+            rowsHtml.push('<button type="button" class="pr-ftree__item' + (pick === f.id ? " is-picked" : "") + '" data-fpick="' + f.id + '"' +
+              (off ? " disabled" : "") + ' style="padding-left:' + (12 + depth * 20) + 'px">' +
+              '<i class="fa-' + (pick === f.id ? "solid fa-folder-open" : "regular fa-folder") + '"></i> ' + esc(f.name) +
+              (f.id === current ? ' <span class="pr-note">(actual)</span>' : "") + "</button>");
+            walk(f.id, depth + 1);
+          });
+        };
+        walk(null, 1);
+        box.innerHTML = '<div class="pr-modal__card pr-ftree" role="dialog" aria-modal="true">' +
+          "<h3>" + esc(title) + "</h3>" +
+          '<div class="pr-ftree__list">' +
+            '<button type="button" class="pr-ftree__item' + (pick == null ? " is-picked" : "") + '" data-fpick="">' +
+              '<i class="fa-solid fa-house"></i> Workflows (sin carpeta)' + (current == null ? ' <span class="pr-note">(actual)</span>' : "") + "</button>" +
+            rowsHtml.join("") +
+          "</div>" +
+          '<button type="button" class="pr-wf-add" data-fnew="1"><i class="fa-solid fa-folder-plus"></i> Nueva carpeta ' +
+            (pick == null ? "" : "dentro de «" + esc(folderById(pick).name) + "»") + "</button>" +
+          '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-fx="cancel">Cancelar</button>' +
+          '<button type="button" class="pr-btn pr-btn--primary" data-fx="ok"' + (pick === current ? " disabled" : "") + ">Mover acá</button></div></div>";
+      };
+      draw();
+      document.body.appendChild(box);
+      var close = function (v) { box.remove(); document.removeEventListener("keydown", onKey); resolve(v); };
+      var onKey = function (e) { if (e.key === "Escape") close(undefined); };
+      document.addEventListener("keydown", onKey);
+      box.addEventListener("click", function (e) {
+        if (e.target === box) return close(undefined);
+        var b = e.target.closest("button");
+        if (!b || b.disabled) return;
+        if (b.hasAttribute("data-fpick")) { var v = b.getAttribute("data-fpick"); pick = v ? Number(v) : null; return draw(); }
+        if (b.hasAttribute("data-fnew")) {
+          return newFolder(pick).then(function (f) { if (f) { pick = f.id; } draw(); });
+        }
+        var x = b.getAttribute("data-fx");
+        if (x === "cancel") return close(undefined);
+        if (x === "ok") return close(pick);
+      });
     });
   }
 
@@ -1874,8 +2225,10 @@
   function save() {
     showErrors(null);
     var isNew = !draft.id;
+    var body = payload();
+    if (isNew) body.folder_id = curFolder;  // nace en la carpeta abierta
     return P.api(isNew ? "/prospecting/workflows" : "/prospecting/workflows/" + draft.id, {
-      method: isNew ? "POST" : "PUT", body: JSON.stringify(payload()),
+      method: isNew ? "POST" : "PUT", body: JSON.stringify(body),
     }).then(function (w) {
       draft.id = w.id;
       draft.enabled = w.enabled;

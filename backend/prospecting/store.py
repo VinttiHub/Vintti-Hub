@@ -337,6 +337,24 @@ def ensure_schema(cur) -> None:
     )
     # Workflows sobre contactos.
     cur.execute("ALTER TABLE prospect_workflows ADD COLUMN IF NOT EXISTS object TEXT NOT NULL DEFAULT 'company'")
+    # Carpetas de workflows (anidadas; parent_id NULL = raíz). Borrar una carpeta sube su
+    # contenido a la de arriba (folders.delete_folder); el ON DELETE SET NULL es la red.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_wf_folders (
+            id          BIGSERIAL PRIMARY KEY,
+            name        TEXT NOT NULL,
+            parent_id   BIGINT REFERENCES prospect_wf_folders(id) ON DELETE SET NULL,
+            created_by  TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute(
+        "ALTER TABLE prospect_workflows ADD COLUMN IF NOT EXISTS folder_id BIGINT "
+        "REFERENCES prospect_wf_folders(id) ON DELETE SET NULL"
+    )
     cur.execute("ALTER TABLE prospect_wf_enrollments ADD COLUMN IF NOT EXISTS contact_id BIGINT")
     # Memoria "ya cumplía" por registro (empresa o contacto, según el workflow).
     # Reemplaza a prospect_wf_match_state, que sólo sabía de empresas.

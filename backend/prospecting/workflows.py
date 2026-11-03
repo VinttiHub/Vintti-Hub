@@ -17,7 +17,7 @@ from prospecting.store import list_bdrs
 
 WF_COLUMNS = """
     w.id, w.name, w.description, w.enabled, w.reenroll, w.conditions, w.actions,
-    w.trigger, w.steps, w.unenroll, w.goal, w.settings, w.object,
+    w.trigger, w.steps, w.unenroll, w.goal, w.settings, w.object, w.folder_id,
     w.created_by, w.updated_by, w.created_at, w.updated_at
 """
 
@@ -122,17 +122,22 @@ def clean_definition(cur, body: dict, self_id=None, require_name: bool = True, o
 
 
 def create_workflow(cur, body: dict, actor: str) -> dict:
+    from prospecting.folders import clean_folder_id
+
     d = clean_definition(cur, body)
+    # Nace en la carpeta abierta. Después sólo se mueve por /workflows/move: el PUT del
+    # editor no toca folder_id, así Guardar nunca lo saca de su carpeta.
+    folder_id = clean_folder_id(cur, body.get("folder_id"))
     cur.execute(
         """
         INSERT INTO prospect_workflows
             (name, description, enabled, reenroll, trigger, steps, unenroll, goal, settings,
-             created_by, updated_by, object)
-        VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             created_by, updated_by, object, folder_id)
+        VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (d["name"], d["description"], d["reenroll"], Json(d["trigger"]), Json(d["steps"]),
-         Json(d["unenroll"]), Json(d["goal"]), Json(d["settings"]), actor, actor, d["object"]),
+         Json(d["unenroll"]), Json(d["goal"]), Json(d["settings"]), actor, actor, d["object"], folder_id),
     )
     return get_workflow(cur, cur.fetchone()["id"])
 

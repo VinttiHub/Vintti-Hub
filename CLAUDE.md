@@ -1342,6 +1342,19 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (`bindHeaderDrag()`, empresas y contactos); en «Todos los contactos» quedan en el navegador y no entran en las pestañas de empresas. En `/contacts`,
   `company_name` sigue siendo la empresa del Hub (la leen workflows y fichas); la propiedad del
   contacto viaja como `contact_company_name` y la del Hub también como `hub_company`.
+- **Carpetas de workflows (2026-11-03)**, anidadas como en HubSpot: tabla `prospect_wf_folders`
+  (`parent_id` NULL = raíz) + `prospect_workflows.folder_id`, autocreadas en `ensure_schema()`.
+  Lógica en `backend/prospecting/folders.py`; rutas `POST/PATCH/DELETE /prospecting/workflow-folders`
+  y `POST /prospecting/workflows/move` (sólo `WORKFLOW_EDITORS`); `GET /workflows` trae `folders`.
+  **Borrar una carpeta nunca borra workflows**: su contenido sube a la carpeta de arriba (si una
+  subcarpeta choca de nombre, se le agrega el de la borrada). Una carpeta no se puede mover dentro
+  de sí misma ni de una descendiente. El workflow nuevo nace en la carpeta abierta (`folder_id` en
+  el POST); el PUT del editor **no** toca `folder_id`, así Guardar nunca lo saca de su carpeta. El
+  buscador de la lista busca en todas las carpetas y muestra la ruta. **Arrastrar y soltar** (`bindDrag()`): un
+  workflow (o todos los tildados, si es uno de ellos) o una carpeta se suelta sobre una carpeta
+  o sobre un tramo de la ruta de arriba («Workflows» = sin carpeta); va por las mismas rutas que
+  «Mover a…» (`doMoveWorkflows()` / `doMoveFolder()`) y `canDrop()` rechaza la carpeta actual y
+  las descendientes.
 - **Panel «Elegir una acción» (2026-11-03)**, el de HubSpot: el «+» del lienzo ya no abre un
   desplegable, abre un panel en la columna derecha (`pickerPanel()` en
   `prospecting-workflows.js`; en <1100px es un drawer) con buscador, 4 tarjetas (Retraso,
