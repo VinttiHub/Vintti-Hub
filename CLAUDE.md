@@ -1387,7 +1387,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   debajo, como pestañas subrayadas, sólo las vistas de esa sección (la tira de contactos
   `#prCtTabs` vive ahí, ya no en la tarjeta).
   Cambiar de sección no descarta nada y la última queda en `localStorage`. **Negocios es un
-  «Próximamente»**: no existen en Prospecting.
+  «Próximamente»**: no existen en Prospecting. **Configuración** (2026-11-03) junta «BDR IDs
+  (Clay)» y el «Test panel», que antes eran botones del header sólo para pgonzales: la ven
+  pgonzales, mia y manuela (`can_configure` de `/prospecting/me` = admin o `WORKFLOW_EDITORS`;
+  `POST /dummy/seed` y `DELETE /dummy` piden lo mismo con `_gate(cur, settings=True)`).
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas

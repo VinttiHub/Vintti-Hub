@@ -1717,7 +1717,7 @@
     });
   }
 
-  /* ---------- Panel de pruebas (sólo admin) ---------- */
+  /* ---------- Sección Configuración (owner + editoras de workflows) ---------- */
   /* IDs del Hub (users.user_id) para el round robin de Clay: Clay reparte estos
      números en `prospecting_owner_id` y el webhook los convierte en el BDR. */
   function showBdrIds() {
@@ -1752,7 +1752,7 @@
     drawerSave = null;
     $("prDrawerEyebrow").textContent = "Test panel";
     $("prDrawerTitle").textContent = "Dummies y reloj de prueba";
-    $("prDrawerSub").textContent = "Only you see this. Dummy companies are hidden from the BDRs.";
+    $("prDrawerSub").textContent = "Solo lo ven mia, manuela y pgonzales. Los BDRs no ven las empresas dummy.";
     $("prDrawerFoot").hidden = true;
     $("prDrawerBody").innerHTML =
       '<section class="pr-section"><h3 class="pr-section__title">1 · Dummy companies</h3>' +
@@ -1955,11 +1955,15 @@
     { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", soon: true,
       sub: "Los negocios de prospección. Todavía no están." },
     { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue",
-      sub: "Automatizaciones sobre empresas y contactos." }
+      sub: "Automatizaciones sobre empresas y contactos." },
+    // Sólo owner + editoras de workflows (ME.can_configure): el server frena igual.
+    { key: "settings", label: "Configuración", icon: "fa-solid fa-gear", tone: "violet", restricted: true,
+      sub: "IDs de los BDRs para Clay y panel de pruebas." }
   ];
+  function visibleSections() { return SECTIONS.filter(function (x) { return !x.restricted || ME.can_configure; }); }
   var SECTION_KEY = "prospecting_section_v1";
   var section = "table";
-  function sectionOf(key) { return SECTIONS.filter(function (x) { return x.key === key; })[0] || SECTIONS[0]; }
+  function sectionOf(key) { return visibleSections().filter(function (x) { return x.key === key; })[0] || SECTIONS[0]; }
 
   function showSection(kind) {
     section = sectionOf(kind).key;
@@ -1968,16 +1972,17 @@
     $("prWorkflows").hidden = section !== "workflows";
     $("prContactsView").hidden = section !== "contacts";
     $("prDealsView").hidden = section !== "deals";
+    $("prSettingsView").hidden = section !== "settings";
     $("prCoStrip").hidden = section !== "table";
     $("prCtTabs").hidden = section !== "contacts";
     $("prTabs").hidden = section !== "table" && section !== "contacts";
     var x = sectionOf(section);
-    $("prSectionBtn").innerHTML = esc(x.label) + '<span class="pr-section__caret"><i class="fa-solid fa-chevron-down"></i></span>';
+    $("prSectionBtn").innerHTML = esc(x.label) + '<span class="pr-secbtn__caret"><i class="fa-solid fa-chevron-down"></i></span>';
     $("prHeadSub").textContent = x.sub;
   }
   function sectionMenu(anchor) {
     $("prViewPop").classList.add("pr-pop--sections");  // antes de medir: es más ancho
-    openPop(anchor, '<div class="pr-pop__head">Ir a</div>' + SECTIONS.map(function (x) {
+    openPop(anchor, '<div class="pr-pop__head">Ir a</div>' + visibleSections().map(function (x) {
       return '<button type="button" class="pr-secitem' + (x.key === section ? " is-on" : "") + '" data-section-go="' + x.key + '">' +
         '<span class="pr-secitem__icon pr-tone--' + x.tone + '"><i class="' + x.icon + '"></i></span>' +
         '<span class="pr-secitem__text"><strong>' + esc(x.label) +
@@ -2568,10 +2573,6 @@
       }
       ME = me;
       $("prApp").hidden = false;
-      if (me.is_admin) {
-        $("prTestBtn").hidden = false;
-        $("prBdrIdsBtn").hidden = false;
-      }
       if (me.sees_dummies) $("prFDummyWrap").hidden = false;
       bind();
       bindContacts();

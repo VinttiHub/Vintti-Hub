@@ -46,6 +46,12 @@ def _is_wf_editor(email: str) -> bool:
     return email in WORKFLOW_EDITORS
 
 
+def _can_configure(email: str) -> bool:
+    # Sección «Configuración» de la página (BDR IDs de Clay + Test panel):
+    # la owner y las editoras de workflows (mia, manuela), 2026-11-03.
+    return _is_admin(email) or _is_wf_editor(email)
+
+
 def _sees_dummies(email: str) -> bool:
     # Quien arma workflows necesita ver las dummies para probarlos.
     return _is_admin(email) or _is_wf_editor(email)
@@ -89,9 +95,11 @@ class _Db:
         return False
 
 
-def _gate(cur, admin_only: bool = False):
+def _gate(cur, admin_only: bool = False, settings: bool = False):
     email = _current_email()
-    if admin_only:
+    if settings:
+        ok = _can_configure(email)
+    elif admin_only:
         ok = _is_admin(email)
     else:
         ok = store.has_access(cur, email)
@@ -112,6 +120,7 @@ def me():
             "has_access": store.has_access(cur, email),
             "is_admin": _is_admin(email),
             "can_edit_workflows": _is_wf_editor(email),
+            "can_configure": _can_configure(email),
             "sees_dummies": _sees_dummies(email),
         })
 
@@ -1092,14 +1101,14 @@ def workflows_tick():
 
 
 # --------------------------------------------------------------------------- #
-# Datos de prueba (sólo admin)
+# Datos de prueba (sección Configuración: owner + editoras de workflows)
 # --------------------------------------------------------------------------- #
 @bp.post("/dummy/seed")
 def dummy_seed():
     body = request.get_json(silent=True) or {}
     n = max(1, min(300, int(body.get("n") or 60)))
     with _Db() as cur:
-        denied = _gate(cur, admin_only=True)
+        denied = _gate(cur, settings=True)
         if denied:
             return denied
         owners = [b["email"] for b in store.list_bdrs(cur)]
@@ -1119,7 +1128,7 @@ def dummy_seed():
 @bp.delete("/dummy")
 def dummy_delete():
     with _Db() as cur:
-        denied = _gate(cur, admin_only=True)
+        denied = _gate(cur, settings=True)
         if denied:
             return denied
         deleted = store.delete_dummies(cur)
