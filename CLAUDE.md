@@ -1342,6 +1342,22 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (`bindHeaderDrag()`, empresas y contactos); en «Todos los contactos» quedan en el navegador y no entran en las pestañas de empresas. En `/contacts`,
   `company_name` sigue siendo la empresa del Hub (la leen workflows y fichas); la propiedad del
   contacto viaja como `contact_company_name` y la del Hub también como `hub_company`.
+- **Panel «Elegir una acción» (2026-11-03)**, el de HubSpot: el «+» del lienzo ya no abre un
+  desplegable, abre un panel en la columna derecha (`pickerPanel()` en
+  `prospecting-workflows.js`; en <1100px es un drawer) con buscador, 4 tarjetas (Retraso,
+  Ramificación, Ir a workflow = `enroll_workflow`, Ir a acción = «ir a», sólo en el «+» final) y
+  las categorías de `ACTION_GROUPS` (`constants.py`). Categoría, descripción y app de cada acción
+  salen de `ACTIONS` (`group` / `desc` / `app`; `hidden` = no se ofrece suelta, p. ej.
+  `set_today`). Retraso y Ramificación abren una 2ª pantalla con `title` + `example` de
+  `DELAYS` / `BRANCHES`. Cuatro acciones nuevas, todas validadas en `rules.check_action()` y
+  corridas en `engine.run_action()`: **`format_phone`** (sólo contactos, E.164 con
+  `phonenumbers` — dep nueva en los dos requirements; inválido = no toca el valor),
+  **`create_contact`** (sólo empresas, vía `store.create_contact()` + evento `created`),
+  **`sheets_append`** (Google Sheets por la service account de `utils/sheets_utils.py`; el
+  Sheet hay que compartirlo con ella como editor; sobre dummies no escribe) y **`ask_ai`**
+  (gpt-4o-mini; guarda en una propiedad de texto o como nota `__note__`; en dry run no llama a
+  OpenAI). Los textos admiten además `{campo:<clave>}` (y `{campo:company.<clave>}` desde un
+  contacto) en `render_tokens()`.
 - **Menú de secciones (2026-11-03)**: el título de la página es un desplegable «Empresas ▾» con
   Empresas, Contactos, Negocios y Workflows (`SECTIONS` / `showSection()` en `prospecting.js`);
   debajo, como pestañas subrayadas, sólo las vistas de esa sección (la tira de contactos

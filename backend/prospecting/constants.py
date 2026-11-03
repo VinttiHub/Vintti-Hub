@@ -326,34 +326,94 @@ OPERATORS_BY_TYPE = {
 }
 
 # --------------------------------------------------------------------------- #
-# Acciones. `group` las ordena en el menú del editor; `field` dice si piden una
-# propiedad editable (y de qué tipos). Los parámetros de cada una los valida
-# rules._check_action().
+# Acciones. `group` las agrupa en el panel «Elegir una acción» del editor (las
+# categorías de HubSpot, ver ACTION_GROUPS); `desc` es la línea gris de cada
+# tarjeta; `app` agrupa dentro de «Aplicaciones integradas». `field` dice si piden
+# una propiedad editable (y de qué tipos). Los parámetros de cada una los valida
+# rules.check_action().
 # --------------------------------------------------------------------------- #
 ACTIONS = {
-    # Editar registro
-    "set":            {"label": "Definir",                      "group": "Editar registro", "field": True},
-    "clear":          {"label": "Borrar",                       "group": "Editar registro", "field": True},
-    "set_today":      {"label": "Poner la fecha de hoy",        "group": "Editar registro", "field": True, "types": ["date"]},
-    "set_date_offset": {"label": "Poner hoy ± N días",          "group": "Editar registro", "field": True, "types": ["date"]},
-    "copy":           {"label": "Copiar el valor de otra propiedad", "group": "Editar registro", "field": True},
-    "increment":      {"label": "Sumar o restar",               "group": "Editar registro", "field": True, "types": ["number"]},
-    # Asignación
-    "rotate_owner":   {"label": "Repartir entre BDRs (por turnos)", "group": "Asignación"},
+    # IA
+    "ask_ai":         {"label": "Preguntar a la IA", "group": "IA",
+                       "desc": "Le manda una pregunta con datos del registro a la IA y guarda la respuesta en una propiedad."},
+    # Comunicaciones
+    "send_email":     {"label": "Enviar notificación interna por correo", "group": "Comunicaciones",
+                       "desc": "Envía un correo a cualquiera de los miembros del equipo (o al owner)."},
+    "create_todo":    {"label": "Crear tarea (To-Do)", "group": "Comunicaciones",
+                       "desc": "Crea una tarea en el To-Do del owner o de otra persona del equipo."},
+    # CRM (orden alfabético, como HubSpot)
+    "format_phone":   {"label": "Validar y formatear número de teléfono", "group": "CRM", "field": True, "types": ["phone"], "objects": ["contact"],
+                       "desc": "Valida un número de teléfono y lo transforma al formato internacional (+54 9 11…)."},
+    "increment":      {"label": "Aumentar o disminuir el valor de la propiedad", "group": "CRM", "field": True, "types": ["number"],
+                       "desc": "Aumenta o disminuye el valor de una propiedad numérica."},
+    "copy":           {"label": "Copiar valor de propiedad", "group": "CRM", "field": True,
+                       "desc": "Copia el valor de otra propiedad (propia o de la empresa asociada)."},
     # Sólo workflows de contacto: el "Crear asociaciones" de HubSpot. Hoy el BDR crea
     # el contacto dentro de su empresa (ya nace asociado); sirve cuando lleguen
     # contactos de Clay o haya que moverlos a la empresa de su dominio.
-    "associate_company": {"label": "Crear asociación con la empresa (por dominio del email)", "group": "Asociaciones", "objects": ["contact"]},
-    # Comunicación interna
-    "create_todo":    {"label": "Crear To-Do",                  "group": "Comunicación"},
-    "send_email":     {"label": "Mandar mail interno",          "group": "Comunicación"},
-    "send_slack":     {"label": "Avisar por Slack",             "group": "Comunicación"},
-    "add_note":       {"label": "Agregar nota",                 "group": "Comunicación"},
-    # Otros
-    "webhook":        {"label": "Mandar webhook",               "group": "Otros"},
-    "enroll_workflow":   {"label": "Inscribir en otro workflow", "group": "Otros"},
-    "unenroll_workflow": {"label": "Sacar de otro workflow",     "group": "Otros"},
+    "associate_company": {"label": "Crear asociaciones", "group": "CRM", "objects": ["contact"],
+                       "desc": "Asocia el contacto a la empresa de su dominio de email."},
+    "add_note":       {"label": "Crear nota", "group": "CRM",
+                       "desc": "Crea una nueva nota en la actividad del registro."},
+    # Sólo workflows de empresa: crea un contacto asociado a la empresa.
+    "create_contact": {"label": "Crear registro (contacto)", "group": "CRM", "objects": ["company"],
+                       "desc": "Crea un contacto asociado a la empresa con los valores que definas."},
+    "set":            {"label": "Editar registro: definir valor", "group": "CRM", "field": True,
+                       "desc": "Define el valor de una propiedad."},
+    "set_today":      {"label": "Poner la fecha de hoy", "group": "CRM", "field": True, "types": ["date"], "hidden": True,
+                       "desc": "Pone la fecha en que se ejecuta la acción."},
+    "set_date_offset": {"label": "Poner hoy ± N días", "group": "CRM", "field": True, "types": ["date"], "hidden": True,
+                       "desc": "Pone la fecha de ejecución más o menos N días."},
+    "clear":          {"label": "Editar registro: borrar valor", "group": "CRM", "field": True,
+                       "desc": "Borra el valor de una propiedad."},
+    "rotate_owner":   {"label": "Rotar registro al propietario", "group": "CRM",
+                       "desc": "Asigna por turnos cuál BDR debería ser responsable del registro."},
+    # Workflows
+    "enroll_workflow":   {"label": "Inscribir en otro workflow", "group": "Workflows",
+                          "desc": "Inscribe el registro (o su empresa / sus contactos) en otro workflow."},
+    "unenroll_workflow": {"label": "Sacar de otro workflow", "group": "Workflows",
+                          "desc": "Saca el registro de otro workflow en el que esté inscripto."},
+    # Aplicaciones integradas
+    "send_slack":     {"label": "Enviar notificación de Slack", "group": "Aplicaciones integradas", "app": "Slack",
+                       "desc": "Manda un mensaje a un canal de Slack."},
+    "sheets_append":  {"label": "Crear fila de Google Sheet", "group": "Aplicaciones integradas", "app": "Google Sheets",
+                       "desc": "Agrega una nueva fila a una hoja de cálculo de Google con datos del registro."},
+    "webhook":        {"label": "Enviar un webhook", "group": "Aplicaciones integradas", "app": "Webhook",
+                       "desc": "Manda los datos del registro por POST a una URL https://."},
 }
+
+# Categorías del panel «Elegir una acción», en orden. `color` = token de la paleta de
+# marca del CSS (--pr-mag, --pr-violet, --pr-lime, --pr-blue, --pr-cyan).
+ACTION_GROUPS = [
+    {"key": "IA", "icon": "fa-solid fa-wand-magic-sparkles", "color": "mag",
+     "desc": "Preguntar algo a la IA"},
+    {"key": "Comunicaciones", "icon": "fa-regular fa-envelope", "color": "violet",
+     "desc": "Enviar correos y tareas al equipo"},
+    {"key": "CRM", "icon": "fa-regular fa-address-book", "color": "lime",
+     "desc": "Crea y actualiza registros del CRM y valores de propiedades"},
+    {"key": "Workflows", "icon": "fa-solid fa-diagram-project", "color": "blue",
+     "desc": "Inscribe o saca registros de otros workflows"},
+    {"key": "Aplicaciones integradas", "icon": "fa-solid fa-puzzle-piece", "color": "cyan",
+     "desc": "Slack, Google Sheets y webhooks"},
+]
+ACTION_APPS = {
+    "Slack": {"icon": "fa-brands fa-slack"},
+    "Google Sheets": {"icon": "fa-solid fa-table"},
+    "Webhook": {"icon": "fa-solid fa-satellite-dish"},
+}
+
+# «Validar y formatear teléfono»: país que se asume cuando el número no trae +código.
+PHONE_COUNTRIES = {
+    "AR": "Argentina", "US": "Estados Unidos / Canadá", "MX": "México", "CO": "Colombia",
+    "CL": "Chile", "UY": "Uruguay", "PE": "Perú", "BR": "Brasil", "ES": "España",
+    "GT": "Guatemala",
+}
+# «Preguntar a la IA»: modelo y topes.
+AI_MODEL = "gpt-4o-mini"
+AI_MAX_PROMPT = 4000
+AI_MAX_ANSWER = 2000
+# «Crear fila de Google Sheet»: tope de columnas.
+SHEETS_MAX_COLUMNS = 40
 
 # Disparadores (tarjeta de inscripción).
 TRIGGERS = {
@@ -371,18 +431,29 @@ SCHEDULES = {
     "weekly": {"label": "Ciertos días de la semana"},
     "date":   {"label": "Una fecha"},
 }
+# `title` + `example` son los del panel «Retraso» (los nombres de HubSpot); `label` es
+# el del desplegable dentro de la tarjeta del paso.
 DELAYS = {
-    "duration":       {"label": "Un tiempo"},
-    "until_date":     {"label": "Hasta una fecha"},
-    "until_property": {"label": "Hasta la fecha de una propiedad"},
-    "until_weekday":  {"label": "Hasta ciertos días de la semana"},
-    "until_time":     {"label": "Hasta una hora del día"},
-    "until_condition": {"label": "Hasta que se cumpla algo"},
+    "duration":       {"label": "Un tiempo", "title": "Período específico",
+                       "example": "Ejemplo: retraso por 3 días y 4 horas"},
+    "until_weekday":  {"label": "Hasta ciertos días de la semana", "title": "Día de la semana",
+                       "example": "Ejemplo: retraso hasta el lunes"},
+    "until_time":     {"label": "Hasta una hora del día", "title": "Hora del día",
+                       "example": "Ejemplo: retraso hasta las 15:00 (hora Argentina)"},
+    "until_date":     {"label": "Hasta una fecha", "title": "Día natural",
+                       "example": "Ejemplo: retraso hasta el 21/03/2027"},
+    "until_property": {"label": "Hasta la fecha de una propiedad", "title": "Fecha de la propiedad",
+                       "example": "Ejemplo: retraso hasta la Prospecting Start Date + 7 días"},
+    "until_condition": {"label": "Hasta que se cumpla algo", "title": "Se produce el evento",
+                        "example": "Ejemplo: retraso hasta que el status pase a Qualified"},
 }
 BRANCHES = {
-    "value":      {"label": "Según el valor de una propiedad"},
-    "conditions": {"label": "Según condiciones (Y/O)"},
-    "random":     {"label": "Reparto al azar por %"},
+    "value":      {"label": "Según el valor de una propiedad", "title": "Una propiedad o el resultado de una acción",
+                   "example": "Ejemplo: enviar a la Rama 1 si su <b>Status</b> es igual a <b>In Progress</b>."},
+    "conditions": {"label": "Según condiciones (Y/O)", "title": "Lógica Y/O",
+                   "example": "Ejemplo: enviar a la Rama 1 si su <b>dominio es conocido</b> Y el <b>Size</b> es <b>11-50</b>."},
+    "random":     {"label": "Reparto al azar por %", "title": "Distribución aleatoria por porcentaje",
+                   "example": "Ejemplo: envía <b>50%</b> a la Rama 1 y <b>50%</b> a la Rama 2."},
 }
 WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 

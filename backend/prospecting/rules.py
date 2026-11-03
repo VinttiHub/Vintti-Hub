@@ -39,6 +39,7 @@ except ImportError:  # Python 3.8 fallback (App Runner)
 
 from prospecting.constants import (
     ACTIONS,
+    AI_MAX_PROMPT,
     BRANCHES,
     DELAYS,
     EVENTS,
@@ -47,7 +48,9 @@ from prospecting.constants import (
     OPERATORS,
     OPERATORS_BY_TYPE,
     PERIODS,
+    PHONE_COUNTRIES,
     SCHEDULES,
+    SHEETS_MAX_COLUMNS,
     TIMEZONE,
     TRIGGERS,
 )
@@ -449,6 +452,9 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
         return [f"{where}: elegí qué hacer."]
     t = a["type"]
     meta = ACTIONS[t]
+    if meta.get("objects") and ctx.obj not in meta["objects"]:
+        only = "contactos" if meta["objects"] == ["contact"] else "empresas"
+        return [f"{where}: «{meta['label']}» sólo sirve en workflows de {only}."]
     if meta.get("field"):
         # En un workflow de contacto, `company.<key>` = editar la empresa asociada.
         target, field, cross = resolve(ctx.obj, a.get("field"))
@@ -464,6 +470,8 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
             return check_value_for_field(field, a.get("value"), label, ctx)
         if t == "set_date_offset":
             return [] if parse_int(a.get("days")) is not None else [f"{label}: cantidad de días inválida."]
+        if t == "format_phone":
+            return [] if a.get("country") in PHONE_COUNTRIES else [f"{label}: elegí el país por defecto."]
         if t == "increment":
             n = parse_number(a.get("amount"))
             return [] if n not in (None, 0) else [f"{label}: poné cuánto sumar o restar."]
@@ -476,10 +484,14 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
             if src["type"] not in COPY_COMPATIBLE.get(field["type"], ()):
                 return [f"{label}: no se puede copiar «{src['label']}» acá (tipos distintos)."]
         return []
-    if meta.get("objects") and ctx.obj not in meta["objects"]:
-        return [f"{where}: «{meta['label']}» sólo sirve en workflows de contactos."]
     if t == "associate_company":
         return []
+    if t == "create_contact":
+        return _check_create_contact(a, where, ctx)
+    if t == "ask_ai":
+        return _check_ask_ai(a, where, ctx)
+    if t == "sheets_append":
+        return _check_sheets_append(a, where, ctx)
     if t == "rotate_owner":
         owners = a.get("owners")
         if not isinstance(owners, list) or not owners:
@@ -524,6 +536,90 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
             return [f"{where}: no puede apuntar a este mismo workflow."]
         return []
     return [f"{where}: acción desconocida."]
+
+
+_SHEET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
+_SHEET_URL_RE = re.compile(r"/spreadsheets/d/([A-Za-z0-9_-]{20,100})")
+
+
+def sheet_id_of(v) -> str | None:
+    """El id de un Google Sheet a partir del link entero o del id suelto."""
+    s = (v or "").strip() if isinstance(v, str) else ""
+    m = _SHEET_URL_RE.search(s)
+    if m:
+        return m.group(1)
+    return s if _SHEET_ID_RE.match(s) else None
+
+
+def _check_create_contact(a: dict, where: str, ctx: Ctx) -> list[str]:
+    from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+
+    values = a.get("values")
+    if not isinstance(values, list) or not values:
+        return [f"{where}: definí al menos una propiedad del contacto."]
+    errs, seen = [], set()
+    for i, item in enumerate(values, 1):
+        key = (item or {}).get("field") if isinstance(item, dict) else None
+        f = CONTACT_FIELDS_BY_KEY.get(key) if isinstance(key, str) else None
+        if not f:
+            errs.append(f"{where} (propiedad {i}): elegí la propiedad.")
+            continue
+        if key in seen:
+            errs.append(f"{where}: «{f['label']}» está dos veces.")
+        seen.add(key)
+        v = item.get("value")
+        # Los textos admiten {tokens}: se validan recién al ejecutar.
+        if f["type"] in ("text", "longtext", "url", "email", "phone"):
+            if not (isinstance(v, str) and v.strip()):
+                errs.append(f"{where} ({f['label']}): falta el valor.")
+        else:
+            errs += check_value_for_field(f, v, f"{where} ({f['label']})", Ctx(obj="contact", users=ctx.users))
+    return errs
+
+
+def _check_ask_ai(a: dict, where: str, ctx: Ctx) -> list[str]:
+    errs = []
+    prompt = (a.get("prompt") or "").strip()
+    if not prompt:
+        errs.append(f"{where}: escribí qué le preguntás a la IA.")
+    elif len(prompt) > AI_MAX_PROMPT:
+        errs.append(f"{where}: la pregunta es muy larga (máximo {AI_MAX_PROMPT} caracteres).")
+    if a.get("field") == "__note__":  # guardar la respuesta como nota en la actividad
+        return errs
+    target, f, cross = resolve(ctx.obj, a.get("field"))
+    if not f or (cross and target != "company") or f["key"] not in OBJECTS[target]["editable"] \
+            or f["type"] not in ("text", "longtext"):
+        errs.append(f"{where}: elegí una propiedad de texto donde guardar la respuesta.")
+    return errs
+
+
+def _check_sheets_append(a: dict, where: str, ctx: Ctx) -> list[str]:
+    errs = []
+    if not sheet_id_of(a.get("spreadsheet")):
+        errs.append(f"{where}: pegá el link (o el id) del Google Sheet.")
+    tab = (a.get("sheet") or "").strip()
+    if not tab or len(tab) > 100:
+        errs.append(f"{where}: escribí el nombre de la pestaña del Sheet.")
+    cols = a.get("columns")
+    if not isinstance(cols, list) or not cols:
+        errs.append(f"{where}: agregá al menos una columna.")
+    elif len(cols) > SHEETS_MAX_COLUMNS:
+        errs.append(f"{where}: máximo {SHEETS_MAX_COLUMNS} columnas.")
+    else:
+        # Cada columna es una propiedad del registro ({"field": key}, también
+        # `company.<key>` desde un contacto) o un texto fijo con {tokens} ({"text": ...}).
+        for i, c in enumerate(cols, 1):
+            if isinstance(c, dict) and "field" in c:
+                _o, f, cross = resolve(ctx.obj, c.get("field"))
+                if not f or (cross and _o != "company"):
+                    errs.append(f"{where} (columna {i}): elegí la propiedad.")
+            elif isinstance(c, dict) and isinstance(c.get("text"), str) and len(c["text"]) <= 500:
+                continue
+            else:
+                errs.append(f"{where} (columna {i}): columna inválida.")
+        if not errs and not any((c.get("field") or (c.get("text") or "").strip()) for c in cols):
+            errs.append(f"{where}: todas las columnas están vacías.")
+    return errs
 
 
 # --------------------------------------------------------------------------- #

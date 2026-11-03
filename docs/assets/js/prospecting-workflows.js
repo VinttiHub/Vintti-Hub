@@ -26,7 +26,8 @@
   var draft = null;      // workflow en edición
   var dirty = false;
   var tab = "editor";    // editor | history
-  var openMenu = null;   // "+" con el menú abierto
+  var openMenu = null;   // "+" con el panel «Elegir una acción» abierto (su puntero)
+  var pickerView = "home"; // home | delay | branch (2ª pantalla del panel)
   var historyState = { status: "", rows: [], detail: null };
   var testState = { q: "", results: [], company: null, result: null };
   /* Objeto del workflow que se está mirando: "company" | "contact". Decide qué
@@ -65,6 +66,7 @@
     var acts = S().actions || {}, groups = {}, order = [];
     keysOf("actions").forEach(function (k) {
       if (acts[k].objects && acts[k].objects.indexOf(curObj) === -1) return;
+      if (acts[k].hidden) return;
       var g = acts[k].group;
       if (!groups[g]) { groups[g] = []; order.push(g); }
       groups[g].push(k);
@@ -205,6 +207,10 @@
       case "webhook": return "Manda un webhook";
       case "enroll_workflow": return "Inscribe en otro workflow";
       case "unenroll_workflow": return "Saca de otro workflow";
+      case "format_phone": return "Valida y formatea <strong>" + esc(label) + "</strong> al formato internacional";
+      case "ask_ai": return "Pregunta a la IA y guarda la respuesta en <strong>" + esc(a.field === "__note__" ? "una nota" : label) + "</strong>";
+      case "create_contact": return "Crea un contacto asociado a la empresa";
+      case "sheets_append": return "Agrega una fila a <strong>" + esc(a.sheet || "—") + "</strong> (" + (a.columns || []).length + " columnas)";
     }
     return esc(a.type);
   }
@@ -582,13 +588,30 @@
     var id = newId(), after = getPtr(ptr);
     var node;
     if (kind === "action") node = { type: "action", action: defaultAction(extra), next: after };
-    else if (kind === "delay") node = { type: "delay", delay: { kind: "duration", days: 1 }, next: after };
+    else if (kind === "delay") node = { type: "delay", delay: delayDefaults(extra || "duration"), next: after };
     else if (kind === "branch") {
-      node = { type: "branch", branch: { kind: "value", field: defaultField(),
-        paths: [{ values: [], next: null }], else_next: after } };
+      var bk = extra || "value";
+      if (bk === "random") node = { type: "branch", branch: { kind: "random", paths: [{ pct: 50, next: after }, { pct: 50, next: null }] } };
+      else if (bk === "conditions") node = { type: "branch", branch: { kind: "conditions", paths: [{ label: "Rama 1", conditions: blankConds(), next: null }], else_next: after } };
+      else node = { type: "branch", branch: { kind: "value", field: defaultField(), paths: [{ values: [], next: null }], else_next: after } };
     }
     draft.steps.nodes[id] = node;
     setPtr(ptr, id);
+  }
+
+  /* Dónde guardar la respuesta de «Preguntar a la IA»: una nota o una propiedad de texto. */
+  function aiTargets() {
+    var own = objFields(curObj).filter(function (f) { return f.editable !== false && (f.type === "text" || f.type === "longtext"); })
+      .map(function (f) { return { value: f.key, label: f.label }; });
+    return [{ value: "__note__", label: "Una nota en la actividad" }].concat(own);
+  }
+
+  function delayDefaults(kind) {
+    var defaults = { duration: { days: 1 }, until_date: { date: "", time: "09:00" },
+      until_property: { field: curObj === "contact" ? "follow_up_date" : "prospecting_start_date", offset_days: 0, time: "09:00" },
+      until_weekday: { days: [0], time: "09:00" }, until_time: { time: "09:00" },
+      until_condition: { conditions: blankConds(), max_days: 7 } };
+    return Object.assign({ kind: kind }, clone(defaults[kind] || {}));
   }
 
   function defaultAction(type) {
@@ -611,6 +634,10 @@
     if (a.type === "add_note") a.text = "";
     if (a.type === "webhook") a.url = "https://";
     if (a.type === "enroll_workflow" || a.type === "unenroll_workflow") a.workflow_id = "";
+    if (a.type === "format_phone") a.country = "AR";
+    if (a.type === "ask_ai") { a.prompt = ""; a.field = aiTargets()[0] ? aiTargets()[0].value : "__note__"; }
+    if (a.type === "create_contact") a.values = [{ field: "first_name", value: "" }, { field: "email", value: "" }];
+    if (a.type === "sheets_append") { a.spreadsheet = ""; a.sheet = "Hoja 1"; a.columns = [{ field: curObj === "contact" ? "email" : "name" }, { text: "{owner}" }]; }
     return a;
   }
 
@@ -649,7 +676,8 @@
       '<div class="pr-wf-editor">' + topBar() +
         '<div class="pr-wf-errors" id="prWfErrors" hidden></div>' +
         (tab === "editor"
-          ? '<div class="pr-wf-body"><div class="pr-wf-canvas">' + canvas() + "</div>" + sidePanel() + "</div>"
+          ? '<div class="pr-wf-body' + (openMenu ? " is-picking" : "") + '"><div class="pr-wf-canvas">' + canvas() + "</div>" +
+            (openMenu ? '<div class="pr-pick__veil" data-pick-cancel="1"></div>' + pickerPanel() : sidePanel()) + "</div>"
           : historyView()) +
       "</div>";
     bind();
@@ -747,26 +775,144 @@
     return out;
   }
 
+  /* El «+» sólo marca dónde va el paso: el selector vive en el panel lateral
+     (pickerPanel), como el «Elegir una acción» de HubSpot. */
   function plus(ptr, isEnd) {
     if (!canEdit) return "";
     var open = openMenu === ptr;
-    var menu = "";
-    if (open) {
-      var acts = S().actions || {}, ag = actionGroups(), groups = ag.groups;
-      menu = '<div class="pr-wf-menu" role="menu">' +
-        ag.order.map(function (g) {
-          return '<div class="pr-wf-menu__group">' + esc(g) + "</div>" +
-            groups[g].map(function (k) { return '<button type="button" data-ins="action" data-ins-type="' + k + '">' + esc(acts[k].label) + "</button>"; }).join("");
-        }).join("") +
-        '<div class="pr-wf-menu__group">Flujo</div>' +
-        '<button type="button" data-ins="delay"><i class="fa-regular fa-clock"></i> Esperar</button>' +
-        '<button type="button" data-ins="branch"><i class="fa-solid fa-code-branch"></i> Rama (si / si no)</button>' +
-        (isEnd ? '<button type="button" data-ins="goto"><i class="fa-solid fa-turn-up"></i> Ir a un paso…</button>' : "") +
-        "</div>";
-    }
-    return '<div class="pr-wf-plus-wrap" data-ptr="' + ptr + '">' +
+    return '<div class="pr-wf-plus-wrap" data-ptr="' + ptr + '"' + (isEnd ? ' data-end="1"' : "") + ">" +
       '<button type="button" class="pr-wf-plus' + (open ? " is-open" : "") + '" data-plus="' + ptr + '" title="Agregar un paso"><i class="fa-solid fa-plus"></i></button>' +
-      menu + "</div>";
+      "</div>";
+  }
+
+  /* ---------- Panel «Elegir una acción» ---------- */
+  var GROUP_ICON_FALLBACK = "fa-solid fa-bolt";
+  function pickerIsEnd() { return !!openMenu && !getPtr(openMenu); }
+  function pickerPanel() {
+    var head = function (title, back) {
+      return '<div class="pr-pick__head">' +
+        (back ? '<button type="button" class="pr-pick__back" data-pick-view="home" title="Volver"><i class="fa-solid fa-chevron-left"></i></button>' : "") +
+        '<h3 class="pr-pick__title">' + esc(title) + "</h3>" +
+        '<button type="button" class="pr-btn pr-pick__cancel" data-pick-cancel="1">Cancelar</button></div>';
+    };
+    var body;
+    if (pickerView === "delay") {
+      var dk = S().delays || {};
+      body = head("Retraso", true) +
+        '<p class="pr-pick__lead">Esperar antes del próximo paso, basado en:</p>' +
+        '<div class="pr-pick__opts">' + keysOf("delays").map(function (k) {
+          return '<button type="button" class="pr-pick__opt" data-ins="delay" data-ins-type="' + k + '">' +
+            '<span class="pr-pick__opt-title">' + esc(dk[k].title || dk[k].label) + "</span>" +
+            '<span class="pr-pick__opt-ex">' + esc(dk[k].example || "") + "</span></button>";
+        }).join("") + "</div>";
+    } else if (pickerView === "branch") {
+      var bk = S().branches || {};
+      var icons = { value: "fa-solid fa-list-check", conditions: "fa-solid fa-circle-nodes", random: "fa-solid fa-shuffle" };
+      body = head("Ramificación", true) +
+        '<p class="pr-pick__lead">Enviar ' + (curObj === "contact" ? "contactos" : "empresas") + " a ramificaciones basado en:</p>" +
+        '<div class="pr-pick__bcards">' + keysOf("branches").map(function (k) {
+          // `example` viene del backend (constants.BRANCHES) con <b> para resaltar: es texto fijo nuestro.
+          return '<button type="button" class="pr-pick__bcard" data-ins="branch" data-ins-type="' + k + '">' +
+            '<span class="pr-pick__bicon pr-pick__bicon--' + k + '"><i class="' + (icons[k] || "fa-solid fa-code-branch") + '"></i></span>' +
+            '<span class="pr-pick__btext"><strong>' + esc(bk[k].title || bk[k].label) + "</strong>" +
+            "<span>" + String(bk[k].example || "").replace(/<(?!\/?b>)[^>]*>/g, "") + "</span></span></button>";
+        }).join("") + "</div>";
+    } else {
+      var acts = S().actions || {}, ag = actionGroups(), meta = {};
+      (S().action_groups || []).forEach(function (g) { meta[g.key] = g; });
+      var apps = S().action_apps || {};
+      var isEnd = pickerIsEnd();
+      var tile = function (attrs, icon, label, disabled, tip) {
+        return '<button type="button" class="pr-pick__tile"' + attrs + (disabled ? " disabled" : "") + (tip ? ' title="' + esc(tip) + '"' : "") + ">" +
+          '<span class="pr-pick__tile-icon"><i class="' + icon + '"></i></span><span>' + label + "</span></button>";
+      };
+      var card = function (k, color) {
+        var a = acts[k];
+        return '<button type="button" class="pr-pick__act pr-pick__act--' + color + '" data-ins="action" data-ins-type="' + k + '"' +
+          ' data-search="' + esc((a.label + " " + (a.desc || "") + " " + (a.app || "")).toLowerCase()) + '">' +
+          '<span class="pr-pick__act-title">' + esc(a.label) + "</span>" +
+          (a.desc ? '<span class="pr-pick__act-desc">' + esc(a.desc) + "</span>" : "") + "</button>";
+      };
+      var order = (S().action_groups || []).map(function (g) { return g.key; }).filter(function (g) { return ag.groups[g]; });
+      ag.order.forEach(function (g) { if (order.indexOf(g) === -1) order.push(g); });
+      body = head("Elegir una acción", false) +
+        '<div class="pr-pick__search"><input type="search" id="prWfPickQ" class="pr-filter__input" placeholder="Buscar una acción" autocomplete="off">' +
+          '<i class="fa-solid fa-magnifying-glass"></i></div>' +
+        '<div class="pr-pick__tiles">' +
+          tile(' data-pick-view="delay"', "fa-solid fa-stopwatch", "Retraso") +
+          tile(' data-pick-view="branch"', "fa-solid fa-sitemap", "Ramificación") +
+          tile(' data-ins="action" data-ins-type="enroll_workflow"', "fa-solid fa-arrow-right-to-bracket", "Ir a workflow") +
+          tile(' data-ins="goto"', "fa-solid fa-turn-up", "Ir a acción", !isEnd,
+               isEnd ? "Saltar a un paso que ya existe" : "Sólo al final de una rama: elegí el «+» de abajo de todo") +
+        "</div>" +
+        '<p class="pr-pick__empty" id="prWfPickEmpty" hidden>Ninguna acción coincide con la búsqueda.</p>' +
+        '<div class="pr-pick__groups">' + order.map(function (g) {
+          var m = meta[g] || { icon: GROUP_ICON_FALLBACK, color: "violet", desc: "" };
+          var keys = ag.groups[g];
+          var inner;
+          if (g === "Aplicaciones integradas") {
+            // Una sub-sección por aplicación, como en HubSpot.
+            var byApp = {}, appOrder = [];
+            keys.forEach(function (k) { var ap = acts[k].app || "Otras"; if (!byApp[ap]) { byApp[ap] = []; appOrder.push(ap); } byApp[ap].push(k); });
+            inner = appOrder.map(function (ap) {
+              return '<div class="pr-pick__app" data-app-block="1"><div class="pr-pick__app-head"><span class="pr-pick__app-icon"><i class="' +
+                ((apps[ap] || {}).icon || GROUP_ICON_FALLBACK) + '"></i></span><strong>' + esc(ap) + "</strong></div>" +
+                byApp[ap].map(function (k) { return card(k, m.color); }).join("") + "</div>";
+            }).join("");
+          } else inner = keys.map(function (k) { return card(k, m.color); }).join("");
+          return '<details class="pr-pick__group" data-group="1">' +
+            '<summary><i class="fa-solid fa-chevron-right pr-pick__chev"></i>' +
+              '<span class="pr-pick__gicon pr-pick__gicon--' + m.color + '"><i class="' + m.icon + '"></i></span>' +
+              '<span class="pr-pick__gtext"><strong>' + esc(g) + "</strong><span>" + esc(m.desc || "") + "</span></span></summary>" +
+            '<div class="pr-pick__list">' + inner + "</div></details>";
+        }).join("") + "</div>";
+    }
+    return '<aside class="pr-wf-side pr-pick" data-ptr="' + esc(openMenu) + '" role="dialog" aria-label="Elegir una acción">' + body + "</aside>";
+  }
+  /* Buscar: filtra las tarjetas en el DOM (sin redibujar, así no se pierde el foco). */
+  function filterPicker(q) {
+    var panel = root.querySelector(".pr-pick");
+    if (!panel) return;
+    q = (q || "").trim().toLowerCase();
+    var any = false;
+    panel.querySelectorAll("[data-group]").forEach(function (g) {
+      var hits = 0;
+      g.querySelectorAll("[data-search]").forEach(function (c) {
+        var ok = !q || c.getAttribute("data-search").indexOf(q) !== -1;
+        c.hidden = !ok;
+        if (ok) hits++;
+      });
+      g.querySelectorAll("[data-app-block]").forEach(function (b) {
+        b.hidden = !!q && !b.querySelector("[data-search]:not([hidden])");
+      });
+      g.hidden = !!q && !hits;
+      if (q) g.open = hits > 0;
+      if (hits) any = true;
+    });
+    var tiles = panel.querySelector(".pr-pick__tiles");
+    if (tiles) tiles.hidden = !!q;
+    var empty = $("prWfPickEmpty");
+    if (empty) empty.hidden = !q || any;
+  }
+  function closePicker() { openMenu = null; pickerView = "home"; render(); }
+  /* El panel vive dentro de #prWorkflows, que es el que scrollea (no la ventana): su alto
+     tiene que salir del espacio visible de ESE contenedor, o el final queda tapado y no
+     se puede llegar scrolleando adentro del panel. */
+  function fitPicker() {
+    var panel = root && root.querySelector(".pr-pick");
+    if (!panel) return;
+    if (window.matchMedia("(max-width: 1100px)").matches) { panel.style.maxHeight = ""; return; }
+    var box = root.getBoundingClientRect();
+    var bottom = Math.min(box.bottom, window.innerHeight);
+    var top = Math.max(panel.getBoundingClientRect().top, box.top);
+    panel.style.maxHeight = Math.max(240, bottom - top - 12) + "px";
+  }
+  var fitBound = false;
+  function bindFit() {
+    if (fitBound || !root) return;
+    fitBound = true;
+    root.addEventListener("scroll", fitPicker, { passive: true });
+    window.addEventListener("resize", fitPicker);
   }
 
   function nodeHead(id, num, icon, title, cls) {
@@ -889,6 +1035,9 @@
     if (helpTipFor === badge && helpTipPinned) hideHelpTip();
     else showHelpTip(badge, true);
   }, true);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && openMenu && draft) { e.preventDefault(); closePicker(); }
+  });
   document.addEventListener("mouseover", function (e) {
     var badge = e.target.closest && e.target.closest(".pr-wf-help");
     if (badge && !helpTipPinned) showHelpTip(badge, false);
@@ -1054,8 +1203,10 @@
         return '<optgroup label="' + esc(g) + '">' + optionTags(keys.map(function (k) { return { value: k, label: acts[k].label }; }), shown) + "</optgroup>";
       }).join("") + "</select>";
     var meta = acts[shown] || {};
-    return '<div class="pr-wf-node pr-wf-node--action">' +
-      nodeHead(id, num, "fa-regular fa-pen-to-square", esc(meta.group || "Acción")) +
+    var gm = (S().action_groups || []).filter(function (g) { return g.key === meta.group; })[0] || {};
+    var appIcon = meta.app && ((S().action_apps || {})[meta.app] || {}).icon;
+    return '<div class="pr-wf-node pr-wf-node--action' + (gm.color ? " pr-wf-node--g-" + gm.color : "") + '">' +
+      nodeHead(id, num, appIcon || gm.icon || "fa-regular fa-pen-to-square", esc(meta.app || meta.group || "Acción"), gm.color ? "pr-wf-node__icon--g-" + gm.color : "") +
       '<div class="pr-wf-action">' + typeSel + actionParams(id, a, meta) + "</div>" +
       '<p class="pr-wf-node__sum">' + actionText(a) + "</p>" +
       "</div>";
@@ -1067,8 +1218,8 @@
   function area(id, key, value, ph) {
     return '<textarea class="pr-filter__input pr-wf-area" rows="3" data-a="' + key + '" data-node="' + id + '" placeholder="' + esc(ph || "") + '"' + dis() + ">" + esc(value || "") + "</textarea>";
   }
-  var TOKENS_COMPANY = '<p class="pr-note pr-wf-tokens">Podés usar: {empresa} {dominio} {owner} {status} {semana} {not_icp} {link}</p>';
-  var TOKENS_CONTACT = '<p class="pr-note pr-wf-tokens">Podés usar: {contacto} {email_contacto} {empresa} {owner} {status} {link}</p>';
+  var TOKENS_COMPANY = '<p class="pr-note pr-wf-tokens">Podés usar: {empresa} {dominio} {owner} {status} {semana} {not_icp} {link} · y cualquier propiedad con {campo:clave}</p>';
+  var TOKENS_CONTACT = '<p class="pr-note pr-wf-tokens">Podés usar: {contacto} {email_contacto} {empresa} {owner} {status} {link} · y cualquier propiedad con {campo:clave}</p>';
   var TOKENS = TOKENS_COMPANY;
 
   function actionParams(id, a, meta) {
@@ -1105,6 +1256,11 @@
         html += '<div class="pr-wf-full"><span class="pr-wf-lbl">Copiar desde</span><select class="pr-filter__input" data-a="from_field" data-node="' + id + '"' + dis() + '><option value="">Elegir…</option>' +
           fieldOptions(a.from_field, function (x) { return x.key !== a.field; }, true) + "</select></div>";
       }
+      if (a.type === "format_phone") {
+        html += '<div class="pr-wf-full"><span class="pr-wf-lbl">País si el número no trae código (+…)</span>' +
+          '<select class="pr-filter__input" data-a="country" data-node="' + id + '"' + dis() + ">" + optionTags(S().phone_countries || [], a.country) + "</select>" +
+          '<p class="pr-note">Lo deja como <em>+54 9 11 5555-1234</em>. Si no es un número válido no lo toca y queda anotado en el historial del paso.</p></div>';
+      }
       return html;
     }
     switch (a.type) {
@@ -1133,6 +1289,54 @@
       case "webhook":
         return '<div class="pr-wf-full">' + inp(id, "url", a.url, "url", ' placeholder="https://…"') +
           '<p class="pr-note">Manda un POST con los datos de la empresa. Sobre empresas dummy se registra y no se manda.</p></div>';
+      case "ask_ai":
+        return '<div class="pr-wf-full">' + area(id, "prompt", a.prompt, "Qué le preguntás. Ej.: ¿A qué se dedica {empresa} ({dominio})? Respondé en una frase.") +
+          '<div class="pr-wf-row"><span class="pr-wf-lbl">Insertar propiedad</span><select class="pr-filter__input" data-token-node="' + id + '"' + dis() + '><option value="">Elegir…</option>' +
+            fieldOptions("", null, curObj === "contact") + "</select></div>" +
+          '<span class="pr-wf-lbl">Guardar la respuesta en</span><select class="pr-filter__input" data-a="field" data-node="' + id + '"' + dis() + ">" +
+            optionTags(aiTargets(), a.field) + "</select>" + TOKENS +
+          '<p class="pr-note">Usa ' + esc(S().ai_model || "gpt-4o-mini") + '. En la prueba y la vista previa no se llama a la IA.</p></div>';
+      case "create_contact":
+        var cfs = objFields("contact");
+        return '<div class="pr-wf-full"><span class="pr-wf-lbl">Propiedades del contacto nuevo</span>' +
+          (a.values || []).map(function (it, i) {
+            var cf = cfs.filter(function (x) { return x.key === it.field; })[0];
+            var valInput;
+            if (cf && (cf.type === "enum" || cf.type === "owner" || cf.type === "user")) {
+              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + '><option value="">Elegir…</option>' + optionTags(choices(cf), it.value) + "</select>";
+            } else if (cf && cf.type === "bool") {
+              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + ">" +
+                optionTags([{ value: "", label: "Elegir…" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }], it.value === true ? "true" : it.value === false ? "false" : (it.value || "")) + "</select>";
+            } else {
+              var ty = cf && (cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text");
+              valInput = '<input type="' + (ty || "text") + '" class="pr-filter__input" data-cc="' + id + "|" + i + '|value" value="' + esc(it.value == null ? "" : it.value) + '" placeholder="Valor (admite {empresa}…)"' + dis() + ">";
+            }
+            return '<div class="pr-wf-kv"><select class="pr-filter__input" data-cc="' + id + "|" + i + '|field"' + dis() + '><option value="">Propiedad…</option>' +
+              optionTags(cfs.filter(function (x) { return x.type !== "multi" && x.type !== "datetime"; }).map(function (x) { return { value: x.key, label: x.label }; }), it.field) + "</select>" +
+              valInput + (canEdit && (a.values || []).length > 1 ? '<button type="button" class="pr-wf-x" data-cc-del="' + id + "|" + i + '" title="Quitar"><i class="fa-solid fa-xmark"></i></button>' : "") + "</div>";
+          }).join("") +
+          (canEdit ? '<button type="button" class="pr-wf-add" data-cc-add="' + id + '"><i class="fa-solid fa-plus"></i> Agregar propiedad</button>' : "") +
+          TOKENS + '<p class="pr-note">Se crea dentro de la empresa (si es dummy, el contacto también). Si el email ya existe en otro contacto, el paso falla y queda en el historial.</p></div>';
+      case "sheets_append":
+        var sa = S().sheets_service_account;
+        return '<div class="pr-wf-full">' +
+          inp(id, "spreadsheet", a.spreadsheet, "text", ' placeholder="Link del Google Sheet"') +
+          '<div class="pr-wf-row"><span class="pr-wf-lbl">Pestaña</span>' + inp(id, "sheet", a.sheet, "text", ' placeholder="Hoja 1"') + "</div>" +
+          '<span class="pr-wf-lbl">Columnas (A, B, C…)</span>' +
+          (a.columns || []).map(function (c, i) {
+            var letter = String.fromCharCode(65 + (i % 26));
+            var isText = !("field" in c);
+            return '<div class="pr-wf-kv"><span class="pr-wf-col-letter">' + letter + "</span>" +
+              '<select class="pr-filter__input" data-sc="' + id + "|" + i + '|kind"' + dis() + ">" +
+                '<option value="__text__"' + (isText ? " selected" : "") + ">Texto fijo…</option>" + fieldOptions(isText ? "" : c.field, null, curObj === "contact") + "</select>" +
+              (isText ? '<input type="text" class="pr-filter__input" data-sc="' + id + "|" + i + '|text" value="' + esc(c.text || "") + '" placeholder="Texto (admite {tokens})"' + dis() + ">" : "") +
+              (canEdit && (a.columns || []).length > 1 ? '<button type="button" class="pr-wf-x" data-sc-del="' + id + "|" + i + '" title="Quitar"><i class="fa-solid fa-xmark"></i></button>' : "") + "</div>";
+          }).join("") +
+          (canEdit ? '<button type="button" class="pr-wf-add" data-sc-add="' + id + '"><i class="fa-solid fa-plus"></i> Agregar columna</button>' : "") + TOKENS +
+          '<p class="pr-note">Compartí el Sheet como <strong>editor</strong> con ' +
+            (sa ? '<code>' + esc(sa) + '</code> <button type="button" class="pr-btn pr-btn--sm" data-copy-sa="' + esc(sa) + '"><i class="fa-regular fa-copy"></i> Copiar</button>'
+                : "la service account de Google del Hub") +
+          ". Sobre registros dummy la fila no se escribe.</p></div>";
       case "enroll_workflow":
       case "unenroll_workflow":
         var others2 = list.filter(function (w) { return w.id !== draft.id; }).map(function (w) { return { value: w.id, label: w.name }; });
@@ -1345,6 +1549,18 @@
     body.addEventListener("click", onClick);
     body.addEventListener("change", onChange);
     body.addEventListener("input", onInput);
+    bindFit();
+    fitPicker();
+    var pq = $("prWfPickQ");
+    if (pq) {
+      pq.addEventListener("input", function () { filterPicker(pq.value); });
+      pq.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        var first = root.querySelector(".pr-pick [data-search]:not([hidden])");
+        if (first && pq.value.trim()) { e.preventDefault(); first.click(); }
+      });
+      try { pq.focus({ preventScroll: true }); } catch (e) { pq.focus(); }
+    }
     var tq = $("prWfTestQ");
     if (tq) {
       var t = null;
@@ -1386,6 +1602,18 @@
     }
     if (el.tagName !== "SELECT" && el.type !== "checkbox" && (a = el.getAttribute("data-a"))) {
       setActionParam(draft.steps.nodes[el.getAttribute("data-node")].action, a, el.value);
+      markDirty();
+      return;
+    }
+    if (el.tagName === "INPUT" && (a = el.getAttribute("data-cc"))) {
+      var cp = a.split("|");
+      draft.steps.nodes[cp[0]].action.values[Number(cp[1])].value = el.value;
+      markDirty();
+      return;
+    }
+    if (el.tagName === "INPUT" && (a = el.getAttribute("data-sc"))) {
+      var sp = a.split("|");
+      draft.steps.nodes[sp[0]].action.columns[Number(sp[1])].text = el.value;
       markDirty();
       return;
     }
@@ -1461,14 +1689,21 @@
         if (el.checked) n.action.to.unshift("owner");
       } else if (el.type === "checkbox") n.action[a] = el.checked;
       else setActionParam(n.action, a, el.value);
+    } else if ((a = el.getAttribute("data-cc")) && el.tagName === "SELECT") {
+      var cp = a.split("|"), it = draft.steps.nodes[cp[0]].action.values[Number(cp[1])];
+      if (cp[2] === "field") { it.field = el.value; it.value = ""; }
+      else it.value = el.value === "true" ? true : el.value === "false" ? false : el.value;
+    } else if ((a = el.getAttribute("data-sc")) && el.tagName === "SELECT") {
+      var sp = a.split("|"), cols = draft.steps.nodes[sp[0]].action.columns;
+      cols[Number(sp[1])] = el.value === "__text__" ? { text: "" } : { field: el.value };
+    } else if ((a = el.getAttribute("data-token-node"))) {
+      if (!el.value) return;
+      var tn = draft.steps.nodes[a].action;
+      tn.prompt = (tn.prompt || "") + (tn.prompt && !/\s$/.test(tn.prompt) ? " " : "") + "{campo:" + el.value + "}";
     } else if ((a = el.getAttribute("data-d"))) {
       n = draft.steps.nodes[el.getAttribute("data-node")];
       if (a === "kind") {
-        var defaults = { duration: { days: 1 }, until_date: { date: "", time: "09:00" },
-          until_property: { field: curObj === "contact" ? "follow_up_date" : "prospecting_start_date", offset_days: 0, time: "09:00" },
-          until_weekday: { days: [0], time: "09:00" }, until_time: { time: "09:00" },
-          until_condition: { conditions: blankConds(), max_days: 7 } };
-        n.delay = Object.assign({ kind: el.value }, defaults[el.value] || {});
+        n.delay = delayDefaults(el.value);
       } else n.delay[a] = el.value;
     } else if ((a = el.getAttribute("data-b"))) {
       n = draft.steps.nodes[el.getAttribute("data-node")];
@@ -1496,7 +1731,7 @@
     if (!b) {
       var tr = e.target.closest("[data-enr]");
       if (tr) return openEnrollment(Number(tr.getAttribute("data-enr")));
-      if (openMenu && !e.target.closest(".pr-wf-menu")) { openMenu = null; render(); }
+      if (e.target.closest("[data-pick-cancel]")) closePicker();
       return;
     }
     var v, p, ref;
@@ -1516,10 +1751,27 @@
     if ((v = b.getAttribute("data-hstatus")) !== null) { historyState.status = v; historyState.detail = null; return loadHistory(); }
     if ((v = b.getAttribute("data-unenroll")) !== null) return unenroll(Number(v));
     if ((v = b.getAttribute("data-test-co")) !== null) return runTest(Number(v));
-    if ((v = b.getAttribute("data-plus")) !== null) { openMenu = openMenu === v ? null : v; return render(); }
-    if ((v = b.getAttribute("data-ins")) !== null) {
+    if ((v = b.getAttribute("data-plus")) !== null) { openMenu = openMenu === v ? null : v; pickerView = "home"; return render(); }
+    if (b.getAttribute("data-pick-cancel") !== null) return closePicker();
+    if ((v = b.getAttribute("data-pick-view")) !== null) { pickerView = v; return render(); }
+    if ((v = b.getAttribute("data-cc-add")) !== null) {
+      draft.steps.nodes[v].action.values.push({ field: "", value: "" });
+    } else if ((v = b.getAttribute("data-cc-del")) !== null) {
+      p = v.split("|");
+      draft.steps.nodes[p[0]].action.values.splice(Number(p[1]), 1);
+    } else if ((v = b.getAttribute("data-sc-add")) !== null) {
+      draft.steps.nodes[v].action.columns.push({ field: curObj === "contact" ? "email" : "name" });
+    } else if ((v = b.getAttribute("data-sc-del")) !== null) {
+      p = v.split("|");
+      draft.steps.nodes[p[0]].action.columns.splice(Number(p[1]), 1);
+    } else if ((v = b.getAttribute("data-copy-sa")) !== null) {
+      if (navigator.clipboard) navigator.clipboard.writeText(v);
+      b.innerHTML = '<i class="fa-solid fa-check"></i> Copiado';
+      return;
+    } else if ((v = b.getAttribute("data-ins")) !== null) {
       var ptr = b.closest("[data-ptr]").getAttribute("data-ptr");
       openMenu = null;
+      pickerView = "home";
       if (v === "goto") return chooseGoto(ptr);
       insertNode(ptr, v, b.getAttribute("data-ins-type"));
     } else if ((v = b.getAttribute("data-del")) !== null) {

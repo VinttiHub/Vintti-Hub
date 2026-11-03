@@ -24,6 +24,9 @@ from datetime import date, datetime, timedelta
 from psycopg2.extras import Json
 
 from prospecting.constants import (
+    ACTION_APPS,
+    AI_MODEL,
+    ACTION_GROUPS,
     ACTIONS,
     BRANCHES,
     DELAYS,
@@ -40,6 +43,7 @@ from prospecting.constants import (
     OPERATORS,
     OPERATORS_BY_TYPE,
     PERIODS,
+    PHONE_COUNTRIES,
     WORKFLOW_EDITORS,
     BDR_FIELDS,
     BDR_ROLE_PATTERN,
@@ -58,6 +62,22 @@ from prospecting.constants import (
 # Schema
 # --------------------------------------------------------------------------- #
 _SCHEMA_READY = False
+
+
+_SA_EMAIL = []
+
+
+def _sheets_service_account() -> str | None:
+    """Mail de la service account de Google (con quién compartir el Sheet de la acción
+    «Crear fila de Google Sheet»). Se calcula una vez por proceso."""
+    if not _SA_EMAIL:
+        try:
+            from utils.sheets_utils import sheets_credentials
+
+            _SA_EMAIL.append(sheets_credentials().service_account_email)
+        except Exception:
+            return None
+    return _SA_EMAIL[0]
 
 
 def ensure_schema(cur) -> None:
@@ -1081,6 +1101,11 @@ def options(cur) -> dict:
             "operators_by_type": OPERATORS_BY_TYPE,
             "periods": [{"value": k, "label": v} for k, v in PERIODS.items()],
             "actions": ACTIONS,
+            "action_groups": ACTION_GROUPS,
+            "action_apps": ACTION_APPS,
+            "phone_countries": [{"value": k, "label": v} for k, v in PHONE_COUNTRIES.items()],
+            "sheets_service_account": _sheets_service_account(),
+            "ai_model": AI_MODEL,
             "triggers": TRIGGERS,
             "events": EVENTS,
             "schedules": SCHEDULES,

@@ -29,6 +29,7 @@ from __future__ import annotations
 import html
 import logging
 import random
+import re
 from datetime import date, datetime, time, timedelta, timezone
 try:
     from zoneinfo import ZoneInfo
@@ -40,6 +41,8 @@ import requests
 from prospecting import store
 from prospecting.constants import (
     ACTIONS,
+    AI_MAX_ANSWER,
+    AI_MODEL,
     AUTOMATION_REAL_DATA,
     DELAYS,
     MAX_STEPS_PER_RUN,
@@ -58,6 +61,7 @@ from prospecting.rules import (
     parse_datetime,
     parse_int,
     parse_number,
+    sheet_id_of,
     uses_cross,
     uses_history,
 )
@@ -626,7 +630,40 @@ def render_tokens(cur, text: str, row: dict, obj: str = "company") -> str:
     }
     for k, v in vals.items():
         text = text.replace(k, str(v or ""))
+    # {campo:<key>} = el valor de cualquier propiedad del registro (y
+    # {campo:company.<key>} el de la empresa asociada, desde un contacto).
+    if "{campo:" in text:
+        company = {}
+
+        def _sub(m):
+            nonlocal company
+            target, f, cross = resolve(obj, m.group(1))
+            if not f or (cross and target != "company"):
+                return m.group(0)
+            src = row
+            if cross:
+                if not company:
+                    company = load_company(cur, _company_id_of(obj, row)) or {}
+                src = company
+            return _token_text(f, src.get(f["key"]))
+
+        text = _CAMPO_RE.sub(_sub, text)
     return text
+
+
+_CAMPO_RE = re.compile(r"\{campo:([a-z0-9_.]+)\}")
+
+
+def _token_text(f: dict, v) -> str:
+    if v is None or v == "":
+        return ""
+    if isinstance(v, list):
+        return ", ".join(str(x) for x in v)
+    if isinstance(v, bool):
+        return "Sí" if v else "No"
+    if isinstance(v, (date, datetime)):
+        return v.isoformat()
+    return str(v)
 
 
 def _edit_value(a: dict, field: dict, source_row: dict, cur_value, as_of: date, now: datetime):
@@ -642,6 +679,8 @@ def _edit_value(a: dict, field: dict, source_row: dict, cur_value, as_of: date, 
         return (now + timedelta(days=days)).isoformat() if ftype == "datetime" else as_of + timedelta(days=days)
     if t == "increment":
         return int(round((parse_number(cur_value) or 0) + parse_number(a.get("amount"))))
+    if t == "format_phone":
+        return format_phone(cur_value, a.get("country"))[0]
     if t == "copy":
         v = source_row.get(a["from_field"].split(".", 1)[-1]) if source_row else None
         if v is None:
@@ -702,7 +741,16 @@ def describe_action(obj: str, a: dict) -> str:
             return f"{'Suma' if n > 0 else 'Resta'} {abs(n):g} a {f}"
         if t == "copy":
             return f"Copia {field_label(obj, a.get('from_field'))} en {f}"
+        if t == "format_phone":
+            return f"Valida y formatea {f} (país por defecto: {a.get('country')})"
         return f"Define {f} como {a.get('value')}"
+    if t == "ask_ai":
+        dest = "una nota" if a.get("field") == "__note__" else field_label(obj, a.get("field"))
+        return f"Pregunta a la IA y guarda la respuesta en {dest}"
+    if t == "create_contact":
+        return "Crea un contacto asociado a la empresa"
+    if t == "sheets_append":
+        return f"Agrega una fila a la pestaña «{a.get('sheet')}» de un Google Sheet"
     return ACTIONS.get(t, {}).get("label", t)
 
 
@@ -771,6 +819,13 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
             old = holder.get(key) if holder else None
             new = _edit_value(a, field, src_row, old, ctx.as_of, ctx.now)
             summary = describe_action(obj, a)
+            if t == "format_phone":
+                if old in (None, ""):
+                    return {"summary": f"{field['label']} está vacío: no hay nada que formatear."}
+                _fmt, problem = format_phone(old, a.get("country"))
+                if problem:
+                    return {"summary": f"{field['label']} «{old}» no es un teléfono válido ({problem}): queda como está."}
+                summary = f"{field['label']}: {old} → {new}"
         if _same(old, new):
             return {"summary": summary + " — ya estaba así, sin cambios."}
         label_key = key if target == obj else f"company.{key}"
@@ -914,6 +969,60 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
             raise RuntimeError(f"El webhook respondió {r.status_code}.")
         return {"summary": f"Webhook a {url}: respondió {r.status_code}."}
 
+    if t == "sheets_append":
+        return _sheets_append(cur, a, row, ctx, test)
+
+    # ---- IA ---------------------------------------------------------------- #
+    if t == "ask_ai":
+        prompt = render_tokens(cur, a["prompt"], row, obj)
+        as_note = a.get("field") == "__note__"
+        if ctx.dry:
+            return {"summary": describe_action(obj, a) + " (en la prueba no se llama a la IA)."}
+        answer = ask_ai(prompt)
+        if as_note:
+            answer = answer[:AI_MAX_ANSWER]
+            store.log_event(cur, _company_id_of(obj, row), ctx.source, ctx.actor, "__note__", None, f"IA: {answer}",
+                            contact_id=row["id"] if obj == "contact" else None)
+            return {"summary": f"Nota de la IA: {answer[:140]}{'…' if len(answer) > 140 else ''}"}
+        target, field, _cross = resolve(obj, a["field"])
+        limit = AI_MAX_ANSWER if field["type"] == "longtext" else 500
+        answer = answer[:limit]
+        company_row = None
+        if target != obj:
+            company_row = load_company(cur, _company_id_of(obj, row))
+        holder = company_row if target != obj else row
+        old = holder.get(field["key"]) if holder else None
+        label_key = field["key"] if target == obj else f"company.{field['key']}"
+        summary = f"La IA respondió y se guardó en {field['label']}: {answer[:140]}{'…' if len(answer) > 140 else ''}"
+        if _same(old, answer):
+            return {"summary": summary + " — ya estaba así, sin cambios."}
+        _apply_edit(cur, ctx, row, target, field["key"], answer)
+        return {"summary": summary, "changes": {label_key: {"from": _plain(old), "to": answer}}}
+
+    # ---- Crear registro (contacto de la empresa) -------------------------- #
+    if t == "create_contact":
+        from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+
+        data = {}
+        for item in a.get("values") or []:
+            f = CONTACT_FIELDS_BY_KEY[item["field"]]
+            v = item.get("value")
+            if isinstance(v, str) and f["type"] in ("text", "longtext", "url", "email", "phone"):
+                v = render_tokens(cur, v, row, obj).strip()
+                if not v:
+                    continue
+            data[item["field"]] = v
+        name = " ".join(str(data[k]) for k in ("first_name", "last_name") if data.get(k)) or data.get("email") or "sin nombre"
+        summary = f"Crea el contacto «{name}» en {row.get('name')}"
+        if ctx.dry:
+            return {"summary": summary}
+        try:
+            created = store.create_contact(cur, row["id"], data, ctx.actor, source=ctx.source)
+        except ValueError as exc:
+            raise RuntimeError(f"No se pudo crear el contacto: {exc}") from exc
+        emit_event(cur, "contact", created["id"], "created", created.pop("_changes", []), ctx.now, ctx.actor)
+        return {"summary": summary + f" (#{created['id']})"}
+
     # ---- Otros workflows -------------------------------------------------- #
     if t in ("enroll_workflow", "unenroll_workflow"):
         from prospecting.workflows import get_workflow
@@ -940,6 +1049,101 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         return {"summary": f"Sacado de «{other['name']}»." if n else f"No estaba en «{other['name']}»."}
 
     raise RuntimeError(f"Acción desconocida: {t}")
+
+
+# --------------------------------------------------------------------------- #
+# Helpers de las acciones con servicios externos
+# --------------------------------------------------------------------------- #
+def format_phone(value, country: str | None) -> tuple:
+    """(número en formato internacional, problema). Con problema != None el número no
+    es válido y el valor nuevo es el mismo de antes."""
+    import phonenumbers
+
+    raw = str(value or "").strip()
+    if not raw:
+        return value, "vacío"
+    try:
+        num = phonenumbers.parse(raw, (country or "AR").upper())
+    except phonenumbers.NumberParseException:
+        return value, "no se pudo leer"
+    if not phonenumbers.is_valid_number(num):
+        return value, "no existe ese número"
+    return phonenumbers.format_number(num, phonenumbers.PhoneNumberFormat.INTERNATIONAL), None
+
+
+def ask_ai(prompt: str) -> str:
+    import openai
+
+    try:
+        r = openai.chat.completions.create(
+            model=AI_MODEL,
+            temperature=0,
+            max_tokens=600,
+            messages=[
+                {"role": "system", "content": (
+                    "Sos un asistente de prospección B2B de Vintti. Respondé en una o pocas "
+                    "frases, sin saludos ni explicaciones, sólo lo que se pide.")},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=40,
+        )
+    except Exception as exc:  # cuota agotada = no reintentar; cualquier otro, error del paso
+        code = getattr(exc, "code", None)
+        if code == "insufficient_quota":
+            raise RuntimeError("La IA no respondió: se terminó el saldo de OpenAI del mes.") from exc
+        raise RuntimeError(f"La IA no respondió: {exc}") from exc
+    answer = ((r.choices[0].message.content if r.choices else "") or "").strip()
+    if not answer:
+        raise RuntimeError("La IA devolvió una respuesta vacía.")
+    return answer
+
+
+def sheets_service_account() -> str | None:
+    """El mail con el que hay que compartir el Sheet (para mostrarlo en el editor)."""
+    try:
+        from utils.sheets_utils import sheets_credentials
+
+        return sheets_credentials().service_account_email
+    except Exception:
+        return None
+
+
+def _sheets_append(cur, a: dict, row: dict, ctx: Ctx, test: bool) -> dict:
+    obj = ctx.obj
+    values, company = [], None
+    for c in a.get("columns") or []:
+        if c.get("field"):
+            target, f, cross = resolve(obj, c["field"])
+            src = row
+            if cross:
+                if company is None:
+                    company = load_company(cur, _company_id_of(obj, row)) or {}
+                src = company
+            values.append(_token_text(f, src.get(f["key"])))
+        else:
+            values.append(render_tokens(cur, c.get("text") or "", row, obj))
+    sheet = (a.get("sheet") or "").strip()
+    summary = f"Fila en «{sheet}»: " + " | ".join(v[:40] for v in values)
+    if ctx.dry or test:
+        return {"summary": summary + (" — simulado (registro dummy), no se escribió." if test and not ctx.dry else "")}
+    from utils.sheets_utils import a1_quote, sheets_service
+
+    try:
+        sheets_service().spreadsheets().values().append(
+            spreadsheetId=sheet_id_of(a["spreadsheet"]),
+            range=f"{a1_quote(sheet)}!A1",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [values]},
+        ).execute()
+    except Exception as exc:
+        msg = str(exc)
+        if "403" in msg or "PERMISSION_DENIED" in msg:
+            msg = f"el Sheet no está compartido con {sheets_service_account() or 'la service account'} como editor"
+        elif "Unable to parse range" in msg:
+            msg = f"no existe la pestaña «{sheet}»"
+        raise RuntimeError(f"No se pudo escribir en Google Sheets: {msg}") from exc
+    return {"summary": summary}
 
 
 # --------------------------------------------------------------------------- #
