@@ -73,6 +73,21 @@ def _first_email(v):
 # Lo único que una re-agenda pisa; el resto sólo se rellena si está vacío.
 OVERWRITE_FIELDS = {"meeting_datetime"}
 
+# El Zap del formulario (Routing Form Submission → Delay → POST) manda este Origin detail
+# para quien llenó el form y no agendó. Esa llegada nunca trae una reunión: la fecha que
+# viene es la del formulario, y como meeting_datetime se pisa siempre, le borraría la
+# reunión real a quien sí agendó. Y si el mail ya tiene reunión, no abandonó.
+ABANDONED_ORIGIN_DETAIL = "Abandoned Calendar"
+
+
+def _settle_abandoned(data: dict, has_meeting: bool) -> bool | None:
+    """None si no es una llegada del formulario; si no, si quedó marcada."""
+    if data.get("origin_detail") != ABANDONED_ORIGIN_DETAIL:
+        return None
+    if has_meeting:
+        data.pop("origin_detail")
+    return not has_meeting
+
 
 def ensure_schema(cur) -> None:
     cur.execute(
@@ -223,6 +238,9 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
     if not email:
         raise ValueError("Falta el email del invitado (email / invitee_email).")
     domain = company_domain(email, extra.get("website"))
+    if data.get("origin_detail") == ABANDONED_ORIGIN_DETAIL:
+        data.pop("meeting_datetime", None)
+    abandoned = None
 
     # 1. Ya existe: re-agenda.
     found = _find_contact(cur, email)
@@ -233,12 +251,13 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
                 else "Ese email ya es un contacto real: no se puede mandar como prueba (is_dummy)."
             )
         current = store.get_contact(cur, found["id"]) or {}
+        abandoned = _settle_abandoned(data, bool(current.get("meeting_datetime")))
         row = store.update_contact(cur, found["id"], _merge_patch(current, data), None, source="calendly")
         changes = row.pop("_changes")
         inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "linked", "existing_contact",
                              found["id"], found["company_id"])
         return {"action": "updated", "inbound_id": inbound_id, "contact_id": found["id"],
-                "company_id": found["company_id"], "changes": changes, **_warn(extra)}
+                "company_id": found["company_id"], "changes": changes, **_warn(extra), **_abandoned(abandoned)}
 
     # Ya estaba esperando en la bandeja: se actualiza esa fila en vez de sumar otra.
     cur.execute(
@@ -250,6 +269,7 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
         (email, bool(is_dummy)),
     )
     waiting = cur.fetchone()
+    abandoned = _settle_abandoned(data, bool(waiting and waiting["meeting_datetime"]))
     if waiting is not None:
         before = waiting["contact_data"] or {}
         data = {**before, **_merge_patch(before, data)}
@@ -286,7 +306,8 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
             inbound_id = waiting["id"]
         else:
             inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "pending", reason)
-        return {"action": "pending", "inbound_id": inbound_id, "reason": reason, **_warn(extra)}
+        return {"action": "pending", "inbound_id": inbound_id, "reason": reason, **_warn(extra),
+                **_abandoned(abandoned)}
 
     row = store.create_contact(cur, company_id, data, None, source="calendly")
     changes = row.pop("_changes")
@@ -297,11 +318,15 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
         inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "linked", "domain_match",
                              row["id"], company_id)
     return {"action": "created", "inbound_id": inbound_id, "contact_id": row["id"],
-            "company_id": company_id, "changes": changes, **_warn(extra)}
+            "company_id": company_id, "changes": changes, **_warn(extra), **_abandoned(abandoned)}
 
 
 def _warn(extra: dict) -> dict:
     return {"warnings": extra["warnings"]} if extra.get("warnings") else {}
+
+
+def _abandoned(flag: bool | None) -> dict:
+    return {} if flag is None else {"abandoned": flag}
 
 
 def _resolve(cur, inbound_id: int, contact_id, company_id, actor: str | None, status: str = "linked") -> None:

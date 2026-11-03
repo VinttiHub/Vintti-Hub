@@ -129,6 +129,8 @@ CONTACT_FIELDS = [
     _f("origin", "Origin", "enum", G[5], _ORIGINS, "Origen del lead."),
     _f("origin_detail", "Origin detail", "text", G[5],
        description="Punto exacto de entrada (Meta Ads, Google Ads, Lead Magnet, Chatbot, Live Chat…)."),
+    _f("how_did_you_find_us", "How did you find us?", "text", G[5],
+       description="Respuesta libre del formulario de Calendly (llega por Zapier)."),
     _f("conversion_channel", "Conversion Channel", "enum", G[5],
        _ORIGINS + ["Email Marketing", "Other", "Newsletter"], "Canal por el que agendó la reunión."),
     _f("mql_source", "MQL Source", "enum", G[5],

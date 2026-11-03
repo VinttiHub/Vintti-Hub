@@ -1260,6 +1260,11 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `company_id` NULL porque de esa columna cuelgan el historial, el motor y los JOINs. Una
   pregunta del form se mapea en Zapier con la clave exacta de `contact_fields.py`; un valor
   inválido no frena la llegada, vuelve en `warnings`. `"is_dummy": true` = prueba, como Clay.
+  Son **dos Zaps** al mismo endpoint: el de reservas (*Invitee Created or Rescheduled*) y el del
+  formulario sin reserva (*Routing Form Submission* → Delay), que manda `origin_detail =
+  "Abandoned Calendar"` (`ABANDONED_ORIGIN_DETAIL`). Esa llegada **nunca trae reunión**: se tira
+  la fecha que venga (era la hora del form y, como la reunión se pisa siempre, borraba la real), y
+  si el mail ya tiene reunión no se marca. Agendar después no borra la marca (fill-if-empty).
 - **Qualified / SQL exigen contacto**: si la empresa queda en esos status sin un contacto con
   `REQUIRED_ON_QUALIFIED` completos, `contact_incomplete = TRUE`. El PATCH responde
   `needs_contact` y la página abre «Completá el contacto». Se recalcula en cada cambio de
