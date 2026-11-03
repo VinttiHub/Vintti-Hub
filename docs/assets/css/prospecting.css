@@ -1254,8 +1254,6 @@
 .pr-table th.is-drop-before { box-shadow: inset 3px 0 0 var(--pr-violet); }
 .pr-table th.is-drop-after { box-shadow: inset -3px 0 0 var(--pr-violet); }
 /* Tira de vistas de la pestaña Contacts */
-.pr-ct-tabs { padding: 14px 18px 0; }
-.pr-ct-tabs .pr-tabs { margin-bottom: 0; }
 .pr-modal .pr-export > .pr-filter__label { margin-bottom: -4px; }
 /* Exportar a CSV: lista de columnas con scroll propio */
 .pr-export { width: min(560px, 100%); }
@@ -1692,3 +1690,84 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 }
 .pr-cell-pop__hint { margin-right: auto; align-self: center; font-size: 11.5px; color: var(--pr-ink-3, #8a90a0); }
 .pr-cell-pop__hint kbd { background: var(--pr-card-soft, #f3f4f8); color: var(--pr-ink-2, #3b4152); border: 1px solid var(--pr-rule, #e6e8ef); }
+
+/* =====================================================================
+   Menú de secciones (prospecting.js → showSection / sectionMenu): el título de
+   la página es el menú («Empresas ▾»); debajo, las vistas de esa sección como
+   pestañas subrayadas pegadas a la tarjeta.
+   ===================================================================== */
+.pr-tabs__views[hidden], #prTabs[hidden] { display: none; }
+.pr-head__eyebrow {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--pr-ink-3);
+}
+.pr-head__eyebrow i { color: var(--pr-violet); font-size: 10px; }
+.pr-section {
+  appearance: none; border: 0; background: transparent; font: inherit; color: var(--pr-ink);
+  display: inline-flex; align-items: center; gap: 10px;
+  margin: 0 0 0 -10px; padding: 2px 10px; border-radius: 12px; cursor: pointer;
+  transition: background .15s ease;
+}
+.pr-section:hover { background: rgba(108, 56, 255, .07); }
+.pr-section__caret {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px;
+  background: #fff; border: 1px solid var(--pr-rule); box-shadow: 0 1px 2px rgba(13, 18, 30, .06);
+  font-size: 10px; color: var(--pr-ink-3); transition: color .15s ease, transform .15s ease;
+}
+.pr-section:hover .pr-section__caret { color: var(--pr-violet); transform: translateY(1px); }
+
+/* Pestañas de vistas: subrayadas, sin la cápsula */
+#prTabs.pr-viewtabs {
+  display: flex; align-self: stretch; flex-wrap: wrap; gap: 2px;
+  background: transparent; border: 0; border-bottom: 1px solid var(--pr-rule);
+  border-radius: 0; padding: 0; margin-bottom: 14px;
+}
+#prTabs .pr-tab {
+  position: relative; border-radius: 8px 8px 0 0; padding: 10px 14px 11px;
+  color: var(--pr-ink-3); font-weight: 600;
+}
+#prTabs .pr-tab:hover { color: var(--pr-ink); background: rgba(13, 18, 30, .035); }
+#prTabs .pr-tab.is-active { background: transparent; box-shadow: none; color: var(--pr-ink); }
+#prTabs .pr-tab.is-active::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--pr-violet);
+}
+#prTabs .pr-tab.is-active .pr-tab__icon { color: var(--pr-violet); opacity: 1; }
+#prTabs .pr-tab--add { border-radius: 8px; padding: 8px 12px; margin-left: 2px; }
+
+/* El menú de secciones */
+.pr-pop.pr-pop--sections { width: 330px; }
+.pr-secitem {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  appearance: none; border: 0; background: transparent; font: inherit; text-align: left;
+  padding: 9px 10px; border-radius: 10px; cursor: pointer; color: var(--pr-ink);
+}
+.pr-secitem:hover { background: var(--pr-card-soft); }
+.pr-secitem.is-on { background: rgba(108, 56, 255, .06); }
+.pr-secitem__icon {
+  flex: 0 0 auto; display: inline-grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 10px; font-size: 14px;
+}
+.pr-tone--violet { background: color-mix(in srgb, var(--pr-violet) 12%, #fff); color: var(--pr-violet); }
+.pr-tone--cyan   { background: color-mix(in srgb, var(--pr-cyan) 16%, #fff); color: #1f7fd6; }
+.pr-tone--mag    { background: color-mix(in srgb, var(--pr-mag) 11%, #fff); color: #c5129f; }
+.pr-tone--blue   { background: color-mix(in srgb, var(--pr-blue) 10%, #fff); color: var(--pr-blue); }
+.pr-secitem__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pr-secitem__text strong { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; }
+.pr-secitem__text small { font-size: 11.5px; color: var(--pr-ink-3); line-height: 1.35; }
+.pr-secitem__check { margin-left: auto; font-size: 12px; color: var(--pr-violet); }
+.pr-soon-chip {
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--pr-card-soft); color: var(--pr-ink-3);
+  font-size: 10px; font-weight: 600; letter-spacing: .02em;
+}
+.pr-soon { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 72px 24px; }
+.pr-soon__icon {
+  display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 16px;
+  background: color-mix(in srgb, var(--pr-violet) 12%, #fff); color: var(--pr-violet); font-size: 20px;
+}
+.pr-soon__title { margin: 14px 0 6px; font-size: 18px; color: var(--pr-ink); }
+.pr-soon__text { margin: 0 auto; max-width: 420px; color: var(--pr-ink-3); font-size: 13.5px; }
+/* La lista de workflows ya tiene el título en el menú de arriba: no repetirlo. */
+#prWorkflows > .pr-wf-top > div > .pr-wf-title { display: none; }
+#prWorkflows > .pr-wf-top { align-items: center; }

@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/prospecting.css?v=41" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=43" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -19,9 +19,13 @@
 
   <main class="main-content page pr-page">
     <header class="pr-head">
-      <div>
-        <h1 class="pr-head__title">Prospecting</h1>
-        <p class="pr-head__sub">Companies loaded from Clay for BDR prospecting.</p>
+      <div class="pr-head__main">
+        <span class="pr-head__eyebrow"><i class="fa-solid fa-bullseye"></i> Prospecting</span>
+        <!-- Menú de secciones (prospecting.js → showSection / sectionMenu) -->
+        <h1 class="pr-head__title">
+          <button type="button" class="pr-section" id="prSectionBtn" aria-haspopup="menu">Empresas</button>
+        </h1>
+        <p class="pr-head__sub" id="prHeadSub">Empresas que manda Clay para que las prospecten los BDRs.</p>
       </div>
       <div class="pr-head__actions">
         <button type="button" class="pr-btn" id="prBdrIdsBtn" hidden>
@@ -39,15 +43,15 @@
     </div>
 
     <div id="prApp" hidden>
-      <!-- Vistas de la tabla: las fijas + las de cada persona (prospecting.js → renderTabs) -->
-      <div class="pr-tabs" role="tablist" id="prTabs">
-        <span class="pr-tabs__views" id="prViewTabs"></span>
-        <button type="button" class="pr-tab pr-tab--add" id="prViewAdd" title="Create or add a view" aria-label="Create or add a view">
-          <i class="fa-solid fa-plus"></i></button>
-        <span class="pr-tabs__sep" aria-hidden="true"></span>
-        <button type="button" class="pr-tab" data-view="contacts" role="tab"><i class="fa-regular fa-user"></i> Contacts</button>
-        <button type="button" class="pr-tab pr-tab--wf" data-view="workflows" role="tab">
-          <i class="fa-solid fa-diagram-project"></i> Workflows</button>
+      <!-- Vistas de la sección elegida en el menú del título: las de empresas
+           (prospecting.js → renderTabs) o las de contactos (renderCtTabs). -->
+      <div class="pr-tabs pr-viewtabs" role="tablist" id="prTabs">
+        <span class="pr-tabs__views" id="prCoStrip">
+          <span class="pr-tabs__views" id="prViewTabs"></span>
+          <button type="button" class="pr-tab pr-tab--add" id="prViewAdd" title="Create or add a view" aria-label="Create or add a view">
+            <i class="fa-solid fa-plus"></i></button>
+        </span>
+        <span class="pr-tabs__views" id="prCtTabs" hidden></span>
       </div>
 
       <div class="pr-card" id="prTableCard">
@@ -125,8 +129,6 @@
       <!-- Pestaña Workflows: lista + editor (prospecting-workflows.js) -->
       <!-- Pestaña Contacts -->
       <div class="pr-card" id="prContactsView" hidden>
-        <!-- Vistas de contactos (Acciones → «Por segmento» / Duplicar) — backend/prospecting/views.py -->
-        <div class="pr-ct-tabs"><div class="pr-tabs" id="prCtTabs" role="tablist"></div></div>
         <div class="pr-filters">
           <label class="pr-filter pr-filter--wide">
             <span class="pr-filter__label">Search</span>
@@ -169,6 +171,13 @@
         </div>
       </div>
 
+      <!-- Negocios: todavía no existen en Prospecting -->
+      <div class="pr-card pr-soon" id="prDealsView" hidden>
+        <span class="pr-soon__icon"><i class="fa-solid fa-handshake"></i></span>
+        <h2 class="pr-soon__title">Negocios — próximamente</h2>
+        <p class="pr-soon__text">Acá van a estar los negocios de prospección, asociados a sus empresas y contactos.</p>
+      </div>
+
       <section class="pr-wf" id="prWorkflows" hidden></section>
     </div>
   </main>
@@ -197,7 +206,7 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20261026-role-access" defer></script>
-  <script src="./assets/js/prospecting.js?v=33" defer></script>
+  <script src="./assets/js/prospecting.js?v=34" defer></script>
   <script src="./assets/js/prospecting-workflows.js?v=25" defer></script>
   <script src="./assets/js/prospecting-contacts.js?v=5" defer></script>
   <script src="./assets/js/prospecting-history.js?v=2" defer></script>

@@ -1342,6 +1342,12 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (`bindHeaderDrag()`, empresas y contactos); en «Todos los contactos» quedan en el navegador y no entran en las pestañas de empresas. En `/contacts`,
   `company_name` sigue siendo la empresa del Hub (la leen workflows y fichas); la propiedad del
   contacto viaja como `contact_company_name` y la del Hub también como `hub_company`.
+- **Menú de secciones (2026-11-03)**: el título de la página es un desplegable «Empresas ▾» con
+  Empresas, Contactos, Negocios y Workflows (`SECTIONS` / `showSection()` en `prospecting.js`);
+  debajo, como pestañas subrayadas, sólo las vistas de esa sección (la tira de contactos
+  `#prCtTabs` vive ahí, ya no en la tarjeta).
+  Cambiar de sección no descarta nada y la última queda en `localStorage`. **Negocios es un
+  «Próximamente»**: no existen en Prospecting.
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas

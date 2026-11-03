@@ -1941,10 +1941,54 @@
     }).catch(function () { /* sin vistas igual anda la tabla con las fijas */ });
   }
 
+  /* Secciones del menú de arriba. Cada una muestra sólo sus vistas al lado del menú:
+     Empresas las de empresas, Contactos las de contactos; Workflows y Negocios, ninguna. */
+  var SECTIONS = [
+    { key: "table", label: "Empresas", icon: "fa-solid fa-building", tone: "violet",
+      sub: "Empresas que manda Clay para que las prospecten los BDRs." },
+    { key: "contacts", label: "Contactos", icon: "fa-solid fa-user", tone: "cyan",
+      sub: "Las personas de esas empresas: las cargan los BDRs o llegan de Calendly." },
+    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", soon: true,
+      sub: "Los negocios de prospección. Todavía no están." },
+    { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue",
+      sub: "Automatizaciones sobre empresas y contactos." }
+  ];
+  var SECTION_KEY = "prospecting_section_v1";
+  var section = "table";
+  function sectionOf(key) { return SECTIONS.filter(function (x) { return x.key === key; })[0] || SECTIONS[0]; }
+
   function showSection(kind) {
-    $("prTableCard").hidden = kind !== "table";
-    $("prWorkflows").hidden = kind !== "workflows";
-    $("prContactsView").hidden = kind !== "contacts";
+    section = sectionOf(kind).key;
+    try { localStorage.setItem(SECTION_KEY, section); } catch (e) {}
+    $("prTableCard").hidden = section !== "table";
+    $("prWorkflows").hidden = section !== "workflows";
+    $("prContactsView").hidden = section !== "contacts";
+    $("prDealsView").hidden = section !== "deals";
+    $("prCoStrip").hidden = section !== "table";
+    $("prCtTabs").hidden = section !== "contacts";
+    $("prTabs").hidden = section !== "table" && section !== "contacts";
+    var x = sectionOf(section);
+    $("prSectionBtn").innerHTML = esc(x.label) + '<span class="pr-section__caret"><i class="fa-solid fa-chevron-down"></i></span>';
+    $("prHeadSub").textContent = x.sub;
+  }
+  function sectionMenu(anchor) {
+    $("prViewPop").classList.add("pr-pop--sections");  // antes de medir: es más ancho
+    openPop(anchor, '<div class="pr-pop__head">Ir a</div>' + SECTIONS.map(function (x) {
+      return '<button type="button" class="pr-secitem' + (x.key === section ? " is-on" : "") + '" data-section-go="' + x.key + '">' +
+        '<span class="pr-secitem__icon pr-tone--' + x.tone + '"><i class="' + x.icon + '"></i></span>' +
+        '<span class="pr-secitem__text"><strong>' + esc(x.label) +
+        (x.soon ? ' <span class="pr-soon-chip">Próximamente</span>' : "") + "</strong><small>" + esc(x.sub) + "</small></span>" +
+        (x.key === section ? '<i class="fa-solid fa-check pr-secitem__check"></i>' : "") + "</button>";
+    }).join(""));
+  }
+  /* Cambiar de sección no descarta nada: cada sección guarda su vista, sus filtros y sus
+     cambios sin guardar, y al volver están igual. */
+  function goSection(kind) {
+    if (kind === section) return;
+    showSection(kind);
+    if (kind === "table") { renderTabs(); load(); }
+    else if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
+    else if (kind === "contacts") { renderCtTabs(); loadContacts(); loadInbox(); }
   }
 
   function applyTab(key) {
@@ -1967,7 +2011,6 @@
     selAll = null;
     baseline = canon(snapshot());
     renderSegNote($("prSegNote"), segmentOf(key), "empresas");
-    showSection("table");
     renderTabs();
     renderHead();
     renderColsMenu();
@@ -1976,7 +2019,7 @@
   }
 
   function switchTab(key) {
-    if (key === state.view && $("prTableCard").hidden === false) return;
+    if (key === state.view) return;
     var v = viewOf(state.view);
     if (v && v.mine && !$("prTableCard").hidden && isDirty() &&
         !confirm("La vista «" + v.name + "» tiene cambios sin guardar. ¿Descartarlos?")) return;
@@ -2015,9 +2058,6 @@
     }).join("") + (hiddenN > 0
       ? '<button type="button" class="pr-tab pr-tab--overflow" id="prTabsMore" title="More views" aria-haspopup="menu">' +
         '<i class="fa-solid fa-ellipsis"></i> ' + hiddenN + " more</button>" : "");
-    document.querySelectorAll('.pr-tab[data-view]').forEach(function (t) {
-      t.classList.toggle("is-active", !onTable && t.getAttribute("data-view") === (!$("prWorkflows").hidden ? "workflows" : "contacts"));
-    });
   }
 
   /* «Guardar» / «Descartar» cuando la vista cambió respecto de lo guardado. */
@@ -2088,7 +2128,7 @@
   }
 
   /* ---------- Popover (menú de una pestaña / «+») ---------- */
-  function closePop() { $("prViewPop").hidden = true; $("prViewPop").innerHTML = ""; $("prViewPop").classList.remove("pr-pop--actions"); }
+  function closePop() { $("prViewPop").hidden = true; $("prViewPop").innerHTML = ""; $("prViewPop").classList.remove("pr-pop--actions", "pr-pop--sections"); }
   function openPop(anchor, html) {
     var pop = $("prViewPop");
     pop.innerHTML = html;
@@ -2244,15 +2284,13 @@
       if (more) { e.stopPropagation(); tabMenu(more, more.getAttribute("data-tab-menu")); return; }
       if (e.target.closest("#prViewAdd")) { e.stopPropagation(); addMenu($("prViewAdd")); return; }
       if (e.target.closest("#prTabsMore")) { e.stopPropagation(); moreTabsMenu($("prTabsMore")); return; }
-      var tab = e.target.closest(".pr-tab");
-      if (!tab) return;
-      if (tab.hasAttribute("data-tab")) { switchTab(tab.getAttribute("data-tab")); return; }
-      var kind = tab.getAttribute("data-view");
-      if (kind !== "workflows" && kind !== "contacts") return;
-      showSection(kind);
-      renderTabs();
-      if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
-      else { loadContacts(); loadInbox(); }
+      var tab = e.target.closest("[data-tab]");
+      if (tab) switchTab(tab.getAttribute("data-tab"));
+    });
+    $("prSectionBtn").addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (!$("prViewPop").hidden && $("prViewPop").querySelector("[data-section-go]")) closePop();
+      else sectionMenu($("prSectionBtn"));
     });
     // Reordenar pestañas arrastrando.
     $("prViewTabs").addEventListener("dragstart", function (e) {
@@ -2306,6 +2344,8 @@
         }
         return;
       }
+      var sec = e.target.closest("[data-section-go]");
+      if (sec) { closePop(); goSection(sec.getAttribute("data-section-go")); return; }
       var go = e.target.closest("[data-tab-go]");
       if (go) { closePop(); switchTab(go.getAttribute("data-tab-go")); return; }
       var ctGo = e.target.closest("[data-ctv-go]");
@@ -2539,6 +2579,10 @@
         var ctSaved = null;
         try { ctSaved = Number(localStorage.getItem(CT_VIEW_KEY)) || null; } catch (e) {}
         applyCtView(ctSaved);
+        var secSaved = null;
+        try { secSaved = localStorage.getItem(SECTION_KEY); } catch (e) {}
+        showSection("table");
+        goSection(sectionOf(secSaved).key);
       });
     }).catch(function (err) {
       $("prDenied").hidden = false;
