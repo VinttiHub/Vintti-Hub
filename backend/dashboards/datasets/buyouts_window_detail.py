@@ -126,7 +126,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.end_d IS NOT NULL
-            AND c.start_d BETWEEN v.win_ini AND v.win_fin
+            AND c.start_d > v.win_ini AND c.start_d <= v.win_fin
             AND c.end_d   BETWEEN v.win_ini AND v.win_fin
             AND c.buyout_d IS NOT NULL
             AND c.buyout_d >= DATE_TRUNC('month', c.end_d)

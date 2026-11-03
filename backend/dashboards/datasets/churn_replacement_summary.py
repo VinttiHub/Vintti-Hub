@@ -81,7 +81,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT c.candidate_id, BOOL_OR(c.con_replacement) AS con_replacement
           FROM candidatos c
           CROSS JOIN ventana v
-          WHERE c.start_d BETWEEN v.win_ini AND v.win_fin
+          WHERE c.start_d > v.win_ini AND c.start_d <= v.win_fin
             AND c.end_d   BETWEEN v.win_ini AND v.win_fin
             AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
           GROUP BY c.candidate_id
