@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/sidebar.css?v=20260908-aec2" />
-  <link rel="stylesheet" href="./assets/css/prospecting.css?v=52" />
+  <link rel="stylesheet" href="./assets/css/prospecting.css?v=54" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
 </head>
 
@@ -132,14 +132,27 @@
           <label class="pr-filter"><span class="pr-filter__label">Contact Owner</span><select class="pr-filter__input" id="prCtOwner"></select></label>
           <div class="pr-filters__actions">
             <button type="button" class="pr-btn pr-inbox-btn" id="prInboxBtn" aria-expanded="false">
-              <i class="fa-regular fa-calendar-check"></i> Unassigned from Calendly <span class="pr-inbox__count" id="prInboxCount"></span>
+              <i class="fa-regular fa-calendar-check"></i> Unassigned contacts <span class="pr-inbox__count" id="prInboxCount"></span>
             </button>
           </div>
         </div>
 
-        <!-- Bandeja: contactos de Calendly (vía Zapier) sin empresa — backend/prospecting/inbound.py -->
+        <!-- Bandeja: contactos sin empresa, de Calendly (vía Zapier) o de HubSpot — backend/prospecting/inbound.py -->
         <section class="pr-inbox" id="prInbox" hidden>
-          <p class="pr-note">Booked through Calendly, but their email domain did not match exactly one company. Pick the company to link them, or discard.</p>
+          <p class="pr-note">Contacts from Calendly or HubSpot whose company could not be found (no HubSpot company, and their email domain did not match exactly one company). Pick the company to link them, or discard. They link themselves when a company with their domain arrives.</p>
+          <div class="pr-filters">
+            <label class="pr-filter pr-filter--wide">
+              <span class="pr-filter__label">Search</span>
+              <input type="text" class="pr-filter__input pr-filter__input--search" id="prInboxQ" placeholder="Name, email, domain or company…" autocomplete="off">
+            </label>
+            <label class="pr-filter"><span class="pr-filter__label">Source</span>
+              <select class="pr-filter__input" id="prInboxSource">
+                <option value="">All</option>
+                <option value="calendly">Calendly</option>
+                <option value="hubspot">HubSpot</option>
+              </select>
+            </label>
+          </div>
           <div class="pr-table-wrap">
             <table class="pr-table">
               <thead><tr><th>Name</th><th>Email</th><th>Meeting</th><th>UTM</th><th>Why</th><th>Company</th><th></th></tr></thead>
@@ -216,7 +229,7 @@
 
   <script src="./assets/js/avatar-map.js" defer></script>
   <script src="./assets/js/sidebar.js?v=20261026-role-access" defer></script>
-  <script src="./assets/js/prospecting.js?v=37" defer></script>
+  <script src="./assets/js/prospecting.js?v=38" defer></script>
   <script src="./assets/js/prospecting-workflows.js?v=31" defer></script>
   <script src="./assets/js/prospecting-contacts.js?v=5" defer></script>
   <script src="./assets/js/prospecting-history.js?v=2" defer></script>

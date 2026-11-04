@@ -336,6 +336,15 @@ def ensure_schema(cur) -> None:
     )
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_contacts_company ON prospect_contacts (company_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_contacts_email ON prospect_contacts (LOWER(email))")
+    # Contactos de HubSpot (prospecting/hubspot_contacts.py, 2026-11-04): id de HubSpot,
+    # foto del último valor visto (el sync pisa sólo cuando HubSpot cambia) y el payload.
+    cur.execute("ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS hubspot_contact_id TEXT")
+    cur.execute("ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS hubspot_seen JSONB")
+    cur.execute("ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS raw_payload JSONB")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_contacts_hubspot ON prospect_contacts (hubspot_contact_id) "
+        "WHERE hubspot_contact_id IS NOT NULL"
+    )
     # El historial de un contacto va a la misma tabla de eventos: así aparece
     # también en la actividad de su empresa, como en HubSpot.
     cur.execute("ALTER TABLE prospect_company_events ADD COLUMN IF NOT EXISTS contact_id BIGINT")
@@ -1247,6 +1256,9 @@ def _flatten_contact(row) -> dict:
 
     r = dict(row)
     props = r.pop("props", None) or {}
+    # Internas del sync de HubSpot: ni la página ni el motor las leen como propiedades.
+    r.pop("raw_payload", None)
+    r.pop("hubspot_seen", None)
     out = {**props, **r}
     for k in CONTACT_COLUMNS:
         out.setdefault(k, None)

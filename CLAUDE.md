@@ -1321,6 +1321,21 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   cambios reales** (decisión de la owner): historial `source='hubspot_sync'`, `emit_event()` y
   `tick()`, así que disparan workflows. `python scripts/import_hubspot_companies.py --sync
   [--apply]` corre lo mismo sin tope, para ponerse al día.
+- **Contactos de HubSpot (2026-11-04)**: importación `backend/scripts/import_hubspot_contacts.py`
+  (dry-run por defecto; correr DESPUÉS de las empresas) + sync cada 30 min (segundo paso del mismo
+  cron → `POST /prospecting/hubspot/sync-contacts`, marca `prospect_contacts`), lógica en
+  `backend/prospecting/hubspot_contacts.py`. Mapeo contra `contact_fields.py` por nombre o label
+  (el catálogo salió de la planilla de HubSpot); el *value* interno de un desplegable se traduce al
+  label, `a;b` → lista, owners por `OwnerResolver`; un valor que no valida se omite (queda en
+  `raw_payload`), nunca frena el contacto. **Empresa**: asociación de HubSpot (Primary primero) →
+  `hubspot_company_id`; si no, dominio del mail de una sola empresa; si no, **la bandeja
+  «Unassigned contacts»** (`prospect_inbound_contacts`, `source='hubspot'`, único por
+  `hubspot_contact_id`), que ahora tiene filtro por origen y búsqueda; `inbound.link()` usa el
+  `source` de la fila y le pega al contacto su id y foto de HubSpot. Al crear una empresa, el sync
+  de empresas llama a `attach_pending_for_company()`. Mismas reglas que empresas: foto
+  `prospect_contacts.hubspot_seen`, los cambios disparan workflows, la importación blinda los
+  workflows de contacto por condiciones. Un contacto que en HubSpot cambia de empresa **no se
+  mueve** (sale en el reporte).
 - **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
   sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
   respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el

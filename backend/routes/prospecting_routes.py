@@ -698,6 +698,42 @@ def hubspot_companies_sync():
     return jsonify(_json_safe(report))
 
 
+@bp.post("/hubspot/sync-contacts")
+def hubspot_contacts_sync():
+    """Lo mismo que /hubspot/sync, para los contactos (prospecting/hubspot_contacts.py).
+    El cron lo llama después del de empresas: un contacto nuevo encuentra su empresa."""
+    from prospecting import hubspot_contacts as hs_contacts
+
+    by_cron = _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token")
+    if not by_cron and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    dry = request.args.get("dry") in ("1", "true")
+    try:
+        limit = max(1, min(5000, int(request.args.get("limit") or 2000)))
+    except ValueError:
+        limit = 2000
+    conn = get_connection()
+    try:
+        report = hs_contacts.sync(conn, dry_run=dry, max_contacts=limit)
+    finally:
+        conn.close()
+    if report.get("status") == "busy":
+        return jsonify(report), 409
+    return jsonify(_json_safe(report))
+
+
+@bp.get("/hubspot/sync-contacts/last")
+def hubspot_contacts_sync_last():
+    from prospecting import hubspot_companies as hs_companies
+    from prospecting import hubspot_contacts as hs_contacts
+
+    if not _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token") and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    with _Db() as cur:
+        row = hs_companies.last_report(cur, hs_contacts.SYNC_KEY)
+    return jsonify(_json_safe(dict(row) if row else {}))
+
+
 @bp.get("/hubspot/sync/last")
 def hubspot_companies_sync_last():
     from prospecting import hubspot_companies as hs_companies
@@ -799,7 +835,9 @@ def inbound_list():
         status = request.args.get("status") or "pending"
         if status not in ("pending", "linked", "discarded"):
             return jsonify({"error": "status inválido"}), 400
-        data = inbound.list_inbound(cur, status=status, dummy=dummy)
+        source = request.args.get("source") or None
+        data = inbound.list_inbound(cur, status=status, dummy=dummy, source=source,
+                                    q=request.args.get("q") or None)
     return jsonify(_json_safe(data))
 
 

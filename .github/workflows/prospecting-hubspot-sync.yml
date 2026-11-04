@@ -9,7 +9,10 @@ name: Prospecting HubSpot sync
 #
 # Cada corrida procesa hasta 2000 empresas (~200 s, gunicorn corta a los 300): si hay
 # más, la siguiente sigue desde la marca. Un 409 = otra corrida en curso, no es error.
-# Ver backend/prospecting/hubspot_companies.py y CLAUDE.md (Prospecting).
+# Después de las empresas corre el de CONTACTOS (2026-11-04, mismas reglas; los que no
+# tienen empresa van a la bandeja «Unassigned»): así un contacto nuevo encuentra la
+# empresa que se acaba de crear en el paso anterior.
+# Ver backend/prospecting/hubspot_companies.py / hubspot_contacts.py y CLAUDE.md (Prospecting).
 on:
   schedule:
     - cron: "*/30 * * * *"
@@ -43,4 +46,27 @@ jobs:
           fi
           if grep -q '"errores"' sync.json; then
             echo "::warning::Algunas empresas no se pudieron sincronizar (ver errors en el reporte)."
+          fi
+
+      - name: Sincronizar contactos
+        if: always()
+        run: |
+          set -uo pipefail
+          code=$(curl -sS -o sync-contacts.json -w "%{http_code}" -X POST \
+            --retry 3 --retry-delay 15 \
+            -H "Content-Type: application/json" \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            -d "{}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/prospecting/hubspot/sync-contacts")
+          cat sync-contacts.json; echo
+          if [ "$code" = "409" ]; then
+            echo "::notice::Otra corrida del sync de contactos está en curso; la próxima sigue."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::El sync de contactos devolvió HTTP $code"
+            exit 1
+          fi
+          if grep -q '"errores"' sync-contacts.json; then
+            echo "::warning::Algunos contactos no se pudieron sincronizar (ver errors en el reporte)."
           fi

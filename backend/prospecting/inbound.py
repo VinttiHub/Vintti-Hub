@@ -120,6 +120,13 @@ def ensure_schema(cur) -> None:
         "WHERE status = 'pending'"
     )
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_inbound_email ON prospect_inbound_contacts (LOWER(email))")
+    # Contactos de HubSpot sin empresa (prospecting/hubspot_contacts.py, 2026-11-04): la
+    # misma bandeja, `source = 'hubspot'`. El id evita duplicarlos al re-correr.
+    cur.execute("ALTER TABLE prospect_inbound_contacts ADD COLUMN IF NOT EXISTS hubspot_contact_id TEXT")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_inbound_hubspot ON prospect_inbound_contacts (hubspot_contact_id) "
+        "WHERE hubspot_contact_id IS NOT NULL"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -356,15 +363,28 @@ def link(cur, inbound_id: int, company_id: int, actor: str) -> dict:
     if bool(comp["is_dummy"]) != bool(row["is_dummy"]):
         raise ValueError("Un contacto de prueba sólo se asocia a una empresa de prueba (y al revés).")
     data = row["contact_data"] or {}
+    source = row.get("source") or "calendly"
     found = _find_contact(cur, row["email"]) if row["email"] else None
     if found is not None:
         current = store.get_contact(cur, found["id"]) or {}
-        saved = store.update_contact(cur, found["id"], _merge_patch(current, data), actor, source="calendly")
+        saved = store.update_contact(cur, found["id"], _merge_patch(current, data), actor, source=source)
         result = {"action": "updated", "contact_id": found["id"], "company_id": found["company_id"]}
     else:
-        saved = store.create_contact(cur, company_id, data, actor, source="calendly")
+        saved = store.create_contact(cur, company_id, data, actor, source=source)
         result = {"action": "created", "contact_id": saved["id"], "company_id": company_id}
     result["changes"] = saved.pop("_changes")
+    if row.get("hubspot_contact_id"):
+        # Vino de HubSpot: el contacto queda atado a su id y con la foto que usa el sync.
+        cur.execute(
+            """
+            UPDATE prospect_contacts
+               SET hubspot_contact_id = COALESCE(hubspot_contact_id, %s),
+                   hubspot_seen = COALESCE(hubspot_seen, %s), raw_payload = COALESCE(raw_payload, %s)
+             WHERE id = %s
+            """,
+            (row["hubspot_contact_id"], Json((row.get("extra") or {}).get("hubspot_seen") or {}),
+             Json(row.get("raw_payload")) if row.get("raw_payload") is not None else None, result["contact_id"]),
+        )
     _resolve(cur, inbound_id, result["contact_id"], result["company_id"], actor)
     return result
 
@@ -411,8 +431,17 @@ def attach_pending_for_company(cur, company_id: int) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Lectura
 # --------------------------------------------------------------------------- #
-def list_inbound(cur, status: str = "pending", dummy: str = "exclude", limit: int = 200) -> dict:
+def list_inbound(cur, status: str = "pending", dummy: str = "exclude", limit: int = 200,
+                 source: str | None = None, q: str | None = None) -> dict:
     where, params = ["status = %s"], [status]
+    if source in ("calendly", "hubspot"):
+        where.append("source = %s")
+        params.append(source)
+    if q and q.strip():
+        like = "%" + q.strip() + "%"
+        where.append("(email ILIKE %s OR first_name ILIKE %s OR last_name ILIKE %s OR domain ILIKE %s "
+                     "OR contact_data->>'company_name' ILIKE %s)")
+        params += [like] * 5
     if dummy == "only":
         where.append("is_dummy")
     elif dummy != "include":

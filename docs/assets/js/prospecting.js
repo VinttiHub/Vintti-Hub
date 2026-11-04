@@ -1473,21 +1473,25 @@
     bindInbox();
   }
 
-  /* ---------- Bandeja: contactos de Calendly (Zapier) sin empresa ----------
+  /* ---------- Bandeja: contactos sin empresa (Calendly vía Zapier, o HubSpot) ----------
      Los que entran con un dominio que no es de una sola empresa (gmail, ninguna o
-     varias). Se asocian a mano; si Clay después carga la empresa, se asocian solos
-     (backend/prospecting/inbound.py). */
+     varias) y, los de HubSpot, sin empresa asociada allá. Se asocian a mano; si después
+     llega la empresa (Clay o el sync de HubSpot), se asocian solos
+     (backend/prospecting/inbound.py, hubspot_contacts.py). Muestra hasta 200: con miles
+     de HubSpot, se busca. */
   var INBOX_WHY = { free_email: "Personal email", no_company: "No company with that domain", multiple_companies: "Several companies with that domain" };
+  var INBOX_SOURCE = { calendly: "Calendly", hubspot: "HubSpot" };
   var inboxRows = {};
   function loadInbox() {
-    var q = { status: "pending", dummy: ME.sees_dummies ? $("prFDummy").value : "exclude" };
+    var q = { status: "pending", dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
+      source: $("prInboxSource").value, q: $("prInboxQ").value.trim() };
     return api("/prospecting/inbound?" + qs(q)).then(function (r) {
       $("prInboxCount").textContent = r.total ? String(r.total) : "";
       $("prInboxBtn").classList.toggle("has-items", r.total > 0);
       inboxRows = {};
       r.rows.forEach(function (x) { inboxRows[x.id] = x; });
       $("prInboxBody").innerHTML = r.rows.length ? r.rows.map(inboxRow).join("")
-        : '<tr><td class="pr-empty" colspan="7">Nothing waiting: every Calendly contact is linked to a company.</td></tr>';
+        : '<tr><td class="pr-empty" colspan="7">' + (q.q || q.source ? "No contacts match." : "Nothing waiting: every contact is linked to a company.") + "</td></tr>";
     }).catch(function (err) {
       $("prInboxBody").innerHTML = '<tr><td class="pr-empty" colspan="7">' + esc(err.message) + "</td></tr>";
     });
@@ -1499,6 +1503,7 @@
     var hint = [ex.event_name, d.company_name, ex.website, ex.questions_and_answers].filter(Boolean).join(" · ");
     return '<tr data-in="' + x.id + '">' +
       "<td><strong>" + esc(name) + "</strong>" + (x.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") +
+        ' <span class="pr-note">· ' + esc(INBOX_SOURCE[x.source] || x.source || "") + "</span>" +
         (hint ? '<div class="pr-note pr-inbox__hint" title="' + esc(hint) + '">' + esc(hint) + "</div>" : "") + "</td>" +
       "<td>" + cellText(x.email) + "</td>" +
       "<td>" + (x.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(x.meeting_datetime)) : "—") + "</td>" +
@@ -1528,6 +1533,9 @@
       $("prInboxBtn").setAttribute("aria-expanded", String(open));
       if (open) loadInbox();
     });
+    var tq = null;
+    $("prInboxQ").addEventListener("input", function () { clearTimeout(tq); tq = setTimeout(loadInbox, 300); });
+    $("prInboxSource").addEventListener("change", loadInbox);
     var t = null;
     $("prInboxBody").addEventListener("input", function (e) {
       var inp = e.target.closest("[data-in-q]");

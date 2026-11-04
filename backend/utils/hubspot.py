@@ -277,6 +277,45 @@ class HubSpotClient:
         nxt = ((payload.get("paging") or {}).get("next") or {}).get("after")
         return payload.get("results", []), nxt
 
+    def list_contacts_page(self, properties, after=None, limit=100, associations=("companies",)):
+        """Una página de `GET /crm/v3/objects/contacts` (máx. 100), con las empresas
+        asociadas. Devuelve (results, next_after). Importación a Prospecting."""
+        params = {"limit": min(int(limit), 100), "archived": "false",
+                  "properties": ",".join(properties)}
+        if associations:
+            params["associations"] = ",".join(associations)
+        if after:
+            params["after"] = after
+        payload = self._request("GET", "/crm/v3/objects/contacts", params=params)
+        nxt = ((payload.get("paging") or {}).get("next") or {}).get("after")
+        return payload.get("results", []), nxt
+
+    def contact_company_associations(self, contact_ids):
+        """{contact_id: [(company_id, es_primaria)]} vía la API v4 en lote (100 por llamada).
+        El search no trae asociaciones: lo usa el sync incremental de contactos."""
+        out = {}
+        ids = [str(i) for i in contact_ids]
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i + 100]
+            payload = self._request(
+                "POST", "/crm/v4/associations/contacts/companies/batch/read",
+                json={"inputs": [{"id": c} for c in chunk]},
+            )
+            for r in payload.get("results", []):
+                cid = str((r.get("from") or {}).get("id"))
+                out[cid] = [
+                    (str(t.get("toObjectId")),
+                     any((a.get("label") or "").lower() == "primary" for a in t.get("associationTypes") or []))
+                    for t in r.get("to") or []
+                ]
+        return out
+
+    def count_objects(self, object_type):
+        """Total de registros (search con limit 1)."""
+        payload = self._request("POST", f"/crm/v3/objects/{object_type}/search",
+                                json={"limit": 1, "properties": ["hs_object_id"]})
+        return payload.get("total")
+
     def list_owners(self):
         """Todos los owners (activos y archivados) como {id: {"email", "name"}}.
         Indexa por owner id y por userId: una propiedad de tipo "usuario" guarda uno u otro."""

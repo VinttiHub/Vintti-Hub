@@ -1766,8 +1766,28 @@ a.pr-company__name:hover { color: var(--pr-violet); text-decoration: underline; 
   border: 1px solid color-mix(in srgb, var(--pr-mag) 22%, transparent);
 }
 .pr-inbox .pr-table-wrap { overflow: visible; max-height: none; }  /* si no, el buscador de empresa queda recortado */
-.pr-inbox__hint { margin: 2px 0 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-inbox__pick { position: relative; min-width: 200px; }
+/* La página de escritorio mide exactamente la pantalla (overflow: hidden, ver «Scroll sólo
+   dentro de la tabla»): con cientos de contactos de HubSpot la bandeja quedaba más alta que
+   la pantalla y no había cómo llegar abajo. Scroll propio, con tope de alto. */
+@media (min-width: 721px) {
+  .pr-inbox { max-height: 62vh; overflow-y: auto; overscroll-behavior: contain; }
+}
+/* La tabla no scrollea (overflow visible, por el buscador de empresa): tiene que entrar en
+   el ancho de la tarjeta. Con los contactos de HubSpot (nombres, mails y motivos largos) las
+   celdas en una sola línea la estiraban y se cortaban Company y Link. Anchos fijos + texto
+   que baja de línea. */
+.pr-inbox .pr-table { table-layout: fixed; width: 100%; }
+.pr-inbox .pr-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.pr-inbox .pr-table th:nth-child(1) { width: 20%; }
+.pr-inbox .pr-table th:nth-child(2) { width: 18%; }
+.pr-inbox .pr-table th:nth-child(3) { width: 13%; }
+.pr-inbox .pr-table th:nth-child(4) { width: 11%; }
+.pr-inbox .pr-table th:nth-child(5) { width: 12%; }
+.pr-inbox .pr-table th:nth-child(6) { width: 16%; }
+.pr-inbox .pr-table th:nth-child(7) { width: 116px; }
+.pr-inbox .pr-filters { padding: 10px 0 12px; border-bottom: 0; }
+.pr-inbox__hint { margin: 2px 0 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-inbox__pick { position: relative; min-width: 0; }
 .pr-inbox__pick .pr-filter__input { width: 100%; }
 .pr-inbox__results {
   position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% - 4px);

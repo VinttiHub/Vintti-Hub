@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from psycopg2.extras import Json, RealDictCursor
 
-from prospecting import engine, store
+from prospecting import engine, inbound, store
 from prospecting.constants import NOT_ICP_REASONS, SIZES, STATUSES
 from utils.hubspot import HubSpotClient
 
@@ -324,7 +324,7 @@ def _modified_at(rec: dict) -> datetime | None:
         return None
 
 
-def _read_watermark(cur) -> datetime | None:
+def _read_watermark(cur, key: str = SYNC_KEY) -> datetime | None:
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS hubspot_sync_state (
@@ -336,14 +336,14 @@ def _read_watermark(cur) -> datetime | None:
         )
         """
     )
-    cur.execute("SELECT watermark_ms FROM hubspot_sync_state WHERE sync_key = %s", (SYNC_KEY,))
+    cur.execute("SELECT watermark_ms FROM hubspot_sync_state WHERE sync_key = %s", (key,))
     r = cur.fetchone()
     if not r or r["watermark_ms"] is None:
         return None
     return datetime.fromtimestamp(int(r["watermark_ms"]) / 1000, tz=timezone.utc)
 
 
-def _write_state(cur, watermark: datetime | None, status: str, report: dict) -> None:
+def _write_state(cur, watermark: datetime | None, status: str, report: dict, key: str = SYNC_KEY) -> None:
     cur.execute(
         """
         INSERT INTO hubspot_sync_state (sync_key, watermark_ms, last_run_at, last_status, last_report)
@@ -353,14 +353,14 @@ def _write_state(cur, watermark: datetime | None, status: str, report: dict) -> 
                last_run_at = EXCLUDED.last_run_at, last_status = EXCLUDED.last_status,
                last_report = EXCLUDED.last_report
         """,
-        (SYNC_KEY, int(watermark.timestamp() * 1000) if watermark else None, status,
+        (key, int(watermark.timestamp() * 1000) if watermark else None, status,
          json.dumps(report, default=str)),
     )
 
 
-def last_report(cur) -> dict | None:
-    _read_watermark(cur)
-    cur.execute("SELECT * FROM hubspot_sync_state WHERE sync_key = %s", (SYNC_KEY,))
+def last_report(cur, key: str = SYNC_KEY) -> dict | None:
+    _read_watermark(cur, key)
+    cur.execute("SELECT * FROM hubspot_sync_state WHERE sync_key = %s", (key,))
     return cur.fetchone()
 
 
@@ -575,6 +575,12 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
                     engine.emit_event(cur, "company", out["id"], "created" if kind == "created" else "updated",
                                       changes, now, SYNC_SOURCE)
                     touched.append(out["id"])
+                    # Contactos de la bandeja (Calendly / HubSpot) que esperaban una empresa
+                    # con este dominio: se vinculan solos, como con Clay.
+                    for a in inbound.attach_pending_for_company(cur, out["id"]):
+                        engine.emit_event(cur, "contact", a["contact_id"], a["action"], a.pop("changes"),
+                                          now, SYNC_SOURCE)
+                        stats["contactos_de_la_bandeja_vinculados"] += 1
                 cur.execute("RELEASE SAVEPOINT hs_company")
             except Exception as exc:  # una empresa rota no frena el lote
                 cur.execute("ROLLBACK TO SAVEPOINT hs_company")
