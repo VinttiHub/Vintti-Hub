@@ -2126,3 +2126,12 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pr-wf-zoombar__pct { min-width: 52px !important; font-variant-numeric: tabular-nums; }
 .pr-wf-zoombar__fit i { margin-right: 4px; }
 .pr-wf-zoombar__sep { width: 1px; height: 18px; background: var(--pr-rule); margin: 0 2px; }
+
+/* Ficha del contacto: su empresa (buscar / cambiar / quitar). Desde el 2026-11-04 un
+   contacto puede no tener empresa. El desplegable reusa .pr-inbox__pick/__results. */
+.pc-company { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; }
+.pc-company__row { display: flex; gap: 8px; align-items: center; }
+.pc-company__row .pr-inbox__pick { flex: 1 1 auto; }
+.pc-company__row .pr-btn { flex: 0 0 auto; }
+.pc-company__hint:empty { display: none; }
+.pc-company__hint { margin: 0; color: var(--pr-violet); }

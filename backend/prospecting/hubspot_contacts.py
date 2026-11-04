@@ -10,10 +10,10 @@ Empresa de cada contacto, en este orden:
   1. La asociación de HubSpot (la Primary si hay varias) -> la empresa del Hub con ese
      `hubspot_company_id`.
   2. El dominio del mail (nunca gmail/hotmail…) de UNA sola empresa del Hub.
-  3. Si no: la bandeja «Unassigned» (`prospect_inbound_contacts`, source 'hubspot'),
-     con su dominio, para que `inbound.attach_pending_for_company()` lo vincule solo
-     cuando llegue esa empresa. En el Hub un contacto exige empresa (de ahí cuelgan el
-     historial, el motor y los JOINs): ver inbound.py.
+  3. Si no: contacto SIN empresa (desde el 2026-11-04 un contacto puede no tener
+     empresa, como en HubSpot; antes iba a la bandeja «Unassigned»). Se le asocia sola
+     cuando llega una empresa con su dominio (`store.attach_contacts_for_company`) o
+     cuando en HubSpot le asocian una que ya está en el Hub.
 """
 from __future__ import annotations
 
@@ -250,37 +250,11 @@ def find_existing(cur, items: list[dict]) -> None:
         it["waiting"] = waiting.get(it["hs_id"])
 
 
-def record_in_tray(cur, it: dict) -> int:
-    """Alta (o actualización) en la bandeja con source 'hubspot'."""
-    data = {k: v for k, v in it["data"].items() if v is not None}
-    extra = {"hubspot_seen": it["seen"]}
+def _resolve_waiting(cur, it: dict, contact_id: int, company_id) -> None:
+    """La fila que esperaba en la bandeja (de antes de los contactos sin empresa) queda
+    resuelta: el contacto ya existe."""
     if it.get("waiting"):
-        cur.execute(
-            """
-            UPDATE prospect_inbound_contacts
-               SET email = %s, first_name = %s, last_name = %s, domain = %s, contact_data = %s,
-                   extra = %s, raw_payload = %s, reason = %s
-             WHERE id = %s
-            """,
-            (data.get("email"), data.get("first_name"), data.get("last_name"), it["domain"], Json(data),
-             Json(extra), Json(it["raw"]), it["reason"], it["waiting"]["id"]),
-        )
-        return it["waiting"]["id"]
-    cur.execute(
-        """
-        INSERT INTO prospect_inbound_contacts
-            (source, email, first_name, last_name, domain, meeting_datetime, contact_data, extra,
-             raw_payload, status, reason, is_dummy, hubspot_contact_id, received_at)
-        VALUES ('hubspot', %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, FALSE, %s, COALESCE(%s, NOW()))
-        ON CONFLICT (hubspot_contact_id) WHERE hubspot_contact_id IS NOT NULL DO NOTHING
-        RETURNING id
-        """,
-        (data.get("email"), data.get("first_name"), data.get("last_name"), it["domain"],
-         data.get("meeting_datetime"), Json(data), Json(extra), Json(it["raw"]), it["reason"], it["hs_id"],
-         it.get("created_at")),
-    )
-    r = cur.fetchone()
-    return r["id"] if r else 0
+        inbound._resolve(cur, it["waiting"]["id"], contact_id, company_id, SYNC_SOURCE)
 
 
 def build_items(recs: list[dict], mapping: ContactMapping, assoc: dict | None, notes: Counter) -> list[dict]:
@@ -299,7 +273,7 @@ def build_items(recs: list[dict], mapping: ContactMapping, assoc: dict | None, n
     return items
 
 
-def shield(cur, contact_ids: list[int], company_ids: list[int], stats: Counter) -> None:
+def shield(cur, contact_ids: list[int], stats: Counter) -> None:
     """Workflows de contacto por condiciones: los recién importados que YA cumplen quedan
     como "ya cumplía" (no se inscriben en masa). Igual que Importer.shield() de empresas."""
     if not contact_ids:
@@ -311,8 +285,8 @@ def shield(cur, contact_ids: list[int], company_ids: list[int], stats: Counter) 
             continue
         if not has_conditions(wf["trigger"].get("conditions")):
             continue
-        hits = [h for h in engine.matching_ids(cur, wf["trigger"]["conditions"], now, False,
-                                               sorted(set(company_ids)), "contact") if h in mine]
+        hits = engine.matching_ids(cur, wf["trigger"]["conditions"], now, False, None, "contact",
+                                   contact_ids=sorted(mine))
         if hits:
             execute_values(
                 cur,
@@ -330,26 +304,21 @@ def shield(cur, contact_ids: list[int], company_ids: list[int], stats: Counter) 
 # Importación masiva (la usa scripts/import_hubspot_contacts.py)
 # --------------------------------------------------------------------------- #
 def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: list) -> None:
-    """Lote de la importación: en lote, sin disparar workflows (los ya cumplidos quedan
-    blindados). Contacto existente -> sólo rellena vacíos."""
+    """Lote de la importación: en lote, sin disparar workflows (los que ya cumplen quedan
+    blindados). Sin empresa -> contacto sin empresa. Contacto existente -> sólo rellena
+    vacíos (y si no tenía empresa y ahora hay una, se le asigna)."""
     if not items:
         return
     resolve_companies(cur, items)
     find_existing(cur, items)
-    new, fills, tray = [], [], []
-    for it in items:
-        if it["existing"] is not None:
-            fills.append(it)
-        elif it["company_id"] is not None:
-            new.append(it)
-        else:
-            tray.append(it)
-    stats["nuevos_con_empresa"] += len(new)
+    new = [it for it in items if it["existing"] is None]
+    fills = [it for it in items if it["existing"] is not None]
+    stats["nuevos_con_empresa"] += sum(1 for it in new if it["company_id"] is not None)
+    stats["nuevos_sin_empresa"] += sum(1 for it in new if it["company_id"] is None)
     stats["ya_existian"] += len(fills)
-    stats["a_la_bandeja"] += len(tray)
-    for it in new + tray:
+    for it in new:
         stats[f"empresa por: {it['reason']}"] += 1
-    for it in new[:5] + tray[:3]:
+    for it in new[:8]:
         if len(sample) < 12:
             sample.append({"email": it["email"], "empresa": it["company_id"], "por": it["reason"],
                            "datos": {k: v for k, v in it["data"].items() if v is not None}})
@@ -357,7 +326,7 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
         return
 
     from prospecting.contact_fields import CONTACT_COLUMNS
-    cols = [c for c in CONTACT_COLUMNS]
+    cols = list(CONTACT_COLUMNS)
     new_ids: list[int] = []
     if new:
         tuples = []
@@ -369,7 +338,7 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
         res = execute_values(
             cur,
             f"INSERT INTO prospect_contacts (company_id, {', '.join(cols)}, props, created_by, created_at, "
-            f"hubspot_contact_id, hubspot_seen, raw_payload) VALUES %s RETURNING id, company_id",
+            f"hubspot_contact_id, hubspot_seen, raw_payload) VALUES %s RETURNING id, company_id, hubspot_contact_id",
             tuples,
             template="(" + ", ".join(["%s"] * (1 + len(cols))) + ", %s, %s, COALESCE(%s, NOW()), %s, %s, %s)",
             page_size=len(tuples),
@@ -383,26 +352,32 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
             [(r["company_id"], None, IMPORT_SOURCE, None, "contact_created", r["id"]) for r in rows],
             page_size=len(rows),
         )
-        companies = sorted({r["company_id"] for r in rows})
-        # Contacto principal: el primero de cada empresa que no tenía ninguno.
-        cur.execute(
-            """
-            UPDATE prospect_contacts SET is_primary = TRUE WHERE id IN (
-                SELECT DISTINCT ON (company_id) id FROM prospect_contacts
-                 WHERE company_id = ANY(%s)
-                   AND company_id NOT IN (SELECT company_id FROM prospect_contacts WHERE is_primary AND company_id = ANY(%s))
-                 ORDER BY company_id, created_at, id)
-            """,
-            (companies, companies),
-        )
-        # «Completá el contacto» sólo importa en empresas Qualified / SQL.
-        cur.execute(
-            "SELECT id, prospecting_status FROM prospect_companies WHERE id = ANY(%s) "
-            "AND prospecting_status IN ('Qualified', 'SQL')",
-            (companies,),
-        )
-        for r in cur.fetchall():
-            store.recompute_contact_incomplete(cur, r["id"], status=r["prospecting_status"])
+        by_hs = {r["hubspot_contact_id"]: r["id"] for r in rows}
+        for it in new:
+            if it.get("waiting") and it["hs_id"] in by_hs:
+                _resolve_waiting(cur, it, by_hs[it["hs_id"]], it["company_id"])
+        companies = sorted({r["company_id"] for r in rows if r["company_id"] is not None})
+        if companies:
+            # Contacto principal: el primero de cada empresa que no tenía ninguno.
+            cur.execute(
+                """
+                UPDATE prospect_contacts SET is_primary = TRUE WHERE id IN (
+                    SELECT DISTINCT ON (company_id) id FROM prospect_contacts
+                     WHERE company_id = ANY(%s)
+                       AND company_id NOT IN (SELECT company_id FROM prospect_contacts
+                                               WHERE is_primary AND company_id = ANY(%s))
+                     ORDER BY company_id, created_at, id)
+                """,
+                (companies, companies),
+            )
+            # «Completá el contacto» sólo importa en empresas Qualified / SQL.
+            cur.execute(
+                "SELECT id, prospecting_status FROM prospect_companies WHERE id = ANY(%s) "
+                "AND prospecting_status IN ('Qualified', 'SQL')",
+                (companies,),
+            )
+            for r in cur.fetchall():
+                store.recompute_contact_incomplete(cur, r["id"], status=r["prospecting_status"])
 
     filled_ids = []
     for it in fills:
@@ -415,37 +390,18 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
             "hubspot_seen = COALESCE(hubspot_seen, %s), raw_payload = COALESCE(raw_payload, %s) WHERE id = %s",
             (it["hs_id"], Json(it["seen"]), Json(it["raw"]), ex["id"]),
         )
+        touched = False
         if patch:
             store.update_contact(cur, ex["id"], patch, None, source=IMPORT_SOURCE)
+            touched = True
+        if ex["company_id"] is None and it["company_id"] is not None:
+            store.set_contact_company(cur, ex["id"], it["company_id"], None, source=IMPORT_SOURCE)
+            stats["sin_empresa_que_ganaron_empresa"] += 1
+            touched = True
+        if touched:
             filled_ids.append(ex["id"])
 
-    # Bandeja en lote (pueden ser decenas de miles); las que ya esperaban se actualizan.
-    for it in [t for t in tray if t.get("waiting")]:
-        record_in_tray(cur, it)
-    fresh = [t for t in tray if not t.get("waiting")]
-    if fresh:
-        rows = []
-        for it in fresh:
-            d = {k: v for k, v in it["data"].items() if v is not None}
-            rows.append(("hubspot", d.get("email"), d.get("first_name"), d.get("last_name"), it["domain"],
-                         d.get("meeting_datetime"), Json(d), Json({"hubspot_seen": it["seen"]}), Json(it["raw"]),
-                         "pending", it["reason"], False, it["hs_id"], it.get("created_at")))
-        execute_values(
-            cur,
-            """
-            INSERT INTO prospect_inbound_contacts
-                (source, email, first_name, last_name, domain, meeting_datetime, contact_data, extra,
-                 raw_payload, status, reason, is_dummy, hubspot_contact_id, received_at)
-            VALUES %s
-            ON CONFLICT (hubspot_contact_id) WHERE hubspot_contact_id IS NOT NULL DO NOTHING
-            """,
-            rows,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, NOW()))",
-            page_size=len(rows),
-        )
-
-    shield(cur, new_ids + filled_ids,
-           [it["company_id"] for it in new] + [it["existing"]["company_id"] for it in fills], stats)
+    shield(cur, new_ids + filled_ids, stats)
 
 
 # --------------------------------------------------------------------------- #
@@ -469,27 +425,19 @@ def _search_since(client: HubSpotClient, since: datetime, properties: list[str],
 
 
 def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, dict | None, list]:
-    """('created' | 'updated' | 'tray' | 'same', contacto, cambios). HubSpot gana sólo
-    cuando su valor cambió respecto de la foto; si no, gana el Hub."""
+    """('created' | 'updated' | 'same', contacto, cambios). HubSpot gana sólo cuando su
+    valor cambió respecto de la foto; si no, gana el Hub. Sin empresa = contacto sin empresa."""
     ex = it["existing"]
     if ex is None:
-        if it["company_id"] is None:
-            if not dry_run:
-                record_in_tray(cur, it)
-            return "tray", None, []
         data = {k: v for k, v in it["data"].items() if v is not None}
         if dry_run:
             return "created", None, [{"field": k, "old": None, "new": v} for k, v in data.items()]
-        if it.get("waiting"):
-            # Esperaba en la bandeja y ahora tiene empresa: se vincula por el camino de siempre.
-            record_in_tray(cur, it)
-            res = inbound.link(cur, it["waiting"]["id"], it["company_id"], SYNC_SOURCE)
-            return res["action"], {"id": res["contact_id"], "company_id": res["company_id"]}, res["changes"]
         created = store.create_contact(cur, it["company_id"], data, None, source=SYNC_SOURCE)
         cur.execute(
             "UPDATE prospect_contacts SET hubspot_contact_id = %s, hubspot_seen = %s, raw_payload = %s WHERE id = %s",
             (it["hs_id"], Json(it["seen"]), Json(it["raw"]), created["id"]),
         )
+        _resolve_waiting(cur, it, created["id"], it["company_id"])
         return "created", created, created.pop("_changes")
 
     before = store._flatten_contact(ex)
@@ -505,18 +453,30 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, dict | None, list]:
         elif cur_v is None and hs is not None:
             patch[k] = v
         new_seen[k] = hs
+    gains_company = ex["company_id"] is None and it["company_id"] is not None
     if dry_run:
-        return ("updated" if patch else "same"), ex, [
-            {"field": k, "old": before.get(k), "new": v} for k, v in patch.items()]
+        out = [{"field": k, "old": before.get(k), "new": v} for k, v in patch.items()]
+        if gains_company:
+            out.append({"field": "company", "old": None, "new": it["company_id"]})
+        return ("updated" if out else "same"), ex, out
     cur.execute(
         "UPDATE prospect_contacts SET hubspot_contact_id = COALESCE(hubspot_contact_id, %s), "
         "hubspot_seen = %s, raw_payload = %s WHERE id = %s",
         (it["hs_id"], Json(new_seen), Json(it["raw"]), ex["id"]),
     )
-    if not patch:
+    changes = []
+    if gains_company:
+        # Un contacto sin empresa al que en HubSpot le asociaron una (o cuyo dominio ya es de
+        # una sola empresa): se le asigna. Uno que ya tiene empresa no se mueve.
+        store.set_contact_company(cur, ex["id"], it["company_id"], None, source=SYNC_SOURCE)
+        changes.append({"field": "company", "old": None, "new": it["company_id"]})
+    if patch:
+        upd = store.update_contact(cur, ex["id"], patch, None, source=SYNC_SOURCE)
+        changes += upd.pop("_changes", [])
+    if not changes:
         return "same", ex, []
-    upd = store.update_contact(cur, ex["id"], patch, None, source=SYNC_SOURCE)
-    return "updated", upd, upd.pop("_changes", [])
+    cur.execute("SELECT id, company_id FROM prospect_contacts WHERE id = %s", (ex["id"],))
+    return "updated", dict(cur.fetchone()), changes
 
 
 def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
@@ -603,28 +563,35 @@ def _sync_page(cur, items: list[dict], dry_run: bool, stats: Counter, sample: li
     find_existing(cur, items)
     now = engine.utcnow()
     companies: set[int] = set()
+    orphans: set[int] = set()
     for it in items:
         ex = it["existing"]
-        if ex is not None and it["company_id"] and it["company_id"] != ex["company_id"] \
-                and it["reason"] == "hubspot_association":
+        if ex is not None and ex["company_id"] is not None and it["company_id"] \
+                and it["company_id"] != ex["company_id"] and it["reason"] == "hubspot_association":
             stats["cambió_de_empresa_en_hubspot (no se mueve)"] += 1
         cur.execute("SAVEPOINT hs_contact")
         try:
             kind, out, changes = _sync_one(cur, it, dry_run)
             if not dry_run and out is not None and kind in ("created", "updated"):
                 engine.emit_event(cur, "contact", out["id"], kind, changes, now, SYNC_SOURCE)
-                companies.add(out["company_id"])
+                if out.get("company_id") is None:
+                    orphans.add(out["id"])
+                else:
+                    companies.add(out["company_id"])
             cur.execute("RELEASE SAVEPOINT hs_contact")
         except Exception as exc:  # un contacto roto no frena el lote
             cur.execute("ROLLBACK TO SAVEPOINT hs_contact")
             errors.append({"hubspot_contact_id": it["hs_id"], "email": it["email"], "error": str(exc)[:300]})
             stats["errores"] += 1
             continue
-        stats[{"created": "creados", "updated": "actualizados", "tray": "a_la_bandeja", "same": "sin_cambios"}[kind]] += 1
+        stats[{"created": "creados", "updated": "actualizados", "same": "sin_cambios"}[kind]] += 1
+        if kind == "created" and it["company_id"] is None:
+            stats["creados_sin_empresa"] += 1
         if kind in ("created", "updated") and len(sample) < 25:
             sample.append({"email": it["email"], "accion": kind,
                            "cambios": [{"campo": c["field"], "antes": _enc_any(c["old"]), "ahora": _enc_any(c["new"])}
                                        for c in changes][:12]})
-    if companies:
-        res = engine.tick(cur, now, automatic=True, company_id=sorted(companies), actor=SYNC_SOURCE)
+    if companies or orphans:
+        res = engine.tick(cur, now, automatic=True, company_id=sorted(companies) or None, actor=SYNC_SOURCE,
+                          contact_ids=sorted(orphans) or None)
         stats["inscripciones_en_workflows"] += int(res.get("enrolled") or 0)

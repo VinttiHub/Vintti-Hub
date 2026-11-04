@@ -1985,7 +1985,7 @@
         return '<li class="' + (l.ok ? "" : "is-error") + '"><span class="pr-wf-log__at">' + fmtFechaHora(l.at) + "</span>" + esc(l.summary || l.kind) + "</li>";
       }).join("") + "</ol>" +
       (canEdit && (d.status === "active" || d.status === "waiting")
-        ? '<button type="button" class="pr-btn pr-btn--danger" data-unenroll="' + d.company_id + '">Sacar del workflow</button>' : "") +
+        ? '<button type="button" class="pr-btn pr-btn--danger" data-unenroll="' + (d.contact_id || d.company_id) + '">Sacar del workflow</button>' : "") +
       "</aside>" : "";
     return '<div class="pr-wf-history">' + filters +
       '<div class="pr-wf-hbody"><div class="pr-wf-htable"><table class="pr-table"><thead><tr><th>Empresa</th><th>Estado</th><th>Último paso</th><th>Inscripta</th><th>Sigue</th></tr></thead><tbody>' +
@@ -2465,10 +2465,13 @@
     }).catch(function (err) { showErrors(err); });
   }
 
-  function unenroll(companyId) {
-    if (!confirm("¿Sacar esta empresa del workflow?")) return;
+  /* recordId = el contacto en un workflow de contactos (puede no tener empresa), la
+     empresa en uno de empresas. Antes mandaba siempre la empresa: en los de contactos
+     sacaba al contacto equivocado. */
+  function unenroll(recordId) {
+    if (!confirm("¿Sacarlo del workflow?")) return;
     P.api("/prospecting/workflows/" + draft.id + "/unenroll", {
-      method: "POST", body: JSON.stringify({ company_ids: [companyId] }),
+      method: "POST", body: JSON.stringify({ record_ids: [recordId] }),
     }).then(function () {
       historyState.detail = null;
       loadHistory();

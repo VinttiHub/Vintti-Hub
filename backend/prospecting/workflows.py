@@ -221,13 +221,13 @@ def list_enrollments(cur, wf_id: int, status: str | None = None, limit: int = 30
         SELECT e.id, e.company_id, e.contact_id,
                CASE WHEN e.contact_id IS NULL THEN c.name
                     ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
-                         || ' · ' || c.name END AS company_name,
-               c.is_dummy, e.status, e.current_node,
+                         || COALESCE(' · ' || c.name, ' · sin empresa') END AS company_name,
+               COALESCE(ct.is_dummy, c.is_dummy) AS is_dummy, e.status, e.current_node,
                e.wake_at, e.source, e.enrolled_by, e.enrolled_at, e.finished_at, e.last_error,
                (SELECT summary FROM prospect_wf_step_log l WHERE l.enrollment_id = e.id
                  ORDER BY l.id DESC LIMIT 1) AS last_step
           FROM prospect_wf_enrollments e
-          JOIN prospect_companies c ON c.id = e.company_id
+          LEFT JOIN prospect_companies c ON c.id = e.company_id
           LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
          WHERE e.workflow_id = %s {extra}
          ORDER BY e.enrolled_at DESC, e.id DESC
@@ -241,12 +241,12 @@ def list_enrollments(cur, wf_id: int, status: str | None = None, limit: int = 30
 def enrollment_detail(cur, enrollment_id: int) -> dict | None:
     cur.execute(
         """
-        SELECT e.*, c.is_dummy, w.name AS workflow_name,
+        SELECT e.*, COALESCE(ct.is_dummy, c.is_dummy) AS is_dummy, w.name AS workflow_name,
                CASE WHEN e.contact_id IS NULL THEN c.name
                     ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
-                         || ' · ' || c.name END AS company_name
+                         || COALESCE(' · ' || c.name, ' · sin empresa') END AS company_name
           FROM prospect_wf_enrollments e
-          JOIN prospect_companies c ON c.id = e.company_id
+          LEFT JOIN prospect_companies c ON c.id = e.company_id
           JOIN prospect_workflows w ON w.id = e.workflow_id
           LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
          WHERE e.id = %s

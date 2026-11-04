@@ -377,6 +377,20 @@ def ensure_schema(cur) -> None:
         "REFERENCES prospect_wf_folders(id) ON DELETE SET NULL"
     )
     cur.execute("ALTER TABLE prospect_wf_enrollments ADD COLUMN IF NOT EXISTS contact_id BIGINT")
+    # Contactos SIN empresa, como en HubSpot (2026-11-04, decisión de la owner): un contacto,
+    # su historial y sus inscripciones pueden no tener empresa. Antes iban a la bandeja.
+    cur.execute("ALTER TABLE prospect_contacts ALTER COLUMN company_id DROP NOT NULL")
+    cur.execute("ALTER TABLE prospect_company_events ALTER COLUMN company_id DROP NOT NULL")
+    cur.execute("ALTER TABLE prospect_wf_enrollments ALTER COLUMN company_id DROP NOT NULL")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_wf_enrollments_wf_contact "
+        "ON prospect_wf_enrollments (workflow_id, contact_id) WHERE contact_id IS NOT NULL"
+    )
+    # Para asociar solos por dominio los contactos sin empresa cuando llega su empresa.
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_contacts_orphan_domain "
+        "ON prospect_contacts ((split_part(LOWER(email), '@', 2))) WHERE company_id IS NULL"
+    )
     # Memoria "ya cumplía" por registro (empresa o contacto, según el workflow).
     # Reemplaza a prospect_wf_match_state, que sólo sabía de empresas.
     cur.execute(
@@ -1272,10 +1286,12 @@ def contact_missing(contact: dict) -> list[str]:
     return [k for k in REQUIRED_ON_QUALIFIED if contact.get(k) in (None, "", [])]
 
 
-def recompute_contact_incomplete(cur, company_id: int, status: str | None = None) -> bool:
+def recompute_contact_incomplete(cur, company_id: int | None, status: str | None = None) -> bool:
     """Empresa en Qualified / SQL sin ningún contacto con los obligatorios completos.
     `status`: el Prospecting Status si quien llama ya lo tiene (no hace falta releerlo).
-    Sólo se leen los contactos cuando está en Qualified / SQL."""
+    Sólo se leen los contactos cuando está en Qualified / SQL. Contacto sin empresa: nada."""
+    if company_id is None:
+        return False
     if status is None:
         cur.execute("SELECT prospecting_status FROM prospect_companies WHERE id = %s", (company_id,))
         r = cur.fetchone()
@@ -1301,7 +1317,8 @@ def _check_duplicate_email(cur, email: str | None, exclude_id: int | None = None
         return
     cur.execute(
         """
-        SELECT ct.id, c.name AS company FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+        SELECT ct.id, COALESCE(c.name, 'sin empresa') AS company
+          FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id
          WHERE LOWER(ct.email) = LOWER(%s) AND (%s::bigint IS NULL OR ct.id <> %s)
          LIMIT 1
         """,
@@ -1326,15 +1343,23 @@ def _split_contact_data(data: dict) -> tuple[dict, dict]:
     return cols, props
 
 
-def create_contact(cur, company_id: int, data: dict, actor: str | None, source: str = "user") -> dict:
-    cur.execute("SELECT id, is_dummy FROM prospect_companies WHERE id = %s", (company_id,))
-    comp = cur.fetchone()
-    if comp is None:
-        raise LookupError("company")
+def create_contact(cur, company_id: int | None, data: dict, actor: str | None, source: str = "user",
+                   is_dummy: bool = False) -> dict:
+    """`company_id` None = contacto sin empresa (como en HubSpot): no es principal de nada y
+    `is_dummy` lo dice quien llama (con empresa, lo hereda de ella)."""
+    if company_id is not None:
+        cur.execute("SELECT id, is_dummy FROM prospect_companies WHERE id = %s", (company_id,))
+        comp = cur.fetchone()
+        if comp is None:
+            raise LookupError("company")
+    else:
+        comp = {"is_dummy": bool(is_dummy)}
     cols, props = _split_contact_data(data)
     _check_duplicate_email(cur, cols.get("email"))
-    cur.execute("SELECT COUNT(*) AS n FROM prospect_contacts WHERE company_id = %s", (company_id,))
-    first = cur.fetchone()["n"] == 0
+    first = False
+    if company_id is not None:
+        cur.execute("SELECT COUNT(*) AS n FROM prospect_contacts WHERE company_id = %s", (company_id,))
+        first = cur.fetchone()["n"] == 0
     names = list(cols)
     cur.execute(
         f"""
@@ -1343,7 +1368,7 @@ def create_contact(cur, company_id: int, data: dict, actor: str | None, source: 
         VALUES (%s, %s, %s, %s, %s {''.join(', %s' for _ in names)})
         RETURNING *
         """,
-        [company_id, comp["is_dummy"], bool(data.get("is_primary")) or first,
+        [company_id, comp["is_dummy"], company_id is not None and (bool(data.get("is_primary")) or first),
          Json({k: v for k, v in props.items() if v is not None}), actor] + [cols[c] for c in names],
     )
     row = _flatten_contact(cur.fetchone())
@@ -1368,7 +1393,7 @@ def update_contact(cur, contact_id: int, patch: dict, actor: str | None, source:
     for k, v in {**cols, **props}.items():
         if before.get(k) != v:
             changes.append({"field": k, "old": before.get(k), "new": v})
-    if "is_primary" in patch and bool(patch["is_primary"]) != raw["is_primary"]:
+    if "is_primary" in patch and raw["company_id"] is not None and bool(patch["is_primary"]) != raw["is_primary"]:
         if patch["is_primary"]:
             cur.execute("UPDATE prospect_contacts SET is_primary = FALSE WHERE company_id = %s", (raw["company_id"],))
         cur.execute("UPDATE prospect_contacts SET is_primary = %s WHERE id = %s", (bool(patch["is_primary"]), contact_id))
@@ -1402,11 +1427,100 @@ def delete_contact(cur, contact_id: int, actor: str | None) -> bool:
     return True
 
 
+def set_contact_company(cur, contact_id: int, company_id: int | None, actor: str | None,
+                        source: str = "user") -> dict | None:
+    """Asigna, cambia o quita la empresa de un contacto. Deja el cambio en el historial
+    (en la actividad de las dos empresas) y recalcula «Completá el contacto» de ambas.
+    Devuelve {"old", "new", "changed"} o None si el contacto no existe."""
+    cur.execute("SELECT id, company_id, is_dummy, is_primary FROM prospect_contacts WHERE id = %s FOR UPDATE",
+                (contact_id,))
+    ct = cur.fetchone()
+    if ct is None:
+        return None
+    old = ct["company_id"]
+    if company_id is not None:
+        cur.execute("SELECT id, name, is_dummy FROM prospect_companies WHERE id = %s", (company_id,))
+        comp = cur.fetchone()
+        if comp is None:
+            raise LookupError("company")
+        if bool(comp["is_dummy"]) != bool(ct["is_dummy"]):
+            raise ValueError("Un contacto de prueba sólo se asocia a una empresa de prueba (y al revés).")
+    if old == company_id:
+        return {"old": old, "new": company_id, "changed": False}
+    first = False
+    if company_id is not None:
+        cur.execute("SELECT COUNT(*) AS n FROM prospect_contacts WHERE company_id = %s", (company_id,))
+        first = cur.fetchone()["n"] == 0
+    cur.execute(
+        "UPDATE prospect_contacts SET company_id = %s, is_primary = %s, updated_at = NOW() WHERE id = %s",
+        (company_id, first, contact_id),
+    )
+    # Sus inscripciones abiertas siguen al contacto (para el alcance por empresa del motor).
+    cur.execute(
+        "UPDATE prospect_wf_enrollments SET company_id = %s WHERE contact_id = %s AND status IN ('active', 'waiting')",
+        (company_id, contact_id),
+    )
+
+    def _name(cid):
+        if cid is None:
+            return None
+        cur.execute("SELECT name FROM prospect_companies WHERE id = %s", (cid,))
+        r = cur.fetchone()
+        return r["name"] if r else f"#{cid}"
+
+    old_name, new_name = _name(old), _name(company_id)
+    for cid in {old, company_id}:
+        log_event(cur, cid, source, actor, "company", old_name, new_name, contact_id=contact_id)
+    recompute_contact_incomplete(cur, old)
+    recompute_contact_incomplete(cur, company_id)
+    return {"old": old, "new": company_id, "changed": True}
+
+
+def email_domain(email: str | None) -> str | None:
+    from prospecting.inbound import FREE_EMAIL_DOMAINS
+
+    if not email or "@" not in email:
+        return None
+    d = email.rsplit("@", 1)[1].strip().lower()
+    return d if d and d not in FREE_EMAIL_DOMAINS else None
+
+
+def attach_contacts_for_company(cur, company_id: int, actor: str | None = None,
+                                source: str = "auto") -> list[int]:
+    """Llegó (o se completó) una empresa: los contactos SIN empresa cuyo mail es de su
+    dominio se le asocian solos. Sólo si ese dominio es de UNA sola empresa."""
+    cur.execute("SELECT domain, is_dummy FROM prospect_companies WHERE id = %s", (company_id,))
+    comp = cur.fetchone()
+    if comp is None or not comp["domain"]:
+        return []
+    from prospecting.inbound import FREE_EMAIL_DOMAINS
+    if comp["domain"] in FREE_EMAIL_DOMAINS:
+        return []
+    cur.execute(
+        "SELECT COUNT(*) AS n FROM prospect_companies WHERE domain = %s AND is_dummy = %s",
+        (comp["domain"], comp["is_dummy"]),
+    )
+    if cur.fetchone()["n"] != 1:
+        return []
+    cur.execute(
+        """
+        SELECT id FROM prospect_contacts
+         WHERE company_id IS NULL AND split_part(LOWER(email), '@', 2) = %s AND is_dummy = %s
+         ORDER BY id
+        """,
+        (comp["domain"], comp["is_dummy"]),
+    )
+    ids = [r["id"] for r in cur.fetchall()]
+    for cid in ids:
+        set_contact_company(cur, cid, company_id, actor, source=source)
+    return ids
+
+
 def get_contact(cur, contact_id: int) -> dict | None:
     cur.execute(
         """
         SELECT ct.*, c.name AS company_name, c.prospecting_status AS company_status
-          FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+          FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id
          WHERE ct.id = %s
         """,
         (contact_id,),
@@ -1428,7 +1542,8 @@ def get_contact(cur, contact_id: int) -> dict | None:
 
 
 def _contact_where(f: dict) -> tuple[str, list]:
-    """WHERE de la pestaña Contacts (sobre `ct` JOIN `c`). Lo usan la lista y la edición masiva."""
+    """WHERE de la pestaña Contacts (sobre `ct` LEFT JOIN `c`: hay contactos sin empresa).
+    Lo usan la lista y la edición masiva."""
     where, params = [], []
     dummy = f.get("dummy") or "exclude"
     if dummy == "only":
@@ -1446,6 +1561,10 @@ def _contact_where(f: dict) -> tuple[str, list]:
     if isinstance(f.get("ids"), list):  # vista segmento
         where.append("ct.id = ANY(%s)")
         params.append(f["ids"])
+    if f.get("company") == "none":  # «Sin empresa»
+        where.append("ct.company_id IS NULL")
+    elif f.get("company") == "any":
+        where.append("ct.company_id IS NOT NULL")
     if f.get("company_id"):
         where.append("ct.company_id = %s")
         params.append(_to_int(f["company_id"]))
@@ -1459,7 +1578,7 @@ def _contact_where(f: dict) -> tuple[str, list]:
 def contact_ids(cur, f: dict) -> list[int]:
     """Todos los contactos que cumplen los filtros de la pestaña, sin paginar."""
     where_sql, params = _contact_where(f)
-    cur.execute(f"SELECT ct.id FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql} ORDER BY ct.id", params)
+    cur.execute(f"SELECT ct.id FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id {where_sql} ORDER BY ct.id", params)
     return [r["id"] for r in cur.fetchall()]
 
 
@@ -1489,7 +1608,7 @@ def export_rows(cur, obj: str, ids: list[int], sort=None) -> list[dict]:
     cur.execute(
         f"""
         SELECT ct.*, c.name AS hub_company FROM prospect_contacts ct
-          JOIN prospect_companies c ON c.id = ct.company_id
+          LEFT JOIN prospect_companies c ON c.id = ct.company_id
          WHERE ct.id = ANY(%s) ORDER BY {order_sql('contact', sort)}
         """,
         (ids,),
@@ -1501,7 +1620,7 @@ def list_contacts(cur, f: dict) -> dict:
     where_sql, params = _contact_where(f)
     page = max(1, _to_int(f.get("page")) or 1)
     size = min(200, max(10, _to_int(f.get("page_size")) or 25))
-    base = f"FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id {where_sql}"
+    base = f"FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id {where_sql}"
     cur.execute(f"SELECT COUNT(*) AS n {base}", params)
     total = cur.fetchone()["n"]
     cur.execute(

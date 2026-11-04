@@ -363,24 +363,29 @@ def patch_company(company_id: int):
     return jsonify(_json_safe(row))
 
 
-def _run_instant(cur, company_id: int, kind: str, changes: list, actor: str | None,
+def _run_instant(cur, company_id: int | None, kind: str, changes: list, actor: str | None,
                  obj: str = "company", record_id: int | None = None) -> list[dict]:
     """"Al instante": disparadores por evento del registro + tick acotado a su empresa
     (los workflows de empresa miran la empresa; los de contacto, sus contactos).
-    Devuelve qué workflows le hicieron algo (para el aviso de la página)."""
+    Un contacto SIN empresa se alcanza por su id (sin empresa, un tick con company_id
+    None sería la corrida global). Devuelve qué workflows le hicieron algo."""
     cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM prospect_wf_step_log")
     mark = cur.fetchone()["m"]
     now = engine.utcnow()
     engine.emit_event(cur, obj, record_id or company_id, kind, changes, now, actor)
-    engine.tick(cur, now, automatic=True, company_id=company_id, actor=actor)
+    contact_ids = [record_id] if obj == "contact" and record_id else None
+    if company_id is None and contact_ids is None:
+        return []
+    engine.tick(cur, now, automatic=True, company_id=company_id, actor=actor, contact_ids=contact_ids)
     cur.execute(
         """
         SELECT DISTINCT w.id, w.name FROM prospect_wf_step_log l
           JOIN prospect_wf_enrollments e ON e.id = l.enrollment_id
           JOIN prospect_workflows w ON w.id = e.workflow_id
-         WHERE l.id > %s AND e.company_id = %s AND l.kind = 'action'
+         WHERE l.id > %s AND l.kind = 'action'
+           AND (e.company_id = %s OR e.contact_id = %s)
         """,
-        (mark, company_id),
+        (mark, company_id, record_id if obj == "contact" else None),
     )
     return [dict(r) for r in cur.fetchall()]
 
@@ -391,7 +396,7 @@ def _run_instant(cur, company_id: int, kind: str, changes: list, actor: str | No
 def _contact_response(cur, contact_id: int, applied: list) -> dict:
     out = store.get_contact(cur, contact_id) or {}
     out["workflows_applied"] = applied
-    comp = engine.load_company(cur, out["company_id"]) if out else None
+    comp = engine.load_company(cur, out["company_id"]) if out and out.get("company_id") else None
     out["company_contact_incomplete"] = bool(comp and comp.get("contact_incomplete"))
     return out
 
@@ -430,9 +435,43 @@ def contact_get(contact_id: int):
     return jsonify(_json_safe(row))
 
 
-@bp.post("/companies/<int:company_id>/contacts")
-def contact_create(company_id: int):
+@bp.post("/contacts")
+def contact_create_standalone():
+    """Contacto desde cero (pestaña Contacts), con o sin empresa (`company_id` opcional)."""
     body = request.get_json(silent=True) or {}
+    company_id = store._to_int(body.pop("company_id", None))
+    return contact_create(company_id, body)
+
+
+@bp.patch("/contacts/<int:contact_id>/company")
+def contact_set_company(contact_id: int):
+    """Asignar, cambiar o quitar (`company_id: null`) la empresa de un contacto."""
+    body = request.get_json(silent=True) or {}
+    company_id = store._to_int(body.get("company_id"))
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            res = store.set_contact_company(cur, contact_id, company_id, _current_email())
+            if res is None:
+                return jsonify({"error": "not_found"}), 404
+            applied = []
+            if res["changed"]:
+                applied = _run_instant(cur, company_id, "updated",
+                                       [{"field": "company", "old": res["old"], "new": res["new"]}],
+                                       _current_email(), obj="contact", record_id=contact_id)
+            out = _contact_response(cur, contact_id, applied)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out))
+
+
+@bp.post("/companies/<int:company_id>/contacts")
+def contact_create(company_id: int | None, body: dict | None = None):
+    body = body if body is not None else (request.get_json(silent=True) or {})
     try:
         with _Db() as cur:
             denied = _gate(cur)
@@ -531,6 +570,7 @@ def _bulk_update(obj: str):
         mark = cur.fetchone()["m"]
         now = engine.utcnow()
         updated, unchanged, failed, needs_contact, companies = 0, 0, [], 0, set()
+        orphans = set()  # contactos sin empresa: el tick los alcanza por id
         # En el historial se distingue de una edición de a uno: `bulk:<cuántos registros>`.
         source = f"bulk:{len(ids)}"
         for rid in ids:
@@ -551,7 +591,10 @@ def _bulk_update(obj: str):
                 changes = row.pop("_changes")
                 if changes:
                     engine.emit_event(cur, obj, rid, "updated", changes, now, actor, row=row)
-                    companies.add(cid)
+                    if cid is None:
+                        orphans.add(rid)
+                    else:
+                        companies.add(cid)
                     updated += 1
                 else:
                     unchanged += 1
@@ -563,18 +606,20 @@ def _bulk_update(obj: str):
                 failed.append({"id": rid, "error": str(exc)})
         # Lo mismo que _run_instant() de a uno, pero UN tick para todas las empresas tocadas
         # (engine._company_match: company_id acepta una lista).
-        if companies:
-            engine.tick(cur, now, automatic=True, company_id=sorted(companies), actor=actor)
+        if companies or orphans:
+            engine.tick(cur, now, automatic=True, company_id=sorted(companies) or None, actor=actor,
+                        contact_ids=sorted(orphans) or None)
         applied = []
-        if companies:
+        if companies or orphans:
             cur.execute(
                 """
                 SELECT DISTINCT w.name FROM prospect_wf_step_log l
                   JOIN prospect_wf_enrollments e ON e.id = l.enrollment_id
                   JOIN prospect_workflows w ON w.id = e.workflow_id
-                 WHERE l.id > %s AND e.company_id = ANY(%s) AND l.kind = 'action'
+                 WHERE l.id > %s AND l.kind = 'action'
+                   AND (e.company_id = ANY(%s) OR e.contact_id = ANY(%s))
                 """,
-                (mark, sorted(companies)),
+                (mark, sorted(companies), sorted(orphans)),
             )
             applied = [r["name"] for r in cur.fetchall()]
         if failed:
@@ -782,6 +827,15 @@ def clay_webhook():
                                  obj="contact", record_id=a["contact_id"])
                 if attached:
                     result["calendly_contacts_attached"] = [a["contact_id"] for a in attached]
+                # Contactos SIN empresa con el dominio de esta empresa: se le asocian solos.
+                orphan_ids = store.attach_contacts_for_company(cur, result["id"], "clay", source="clay")
+                if orphan_ids:
+                    now_ = engine.utcnow()
+                    for oid in orphan_ids:
+                        engine.emit_event(cur, "contact", oid, "updated",
+                                          [{"field": "company", "old": None, "new": result["id"]}], now_, "clay")
+                    engine.tick(cur, now_, automatic=True, company_id=result["id"], actor="clay")
+                    result["contacts_attached"] = orphan_ids
                 results.append(result)
                 cur.execute("RELEASE SAVEPOINT clay_item")
             except ValueError as exc:
@@ -799,7 +853,7 @@ def zapier_calendly():
     """Un invitado de Calendly por request (Zap "Invitee Created" → Webhooks POST).
 
     Si el contacto ya existe se actualiza; si el dominio es de una sola empresa se
-    crea ahí; si no, queda en la bandeja "Unassigned". `"is_dummy": true` lo crea
+    crea ahí; si no, queda como contacto sin empresa. `"is_dummy": true` lo crea
     como prueba, igual que el webhook de Clay.
     """
     if not _token_ok("ZAPIER_WEBHOOK_TOKEN", "X-Zapier-Token"):
@@ -1048,10 +1102,10 @@ def workflow_preview():
                 cur.execute(
                     """
                     SELECT ct.id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), ''), ct.email)
-                           || ' · ' || c.name AS name, ct.is_dummy, ct.lead_life AS prospecting_status,
+                           || COALESCE(' · ' || c.name, ' · sin empresa') AS name, ct.is_dummy, ct.lead_life AS prospecting_status,
                            EXISTS (SELECT 1 FROM prospect_wf_enrollments e WHERE e.contact_id = ct.id
                                     AND e.workflow_id = %s AND e.status IN ('active','waiting')) AS already_in
-                      FROM prospect_contacts ct JOIN prospect_companies c ON c.id = ct.company_id
+                      FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id
                      WHERE ct.id = ANY(%s) ORDER BY 2 LIMIT 200
                     """,
                     (body.get("id") or 0, ids),
@@ -1131,7 +1185,7 @@ def workflow_unenroll(wf_id: int):
             return jsonify({"error": "not_found"}), 404
         n = sum(
             engine.unenroll_record(cur, wf, int(c), engine.utcnow(), f"Sacado a mano por {_current_email()}")
-            for c in (body.get("record_ids") or body.get("company_ids") or [])
+            for c in (body.get("record_ids") or body.get("company_ids") or []) if c is not None
         )
     return jsonify({"unenrolled": n})
 

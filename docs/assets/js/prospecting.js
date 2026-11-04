@@ -1107,7 +1107,9 @@
       return '<button type="button" class="pr-company__name" data-ct-open="' + c.id + '">' + esc(c.name) + "</button>" +
         (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "");
     }
-    if (key === "hub_company") return '<a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.hub_company || c.company_name) + "</a>";
+    if (key === "hub_company") return c.company_id
+      ? '<a class="pr-link" href="prospecting-company.html?id=' + c.company_id + '">' + esc(c.hub_company || c.company_name) + "</a>"
+      : '<span class="pr-note">Sin empresa</span>';
     if (key === "lead_life") return v ? '<span class="pr-wf-stat">' + esc(v) + "</span>" : "—";
     if (v == null || v === "" || (Array.isArray(v) && !v.length)) return "—";
     if (f.type === "owner" || f.type === "user") return cellText(ownerName(v) || v);
@@ -1177,6 +1179,7 @@
     $("prCtQ").value = f.q || "";
     $("prCtLead").value = f.lead_life || "";
     $("prCtOwner").value = f.owner || "";
+    $("prCtCompany").value = f.company || "";
     ctState.page = 1;
     ctSelected = {};
     ctSelAll = null;
@@ -1235,7 +1238,8 @@
   /* Filtros de la pestaña (búsqueda, Lead Life, Owner): se guardan en la vista de contactos
      igual que en las de empresas — barra «Cambios sin guardar» con Guardar / Descartar. */
   function ctFilterInputs() {
-    var f = { q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value };
+    var f = { q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
+      company: $("prCtCompany").value };
     Object.keys(f).forEach(function (k) { if (!f[k]) delete f[k]; });
     return f;
   }
@@ -1295,6 +1299,7 @@
     var vf = ((v || {}).config || {}).filters || {};
     var f = {
       q: $("prCtQ").value.trim(), lead_life: $("prCtLead").value, owner: $("prCtOwner").value,
+      company: $("prCtCompany").value,
       // Un segmento con dummies se guarda con dummy=include (si no, se vería vacío).
       dummy: vf.dummy || (ME.sees_dummies ? $("prFDummy").value : "exclude"),
     };
@@ -1315,7 +1320,7 @@
   function renderCtRows() {
     var cols = ctColumns(), span = cols.length + 1;
     $("prCtBody").innerHTML = ctRows.length ? ctRows.map(function (c) {
-      return '<tr data-ct="' + c.id + '" data-co="' + c.company_id + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
+      return '<tr data-ct="' + c.id + '" data-co="' + (c.company_id || "") + '"' + (ctSelected[c.id] ? ' class="is-selected"' : "") + ">" +
         '<td class="pr-selcol"><label class="pr-check pr-check--bare"><input type="checkbox" data-ct-sel="' + c.id + '"' + (ctSelected[c.id] ? " checked" : "") + "></label></td>" +
         cols.map(function (k) {
           var editable = k !== "name" && k !== "hub_company";
@@ -1355,7 +1360,7 @@
     $("prCtOwner").value = keep.owner;
   }
   function bindContacts() {
-    ["prCtLead", "prCtOwner"].forEach(function (id) { $(id).addEventListener("change", function () { ctState.page = 1; loadContacts(); }); });
+    ["prCtLead", "prCtOwner", "prCtCompany"].forEach(function (id) { $(id).addEventListener("change", function () { ctState.page = 1; loadContacts(); }); });
     var t = null;
     $("prCtQ").addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { ctState.page = 1; loadContacts(); }, 300); });
     $("prCtPrev").addEventListener("click", function () { if (ctState.page > 1) { ctState.page--; loadContacts(); } });
@@ -1467,121 +1472,20 @@
       var b = e.target.closest("[data-ct-open]");
       if (!b) return;
       var tr = b.closest("tr");
-      window.ProspectingContacts.open({ contactId: Number(b.getAttribute("data-ct-open")), companyId: Number(tr.getAttribute("data-co")),
+      window.ProspectingContacts.open({ contactId: Number(b.getAttribute("data-ct-open")),
+        companyId: Number(tr.getAttribute("data-co")) || null,
         onSaved: function () { loadContacts(); } });
     });
-    bindInbox();
+    // Contacto desde cero, con o sin empresa (como en HubSpot, 2026-11-04).
+    $("prCtNew").addEventListener("click", function () {
+      window.ProspectingContacts.open({ onSaved: function () { loadContacts(); } });
+    });
   }
 
-  /* ---------- Bandeja: contactos sin empresa (Calendly vía Zapier, o HubSpot) ----------
-     Los que entran con un dominio que no es de una sola empresa (gmail, ninguna o
-     varias) y, los de HubSpot, sin empresa asociada allá. Se asocian a mano; si después
-     llega la empresa (Clay o el sync de HubSpot), se asocian solos
-     (backend/prospecting/inbound.py, hubspot_contacts.py). Muestra hasta 200: con miles
-     de HubSpot, se busca. */
-  var INBOX_WHY = { free_email: "Personal email", no_company: "No company with that domain", multiple_companies: "Several companies with that domain" };
-  var INBOX_SOURCE = { calendly: "Calendly", hubspot: "HubSpot" };
-  var inboxRows = {};
-  function loadInbox() {
-    var q = { status: "pending", dummy: ME.sees_dummies ? $("prFDummy").value : "exclude",
-      source: $("prInboxSource").value, q: $("prInboxQ").value.trim() };
-    return api("/prospecting/inbound?" + qs(q)).then(function (r) {
-      $("prInboxCount").textContent = r.total ? String(r.total) : "";
-      $("prInboxBtn").classList.toggle("has-items", r.total > 0);
-      inboxRows = {};
-      r.rows.forEach(function (x) { inboxRows[x.id] = x; });
-      $("prInboxBody").innerHTML = r.rows.length ? r.rows.map(inboxRow).join("")
-        : '<tr><td class="pr-empty" colspan="7">' + (q.q || q.source ? "No contacts match." : "Nothing waiting: every contact is linked to a company.") + "</td></tr>";
-    }).catch(function (err) {
-      $("prInboxBody").innerHTML = '<tr><td class="pr-empty" colspan="7">' + esc(err.message) + "</td></tr>";
-    });
-  }
-  function inboxRow(x) {
-    var d = x.contact_data || {}, ex = x.extra || {};
-    var name = [x.first_name, x.last_name].filter(Boolean).join(" ") || x.email;
-    var utm = ["utm_source", "utm_medium", "utm_campaign"].map(function (k) { return d[k]; }).filter(Boolean);
-    var hint = [ex.event_name, d.company_name, ex.website, ex.questions_and_answers].filter(Boolean).join(" · ");
-    return '<tr data-in="' + x.id + '">' +
-      "<td><strong>" + esc(name) + "</strong>" + (x.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") +
-        ' <span class="pr-note">· ' + esc(INBOX_SOURCE[x.source] || x.source || "") + "</span>" +
-        (hint ? '<div class="pr-note pr-inbox__hint" title="' + esc(hint) + '">' + esc(hint) + "</div>" : "") + "</td>" +
-      "<td>" + cellText(x.email) + "</td>" +
-      "<td>" + (x.meeting_datetime ? esc(window.ProspectingContacts.fmtLocal(x.meeting_datetime)) : "—") + "</td>" +
-      "<td>" + (utm.length ? esc(utm.join(" / ")) : "—") + "</td>" +
-      '<td><span class="pr-note">' + esc(INBOX_WHY[x.reason] || x.reason || "") + (x.domain ? " (" + esc(x.domain) + ")" : "") + "</span></td>" +
-      '<td class="pr-inbox__pick"><input type="text" class="pr-filter__input" data-in-q placeholder="Search company…" autocomplete="off"' +
-        ' value="' + esc(d.company_name || "") + '"><div class="pr-inbox__results" data-in-results hidden></div></td>' +
-      '<td class="pr-inbox__acts"><button type="button" class="pr-btn pr-btn--primary" data-in-link disabled>Link</button>' +
-        '<button type="button" class="pr-btn pr-btn--danger" data-in-discard title="Discard"><i class="fa-regular fa-trash-can"></i></button></td></tr>';
-  }
-  function searchCompanies(tr, text) {
-    var box = tr.querySelector("[data-in-results]");
-    var x = inboxRows[tr.getAttribute("data-in")];
-    if (!text.trim()) { box.hidden = true; return; }
-    api("/prospecting/companies?" + qs({ q: text.trim(), page_size: 10, dummy: x && x.is_dummy ? "only" : "exclude" })).then(function (r) {
-      box.innerHTML = r.rows.length ? r.rows.map(function (c) {
-        return '<button type="button" data-in-co="' + c.id + '" data-in-name="' + esc(c.name) + '"><strong>' + esc(c.name) + "</strong>" +
-          (c.domain ? ' <span class="pr-note">' + esc(c.domain) + "</span>" : "") + "</button>";
-      }).join("") : '<span class="pr-note">No companies match.</span>';
-      box.hidden = false;
-    }).catch(function (err) { box.innerHTML = '<span class="pr-note">' + esc(err.message) + "</span>"; box.hidden = false; });
-  }
-  function bindInbox() {
-    $("prInboxBtn").addEventListener("click", function () {
-      var open = $("prInbox").hidden;
-      $("prInbox").hidden = !open;
-      $("prInboxBtn").setAttribute("aria-expanded", String(open));
-      if (open) loadInbox();
-    });
-    var tq = null;
-    $("prInboxQ").addEventListener("input", function () { clearTimeout(tq); tq = setTimeout(loadInbox, 300); });
-    $("prInboxSource").addEventListener("change", loadInbox);
-    var t = null;
-    $("prInboxBody").addEventListener("input", function (e) {
-      var inp = e.target.closest("[data-in-q]");
-      if (!inp) return;
-      var tr = inp.closest("tr");
-      tr.removeAttribute("data-co");
-      tr.querySelector("[data-in-link]").disabled = true;
-      clearTimeout(t);
-      t = setTimeout(function () { searchCompanies(tr, inp.value); }, 250);
-    });
-    $("prInboxBody").addEventListener("focusin", function (e) {
-      var inp = e.target.closest("[data-in-q]");
-      if (inp && inp.value && !inp.closest("tr").getAttribute("data-co")) searchCompanies(inp.closest("tr"), inp.value);
-    });
-    $("prInboxBody").addEventListener("click", function (e) {
-      var tr = e.target.closest("tr[data-in]");
-      if (!tr) return;
-      var id = tr.getAttribute("data-in");
-      var pick = e.target.closest("[data-in-co]");
-      if (pick) {
-        tr.setAttribute("data-co", pick.getAttribute("data-in-co"));
-        tr.querySelector("[data-in-q]").value = pick.getAttribute("data-in-name");
-        tr.querySelector("[data-in-results]").hidden = true;
-        tr.querySelector("[data-in-link]").disabled = false;
-        return;
-      }
-      var link = e.target.closest("[data-in-link]");
-      if (link && tr.getAttribute("data-co")) {
-        link.disabled = true;
-        api("/prospecting/inbound/" + id + "/link", { method: "POST", body: JSON.stringify({ company_id: Number(tr.getAttribute("data-co")) }) })
-          .then(function (r) {
-            toast('<i class="fa-regular fa-user"></i> Contact ' + (r.action === "created" ? "created" : "updated") + " in <strong>" +
-              esc(tr.querySelector("[data-in-q]").value) + "</strong>.");
-            loadInbox();
-            loadContacts();
-          }).catch(function (err) { link.disabled = false; alert(err.message); });
-        return;
-      }
-      if (e.target.closest("[data-in-discard]")) {
-        var x = inboxRows[id] || {};
-        if (!confirm("Discard " + (x.email || "this contact") + "? It will not be created.")) return;
-        api("/prospecting/inbound/" + id + "/discard", { method: "POST" }).then(function () { loadInbox(); })
-          .catch(function (err) { alert(err.message); });
-      }
-    });
-  }
+  /* La bandeja «Unassigned contacts» (contactos sin empresa de Calendly / HubSpot) se
+     sacó el 2026-11-04: desde ese día un contacto puede no tener empresa y está en la
+     tabla como cualquier otro (filtro Company: Sin empresa). Lo que quedaba pendiente lo
+     pasa a contactos backend/scripts/migrate_inbound_to_contacts.py. */
 
   /* ---------- Drawer ---------- */
   var drawerSave = null;
@@ -2005,7 +1909,7 @@
     showSection(kind);
     if (kind === "table") { renderTabs(); load(); }
     else if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
-    else if (kind === "contacts") { renderCtTabs(); loadContacts(); loadInbox(); }
+    else if (kind === "contacts") { renderCtTabs(); loadContacts(); }
   }
 
   function applyTab(key) {

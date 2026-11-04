@@ -11,14 +11,15 @@ alguien agenda. Cada llegada queda registrada en `prospect_inbound_contacts`
      2026-10-28).
   2. El dominio (del website que mande el form, si no del email) coincide con UNA
      sola empresa de Prospecting → se crea el contacto ahí.
-  3. Si no (gmail/hotmail, ninguna empresa o más de una) → queda `pending` en la
-     bandeja "Unassigned" de la pestaña Contacts y una persona lo asocia a mano.
-     Cuando Clay carga después una empresa con ese dominio, se asocia solo
-     (`attach_pending_for_company`).
+  3. Si no (gmail/hotmail, ninguna empresa o más de una) → contacto SIN empresa
+     (desde el 2026-11-04, como en HubSpot). Cuando llega después una empresa con ese
+     dominio se le asocia sola (`store.attach_contacts_for_company`); si no, a mano desde
+     su ficha.
 
-Por qué una bandeja aparte y no `prospect_contacts.company_id` NULL: de esa
-columna dependen el historial (`prospect_company_events`), el motor de workflows y
-los JOINs de la página. El contacto de verdad se crea recién cuando tiene empresa.
+Hasta el 2026-11-04 el caso 3 quedaba `pending` en una bandeja «Unassigned» porque un
+contacto exigía empresa. Esa bandeja ya no recibe nada: lo que quedó pendiente lo pasa a
+contactos `scripts/migrate_inbound_to_contacts.py`. La tabla sigue como registro de cada
+llegada (status `linked`).
 """
 from __future__ import annotations
 
@@ -298,31 +299,16 @@ def ingest(cur, payload: dict, is_dummy: bool = False) -> dict:
         else:
             reason = "multiple_companies" if ids else "no_company"
 
-    if company_id is None:
-        if waiting is not None:
-            cur.execute(
-                """
-                UPDATE prospect_inbound_contacts
-                   SET first_name = %s, last_name = %s, domain = %s, meeting_datetime = %s, event_name = %s,
-                       contact_data = %s, extra = %s, raw_payload = %s, reason = %s, received_at = NOW()
-                 WHERE id = %s
-                """,
-                (data.get("first_name"), data.get("last_name"), domain, data.get("meeting_datetime"),
-                 extra.get("event_name"), Json(data), Json(extra), Json(payload), reason, waiting["id"]),
-            )
-            inbound_id = waiting["id"]
-        else:
-            inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "pending", reason)
-        return {"action": "pending", "inbound_id": inbound_id, "reason": reason, **_warn(extra),
-                **_abandoned(abandoned)}
-
-    row = store.create_contact(cur, company_id, data, None, source="calendly")
+    # 3. Sin empresa: desde el 2026-11-04 es un contacto SIN empresa (como en HubSpot), no
+    # una fila pendiente de la bandeja. Se le asocia sola cuando llega su empresa.
+    row = store.create_contact(cur, company_id, data, None, source="calendly", is_dummy=is_dummy)
     changes = row.pop("_changes")
     if waiting is not None:
         _resolve(cur, waiting["id"], row["id"], company_id, "calendly")
         inbound_id = waiting["id"]
     else:
-        inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "linked", "domain_match",
+        inbound_id = _record(cur, data, extra, payload, domain, is_dummy, "linked",
+                             "domain_match" if company_id is not None else (reason or "no_company"),
                              row["id"], company_id)
     return {"action": "created", "inbound_id": inbound_id, "contact_id": row["id"],
             "company_id": company_id, "changes": changes, **_warn(extra), **_abandoned(abandoned)}
@@ -368,7 +354,9 @@ def link(cur, inbound_id: int, company_id: int, actor: str) -> dict:
     if found is not None:
         current = store.get_contact(cur, found["id"]) or {}
         saved = store.update_contact(cur, found["id"], _merge_patch(current, data), actor, source=source)
-        result = {"action": "updated", "contact_id": found["id"], "company_id": found["company_id"]}
+        if found["company_id"] is None:
+            store.set_contact_company(cur, found["id"], company_id, actor, source=source)
+        result = {"action": "updated", "contact_id": found["id"], "company_id": found["company_id"] or company_id}
     else:
         saved = store.create_contact(cur, company_id, data, actor, source=source)
         result = {"action": "created", "contact_id": saved["id"], "company_id": company_id}

@@ -161,7 +161,11 @@
     });
   }
 
-  /* opts: {contactId?, companyId, companyName?, requireQualified?, onSaved?} */
+  /* opts: {contactId?, companyId?, companyName?, requireQualified?, onSaved?}
+     Sin companyId (y sin contactId) = contacto nuevo desde cero, con o sin empresa
+     (POST /prospecting/contacts). Desde el 2026-11-04 un contacto puede no tener empresa. */
+  var pcCompany = { id: null, name: "" };   // empresa elegida en la ficha
+  var pcCompanyOrig = null;                  // la que tenía al abrir
   function open(opts) {
     ensurePanel();
     panel.classList.add("is-open");
@@ -180,9 +184,12 @@
     var req = opts.requireQualified ? required() : [];
     document.getElementById("pcEyebrow").textContent = isNew ? "Nuevo contacto" : "Contacto";
     document.getElementById("pcTitle").textContent = isNew ? "Agregar contacto" : c.name;
-    document.getElementById("pcSub").textContent = (c.company_name || opts.companyName || "") +
-      (c.is_primary ? " · contacto principal" : "");
-    var body = "";
+    pcCompany = isNew ? { id: opts.companyId || null, name: opts.companyName || "" }
+      : { id: c.company_id || null, name: c.company_name || "" };
+    pcCompanyOrig = pcCompany.id;
+    document.getElementById("pcSub").textContent = (pcCompany.id ? pcCompany.name : "Sin empresa") +
+      (c.is_primary && pcCompany.id ? " · contacto principal" : "");
+    var body = companyBox();
     if (opts.requireQualified) {
       body += '<div class="pc-banner"><i class="fa-solid fa-circle-exclamation"></i><div><strong>La empresa pasó a Qualified / SQL.</strong> ' +
         "Completá los campos con <span class=\"pc-req\">*</span> para que deje de figurar como «Contacto incompleto».</div></div>";
@@ -204,7 +211,9 @@
         }).join("") + "</div></details>";
     });
     if (!isNew) {
-      body += '<label class="pr-check pc-primary"><input type="checkbox" id="pcPrimary"' + (c.is_primary ? " checked" : "") + "> Contacto principal de la empresa</label>";
+      if (c.company_id) {
+        body += '<label class="pr-check pc-primary"><input type="checkbox" id="pcPrimary"' + (c.is_primary ? " checked" : "") + "> Contacto principal de la empresa</label>";
+      }
       if ((c.enrollments || []).length) {
         body += '<section class="pr-section"><h3 class="pr-section__title">Workflows</h3><ul class="pr-events">' +
           c.enrollments.map(function (e) {
@@ -216,6 +225,7 @@
         historyHtml(c.events || []) + "</details>";
     }
     document.getElementById("pcBody").innerHTML = body;
+    bindCompanyBox();
     updateCounts();
     var del = document.getElementById("pcDelete");
     del.hidden = isNew;
@@ -230,7 +240,57 @@
     document.getElementById("pcSave").onclick = function () { save(c, isNew, opts); };
   }
 
+  /* Empresa del contacto: buscar y elegir, cambiar o quitar. Se guarda con «Guardar». */
+  function companyBox() {
+    return '<section class="pc-company"><span class="pr-filter__label">Empresa</span>' +
+      '<div class="pc-company__row"><div class="pr-inbox__pick">' +
+      '<input type="text" class="pr-filter__input" id="pcCoQ" placeholder="Sin empresa — buscá una para asociarla…" autocomplete="off" value="' + esc(pcCompany.name || "") + '">' +
+      '<div class="pr-inbox__results" id="pcCoResults" hidden></div></div>' +
+      '<a class="pr-btn" id="pcCoOpen" target="_blank" rel="noopener"' + (pcCompany.id ? ' href="prospecting-company.html?id=' + pcCompany.id + '"' : " hidden") + '><i class="fa-solid fa-arrow-up-right-from-square"></i></a>' +
+      '<button type="button" class="pr-btn" id="pcCoClear"' + (pcCompany.id ? "" : " hidden") + ">Quitar</button></div>" +
+      '<p class="pr-note pc-company__hint" id="pcCoHint"></p></section>';
+  }
+  function setCompany(id, name) {
+    pcCompany = { id: id, name: name || "" };
+    document.getElementById("pcCoQ").value = pcCompany.name;
+    var open = document.getElementById("pcCoOpen");
+    open.hidden = !id;
+    if (id) open.href = "prospecting-company.html?id=" + id;
+    document.getElementById("pcCoClear").hidden = !id;
+    document.getElementById("pcCoHint").textContent = id === pcCompanyOrig ? "" :
+      (id ? "Se asocia a esta empresa al guardar." : "Queda sin empresa al guardar.");
+  }
+  function bindCompanyBox() {
+    var q = document.getElementById("pcCoQ"), box = document.getElementById("pcCoResults"), t = null;
+    q.addEventListener("input", function () {
+      clearTimeout(t);
+      var text = q.value.trim();
+      if (!text) { box.hidden = true; return; }
+      t = setTimeout(function () {
+        P().api("/prospecting/companies?q=" + encodeURIComponent(text) + "&page_size=10").then(function (r) {
+          box.innerHTML = r.rows.length ? r.rows.map(function (co) {
+            return '<button type="button" data-co="' + co.id + '" data-name="' + esc(co.name) + '"><strong>' + esc(co.name) + "</strong>" +
+              (co.domain ? ' <span class="pr-note">' + esc(co.domain) + "</span>" : "") + "</button>";
+          }).join("") : '<span class="pr-note">Ninguna empresa coincide.</span>';
+          box.hidden = false;
+        }).catch(function (err) { box.innerHTML = '<span class="pr-note">' + esc(err.message) + "</span>"; box.hidden = false; });
+      }, 250);
+    });
+    q.addEventListener("blur", function () {
+      setTimeout(function () { box.hidden = true; if (q.value.trim() !== (pcCompany.name || "")) q.value = pcCompany.name || ""; }, 200);
+    });
+    box.addEventListener("mousedown", function (e) {
+      var b = e.target.closest("[data-co]");
+      if (!b) return;
+      e.preventDefault();
+      setCompany(Number(b.getAttribute("data-co")), b.getAttribute("data-name"));
+      box.hidden = true;
+    });
+    document.getElementById("pcCoClear").addEventListener("click", function () { setCompany(null, ""); });
+  }
+
   function label(key) {
+    if (key === "company") return "Empresa";
     var f = schema().fields.filter(function (x) { return x.key === key; })[0];
     return f ? f.label : key;
   }
@@ -272,11 +332,27 @@
     });
     var prim = document.getElementById("pcPrimary");
     if (prim && prim.checked !== !!c.is_primary) patch.is_primary = prim.checked;
-    if (!Object.keys(patch).length) { status.textContent = "Sin cambios."; return; }
+    var companyChanged = !isNew && (pcCompany.id || null) !== (pcCompanyOrig || null);
+    if (!Object.keys(patch).length && !companyChanged && !isNew) { status.textContent = "Sin cambios."; return; }
+    if (isNew && !Object.keys(patch).length) { status.textContent = "Completá al menos un campo."; return; }
     status.textContent = "Guardando…";
-    var req = isNew
-      ? P().api("/prospecting/companies/" + opts.companyId + "/contacts", { method: "POST", body: JSON.stringify(patch) })
-      : P().api("/prospecting/contacts/" + c.id, { method: "PATCH", body: JSON.stringify(patch) });
+    var req;
+    if (isNew) {
+      req = P().api("/prospecting/contacts", { method: "POST",
+        body: JSON.stringify(Object.assign({}, patch, { company_id: pcCompany.id || null })) });
+    } else {
+      req = (Object.keys(patch).length
+        ? P().api("/prospecting/contacts/" + c.id, { method: "PATCH", body: JSON.stringify(patch) })
+        : Promise.resolve(null)
+      ).then(function (saved) {
+        if (!companyChanged) return saved;
+        return P().api("/prospecting/contacts/" + c.id + "/company", { method: "PATCH",
+          body: JSON.stringify({ company_id: pcCompany.id || null }) }).then(function (s2) {
+          if (saved) s2.workflows_applied = (saved.workflows_applied || []).concat(s2.workflows_applied || []);
+          return s2;
+        });
+      });
+    }
     req.then(function (saved) {
       var applied = (saved.workflows_applied || []).map(function (a) { return "<strong>" + esc(a.name) + "</strong>"; });
       var msg = '<i class="fa-regular fa-user"></i> ' + (isNew ? "Contacto creado." : "Contacto guardado.");

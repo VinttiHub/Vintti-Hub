@@ -206,7 +206,7 @@ def load_contact(cur, contact_id: int, lock: bool = False) -> dict | None:
     cur.execute(
         """
         SELECT ct.*, c.name AS company_name FROM prospect_contacts ct
-          JOIN prospect_companies c ON c.id = ct.company_id WHERE ct.id = %s
+          LEFT JOIN prospect_companies c ON c.id = ct.company_id WHERE ct.id = %s
         """ + (" FOR UPDATE OF ct" if lock else ""),
         (contact_id,),
     )
@@ -246,6 +246,8 @@ def related_of(cur, obj: str, row: dict) -> dict:
     """Lo que necesita una condición cruzada: la empresa de un contacto, o los contactos
     de una empresa (con su historial)."""
     if obj == "contact":
+        if row.get("company_id") is None:
+            return {}  # contacto sin empresa: toda condición `company.*` es falsa (igual que en SQL)
         comp = load_company(cur, row["company_id"])
         h = load_history(cur, [row["company_id"]], "company").get(row["company_id"], {})
         return {"company": {"row": comp, "history": h}} if comp else {}
@@ -264,7 +266,7 @@ def _row_matches(cur, conditions, row: dict, now: datetime, obj: str = "company"
     return matches(conditions, row, as_of_of(now), now, history or {}, obj=obj, related=rel)
 
 
-def _company_id_of(obj: str, row: dict) -> int:
+def _company_id_of(obj: str, row: dict) -> int | None:
     return row["company_id"] if obj == "contact" else row["id"]
 
 
@@ -430,32 +432,56 @@ def _company_match(col: str, company_id) -> tuple[str, list]:
     """`col = %s` para una empresa o `col = ANY(%s)` para varias (la edición masiva corre
     un solo tick para todas sus empresas en vez de uno por empresa)."""
     if isinstance(company_id, (list, tuple, set)):
-        return f"{col} = ANY(%s)", [sorted(int(x) for x in company_id)]
+        return f"{col} = ANY(%s)", [sorted(int(x) for x in company_id if x is not None)]
     return f"{col} = %s", [company_id]
 
 
-def _scope_sql(obj: str, dummy_only: bool, company_id) -> tuple[str, list]:
+def _scope_sql(obj: str, dummy_only: bool, company_id, contact_ids=None) -> tuple[str, list]:
     """Filtro sobre la tabla del objeto: sólo dummies y/o sólo una empresa o varias (para
-    un contacto, "los de esa empresa")."""
+    un contacto, "los de esa empresa") y/o sólo ciertos contactos. Con empresas Y contactos
+    es la unión (los contactos sin empresa no caen en ninguna empresa). Con sólo contactos,
+    un workflow de empresa no alcanza a nadie."""
     t = OBJECTS[obj]["table"]
     parts, params = [], []
     if dummy_only:
         parts.append(f"{t}.is_dummy")
+    scopes = []
     if company_id is not None:
         sql, p = _company_match(f"{t}.{'company_id' if obj == 'contact' else 'id'}", company_id)
-        parts.append(sql)
+        scopes.append(sql)
         params += p
+    if contact_ids is not None:
+        if obj == "contact":
+            scopes.append(f"{t}.id = ANY(%s)")
+            params.append(sorted(int(x) for x in contact_ids))
+        elif company_id is None:
+            scopes.append("FALSE")
+    if scopes:
+        parts.append("(" + " OR ".join(scopes) + ")")
     return "".join(" AND " + x for x in parts), params
+
+
+def _enr_scope_sql(company_id, contact_ids) -> tuple[list, list]:
+    """Lo mismo, sobre prospect_wf_enrollments (alias e)."""
+    scopes, params = [], []
+    if company_id is not None:
+        sql, p = _company_match("e.company_id", company_id)
+        scopes.append(sql)
+        params += p
+    if contact_ids is not None:
+        scopes.append("e.contact_id = ANY(%s)")
+        params.append(sorted(int(x) for x in contact_ids))
+    return (["(" + " OR ".join(scopes) + ")"] if scopes else []), params
 
 
 # --------------------------------------------------------------------------- #
 # Disparadores
 # --------------------------------------------------------------------------- #
 def matching_ids(cur, conditions: dict, now: datetime, dummy_only: bool, company_id: int | None = None,
-                 obj: str = "company") -> list[int]:
+                 obj: str = "company", contact_ids=None) -> list[int]:
     t = OBJECTS[obj]["table"]
     cond_sql, params = compile_conditions(conditions, as_of_of(now), now, obj)
-    scope, sp = _scope_sql(obj, dummy_only, company_id)
+    scope, sp = _scope_sql(obj, dummy_only, company_id, contact_ids)
     cur.execute(f"SELECT {t}.id FROM {t} WHERE {cond_sql} {scope} ORDER BY {t}.id", params + sp)
     return [r["id"] for r in cur.fetchall()]
 
@@ -474,11 +500,12 @@ def snapshot_matches(cur, wf: dict, now: datetime, matching: list[int]) -> None:
         )
 
 
-def _sync_filter(cur, wf: dict, now: datetime, dummy_only: bool, company_id: int | None, actor) -> int:
+def _sync_filter(cur, wf: dict, now: datetime, dummy_only: bool, company_id: int | None, actor,
+                 contact_ids=None) -> int:
     obj = obj_of(wf)
     t = OBJECTS[obj]["table"]
-    matching = set(matching_ids(cur, wf["trigger"]["conditions"], now, dummy_only, company_id, obj))
-    scope, sp = _scope_sql(obj, dummy_only, company_id)
+    matching = set(matching_ids(cur, wf["trigger"]["conditions"], now, dummy_only, company_id, obj, contact_ids))
+    scope, sp = _scope_sql(obj, dummy_only, company_id, contact_ids)
     cur.execute(
         f"""
         SELECT s.record_id, s.matching FROM prospect_wf_match s
@@ -754,6 +781,9 @@ def describe_action(obj: str, a: dict) -> str:
     return ACTIONS.get(t, {}).get("label", t)
 
 
+_NO_COMPANY = "el contacto no tiene empresa asociada: no hay empresa que editar."
+
+
 def _apply_edit(cur, ctx: Ctx, row: dict, target: str, key: str, new) -> dict:
     """Escribe el cambio en el registro (o en la empresa asociada) y dispara sus eventos."""
     if target == "company":
@@ -810,6 +840,9 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         else:
             target, field, _cross = resolve(obj, a["field"])
             key = field["key"]
+            if obj == "contact" and row.get("company_id") is None and (
+                    target != obj or (a.get("from_field") or "").startswith("company.")):
+                return {"summary": f"{describe_action(obj, a)} — {_NO_COMPANY}"}
             # Valor actual y fila de origen (para "copiar"), propios o de la empresa.
             company_row = None
             if target != obj or (a.get("from_field") or "").startswith("company."):
@@ -855,7 +888,7 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
             (store.normalize_domain(domain), bool(row.get("is_dummy"))),
         )
         target = cur.fetchone()
-        current = row.get("company_name") or f"#{row.get('company_id')}"
+        current = (row.get("company_name") or f"#{row.get('company_id')}") if row.get("company_id") else "sin empresa"
         if target is None:
             return {"summary": f"Crear asociación: no hay una empresa con el dominio {domain}; sigue asociado a {current}."}
         if target["id"] == row["company_id"]:
@@ -863,19 +896,7 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         summary = f"Asocia el contacto a {target['name']} (antes: {current})"
         if ctx.dry:
             return {"summary": summary}
-        old_company = row["company_id"]
-        cur.execute("UPDATE prospect_contacts SET company_id = %s, is_primary = FALSE, updated_at = NOW() WHERE id = %s",
-                    (target["id"], row["id"]))
-        cur.execute(
-            "UPDATE prospect_wf_enrollments SET company_id = %s WHERE contact_id = %s AND status IN ('active', 'waiting')",
-            (target["id"], row["id"]),
-        )
-        store.log_event(cur, old_company, ctx.source, ctx.actor, None, None,
-                        f"contact_moved_to:{target['name']}", contact_id=row["id"])
-        store.log_event(cur, target["id"], ctx.source, ctx.actor, None, None,
-                        f"contact_moved_from:{current}", contact_id=row["id"])
-        store.recompute_contact_incomplete(cur, old_company)
-        store.recompute_contact_incomplete(cur, target["id"])
+        store.set_contact_company(cur, row["id"], target["id"], ctx.actor, source=ctx.source)
         row["company_id"], row["company_name"] = target["id"], target["name"]
         return {"summary": summary}
 
@@ -985,6 +1006,8 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
                             contact_id=row["id"] if obj == "contact" else None)
             return {"summary": f"Nota de la IA: {answer[:140]}{'…' if len(answer) > 140 else ''}"}
         target, field, _cross = resolve(obj, a["field"])
+        if target != obj and row.get("company_id") is None:
+            return {"summary": f"La IA respondió, pero {_NO_COMPANY}"}
         limit = AI_MAX_ANSWER if field["type"] == "longtext" else 500
         answer = answer[:limit]
         company_row = None
@@ -1035,6 +1058,8 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         if oobj == obj:
             targets = [row["id"]]
         elif oobj == "company":
+            if row.get("company_id") is None:
+                return {"summary": f"«{other['name']}» es de empresas y {_NO_COMPANY}"}
             targets = [row["company_id"]]
         else:
             targets = [c["id"] for c in store.company_contacts(cur, row["id"])]
@@ -1351,7 +1376,7 @@ def run_enrollment(cur, enr: dict, wf: dict, now: datetime, actor: str | None) -
 # --------------------------------------------------------------------------- #
 # tick
 # --------------------------------------------------------------------------- #
-def _close_by_conditions(cur, wfs: dict, now: datetime, dummy_only: bool, company_id) -> int:
+def _close_by_conditions(cur, wfs: dict, now: datetime, dummy_only: bool, company_id, contact_ids=None) -> int:
     closed = 0
     for wf in wfs.values():
         goal, unen = wf.get("goal"), wf.get("unenroll")
@@ -1363,15 +1388,16 @@ def _close_by_conditions(cur, wfs: dict, now: datetime, dummy_only: bool, compan
         params = [wf["id"]]
         extra = ""
         if dummy_only:
-            extra += " AND c.is_dummy"
-        if company_id is not None:
-            sql, p = _company_match("e.company_id", company_id)
-            extra += " AND " + sql
-            params += p
+            extra += " AND COALESCE(ct.is_dummy, c.is_dummy)"
+        sc, p = _enr_scope_sql(company_id, contact_ids)
+        extra += "".join(" AND " + x for x in sc)
+        params += p
+        # LEFT JOIN: las inscripciones de un contacto sin empresa no tienen company_id.
         cur.execute(
             f"""
             SELECT e.id, e.{col} AS rid FROM prospect_wf_enrollments e
-              JOIN prospect_companies c ON c.id = e.company_id
+              LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
+              LEFT JOIN prospect_companies c ON c.id = e.company_id
              WHERE e.status IN ('active', 'waiting') AND e.workflow_id = %s {extra}
             """,
             params,
@@ -1398,7 +1424,7 @@ def _close_by_conditions(cur, wfs: dict, now: datetime, dummy_only: bool, compan
 
 
 def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=None, actor=None,
-            include_disabled: bool = False) -> dict:
+            include_disabled: bool = False, contact_ids=None) -> dict:
     from prospecting.workflows import get_workflow
 
     outer, cur = cur, batched(cur)
@@ -1406,11 +1432,10 @@ def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=
     for _ in range(3):  # una acción puede inscribir en otro workflow: otra pasada
         where, params = [], [now]
         if dummy_only:
-            where.append("c.is_dummy")
-        if company_id is not None:
-            sql, p = _company_match("e.company_id", company_id)
-            where.append(sql)
-            params += p
+            where.append("COALESCE(ct.is_dummy, c.is_dummy)")
+        sc, p = _enr_scope_sql(company_id, contact_ids)
+        where += sc
+        params += p
         if workflow_ids:
             where.append("e.workflow_id = ANY(%s)")
             params.append(list(workflow_ids))
@@ -1418,11 +1443,12 @@ def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=
             where.append("w.enabled")
         # Al instante (una empresa recién editada): las esperas "hasta que se cumpla
         # algo" se revisan ya, sin aguardar a su próxima revisión horaria.
-        wait_cond = "OR e.wait_deadline IS NOT NULL" if company_id is not None else ""
+        wait_cond = "OR e.wait_deadline IS NOT NULL" if (company_id is not None or contact_ids is not None) else ""
         cur.execute(
             f"""
             SELECT e.* FROM prospect_wf_enrollments e
-              JOIN prospect_companies c ON c.id = e.company_id
+              LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
+              LEFT JOIN prospect_companies c ON c.id = e.company_id
               JOIN prospect_workflows w ON w.id = e.workflow_id
              WHERE e.status IN ('active', 'waiting')
                AND (e.wake_at IS NULL OR e.wake_at <= %s {wait_cond})
@@ -1457,21 +1483,37 @@ def advance(cur, now: datetime, dummy_only: bool, company_id=None, workflow_ids=
 
 
 def tick(cur, now: datetime | None = None, automatic: bool = True, company_id: int | None = None,
-         dummy_only: bool = False, actor: str | None = None) -> dict:
+         dummy_only: bool = False, actor: str | None = None, contact_ids=None) -> dict:
+    """Sin `company_id` ni `contact_ids` = corrida global (cron). Con alguno, sólo esas
+    empresas (y sus contactos) y/o esos contactos — los contactos SIN empresa sólo se
+    alcanzan por `contact_ids`. Un `company_id` vacío o lleno de None no se vuelve global."""
     from prospecting.workflows import list_enabled
 
     now = now or utcnow()
     dummy_only = _dummy_only(automatic, dummy_only)
+    if isinstance(company_id, (list, tuple, set)):
+        company_id = [c for c in company_id if c is not None] or None
+        if company_id is None and contact_ids is None:
+            return {"now": now.isoformat(), "dummy_only": dummy_only, "enrolled": 0, "closed": 0,
+                    "advanced": 0, "completed": 0, "failed": 0}
+    if contact_ids is not None:
+        contact_ids = [c for c in contact_ids if c is not None]
+        if not contact_ids:
+            contact_ids = None
+            if company_id is None:
+                return {"now": now.isoformat(), "dummy_only": dummy_only, "enrolled": 0, "closed": 0,
+                        "advanced": 0, "completed": 0, "failed": 0}
     wfs = {w["id"]: w for w in enabled_workflows(cur)}
     enrolled = 0
+    scoped = company_id is not None or contact_ids is not None
     for wf in wfs.values():
         t = wf["trigger"].get("type")
         if t == "filter":
-            enrolled += _sync_filter(cur, wf, now, dummy_only, company_id, actor)
-        elif t == "schedule" and company_id is None:
+            enrolled += _sync_filter(cur, wf, now, dummy_only, company_id, actor, contact_ids)
+        elif t == "schedule" and not scoped:
             enrolled += _fire_schedule(cur, wf, now, dummy_only, actor)
-    closed = _close_by_conditions(cur, wfs, now, dummy_only, company_id) if wfs else 0
-    stats = advance(cur, now, dummy_only, company_id, actor=actor)
+    closed = _close_by_conditions(cur, wfs, now, dummy_only, company_id, contact_ids) if wfs else 0
+    stats = advance(cur, now, dummy_only, company_id, actor=actor, contact_ids=contact_ids)
     return {"now": now.isoformat(), "dummy_only": dummy_only, "enrolled": enrolled, "closed": closed, **stats}
 
 
@@ -1554,6 +1596,6 @@ def simulate(cur, wf: dict, record_id: int, now: datetime | None = None) -> dict
             node_id = nxt
     else:
         path.append({"kind": "error", "summary": f"Más de {MAX_STEPS_PER_RUN} pasos: hay un loop sin espera."})
-    name = row.get("name") if obj == "company" else f"{row.get('name')} ({row.get('company_name')})"
+    name = row.get("name") if obj == "company" else f"{row.get('name')} ({row.get('company_name') or 'sin empresa'})"
     return {"object": obj, "company": {"id": row["id"], "name": name, "is_dummy": row["is_dummy"]},
             "enters": enters, "trigger_note": trigger_note, "path": path}

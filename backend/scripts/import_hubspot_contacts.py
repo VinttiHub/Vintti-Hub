@@ -7,8 +7,8 @@ Correr DESPUÉS de importar las empresas: la empresa de cada contacto se busca p
 
 - Con empresa (asociación de HubSpot, o dominio del mail de una sola empresa) -> contacto
   en esa empresa.
-- Sin empresa -> bandeja «Unassigned» de la pestaña Contacts (origen HubSpot), con Link /
-  Discard; se vinculan solos cuando llega una empresa con su dominio.
+- Sin empresa -> contacto SIN empresa (filtro Company: No company de la pestaña Contacts);
+  se le asocia sola cuando llega una empresa con su dominio, o a mano desde su ficha.
 - Contacto que ya existe en el Hub (por id de HubSpot o email) -> sólo rellena vacíos.
 - Workflows: los workflows de contacto por condiciones NO inscriben en masa a los
   importados que ya cumplen (quedan como "ya cumplía"); el que empiece a cumplir

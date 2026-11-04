@@ -581,6 +581,12 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
                         engine.emit_event(cur, "contact", a["contact_id"], a["action"], a.pop("changes"),
                                           now, SYNC_SOURCE)
                         stats["contactos_de_la_bandeja_vinculados"] += 1
+                    # Contactos SIN empresa con este dominio: se le asocian solos (el tick de
+                    # fin de página ya cubre a la empresa y sus contactos).
+                    for oid in store.attach_contacts_for_company(cur, out["id"], SYNC_SOURCE, source=SYNC_SOURCE):
+                        engine.emit_event(cur, "contact", oid, "updated",
+                                          [{"field": "company", "old": None, "new": out["id"]}], now, SYNC_SOURCE)
+                        stats["contactos_sin_empresa_asociados"] += 1
                 cur.execute("RELEASE SAVEPOINT hs_company")
             except Exception as exc:  # una empresa rota no frena el lote
                 cur.execute("ROLLBACK TO SAVEPOINT hs_company")

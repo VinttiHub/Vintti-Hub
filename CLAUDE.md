@@ -1336,6 +1336,25 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `prospect_contacts.hubspot_seen`, los cambios disparan workflows, la importación blinda los
   workflows de contacto por condiciones. Un contacto que en HubSpot cambia de empresa **no se
   mueve** (sale en el reporte).
+- **Contactos SIN empresa, como en HubSpot (2026-11-04, decisión de la owner)**:
+  `prospect_contacts.company_id`, `prospect_company_events.company_id` y
+  `prospect_wf_enrollments.company_id` son nullable (`ensure_schema()`). Un contacto sin empresa
+  está en la tabla (filtro **Company: No company**), se edita, tiene historial y corre workflows
+  de contacto. Se crea desde cero con **New contact** de la pestaña Contacts
+  (`POST /prospecting/contacts`, `company_id` opcional) y la empresa se elige, cambia o quita en
+  su ficha (`PATCH /prospecting/contacts/<id>/company` → `store.set_contact_company()`, que
+  también mueve sus inscripciones abiertas). Se le asocia sola cuando llega una empresa con su
+  dominio (única) — `store.attach_contacts_for_company()` en el webhook de Clay y el sync de
+  empresas — o cuando HubSpot le asocia una que ya está en el Hub. **Motor**: un contacto sin
+  empresa se alcanza por `tick(contact_ids=[…])` (`_scope_sql` / `_enr_scope_sql`); **nunca
+  pasar `company_id=None` esperando "ese contacto"**: sin alcance, `tick()` es la corrida global
+  (por eso `_run_instant()` y la edición masiva separan los ids). `advance()` /
+  `_close_by_conditions()` van con LEFT JOIN y dummy = `COALESCE(ct.is_dummy, c.is_dummy)`.
+  Acciones sobre la empresa (editar/copiar `company.*`, inscribir la empresa, IA a un campo de
+  la empresa) no hacen nada y lo dicen en el log; condiciones `company.*` = falsas.
+  **Fin de la bandeja «Unassigned contacts»**: HubSpot y Calendly crean el contacto sin empresa;
+  lo que quedaba pendiente lo pasa `backend/scripts/migrate_inbound_to_contacts.py` (dry-run por
+  defecto). `prospect_inbound_contacts` queda como registro de llegadas de Calendly.
 - **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
   sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
   respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el
