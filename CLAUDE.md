@@ -1531,6 +1531,46 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   workflows no cambió. Owner `__me__` = quien mira la vista. Las fijas siguen guardando
   columnas en `localStorage`.
 
+## Corte de HubSpot: el «interruptor» (pendiente, lo pide la owner cuando toque)
+
+Mientras se use HubSpot, conviven dos caminos y cada negocio va por uno solo:
+- **Negocio nacido en el Hub** (`prospect_deals.hubspot_deal_id` NULL): ya hace todo desde el Hub
+  (`backend/prospecting/deal_to_hub.py`): SQL crea/vincula la cuenta + `account.sql_date`; Deep
+  Dive crea la oportunidad (con el freno «esperando decisión»); NDA Sent / NDA Signed empujan la
+  opp (NDA Signed → Sourcing, con el Slack de Sourcing); Signed / Close Win / Closed Lost se
+  mueven en Opportunities y `deals.reflect()` trae etapa + valores al negocio.
+- **Negocio importado de HubSpot** (`hubspot_deal_id` con valor): NO crea nada desde el Hub. La
+  cuenta y la opp las crea `POST /hubspot/sync/opportunities` (cron
+  `hubspot-opportunity-sync.yml`); `reflect()` ata el negocio por `hubspot_deal_id`. Es para no
+  duplicar.
+
+Cuando la owner diga **«prendé el interruptor» / «apagamos HubSpot»**, hacer TODO esto junto:
+1. `deal_to_hub.HUB_IS_SOURCE = True` → los negocios importados de HubSpot también crean cuenta
+   y oportunidad desde el Hub. Antes, revisar que sus opps ya atadas tengan `opportunity_id` en
+   el negocio (si no, el freno los deja «esperando decisión» en vez de duplicar).
+2. **Apagar los crons de HubSpot**: `prospecting-hubspot-sync.yml` (empresas, contactos,
+   negocios) y `hubspot-opportunity-sync.yml` (deals → opps, y el push del hub). Si queda
+   prendido el de opps, crea opps duplicadas de deals que ya no se mueven.
+3. **Cron nuevo sin HubSpot** que corra `deals.reflect(cur, values=True)` cada 30 min: hoy esa
+   copia (etapa + valores de Signed / Close Win / Closed Lost desde la oportunidad) corre DENTRO
+   del sync de negocios de HubSpot; sin él sólo se hace al abrir el tablero (etapa) o el negocio
+   (valores). Endpoint propio con `X-Audit-Token`, mismo patrón que los demás crons.
+4. `HUBSPOT_PUSH_ENABLED=false` en App Runner (el push de Signed / CW / CL a HubSpot ya no tiene
+   destino).
+5. **Dashboards que leen HubSpot en vivo** → portarlos a las tablas del Hub (`prospect_contacts`
+   para Lead Life / MQL / Meeting Date; `prospect_deals` para SQL Date y etapas):
+   `_sql_hubspot.py`, `_mkt_sql_anchor.py`, `mkt_*`, `sales_funnel_*`, `sales_mql_to_sql_30d`,
+   `sql_to_cw_ae_am_cierre`. Sin esto dejan de ver los datos nuevos (no fallan: se congelan).
+   Es el paso más grande; conviene hacerlo ANTES de apagar.
+6. Los workflows de Prospecting que dependían de cambios que llegaban de HubSpot pasan a
+   dispararse sólo por cambios en el Hub (no hay que tocar nada, sólo avisarle a la owner).
+
+Pendiente de decisión (2026-11-04): en `deals.HUB_TO_DEAL_STAGE`, una opp en **Stop** manda el
+negocio a Closed Lost. Probablemente no corresponde (Stop es pausa) y explica parte de la
+diferencia de Closed Lost entre el Hub (328) y HubSpot (267); la otra parte son opps Closed Lost
+anteriores al 2026-10-07 que nunca se empujaron a HubSpot (ahí el Hub tiene razón). Preguntar
+antes de cambiarlo.
+
 ## Staffing: columnas y opciones desde la vista
 
 En `docs/staffing.html` (las 3 pestañas) las 5 personas de `STAFFING_ALLOWED` crean
