@@ -265,6 +265,43 @@ class HubSpotClient:
             },
         )
 
+    def list_companies_page(self, properties, after=None, limit=100):
+        """Una página de `GET /crm/v3/objects/companies` (máx. 100). Devuelve
+        (results, next_after); next_after None = no hay más. Lo usa la importación
+        masiva a Prospecting (scripts/import_hubspot_companies.py)."""
+        params = {"limit": min(int(limit), 100), "archived": "false",
+                  "properties": ",".join(properties)}
+        if after:
+            params["after"] = after
+        payload = self._request("GET", "/crm/v3/objects/companies", params=params)
+        nxt = ((payload.get("paging") or {}).get("next") or {}).get("after")
+        return payload.get("results", []), nxt
+
+    def list_owners(self):
+        """Todos los owners (activos y archivados) como {id: {"email", "name"}}.
+        Indexa por owner id y por userId: una propiedad de tipo "usuario" guarda uno u otro."""
+        out = {}
+        for archived in ("false", "true"):
+            after = None
+            while True:
+                params = {"limit": 500, "archived": archived}
+                if after:
+                    params["after"] = after
+                payload = self._request("GET", "/crm/v3/owners/", params=params)
+                for o in payload.get("results", []):
+                    info = {
+                        "email": (o.get("email") or "").strip().lower() or None,
+                        "name": " ".join(x for x in (o.get("firstName"), o.get("lastName")) if x).strip() or None,
+                    }
+                    if o.get("id"):
+                        out.setdefault(str(o["id"]), info)
+                    if o.get("userId"):
+                        out.setdefault(str(o["userId"]), info)
+                after = ((payload.get("paging") or {}).get("next") or {}).get("after")
+                if not after:
+                    break
+        return out
+
     def get_contact(self, contact_id, extra_properties=None, associations=None):
         properties = [
             "firstname",

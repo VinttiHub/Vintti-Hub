@@ -177,6 +177,12 @@ def ensure_schema(cur) -> None:
     # "Id de la empresa" de la planilla es el id de HubSpot: se guarda para la
     # migración (cruzar lo importado con HubSpot), no es la clave del Hub.
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
+    # La importación masiva desde HubSpot (scripts/import_hubspot_companies.py) cruza
+    # por este id en lotes de ~165 k empresas.
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_prospect_companies_hubspot ON prospect_companies (hubspot_company_id) "
+        "WHERE hubspot_company_id IS NOT NULL"
+    )
     # Tier y Remote? (2026-11-03): los mandaba Clay a HubSpot y no tenían dónde caer.
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS tier TEXT")
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS remote_jobs TEXT")

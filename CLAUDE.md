@@ -1292,6 +1292,19 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   ven, y corre los workflows en dry run o aplicados. `backend/scripts/clay_webhook_simulator.py`
   manda payloads con la forma de Clay.
 - Las listas cerradas (status, Not ICP reasons, sizes) viven sólo en `constants.py`.
+- **Importación masiva desde HubSpot (2026-11-03)**: `backend/scripts/import_hubspot_companies.py`
+  (dry-run por defecto, `--apply`, `--limit`, `--resume`) trae las ~165 k empresas por la API,
+  en lotes de 500, `lead_source='HubSpot'`, `created_at` = createdate. Cruza por
+  `hubspot_company_id` (índice parcial en `ensure_schema()`) y adopta por dominio sólo filas de
+  Clay sin id; en lo existente **sólo rellena vacíos**. **No pasa por `upsert_from_clay`** (un
+  evento por campo = horas) ni dispara workflows: en cada lote anota en `prospect_wf_match` las
+  que ya cumplen un workflow por condiciones, así el cron no las inscribe en masa. Los workflows
+  por horario no tienen memoria: el resumen avisa cuántas importadas cumplirían.
+  **El owner sale de «Prospecting Owner (HubSpot)»** (el PO HubSpot = el PO del Hub), nunca de
+  `hubspot_owner_id`, y se cruza con un BDR activo por email **o por nombre** (`OwnerResolver`):
+  el mail del owner en HubSpot no siempre es el `email_vintti`. La primera corrida no lo hacía y
+  dejó sin owner empresas de BDRs activas (Valeria Arias, Semana 30). `--audit` lo diagnostica y
+  `--repair-owners` lo corrige sin pisar un owner que puso una persona o un workflow.
 - **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
   sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
   respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el
