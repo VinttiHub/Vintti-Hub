@@ -1435,6 +1435,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **No volver a CSS `zoom`**: con el tamaño mínimo de letra del navegador las tarjetas se
   angostaban y el texto quedaba grande (captura de la owner a 25 %). Pan y zoom sobreviven a los
   redibujos (variables del módulo); el zoom se recuerda por navegador (`pr_wf_zoom`).
+- **Duplicar / copiar pasos (2026-11-04)**: cada tarjeta del lienzo tiene una casilla; con
+  pasos tildados aparece una barra con **Duplicar** (pega debajo del último tildado),
+  **Copiar** y **Copiar a otro workflow…** (abre el destino, del mismo objeto, o uno nuevo).
+  El portapapeles va en `localStorage` (`pr_wf_clip`) y se pega con la tarjeta «Pegar» del
+  panel de cualquier «+». Todo front (`buildClip()` / `pasteClip()` en
+  `prospecting-workflows.js`); el backend valida al Guardar como siempre. Una ramificación
+  se copia con todo lo que tiene adentro (`ancestry()`, mismo recorrido que `chain()`) y
+  cierra la copia, así que sólo se pega en un «+» final. Los ids se regeneran al pegar; un
+  «ir a» hacia afuera de lo copiado sólo se conserva en el mismo workflow. Copia de
+  contactos no se pega en uno de empresas.
 - **Panel «Elegir una acción» (2026-11-03)**, el de HubSpot: el «+» del lienzo ya no abre un
   desplegable, abre un panel en la columna derecha (`pickerPanel()` en
   `prospecting-workflows.js`; en <1100px es un drawer) con buscador, 4 tarjetas (Retraso,

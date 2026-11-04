@@ -28,6 +28,9 @@
   var tab = "editor";    // editor | history
   var openMenu = null;   // "+" con el panel «Elegir una acción» abierto (su puntero)
   var pickerView = "home"; // home | delay | branch (2ª pantalla del panel)
+  var picked = {};       // pasos tildados en el lienzo (id → true), para duplicar o copiar
+  var justPasted = {};   // pasos recién pegados: se resaltan en el próximo dibujo
+  var draftUid = "";     // identifica la edición abierta (un workflow nuevo no tiene id)
   var historyState = { status: "", rows: [], detail: null };
   var testState = { q: "", results: [], company: null, result: null };
   /* Objeto del workflow que se está mirando: "company" | "contact". Decide qué
@@ -833,6 +836,9 @@
     historyState = { status: "", rows: [], detail: null };
     testState = { q: "", results: [], company: null, result: null };
     centerNext = true;
+    picked = {};
+    justPasted = {};
+    draftUid = newId();
     render();
   }
 
@@ -1011,6 +1017,259 @@
     return true;
   }
 
+  /* ---------- Seleccionar, duplicar y copiar pasos ----------
+     Se tildan pasos en el lienzo y se duplican ahí mismo o se copian a un portapapeles
+     (localStorage, así se pega en otro workflow) que ofrece cada «+». Una ramificación se
+     copia con todo lo que tiene adentro y cierra la copia. Los ids se regeneran al pegar. */
+  var CLIP_KEY = "pr_wf_clip";
+  var memClip = null;
+  function readClip() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CLIP_KEY) || "null");
+      return c && c.start && c.nodes && c.nodes[c.start] ? c : null;
+    } catch (e) { return memClip; }
+  }
+  function writeClip(c) {
+    memClip = c;
+    try { if (c) localStorage.setItem(CLIP_KEY, JSON.stringify(c)); else localStorage.removeItem(CLIP_KEY); } catch (e) { /* queda en memoria */ }
+  }
+  function pickedIds() {
+    return Object.keys(picked).filter(function (id) { return picked[id] && draft.steps.nodes[id]; });
+  }
+  /* Qué ramificaciones contienen a cada paso, recorriendo igual que chain() (preorden,
+     la primera visita gana: lo que se vuelve a alcanzar es un «ir a», no está adentro). */
+  function ancestry() {
+    var anc = {}, seen = {};
+    var walk = function (id, stack) {
+      for (var g = 0; g < 500 && id && !seen[id] && draft.steps.nodes[id]; g++) {
+        seen[id] = true;
+        anc[id] = stack;
+        var n = draft.steps.nodes[id];
+        if (n.type === "branch") {
+          var inner = stack.concat([id]);
+          targets(n).forEach(function (t) { walk(t, inner); });
+          return;
+        }
+        id = n.next;
+      }
+    };
+    walk(draft.steps.start, []);
+    return anc;
+  }
+  function buildClip() {
+    var order = numbering(), anc = ancestry(), on = {};
+    var ids = pickedIds().filter(function (id) { return order[id]; });
+    ids.forEach(function (id) { on[id] = true; });
+    // Lo tildado dentro de una rama tildada ya viaja con ella.
+    var top = ids.filter(function (id) { return !(anc[id] || []).some(function (b) { return on[b]; }); })
+      .sort(function (a, b) { return order[a] - order[b]; });
+    var items = [], dropped = 0;
+    top.forEach(function (id) {
+      var prev = items[items.length - 1];
+      if (prev && draft.steps.nodes[prev].type === "branch") { dropped++; return; }
+      items.push(id);
+    });
+    if (!items.length) return null;
+    var nodes = {};
+    items.forEach(function (id, i) {
+      var n = clone(draft.steps.nodes[id]);
+      if (n.type !== "branch") n.next = items[i + 1] || null;
+      nodes[id] = n;
+      if (n.type === "branch") {
+        Object.keys(anc).forEach(function (x) {
+          if (anc[x].indexOf(id) !== -1) nodes[x] = clone(draft.steps.nodes[x]);
+        });
+      }
+    });
+    var last = items[items.length - 1];
+    return {
+      object: curObj, src_id: draft.id || null, src_uid: draftUid, src_name: draft.name || "",
+      start: items[0], last: last, nodes: nodes, count: Object.keys(nodes).length,
+      ends_in_branch: nodes[last].type === "branch", dropped: dropped,
+    };
+  }
+  /* Por qué no se puede pegar acá ("" = se puede). */
+  function pasteBlocked(clip, ptr) {
+    if ((clip.object || "company") !== curObj) {
+      return "Se copiaron de un workflow de " + (clip.object === "contact" ? "contactos" : "empresas") +
+        ": las propiedades no son las mismas.";
+    }
+    if (clip.ends_in_branch && getPtr(ptr)) return "Termina en una ramificación: pegala en el «+» de abajo de todo de un camino.";
+    return "";
+  }
+  function pasteClip(ptr, clip) {
+    var map = {};
+    Object.keys(clip.nodes).forEach(function (old) {
+      var id;
+      do { id = newId(); } while (draft.steps.nodes[id]);
+      map[old] = id;
+    });
+    // Un «ir a» hacia afuera de lo copiado sólo sigue valiendo en el mismo workflow.
+    var same = clip.src_uid === draftUid || (clip.src_id != null && clip.src_id === draft.id);
+    var fix = function (t) {
+      if (!t) return null;
+      if (map[t]) return map[t];
+      return same && draft.steps.nodes[t] ? t : null;
+    };
+    var after = getPtr(ptr);
+    Object.keys(clip.nodes).forEach(function (old) {
+      var n = clone(clip.nodes[old]);
+      if (n.type === "branch") {
+        (n.branch.paths || []).forEach(function (p) { p.next = fix(p.next); });
+        if (n.branch.kind !== "random") n.branch.else_next = fix(n.branch.else_next);
+      } else n.next = old === clip.last ? after : fix(n.next);
+      draft.steps.nodes[map[old]] = n;
+      justPasted[map[old]] = true;
+    });
+    setPtr(ptr, map[clip.start]);
+    return map;
+  }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function droppedNote(clip) {
+    return clip.dropped ? " (" + plural(clip.dropped, "paso quedó", "pasos quedaron") + " afuera: van después de una ramificación)" : "";
+  }
+  function selAction(v) {
+    if (v === "clear") { picked = {}; return render(); }
+    if (v === "unclip") { writeClip(null); return render(); }
+    var clip = buildClip();
+    if (!clip) { picked = {}; return render(); }
+    var what = plural(clip.count, "paso", "pasos");
+    if (v === "dup") {
+      if (clip.ends_in_branch) {
+        writeClip(clip);
+        picked = {};
+        render();
+        return P.toast('<i class="fa-regular fa-clipboard"></i> ' + what + " copiado" + (clip.count === 1 ? "" : "s") +
+          ". Como termina en una ramificación, tocá el «+» de abajo de todo de un camino para pegarla." + droppedNote(clip));
+      }
+      pasteClip("next:" + clip.last, clip);
+      picked = {};
+      markDirty();
+      render();
+      return P.toast('<i class="fa-regular fa-clone"></i> Se duplicaron ' + what + ", debajo del último seleccionado." + droppedNote(clip));
+    }
+    if (v === "copy") {
+      writeClip(clip);
+      picked = {};
+      render();
+      return P.toast('<i class="fa-regular fa-copy"></i> ' + what + " copiado" + (clip.count === 1 ? "" : "s") +
+        ". Tocá un «+» (en este o en otro workflow) y elegí «Pegar»." + droppedNote(clip));
+    }
+    if (v === "other") {
+      return askTargetWorkflow(clip.count).then(function (dest) {
+        if (dest === undefined) return;
+        var w = dest === "new" ? null : list.filter(function (x) { return x.id === dest; })[0];
+        if (dest !== "new" && !w) return;
+        if (dirty && !confirm("Tenés cambios sin guardar en este workflow. ¿Salir igual? (los pasos ya quedaron copiados)")) {
+          writeClip(clip);
+          return render();
+        }
+        var obj = curObj;
+        writeClip(clip);
+        if (w) {
+          openEditor(w);
+          P.toast('<i class="fa-regular fa-clipboard"></i> ' + what + " listo" + (clip.count === 1 ? "" : "s") + " para pegar en <strong>" +
+            esc(w.name) + "</strong>: tocá un «+» y elegí «Pegar»." + droppedNote(clip));
+        } else {
+          openEditor(null, obj);
+          pasteClip("start", clip);
+          dirty = true;
+          render();
+          P.toast('<i class="fa-regular fa-clipboard"></i> Workflow nuevo con ' + what + ". Ponele nombre y disparador, y guardalo." + droppedNote(clip));
+        }
+      });
+    }
+  }
+  /* Después de dibujar: marca las tarjetas tildadas (y lo que está adentro de una rama
+     tildada, que viaja con ella) y resalta lo recién pegado. */
+  function markPicked() {
+    var on = pickedIds(), inside = {};
+    if (on.length) {
+      var anc = ancestry();
+      Object.keys(anc).forEach(function (x) { if (anc[x].some(function (b) { return picked[b]; })) inside[x] = true; });
+    }
+    root.querySelectorAll("[data-pick-node]").forEach(function (cb) {
+      var id = cb.getAttribute("data-pick-node"), nd = cb.closest(".pr-wf-node");
+      if (!nd) return;
+      if (picked[id]) nd.classList.add("is-picked");
+      else if (inside[id]) nd.classList.add("is-picked-in");
+      if (justPasted[id]) nd.classList.add("is-new");
+    });
+    justPasted = {};
+  }
+  function selBar() {
+    if (!canEdit) return "";
+    var n = pickedIds().length, clip = readClip();
+    if (n) {
+      return '<div class="pr-wf-selbar" role="toolbar" aria-label="Pasos seleccionados">' +
+        '<span class="pr-wf-selbar__n">' + plural(n, "paso seleccionado", "pasos seleccionados") + "</span>" +
+        '<button type="button" data-sel="dup" title="Pegar una copia debajo del último paso seleccionado"><i class="fa-regular fa-clone"></i> Duplicar</button>' +
+        '<button type="button" data-sel="copy" title="Copiar para pegar con un «+», en este o en otro workflow"><i class="fa-regular fa-copy"></i> Copiar</button>' +
+        '<button type="button" data-sel="other" title="Elegir otro workflow y abrirlo para pegar"><i class="fa-solid fa-share-from-square"></i> Copiar a otro workflow…</button>' +
+        '<button type="button" class="pr-wf-selbar__x" data-sel="clear" title="Quitar la selección"><i class="fa-solid fa-xmark"></i></button>' +
+        "</div>";
+    }
+    if (!clip) return "";
+    var off = (clip.object || "company") !== curObj;
+    return '<div class="pr-wf-selbar pr-wf-selbar--clip">' +
+      '<span class="pr-wf-selbar__n"><i class="fa-regular fa-clipboard"></i> ' + plural(clip.count, "paso copiado", "pasos copiados") +
+        (clip.src_name ? " de «" + esc(clip.src_name) + "»" : "") + "</span>" +
+      '<span class="pr-wf-selbar__hint">' + (off ? "De un workflow de " + (clip.object === "contact" ? "contactos" : "empresas") + ": no se pueden pegar acá" : "Tocá un «+» para pegarlos") + "</span>" +
+      '<button type="button" data-sel="unclip" title="Vaciar el portapapeles">Vaciar</button>' +
+      "</div>";
+  }
+  function pasteBlock() {
+    var clip = readClip();
+    if (!clip || !openMenu) return "";
+    var why = pasteBlocked(clip, openMenu);
+    return '<button type="button" class="pr-pick__paste" data-ins="paste"' + (why ? ' disabled title="' + esc(why) + '"' : "") + ">" +
+      '<span class="pr-pick__tile-icon"><i class="fa-regular fa-clipboard"></i></span>' +
+      '<span class="pr-pick__paste-text"><strong>Pegar ' + plural(clip.count, "paso", "pasos") + "</strong>" +
+        "<span>Copiado" + (clip.count === 1 ? "" : "s") + (clip.src_name ? " de «" + esc(clip.src_name) + "»" : "") + "</span>" +
+        (why ? "<em>" + esc(why) + "</em>" : "") + "</span></button>";
+  }
+  function askTargetWorkflow(n) {
+    return new Promise(function (resolve) {
+      var box = document.createElement("div");
+      box.className = "pr-modal";
+      var rows = function (q) {
+        q = (q || "").trim().toLowerCase();
+        var ws = list.filter(function (w) {
+          return (w.object || "company") === curObj && w.id !== draft.id && (!q || String(w.name || "").toLowerCase().indexOf(q) !== -1);
+        }).sort(function (a, b) { return String(a.name || "").localeCompare(String(b.name || ""), "es"); });
+        if (!ws.length) return '<p class="pr-note pr-wf-tpick__empty">Ningún workflow de ' + (curObj === "contact" ? "contactos" : "empresas") + " coincide.</p>";
+        return ws.map(function (w) {
+          return '<button type="button" class="pr-ftree__item pr-wf-tpick__item" data-tpick="' + w.id + '">' +
+            '<i class="fa-solid fa-diagram-project"></i><span class="pr-wf-tpick__name">' + esc(w.name || "(sin nombre)") + "</span>" +
+            '<span class="pr-note">' + esc(pathText(wfFolder(w))) + (w.enabled ? " · activo" : "") + "</span></button>";
+        }).join("");
+      };
+      box.innerHTML = '<div class="pr-modal__card pr-ftree" role="dialog" aria-modal="true">' +
+        "<h3>Copiar " + plural(n, "paso", "pasos") + " a…</h3>" +
+        '<p class="pr-note">Se abre el workflow elegido y los pegás con un «+». Nada se guarda hasta que aprietes Guardar.</p>' +
+        '<input type="search" class="pr-filter__input pr-wf-tpick__q" placeholder="Buscar un workflow" autocomplete="off">' +
+        '<div class="pr-ftree__list">' + rows("") + "</div>" +
+        '<button type="button" class="pr-wf-add" data-tpick="new"><i class="fa-solid fa-plus"></i> A un workflow nuevo de ' +
+          (curObj === "contact" ? "contactos" : "empresas") + "</button>" +
+        '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-tx="cancel">Cancelar</button></div></div>';
+      document.body.appendChild(box);
+      var q = box.querySelector(".pr-wf-tpick__q"), lst = box.querySelector(".pr-ftree__list");
+      q.addEventListener("input", function () { lst.innerHTML = rows(q.value); });
+      setTimeout(function () { q.focus(); }, 0);
+      var close = function (v) { box.remove(); document.removeEventListener("keydown", onKey); resolve(v); };
+      var onKey = function (e) { if (e.key === "Escape") close(undefined); };
+      document.addEventListener("keydown", onKey);
+      box.addEventListener("click", function (e) {
+        if (e.target === box) return close(undefined);
+        var b = e.target.closest("button");
+        if (!b) return;
+        var t = b.getAttribute("data-tpick");
+        if (t !== null) return close(t === "new" ? "new" : Number(t));
+        if (b.getAttribute("data-tx") === "cancel") close(undefined);
+      });
+    });
+  }
+
   /* =================================================================
      Editor — vista
      ================================================================= */
@@ -1164,11 +1423,12 @@
         '<div class="pr-wf-errors" id="prWfErrors" hidden></div>' +
         (tab === "editor"
           ? '<div class="pr-wf-body' + (openMenu ? " is-picking" : "") + '"><div class="pr-wf-canvaswrap">' +
-              '<div class="pr-wf-canvas">' + canvas() + "</div>" + zoomBar() + "</div>" +
+              '<div class="pr-wf-canvas">' + canvas() + "</div>" + selBar() + zoomBar() + "</div>" +
             (openMenu ? '<div class="pr-pick__veil" data-pick-cancel="1"></div>' + pickerPanel() : sidePanel()) + "</div>"
           : historyView()) +
       "</div>";
     bind();
+    markPicked();
     if (root.querySelector(".pr-wf-canvas")) {
       if (centerNext || panX == null) { centerView(); centerNext = false; }
       else applyView();
@@ -1320,6 +1580,7 @@
       body = head("Elegir una acción", false) +
         '<div class="pr-pick__search"><input type="search" id="prWfPickQ" class="pr-filter__input" placeholder="Buscar una acción" autocomplete="off">' +
           '<i class="fa-solid fa-magnifying-glass"></i></div>' +
+        pasteBlock() +
         '<div class="pr-pick__tiles">' +
           tile(' data-pick-view="delay"', "fa-solid fa-stopwatch", "Retraso") +
           tile(' data-pick-view="branch"', "fa-solid fa-sitemap", "Ramificación") +
@@ -1398,7 +1659,10 @@
   }
 
   function nodeHead(id, num, icon, title, cls) {
-    return '<div class="pr-wf-node__head"><span class="pr-wf-node__icon ' + (cls || "") + '"><i class="' + icon + '"></i></span>' +
+    return '<div class="pr-wf-node__head">' +
+      (canEdit ? '<label class="pr-wf-pickbox" title="Seleccionar para duplicar o copiar a otro workflow">' +
+        '<input type="checkbox" data-pick-node="' + id + '"' + (picked[id] ? " checked" : "") + "></label>" : "") +
+      '<span class="pr-wf-node__icon ' + (cls || "") + '"><i class="' + icon + '"></i></span>' +
       '<span class="pr-wf-node__title">' + num + ". " + title + "</span>" +
       (canEdit ? '<button type="button" class="pr-wf-x" data-del="' + id + '" title="Borrar paso"><i class="fa-solid fa-xmark"></i></button>' : "") +
       "</div>";
@@ -2125,6 +2389,10 @@
   /* Selects y checkboxes: cambian la forma de la tarjeta → redibujar. */
   function onChange(e) {
     var el = e.target, a, n;
+    if ((a = el.getAttribute("data-pick-node"))) {
+      if (el.checked) picked[a] = true; else delete picked[a];
+      return render();
+    }
     if (el.tagName === "INPUT" && el.type !== "checkbox" && !el.hasAttribute("data-bpct")) return; // ya lo tomó onInput
     if (el.tagName === "TEXTAREA" || el.id === "prWfOnlyDummy") return;
     if ((a = el.getAttribute("data-rfield"))) {
@@ -2238,6 +2506,7 @@
       if (v === "in") stepZoom(1); else if (v === "out") stepZoom(-1); else if (v === "fit") fitZoom(); else setZoom(1);
       return;
     }
+    if ((v = b.getAttribute("data-sel")) !== null) return selAction(v);
     if ((v = b.getAttribute("data-plus")) !== null) { openMenu = openMenu === v ? null : v; pickerView = "home"; return render(); }
     if (b.getAttribute("data-pick-cancel") !== null) return closePicker();
     if ((v = b.getAttribute("data-pick-view")) !== null) { pickerView = v; return render(); }
@@ -2260,7 +2529,12 @@
       openMenu = null;
       pickerView = "home";
       if (v === "goto") return chooseGoto(ptr);
-      insertNode(ptr, v, b.getAttribute("data-ins-type"));
+      if (v === "paste") {
+        var pc = readClip(), why = pc ? pasteBlocked(pc, ptr) : "No hay pasos copiados.";
+        if (why) { alert(why); return render(); }
+        pasteClip(ptr, pc);
+        P.toast('<i class="fa-regular fa-clipboard"></i> Se pegaron <strong>' + pc.count + "</strong> paso" + (pc.count === 1 ? "" : "s") + ". Revisalos y guardá.");
+      } else insertNode(ptr, v, b.getAttribute("data-ins-type"));
     } else if ((v = b.getAttribute("data-del")) !== null) {
       if (!deleteNode(v)) return;
     } else if ((v = b.getAttribute("data-goto-del")) !== null) {

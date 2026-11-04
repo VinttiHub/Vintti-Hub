@@ -2135,3 +2135,62 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pc-company__row .pr-btn { flex: 0 0 auto; }
 .pc-company__hint:empty { display: none; }
 .pc-company__hint { margin: 0; color: var(--pr-violet); }
+
+/* Workflows: tildar pasos para duplicarlos o copiarlos a otro workflow (2026-11-04). */
+.pr-wf-pickbox { display: inline-grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; margin-right: -2px; cursor: pointer; }
+.pr-wf-pickbox input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr-violet); cursor: pointer; }
+.pr-wf-node.is-picked { outline: 2px solid var(--pr-violet); outline-offset: 2px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--pr-violet) 12%, transparent); }
+.pr-wf-node.is-picked-in { outline: 2px dashed color-mix(in srgb, var(--pr-violet) 55%, #fff); outline-offset: 2px; }
+.pr-wf-node.is-new { animation: pr-wf-pasted 1.8s ease-out; }
+@keyframes pr-wf-pasted {
+  0%, 35% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--pr-lime) 75%, transparent); }
+  100% { box-shadow: 0 2px 8px rgba(13, 18, 30, .05); }
+}
+.pr-wf-selbar {
+  position: absolute; top: 14px; left: 0; right: 0; margin: 0 auto; z-index: 6;
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 4px;
+  width: max-content; max-width: calc(100% - 28px); box-sizing: border-box;
+  padding: 5px 6px 5px 14px; border-radius: 999px;
+  background: var(--pr-ink, #0d121e); color: #fff;
+  box-shadow: 0 10px 28px rgba(13, 18, 30, .25);
+  font: 500 12.5px 'Onest', sans-serif; white-space: nowrap;
+}
+.pr-wf-selbar__n { flex: 0 1 auto; min-width: 0; font-weight: 700; margin-right: 6px; overflow: hidden; text-overflow: ellipsis; }
+.pr-wf-selbar__n i { margin-right: 4px; }
+.pr-wf-selbar__hint { flex: 0 0 auto; color: rgba(255, 255, 255, .7); margin-right: 6px; }
+.pr-wf-selbar button {
+  appearance: none; border: 0; cursor: pointer; flex: 0 0 auto;
+  height: 30px; padding: 0 12px; border-radius: 999px;
+  background: rgba(255, 255, 255, .1); color: #fff; font: 600 12.5px 'Onest', sans-serif;
+}
+.pr-wf-selbar button:hover { background: rgba(255, 255, 255, .22); }
+.pr-wf-selbar button i { margin-right: 5px; }
+.pr-wf-selbar .pr-wf-selbar__x { width: 30px; padding: 0; background: none; }
+.pr-wf-selbar .pr-wf-selbar__x i { margin: 0; }
+.pr-wf-selbar--clip { background: #fff; color: var(--pr-ink, #0d121e); border: 1px solid var(--pr-rule); }
+.pr-wf-selbar--clip .pr-wf-selbar__hint { color: var(--pr-ink-3); }
+.pr-wf-selbar--clip button { background: var(--pr-card-soft, #f4f5f8); color: var(--pr-ink, #0d121e); }
+.pr-wf-selbar--clip button:hover { background: color-mix(in srgb, var(--pr-violet) 12%, #fff); color: var(--pr-violet); }
+@media (max-width: 760px) {
+  .pr-wf-selbar { left: 14px; right: 14px; margin: 0; overflow-x: auto; }
+  .pr-wf-selbar__hint { display: none; }
+}
+.pr-pick__paste {
+  display: flex; align-items: center; gap: 12px; width: calc(100% - 32px); box-sizing: border-box; min-width: 0;
+  margin-top: 14px; padding: 12px 14px; overflow: hidden;
+  border: 1.5px dashed color-mix(in srgb, var(--pr-violet) 55%, #fff); border-radius: 12px;
+  background: color-mix(in srgb, var(--pr-violet) 6%, #fff); cursor: pointer; text-align: left;
+  font: inherit; color: var(--pr-ink, #0d121e);
+}
+.pr-pick__paste:hover:not(:disabled) { background: color-mix(in srgb, var(--pr-violet) 12%, #fff); }
+.pr-pick__paste:disabled { cursor: not-allowed; border-color: rgba(13, 18, 30, .14); background: var(--pr-card-soft, #f4f5f8); }
+.pr-pick__paste:disabled strong, .pr-pick__paste:disabled .pr-pick__tile-icon { color: var(--pr-ink-3); }
+.pr-pick__paste-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pr-pick__paste-text strong { font-size: 13.5px; }
+.pr-pick__paste-text span, .pr-pick__paste-text em { font-size: 12px; color: var(--pr-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-pick__paste-text em { font-style: normal; color: #b4232f; white-space: normal; }
+.pr-wf-tpick__q { width: 100%; margin: 4px 0 10px; }
+.pr-wf-tpick__item { display: flex; align-items: center; gap: 8px; }
+.pr-wf-tpick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.pr-wf-tpick__item .pr-note { flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-wf-tpick__empty { padding: 12px; }
