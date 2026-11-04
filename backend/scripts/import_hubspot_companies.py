@@ -35,6 +35,11 @@ Owners (el «Prospecting Owner (HubSpot)» es EL Prospecting Owner del Hub):
     python scripts/import_hubspot_companies.py --audit --week "Semana 30"   # diagnóstico, sólo lectura
     python scripts/import_hubspot_companies.py --repair-owners              # qué corregiría
     python scripts/import_hubspot_companies.py --repair-owners --apply      # corrige
+
+Sync incremental (lo mismo que corre el cron cada 30 min, sin tope de tiempo; sirve
+para ponerse al día la primera vez):
+    python scripts/import_hubspot_companies.py --sync            # qué cambiaría
+    python scripts/import_hubspot_companies.py --sync --apply    # aplica
 """
 from __future__ import annotations
 
@@ -43,7 +48,6 @@ import json
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -60,215 +64,21 @@ from psycopg2.extras import Json, RealDictCursor, execute_values  # noqa: E402
 
 from db import get_connection  # noqa: E402
 from prospecting import engine, store  # noqa: E402
-from prospecting.constants import NOT_ICP_REASONS, SIZES, STATUSES  # noqa: E402
 from prospecting.rules import has_conditions  # noqa: E402
 from utils.hubspot import HubSpotClient  # noqa: E402
 
 SOURCE = "hubspot_import"
 CURSOR_FILE = HERE / "data" / "hubspot_companies_import.cursor"
 
-# Propiedades nativas de HubSpot -> columna (prioridad sobre los alias de Clay).
-NATIVE = {
-    "name": ["name"],
-    "website": ["website", "domain"],
-    "linkedin_url": ["linkedin_company_page"],
-    "description": ["description"],
-    "industry": ["industry"],
-    "city": ["city"],
-    "state": ["state"],
-    "country": ["country"],
-    "founded_year": ["founded_year"],
-    "size": ["numberofemployees"],
-}
-# Columnas que no se mapean desde HubSpot (o que se resuelven aparte).
-SKIP_COLS = {"clay_record_id", "hubspot_company_id", "prospecting_owner_id", "prospecting_owner_email"}
-# Owner = "Prospecting Owner (HubSpot)" (el "PO HubSpot"). En el Hub hay un solo
-# Prospecting Owner y es ése. NUNCA `hubspot_owner_id` (el dueño del registro, otra cosa):
-# la primera corrida (2026-11-03) podía caer ahí o en otra "Prospecting Owner" y Valeria
-# Arias, BDR activa, quedó sin sus empresas. Orden de preferencia por nombre/label normalizado.
-OWNER_PREFERRED = ["prospecting_owner_hubspot", "po_hubspot", "prospecting_owner"]
-ALWAYS = ["name", "domain", "website", "createdate", "hubspot_owner_id"]
+from prospecting.hubspot_companies import (  # noqa: E402
+    COLS,
+    FILLABLE,
+    OwnerResolver,
+    map_company,
+    owner_property_candidates,
+    resolve_mapping,
+)
 
-
-def owner_property_candidates(props: list[dict]) -> list[dict]:
-    """Propiedades de empresa que pueden ser el PO: nombre/label con prospect+owner, o "PO"."""
-    out = []
-    for p in props:
-        keys = {store._norm_key(p.get("name") or ""), store._norm_key(p.get("label") or "")}
-        if any(("prospect" in k and "owner" in k) or k.startswith("po_") or k == "po" for k in keys):
-            out.append(p)
-    return out
-
-
-def pick_owner_property(props: list[dict], forced: str | None = None) -> dict:
-    if forced:
-        for p in props:
-            if p["name"] == forced:
-                return p
-        raise SystemExit(f"--owner-prop {forced}: no existe esa propiedad de empresa en HubSpot.")
-    cands = owner_property_candidates(props)
-    for pref in OWNER_PREFERRED:
-        for p in cands:
-            if pref in (store._norm_key(p["name"]), store._norm_key(p.get("label") or "")):
-                return p
-    listing = ", ".join(f"{p['name']} («{p.get('label')}»)" for p in cands) or "ninguna"
-    raise SystemExit(f"No encontré «Prospecting Owner (HubSpot)». Candidatas: {listing}. Usá --owner-prop.")
-
-
-class OwnerResolver:
-    """Valor del PO en HubSpot -> email de un BDR activo del Hub.
-
-    El valor puede ser un owner id / user id (propiedad de tipo usuario), un email, o un
-    texto / opción de desplegable con el nombre. Se cruza por email y, si no, por nombre
-    completo contra `users.user_name`: el mail del owner en HubSpot no siempre es el
-    `email_vintti` del Hub."""
-
-    def __init__(self, prop: dict, owners: dict, bdrs: list[dict]):
-        self.prop = prop
-        self.owners = owners
-        self.options = {str(o.get("value")): o.get("label") for o in prop.get("options") or []}
-        self.by_email = {b["email"]: b["email"] for b in bdrs if b.get("email")}
-        self.by_name: dict[str, str | None] = {}
-        for b in bdrs:
-            k = store._norm_key(b.get("name") or "")
-            if k:
-                # Nombre repetido entre BDRs = ambiguo: no se adivina.
-                self.by_name[k] = None if k in self.by_name else b["email"]
-        self.bdr_names = {b["email"]: b.get("name") for b in bdrs}
-
-    def describe(self, raw: str) -> tuple[str | None, str | None]:
-        """(email, nombre) que HubSpot tiene para ese valor."""
-        if "@" in raw:
-            return raw.lower(), None
-        o = self.owners.get(raw)
-        if o:
-            return o.get("email"), o.get("name")
-        return None, self.options.get(raw) or raw
-
-    def _by_name(self, name: str | None) -> str | None:
-        k = store._norm_key(name or "")
-        if not k:
-            return None
-        if self.by_name.get(k):
-            return self.by_name[k]
-        # "Valeria Arias" vs "Valeria Arias Gómez": todas las palabras de HubSpot en el
-        # nombre del Hub, y una sola BDR que cumpla.
-        toks = set(k.split("_"))
-        hits = {e for n, e in self.by_name.items() if e and toks <= set(n.split("_"))}
-        return hits.pop() if len(hits) == 1 else None
-
-    def resolve(self, raw) -> tuple[str | None, str]:
-        """(email del BDR o None, motivo)."""
-        raw = store._clean_text(raw)
-        if not raw:
-            return None, "vacío"
-        email, name = self.describe(raw)
-        if email and email in self.by_email:
-            return email, "email"
-        hit = self._by_name(name)
-        if hit:
-            return hit, "nombre"
-        return None, "sin BDR activo que coincida"
-
-
-def resolve_mapping(client: HubSpotClient, forced_owner: str | None = None) -> tuple[dict, dict, list]:
-    """{columna: [propiedades de HubSpot en orden]} + propiedad de owner.
-
-    Los alias de Clay (`store._ALIASES`) ya traen los nombres de la planilla de
-    propiedades de HubSpot, así que se reusan: se compara contra el nombre interno y
-    el label normalizados."""
-    props = client.get_properties("companies")
-    by_norm: dict[str, str] = {}
-    for p in props:
-        for k in (p.get("name"), p.get("label")):
-            if k:
-                by_norm.setdefault(store._norm_key(k), p["name"])
-    names = {p["name"] for p in props}
-
-    mapping: dict[str, list[str]] = {}
-    for col, cands in NATIVE.items():
-        mapping[col] = [c for c in cands if c in names]
-    for col, aliases in store._ALIASES.items():
-        if col in SKIP_COLS:
-            continue
-        found = mapping.setdefault(col, [])
-        for a in aliases:
-            prop = by_norm.get(a)
-            if prop and prop not in found and prop != "hs_object_id":
-                found.append(prop)
-    mapping = {c: v for c, v in mapping.items() if v}
-
-    return mapping, pick_owner_property(props, forced_owner), props
-
-
-def size_of(v) -> str | None:
-    s = store._clean_text(v)
-    if not s:
-        return None
-    if s in SIZES:
-        return s
-    n = store._to_int(s)
-    if n is None:
-        return None
-    for top, label in ((10, "1-10"), (50, "11-50"), (200, "51-200"), (500, "201-500"),
-                       (1000, "501-1000"), (5000, "1001-5000")):
-        if n <= top:
-            return label
-    return "5000+"
-
-
-def _in_list(v, options) -> str | None:
-    s = store._clean_text(v)
-    if not s:
-        return None
-    low = {o.lower(): o for o in options}
-    return low.get(s.lower())
-
-
-def map_company(rec: dict, mapping: dict, owner: OwnerResolver) -> tuple[dict, Counter]:
-    props = rec.get("properties") or {}
-    notes: Counter = Counter()
-    data: dict = {}
-    for col, plist in mapping.items():
-        raw = next((props.get(p) for p in plist if props.get(p) not in (None, "")), None)
-        if raw is None:
-            continue
-        if col == "size":
-            v = size_of(raw)
-        elif col == "prospecting_status":
-            v = _in_list(raw, STATUSES)
-        elif col == "not_icp_reason":
-            v = _in_list(raw, NOT_ICP_REASONS)
-        else:
-            v = store.clean_value(col, raw)
-        if v is None:
-            notes[f"{col}: valor fuera de la lista (queda en raw_payload)"] += 1
-            continue
-        data[col] = v
-
-    email, why = owner.resolve(props.get(owner.prop["name"]))
-    if email:
-        data["prospecting_owner_email"] = email
-    elif why != "vacío":
-        notes[f"PO HubSpot «{props.get(owner.prop['name'])}» {why} (queda sin owner)"] += 1
-
-    data["hubspot_company_id"] = str(rec["id"])
-    data["domain"] = store.normalize_domain(data.get("website") or props.get("domain"))
-    data["name"] = data.get("name") or data["domain"]
-    created = props.get("createdate")
-    try:
-        data["created_at"] = datetime.fromisoformat(created.replace("Z", "+00:00")) if created else None
-    except ValueError:
-        data["created_at"] = None
-    data["raw_payload"] = {k: v for k, v in props.items() if v not in (None, "")}
-    return data, notes
-
-
-COLS = ["name", "hubspot_company_id", "domain", "website", "linkedin_url", "description",
-        "industry", "keywords", "technologies", "job_types", "open_jobs", "founded_year", "size",
-        "city", "state", "country", "lead_source", "tier", "remote_jobs", "week_label",
-        "prospecting_status", "prospecting_owner_email", "prospecting_start_date", "not_icp_reason"]
-FILLABLE = [c for c in COLS if c not in ("hubspot_company_id",)]
 
 
 class Importer:
@@ -482,9 +292,9 @@ def _protected_owner_ids(cur, ids: list[int]) -> set[int]:
     cur.execute(
         """
         SELECT DISTINCT company_id FROM prospect_company_events
-         WHERE company_id = ANY(%s) AND field = 'prospecting_owner_email' AND source <> %s
+         WHERE company_id = ANY(%s) AND field = 'prospecting_owner_email' AND source NOT IN (%s, %s)
         """,
-        (ids, SOURCE),
+        (ids, SOURCE, "hubspot_sync"),
     )
     return {r["company_id"] for r in cur.fetchall()}
 
@@ -641,7 +451,21 @@ def main():
     ap.add_argument("--audit-sample", type=int, default=300, help="con --audit: cuántas empresas comparar")
     ap.add_argument("--repair-owners", action="store_true",
                     help="corrige el owner de las importadas según «Prospecting Owner (HubSpot)»")
+    ap.add_argument("--sync", action="store_true",
+                    help="sync incremental HubSpot -> Hub (lo del cron), sin tope de tiempo")
     args = ap.parse_args()
+    if args.sync:
+        from prospecting import hubspot_companies as hs_companies
+        conn = get_connection()
+        try:
+            report = hs_companies.sync(conn, dry_run=not args.apply, max_companies=args.limit or 10**9,
+                                       time_budget=float("inf"), log=print)
+        finally:
+            conn.close()
+        print(json.dumps(report, ensure_ascii=False, indent=2, default=str)[:20000])
+        if not args.apply:
+            print("\nSIN --apply: no se escribió nada.")
+        return
     if args.audit:
         args.apply = False
 

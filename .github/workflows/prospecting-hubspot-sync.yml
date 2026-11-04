@@ -1,0 +1,46 @@
+name: Prospecting HubSpot sync
+
+# Empresas de HubSpot -> Prospecting, SÓLO en esa dirección (decisión de la owner,
+# 2026-11-04): mientras los BDRs sigan trabajando en HubSpot, lo que cambian allá
+# (owner, status, semana, empresas nuevas) llega al Hub. Incremental por
+# hs_lastmodifieddate, marca en hubspot_sync_state ('prospect_companies').
+# HubSpot gana sólo cuando su valor cambió: lo que se edite en el Hub no se pisa cada
+# 30 min. Los cambios disparan los workflows del Hub como cualquier cambio.
+#
+# Cada corrida procesa hasta 2000 empresas (~200 s, gunicorn corta a los 300): si hay
+# más, la siguiente sigue desde la marca. Un 409 = otra corrida en curso, no es error.
+# Ver backend/prospecting/hubspot_companies.py y CLAUDE.md (Prospecting).
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: prospecting-hubspot-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sincronizar empresas
+        run: |
+          set -uo pipefail
+          code=$(curl -sS -o sync.json -w "%{http_code}" -X POST \
+            --retry 3 --retry-delay 15 \
+            -H "Content-Type: application/json" \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            -d "{}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/prospecting/hubspot/sync")
+          cat sync.json; echo
+          if [ "$code" = "409" ]; then
+            echo "::notice::Otra corrida del sync está en curso; la próxima sigue."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::El sync devolvió HTTP $code"
+            exit 1
+          fi
+          if grep -q '"errores"' sync.json; then
+            echo "::warning::Algunas empresas no se pudieron sincronizar (ver errors en el reporte)."
+          fi

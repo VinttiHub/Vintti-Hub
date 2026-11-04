@@ -1305,6 +1305,22 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   el mail del owner en HubSpot no siempre es el `email_vintti`. La primera corrida no lo hacía y
   dejó sin owner empresas de BDRs activas (Valeria Arias, Semana 30). `--audit` lo diagnostica y
   `--repair-owners` lo corrige sin pisar un owner que puso una persona o un workflow.
+- **Sync HubSpot → Hub de empresas (2026-11-04)**, mientras los BDRs sigan usando HubSpot. Sólo
+  en esa dirección (el Hub no escribe empresas en HubSpot). Cron cada 30 min
+  `.github/workflows/prospecting-hubspot-sync.yml` → `POST /prospecting/hubspot/sync`
+  (X-Audit-Token; `?dry=1`; `GET /prospecting/hubspot/sync/last`). Código en
+  `backend/prospecting/hubspot_companies.py`, que también tiene el mapeo que usa la importación
+  (una sola definición). Incremental por `hs_lastmodifieddate` (marca en `hubspot_sync_state`,
+  clave `prospect_companies`, 10 min de solape, se congela si hubo errores), hasta 2000 empresas
+  o ~200 s por corrida. **HubSpot gana sólo cuando su valor cambió** respecto de la foto
+  `prospect_companies.hubspot_seen` (patrón de `hubspot_model_seen`): lo editado en el Hub no se
+  pisa cada 30 min. Sin foto (las importadas) la base es el `raw_payload` de la importación; el
+  owner, el valor actual del Hub si nadie lo tocó después. Un valor de HubSpot que no se puede
+  traducir (status fuera de la lista, PO que no es BDR activo) no se aplica ni vacía nada.
+  Empresa nueva en HubSpot → se crea (o adopta la de Clay del mismo dominio). **Los cambios son
+  cambios reales** (decisión de la owner): historial `source='hubspot_sync'`, `emit_event()` y
+  `tick()`, así que disparan workflows. `python scripts/import_hubspot_companies.py --sync
+  [--apply]` corre lo mismo sin tope, para ponerse al día.
 - **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
   sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
   respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el

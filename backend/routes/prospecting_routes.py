@@ -306,6 +306,7 @@ def company(company_id: int):
         return jsonify({"error": "not_found"}), 404
     if not _is_admin(_current_email()):
         row.pop("raw_payload", None)
+        row.pop("hubspot_seen", None)
     return jsonify(_json_safe(row))
 
 
@@ -357,6 +358,7 @@ def patch_company(company_id: int):
     if row is None:
         return jsonify({"error": "not_found"}), 404
     row.pop("raw_payload", None)
+    row.pop("hubspot_seen", None)
     row["workflows_applied"] = applied
     return jsonify(_json_safe(row))
 
@@ -664,6 +666,47 @@ def companies_export():
 @bp.post("/contacts/export")
 def contacts_export():
     return _export("contact")
+
+
+# --------------------------------------------------------------------------- #
+# HubSpot -> Hub (empresas): cron cada 30 min, sólo en esa dirección
+# --------------------------------------------------------------------------- #
+@bp.post("/hubspot/sync")
+def hubspot_companies_sync():
+    """Trae a Prospecting lo que cambió en las empresas de HubSpot desde la última corrida.
+
+    Cron (X-Audit-Token) o la owner. `?dry=1` = reporte sin escribir. HubSpot gana sólo
+    cuando su valor cambió (foto en `hubspot_seen`); los cambios disparan workflows.
+    Ver prospecting/hubspot_companies.py."""
+    from prospecting import hubspot_companies as hs_companies
+
+    by_cron = _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token")
+    if not by_cron and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    dry = request.args.get("dry") in ("1", "true")
+    try:
+        limit = max(1, min(5000, int(request.args.get("limit") or 2000)))
+    except ValueError:
+        limit = 2000
+    conn = get_connection()
+    try:
+        report = hs_companies.sync(conn, dry_run=dry, max_companies=limit)
+    finally:
+        conn.close()
+    if report.get("status") == "busy":
+        return jsonify(report), 409
+    return jsonify(_json_safe(report))
+
+
+@bp.get("/hubspot/sync/last")
+def hubspot_companies_sync_last():
+    from prospecting import hubspot_companies as hs_companies
+
+    if not _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token") and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    with _Db() as cur:
+        row = hs_companies.last_report(cur)
+    return jsonify(_json_safe(dict(row) if row else {}))
 
 
 # --------------------------------------------------------------------------- #

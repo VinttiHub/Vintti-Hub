@@ -177,6 +177,9 @@ def ensure_schema(cur) -> None:
     # "Id de la empresa" de la planilla es el id de HubSpot: se guarda para la
     # migración (cruzar lo importado con HubSpot), no es la clave del Hub.
     cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
+    # Sync HubSpot -> Hub (prospecting/hubspot_companies.py): último valor visto en HubSpot
+    # por campo. HubSpot gana sólo cuando su valor cambia respecto de esta foto.
+    cur.execute("ALTER TABLE prospect_companies ADD COLUMN IF NOT EXISTS hubspot_seen JSONB")
     # La importación masiva desde HubSpot (scripts/import_hubspot_companies.py) cruza
     # por este id en lotes de ~165 k empresas.
     cur.execute(
