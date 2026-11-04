@@ -1355,6 +1355,54 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **Fin de la bandeja «Unassigned contacts»**: HubSpot y Calendly crean el contacto sin empresa;
   lo que quedaba pendiente lo pasa `backend/scripts/migrate_inbound_to_contacts.py` (dry-run por
   defecto). `prospect_inbound_contacts` queda como registro de llegadas de Calendly.
+- **Negocios (deals, 2026-11-04)**: el pipeline de ventas de HubSpot (*Proceso De Contratación*
+  y *Vintti AI Pipeline*) como tablero por etapa en la sección Negocios (`prospecting-deals.js`):
+  arrastrar = cambiar de etapa, tabla, filtros, export, panel del negocio, tarjeta en la ficha de
+  la empresa y lista en el panel del contacto. Tablas en `backend/prospecting/deals.py`
+  (`prospect_deal_stages` sembrada de HubSpot con labels/orden/% — sin HubSpot, de
+  `deal_fields.DEFAULT_STAGES` —, `prospect_deals`, `prospect_deal_contacts`, y
+  `prospect_company_events.deal_id`); catálogo en `deal_fields.py`. **Cambiar de etapa abre
+  «Propiedades dependientes», igual que HubSpot** (pedido de la owner): `STAGE_FORMS` = (campo,
+  obligatorio) por etapa, en el orden de HubSpot; el popup muestra todos (`GET
+  /deals/<id>/stage-form`, `POST /deals/stage-form` para uno nuevo), **prellenados** de la empresa /
+  contacto (`PREFILL`), y lo cargado **rellena los vacíos** de la empresa y el contacto
+  (`deals.fill_related`, con historial y workflows). Sólo los obligatorios frenan (409
+  `needs_fields`). SQL y NDA Sent salieron de las capturas de la owner (2026-11-04); NDA Signed y Closed
+  Lost, de lo que el sync de oportunidades ya sabía que HubSpot exige. **Candidate Signed, Closed
+  Won y Closed Lost de un negocio CON oportunidad se mueven sólo desde Opportunities**
+  (`OPPORTUNITY_OWNED_STAGES`; el server responde 400): ahí nacen el hire, el MKT Collab y el motivo,
+  que el hub le empuja a HubSpot. `deals.copy_closing_values()` copia al negocio esos mismos valores
+  con la misma regla del push (`hire_values_for_opportunity`; se pisa todo menos Role Hired; MKT
+  Collab / Closed Win Date / fecha de cierre sólo al ganar; Closed Lost: motivo, detalle y fecha).
+  Corre en `reflect(values=True)`: el cron y al abrir un negocio, no en cada carga del tablero. Role to hire + Model se
+  exigen además desde Deep Dive si faltan (sin eso no hay oportunidad). Las opciones de los
+  desplegables salen de las propiedades de deal de HubSpot (`prospect_deal_field_options`, se
+  siembra con las etapas); sin opciones, el campo va como texto. La propiedad «Company Name» del
+  negocio es `company_name_deal`: `company_name` en las lecturas es la empresa asociada del Hub. **Los filtros de historial de EMPRESA excluyen `deal_id`**
+  (`objects.history_filter`, `engine` y `property_history`): si no, el owner de un negocio contaría
+  como owner de la empresa en un workflow. **Workflows de negocios todavía no**: el catálogo va en
+  `options.deals`, aparte de `objects`, para que el editor de workflows no lo ofrezca.
+  **Puente al hub** (`deal_to_hub.py`, la regla del sync de HubSpot): **SQL** crea o vincula la
+  cuenta (`_find_existing_account` y compañía de `hubspot_routes.py`) y sella `account.sql_date`
+  una vez; **Deep Dive o más** crea la oportunidad (`_insert_opportunity_from_deal`, sales lead del
+  pipeline, Role to hire → puesto, to-dos, mail de Credit Loop, Slack de Sourcing después del
+  commit) con el mismo **freno**: si la cuenta tiene opps sin negocio atado, queda «esperando
+  decisión» y la ficha ofrece **Vincular** / **Es nueva, creala**. Etapas siguientes empujan la opp
+  sólo hacia adelante (NDA Sent, NDA Signed → Sourcing); Signed / Close Win / Closed Lost los mueve
+  la recruiter en Opportunities y `deals.reflect()` (al abrir el tablero y en el cron) lo trae al
+  negocio, sin retroceder. Las opps que crea nacen con `hubspot_deal_id` NULL: el sync de HubSpot
+  no las toca. Un negocio dummy no crea nada. **Anti doble creación mientras se use HubSpot**: un
+  negocio importado de HubSpot (`hubspot_deal_id`) NO crea cuenta ni opp (las sigue creando
+  `/hubspot/sync/opportunities`); `reflect()` lo ata por `hubspot_deal_id`. **El día del corte**:
+  `deal_to_hub.HUB_IS_SOURCE = True` y apagar los dos crons de HubSpot; antes, portar las cards que
+  leen deals/contactos de HubSpot en vivo (`_sql_hubspot.py`, `_mkt_sql_anchor.py`, `mkt_*`,
+  `sales_funnel_*`, `sales_mql_to_sql_30d`). **HubSpot → Hub**: importación
+  `backend/scripts/import_hubspot_deals.py` (dry-run por defecto, después de empresas y contactos) +
+  tercer paso del cron (`POST /prospecting/hubspot/sync-deals`, marca `prospect_deals`), lógica en
+  `hubspot_deals.py`: sólo los 2 pipelines, etapa por `hubspot_stage_id`, empresa/contactos por
+  asociación, foto `hubspot_seen` (clave `__stage` para la etapa); con oportunidad, HubSpot no hace
+  retroceder la etapa. De paso se arregló el mail de Credit Loop del sync de oportunidades
+  (`payload` sin definir → NameError tragado, no salía nunca).
 - **El motor escribe en lote (2026-10-29)**: `engine.BatchCursor` difiere los INSERT/UPDATE/DELETE
   sin RETURNING (y los SAVEPOINT) y los manda pegados a la próxima consulta que necesita
   respuesta, en el mismo orden; RELEASE / ROLLBACK TO mandan todo, así un error cae en el

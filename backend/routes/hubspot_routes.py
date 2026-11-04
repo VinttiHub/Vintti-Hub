@@ -3453,7 +3453,9 @@ def _process_hubspot_deal(client, cursor, deal, ctx):
                             opportunity_id=new_id,
                             opp_model=model,
                             opp_position_name=role,
-                            client_name=payload.get("name"),
+                            # Antes decía payload.get("name") con `payload` sin definir en esta
+                            # función: NameError tragado y el mail no salía nunca (2026-11-04).
+                            client_name=item.get("account_name"),
                         )
                     )
                 except Exception as exc:  # noqa: BLE001

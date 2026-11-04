@@ -56,8 +56,6 @@ def ensure_schema(cur) -> None:
     )
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_saved_views_owner ON prospect_saved_views (owner_email)")
     cur.execute("ALTER TABLE prospect_saved_views ADD COLUMN IF NOT EXISTS object TEXT NOT NULL DEFAULT 'company'")
-    # Orden de la tira de vistas de contactos (ids), por persona. NULL = orden de creación.
-    cur.execute("ALTER TABLE prospect_view_prefs ADD COLUMN IF NOT EXISTS contact_tabs JSONB")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS prospect_view_prefs (
@@ -67,6 +65,9 @@ def ensure_schema(cur) -> None:
         )
         """
     )
+    # Orden de la tira de vistas de contactos (ids), por persona. NULL = orden de creación.
+    # Después del CREATE: al revés, en una base nueva el ALTER fallaba (tabla inexistente).
+    cur.execute("ALTER TABLE prospect_view_prefs ADD COLUMN IF NOT EXISTS contact_tabs JSONB")
 
 
 # Cómo se ordena una columna (store.order_sql): `asc` / `desc` = A→Z, menor→mayor, más

@@ -2194,3 +2194,101 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pr-wf-tpick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .pr-wf-tpick__item .pr-note { flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pr-wf-tpick__empty { padding: 12px; }
+
+/* =====================================================================
+   Negocios (prospecting-deals.js, 2026-11-04): tablero por etapa estilo HubSpot.
+   ===================================================================== */
+.pd-view { padding-bottom: 0; }
+.pd-pad { padding: 18px; }
+.pd-toggle { display: inline-flex; }
+.pd-toggle .pr-btn { border-radius: 0; }
+.pd-toggle .pr-btn:first-child { border-radius: 10px 0 0 10px; }
+.pd-toggle .pr-btn:last-child { border-radius: 0 10px 10px 0; margin-left: -1px; }
+.pd-toggle .pr-btn.is-on { background: color-mix(in srgb, var(--pr-violet) 10%, #fff); color: var(--pr-violet); border-color: color-mix(in srgb, var(--pr-violet) 40%, #fff); }
+
+.pd-board {
+  display: flex; gap: 12px; overflow-x: auto; padding: 4px 18px 18px;
+  align-items: stretch; min-height: 420px;
+}
+.pd-col {
+  flex: 0 0 280px; display: flex; flex-direction: column; max-height: calc(100vh - 280px); min-height: 360px;
+  background: var(--pr-card-soft); border: 1px solid var(--pr-rule); border-radius: 14px; transition: box-shadow .12s, border-color .12s;
+}
+.pd-col.is-drop { border-color: var(--pr-violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pr-violet) 18%, transparent); }
+.pd-col--won .pd-col__head { box-shadow: inset 0 3px 0 #c1ff72; }
+.pd-col--lost .pd-col__head { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--pr-mag) 55%, #fff); }
+.pd-col__head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; border-radius: 14px 14px 0 0; font-weight: 700; font-size: 14px; }
+.pd-col__count { color: var(--pr-ink-3); font-weight: 600; }
+.pd-col__req { color: var(--pr-violet); font-size: 9px; margin-left: auto; }
+.pd-col__body { flex: 1; overflow-y: auto; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 10px; }
+.pd-col__foot { border-top: 1px solid var(--pr-rule); padding: 10px 14px; font-size: 12px; color: var(--pr-ink-2); line-height: 1.5; }
+.pd-col__foot strong { color: var(--pr-ink); }
+.pd-empty { text-align: center; color: var(--pr-ink-3); font-size: 12.5px; margin: 18px 0; }
+.pd-more { align-self: center; font-size: 12.5px; }
+
+.pd-card {
+  background: var(--pr-card); border: 1px solid var(--pr-rule); border-radius: 12px; padding: 12px 14px;
+  cursor: pointer; box-shadow: 0 1px 2px rgba(13, 18, 30, .04); transition: border-color .12s, box-shadow .12s;
+}
+.pd-card:hover { border-color: color-mix(in srgb, var(--pr-violet) 35%, #fff); box-shadow: 0 4px 14px rgba(13, 18, 30, .07); }
+.pd-card.is-dragging { opacity: .45; }
+.pd-card__name { margin: 0 0 6px; font-size: 14.5px; font-weight: 700; color: var(--pr-violet); word-break: break-word; }
+.pd-card__meta { margin: 0 0 6px; font-size: 12.5px; color: var(--pr-ink-2); }
+.pd-card__meta div { display: flex; gap: 4px; }
+.pd-card__meta dt { color: var(--pr-ink-3); font-weight: 500; }
+.pd-card__meta dd { margin: 0; }
+.pd-card__row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--pr-ink-2); padding: 6px 0; border-top: 1px solid var(--pr-rule); }
+.pd-card__row a { color: var(--pr-ink); text-decoration: none; font-weight: 600; }
+.pd-card__row a:hover { color: var(--pr-violet); text-decoration: underline; }
+.pd-card__foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pd-avatar {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--pr-cyan) 18%, #fff); color: var(--pr-ink); font-size: 10px; font-weight: 700;
+}
+.pd-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-size: 11.5px;
+  border: 1px solid var(--pr-rule); color: var(--pr-ink-2); background: var(--pr-card-soft);
+}
+.pd-chip--warn { border-color: color-mix(in srgb, var(--pr-mag) 35%, #fff); color: #a3128e; background: color-mix(in srgb, var(--pr-mag) 7%, #fff); }
+.pd-chip--ok { border-color: #c1ff72; color: #3a6b00; background: color-mix(in srgb, #c1ff72 22%, #fff); }
+.pd-row { cursor: pointer; }
+
+/* Panel del negocio */
+.pd-stagebox { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.pd-stagebox .pr-filter { flex: 1 1 180px; }
+.pd-hub {
+  margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--pr-rule);
+  background: color-mix(in srgb, var(--pr-blue) 3%, #fff); font-size: 13px; display: flex; flex-direction: column; gap: 8px;
+}
+.pd-hub a { color: var(--pr-violet); font-weight: 600; }
+.pd-hub__row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pd-hub__wait { display: flex; flex-direction: column; gap: 8px; color: var(--pr-ink-2); }
+.pd-hub__cands { display: flex; flex-direction: column; gap: 6px; }
+.pd-hub__cand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px dashed var(--pr-rule); border-radius: 8px; }
+.pd-mini { height: auto; padding: 4px 10px; font-size: 12px; }
+.pd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.pd-ctchip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px; background: var(--pr-card-soft); border: 1px solid var(--pr-rule); font-size: 12.5px; }
+.pd-ctchip button { border: 0; background: none; cursor: pointer; color: var(--pr-ink-3); font-size: 15px; line-height: 1; padding: 0 4px; }
+.pd-ctchip button:hover { color: #a3128e; }
+.pd-req { max-width: 640px; width: calc(100vw - 32px); }
+.pd-req .pc-grid { max-height: 55vh; overflow-y: auto; }
+.pc-deal { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; color: var(--pr-ink-2); font: inherit; }
+.pc-deal strong { color: var(--pr-violet); }
+
+@media (max-width: 720px) {
+  .pd-board { padding: 4px 16px 16px; }
+  .pd-col { flex-basis: 85vw; max-height: none; }
+}
+
+/* «Propiedades dependientes» al cambiar de etapa un negocio (como el popup de HubSpot) */
+.pd-deps .pd-req { max-width: 520px; padding-top: 18px; }
+.pd-req__head { display: flex; align-items: center; justify-content: space-between; }
+.pd-req__head .pr-drawer__close { position: static; }
+.pd-req__list { display: flex; flex-direction: column; gap: 14px; max-height: 62vh; overflow-y: auto; padding: 4px 4px 4px 14px;
+  border-left: 3px solid var(--pr-rule); margin-top: 6px; }
+.pd-req__list .pc-field { display: flex; flex-direction: column; gap: 6px; }
+.pd-req__label { text-transform: none; letter-spacing: 0; font-size: 13.5px; font-weight: 700; color: var(--pr-ink); }
+.pd-req__pre { font-size: 10.5px; font-weight: 600; color: var(--pr-cyan); border: 1px solid color-mix(in srgb, var(--pr-cyan) 35%, #fff);
+  border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
+.pd-req__list .pc-field.is-missing .pr-filter__input { border-color: color-mix(in srgb, var(--pr-mag) 55%, #fff); }
+.pd-req__msg { color: #a3128e; min-height: 1em; }

@@ -7,7 +7,7 @@
    Uso: botón con data-hist="<company|contact>:<id>:<campo>" en cualquier parte
    de la página (el click se escucha delegado en document), o
    ProspectingHistory.open(obj, id, field, anchor).
-   Lee GET /prospecting/<companies|contacts>/<id>/history?field= (store.property_history).
+   Lee GET /prospecting/<companies|contacts|deals>/<id>/history?field= (store.property_history).
 
    Lo cargan prospecting.html y prospecting-company.html. Depende de
    window.Prospecting (prospecting.js o prospecting-core.js).
@@ -19,7 +19,8 @@
   function esc(v) { return P().esc(v); }
 
   function fieldOf(obj, key) {
-    var o = ((P().options() || {}).objects || {})[obj] || {};
+    // Negocios: su catálogo viene aparte (options.deals), no en objects (sin workflows todavía).
+    var o = obj === "deal" ? ((P().options() || {}).deals || {}) : (((P().options() || {}).objects || {})[obj] || {});
     return (o.fields || []).filter(function (f) { return f.key === key; })[0] || { key: key, label: key };
   }
 
@@ -109,7 +110,7 @@
       if (e.target.closest(".pr-hist__close")) close();
     });
     pop.addEventListener("scroll", function (e) { e.stopPropagation(); }, true);
-    P().api("/prospecting/" + (obj === "company" ? "companies" : "contacts") + "/" + id + "/history?field=" + encodeURIComponent(field))
+    P().api("/prospecting/" + (obj === "company" ? "companies" : obj === "deal" ? "deals" : "contacts") + "/" + id + "/history?field=" + encodeURIComponent(field))
       .then(function (data) {
         if (pop !== mine) return;
         pop.innerHTML = render(f, data);

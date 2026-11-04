@@ -11,8 +11,10 @@ name: Prospecting HubSpot sync
 # más, la siguiente sigue desde la marca. Un 409 = otra corrida en curso, no es error.
 # Después de las empresas corre el de CONTACTOS (2026-11-04, mismas reglas; los que no
 # tienen empresa van a la bandeja «Unassigned»): así un contacto nuevo encuentra la
-# empresa que se acaba de crear en el paso anterior.
-# Ver backend/prospecting/hubspot_companies.py / hubspot_contacts.py y CLAUDE.md (Prospecting).
+# empresa que se acaba de crear en el paso anterior. Y al final el de NEGOCIOS (2026-11-04,
+# los 2 pipelines de Vintti), que encuentra su empresa y sus contactos ya sincronizados y
+# ata cada negocio a la oportunidad del hub que tenga su hubspot_deal_id.
+# Ver backend/prospecting/hubspot_companies.py / hubspot_contacts.py / hubspot_deals.py y CLAUDE.md (Prospecting).
 on:
   schedule:
     - cron: "*/30 * * * *"
@@ -69,4 +71,27 @@ jobs:
           fi
           if grep -q '"errores"' sync-contacts.json; then
             echo "::warning::Algunos contactos no se pudieron sincronizar (ver errors en el reporte)."
+          fi
+
+      - name: Sincronizar negocios
+        if: always()
+        run: |
+          set -uo pipefail
+          code=$(curl -sS -o sync-deals.json -w "%{http_code}" -X POST \
+            --retry 3 --retry-delay 15 \
+            -H "Content-Type: application/json" \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            -d "{}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/prospecting/hubspot/sync-deals")
+          cat sync-deals.json; echo
+          if [ "$code" = "409" ]; then
+            echo "::notice::Otra corrida del sync de negocios está en curso; la próxima sigue."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::El sync de negocios devolvió HTTP $code"
+            exit 1
+          fi
+          if grep -q '"errores"' sync-deals.json; then
+            echo "::warning::Algunos negocios no se pudieron sincronizar (ver errors en el reporte)."
           fi

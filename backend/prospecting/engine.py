@@ -232,7 +232,7 @@ def load_history(cur, record_ids, obj: str = "company") -> dict:
         cur.execute(
             """
             SELECT company_id AS rid, field, new_value, at FROM prospect_company_events
-             WHERE company_id = ANY(%s) AND contact_id IS NULL AND field = ANY(%s)
+             WHERE company_id = ANY(%s) AND contact_id IS NULL AND deal_id IS NULL AND field = ANY(%s)
             """,
             (ids, list(OBJECTS["company"]["history"])),
         )

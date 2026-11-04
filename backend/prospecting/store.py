@@ -417,6 +417,9 @@ def ensure_schema(cur) -> None:
     # Contactos que llegan de Calendly vía Zapier (inbound.py).
     from prospecting import inbound
     inbound.ensure_schema(cur)
+    # Negocios (deals.py, 2026-11-04).
+    from prospecting import deals
+    deals.ensure_schema(cur)
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -611,13 +614,23 @@ def _fmt(v) -> str | None:
 
 
 def log_event(cur, company_id: int, source: str, actor: str | None,
-              field: str | None = None, old=None, new=None, contact_id: int | None = None) -> None:
+              field: str | None = None, old=None, new=None, contact_id: int | None = None,
+              deal_id: int | None = None) -> None:
+    if deal_id is None:
+        cur.execute(
+            """
+            INSERT INTO prospect_company_events (company_id, actor, source, field, old_value, new_value, contact_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (company_id, actor, source, field, _fmt(old), _fmt(new), contact_id),
+        )
+        return
     cur.execute(
         """
-        INSERT INTO prospect_company_events (company_id, actor, source, field, old_value, new_value, contact_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO prospect_company_events (company_id, actor, source, field, old_value, new_value, contact_id, deal_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (company_id, actor, source, field, _fmt(old), _fmt(new), contact_id),
+        (company_id, actor, source, field, _fmt(old), _fmt(new), contact_id, deal_id),
     )
 
 
@@ -987,9 +1000,11 @@ def get_company(cur, company_id: int) -> dict | None:
     cur.execute(
         """
         SELECT e.actor, e.source, e.field, e.old_value, e.new_value, e.at, e.contact_id,
-               NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name
+               NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name,
+               e.deal_id, d.name AS deal_name
           FROM prospect_company_events e
           LEFT JOIN prospect_contacts ct ON ct.id = e.contact_id
+          LEFT JOIN prospect_deals d ON d.id = e.deal_id
          WHERE e.company_id = %s
          ORDER BY e.at DESC, e.id DESC
          LIMIT 300
@@ -998,6 +1013,8 @@ def get_company(cur, company_id: int) -> dict | None:
     )
     row["events"] = [dict(r) for r in cur.fetchall()]
     row["contacts"] = [{**c, "missing_required": contact_missing(c)} for c in company_contacts(cur, company_id)]
+    from prospecting import deals
+    row["deals"] = deals.company_deals(cur, company_id)
     return row
 
 
@@ -1016,7 +1033,7 @@ def property_history(cur, obj: str, record_id: int, field: str) -> dict | None:
     if obj == "company":
         cur.execute(f"SELECT id, created_at, {field} AS value FROM prospect_companies WHERE id = %s", (record_id,))
         rec = cur.fetchone()
-        where, created_ev = "company_id = %s AND contact_id IS NULL", "created"
+        where, created_ev = "company_id = %s AND contact_id IS NULL AND deal_id IS NULL", "created"
     else:
         rec = get_contact(cur, record_id)
         if rec is not None:
@@ -1138,6 +1155,7 @@ def seed_dummies(cur, n: int, owners: list[str], today: date) -> list[int]:
 
 
 def delete_dummies(cur) -> int:
+    cur.execute("DELETE FROM prospect_deals WHERE is_dummy")
     cur.execute("DELETE FROM prospect_inbound_contacts WHERE is_dummy")
     cur.execute("DELETE FROM prospect_companies WHERE is_dummy")
     return cur.rowcount
@@ -1162,6 +1180,14 @@ def _object_schema() -> dict:
     }
 
 
+def _deal_schema(cur) -> dict:
+    from prospecting import deals
+    from prospecting.deal_fields import DEAL_GROUPS
+
+    return {"fields": deals.field_defs(cur),
+            "groups": DEAL_GROUPS, "pipelines": deals.pipelines(cur), "export_fields": deals.export_fields()}
+
+
 def options(cur) -> dict:
     bdrs = list_bdrs(cur)
     return {
@@ -1173,6 +1199,9 @@ def options(cur) -> dict:
         "bdrs": bdrs,
         "weeks": list_weeks(cur),
         "export_fields": {"company": export_fields("company"), "contact": export_fields("contact")},
+        # Negocios (deals.py): catálogo de la ficha y pipelines del tablero. Va aparte de
+        # `objects` a propósito: los workflows todavía no tienen objeto «negocio».
+        "deals": _deal_schema(cur),
         # Lo que necesita el constructor de workflows de la página.
         "workflow_schema": {
             "fields": [
@@ -1538,6 +1567,8 @@ def get_contact(cur, contact_id: int) -> dict | None:
         (contact_id,),
     )
     out["events"] = [dict(r) for r in cur.fetchall()]
+    from prospecting import deals
+    out["deals"] = deals.contact_deals(cur, contact_id)
     return out
 
 

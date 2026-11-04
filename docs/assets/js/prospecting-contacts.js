@@ -126,6 +126,13 @@
     document.body.appendChild(panel);
     panel.addEventListener("click", function (e) {
       if (e.target.closest("[data-pc-close]")) return close();
+      // Negocios del contacto (prospecting-deals.js): abren su panel encima de éste.
+      var dl = e.target.closest("[data-pc-deal]");
+      if (dl && window.ProspectingDeals) return window.ProspectingDeals.open({ dealId: Number(dl.getAttribute("data-pc-deal")) });
+      if (e.target.closest("[data-pc-adddeal]") && window.ProspectingDeals && pcCurrent) {
+        return window.ProspectingDeals.open({ contactId: pcCurrent.id, contactName: pcCurrent.name,
+          companyId: pcCurrent.company_id || null, companyName: pcCurrent.company_name || "" });
+      }
       var chip = e.target.closest(".pr-wf-chip");
       if (chip && chip.closest("[data-k]")) {
         chip.classList.toggle("is-on");
@@ -178,9 +185,11 @@
     });
   }
 
+  var pcCurrent = null;  // el contacto abierto (para «Agregar negocio»)
   function render(c, opts) {
     var isNew = !c;
     c = c || {};
+    pcCurrent = isNew ? null : c;
     var req = opts.requireQualified ? required() : [];
     document.getElementById("pcEyebrow").textContent = isNew ? "Nuevo contacto" : "Contacto";
     document.getElementById("pcTitle").textContent = isNew ? "Agregar contacto" : c.name;
@@ -220,6 +229,14 @@
             return '<li><span class="pr-events__src pr-events__src--wf">' + esc(e.workflow_name) + "</span> · " + esc(e.status) +
               (e.last_step ? '<div class="pr-note">' + esc(e.last_step) + "</div>" : "") + "</li>";
           }).join("") + "</ul></section>";
+      }
+      if (window.ProspectingDeals) {
+        body += '<section class="pr-section"><h3 class="pr-section__title">Negocios (' + (c.deals || []).length + ")" +
+          ' <button type="button" class="pr-btn pd-mini" data-pc-adddeal><i class="fa-solid fa-plus"></i> Agregar</button></h3>' +
+          ((c.deals || []).length ? '<ul class="pr-events">' + c.deals.map(function (d) {
+            return '<li><button type="button" class="pc-deal" data-pc-deal="' + d.id + '"><strong>' + esc(d.name) + "</strong> · " +
+              esc(d.stage_label || d.stage_key) + (d.opportunity_id ? " · Opp #" + d.opportunity_id : "") + "</button></li>";
+          }).join("") + "</ul>" : '<p class="pr-note">Sin negocios.</p>') + "</section>";
       }
       body += '<details class="pc-group"><summary><span>Historial</span><span class="pc-group__count">' + (c.events || []).length + "</span></summary>" +
         historyHtml(c.events || []) + "</details>";

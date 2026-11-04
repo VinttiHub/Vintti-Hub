@@ -44,6 +44,7 @@
             var err = new Error(data.error || ("HTTP " + res.status));
             err.status = res.status;
             err.errors = data.errors || null;
+            err.data = data;  // p. ej. needs_fields de un negocio (409)
             throw err;
           }
           return data;
@@ -117,6 +118,7 @@
     ownerName: ownerName,
     options: function () { return OPTS; },
     me: function () { return ME; },
+    apiBase: function () { return API; },
     reloadTable: function () {},
     /* Sólo en esta base: cargar sesión y catálogos. */
     boot: function () {

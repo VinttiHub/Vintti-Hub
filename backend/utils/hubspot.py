@@ -290,6 +290,39 @@ class HubSpotClient:
         nxt = ((payload.get("paging") or {}).get("next") or {}).get("after")
         return payload.get("results", []), nxt
 
+    def list_deals_page(self, properties, after=None, limit=100, associations=("companies", "contacts")):
+        """Una página de `GET /crm/v3/objects/deals` (máx. 100), con empresas y contactos
+        asociados. Devuelve (results, next_after). Importación de negocios a Prospecting."""
+        params = {"limit": min(int(limit), 100), "archived": "false",
+                  "properties": ",".join(properties)}
+        if associations:
+            params["associations"] = ",".join(associations)
+        if after:
+            params["after"] = after
+        payload = self._request("GET", "/crm/v3/objects/deals", params=params)
+        nxt = ((payload.get("paging") or {}).get("next") or {}).get("after")
+        return payload.get("results", []), nxt
+
+    def batch_associations(self, from_type, to_type, ids):
+        """{id: [(to_id, es_primaria)]} vía la API v4 en lote (100 por llamada). El search no
+        trae asociaciones: lo usan los syncs incrementales de Prospecting."""
+        out = {}
+        ids = [str(i) for i in ids]
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i + 100]
+            payload = self._request(
+                "POST", f"/crm/v4/associations/{from_type}/{to_type}/batch/read",
+                json={"inputs": [{"id": c} for c in chunk]},
+            )
+            for r in payload.get("results", []):
+                fid = str((r.get("from") or {}).get("id"))
+                out[fid] = [
+                    (str(t.get("toObjectId")),
+                     any((a.get("label") or "").lower() == "primary" for a in t.get("associationTypes") or []))
+                    for t in r.get("to") or []
+                ]
+        return out
+
     def contact_company_associations(self, contact_ids):
         """{contact_id: [(company_id, es_primaria)]} vía la API v4 en lote (100 por llamada).
         El search no trae asociaciones: lo usa el sync incremental de contactos."""

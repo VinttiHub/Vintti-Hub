@@ -66,7 +66,7 @@
       '<div class="pr-co">' +
         '<aside class="pr-co__left">' + leftCard(c) + "</aside>" +
         '<section class="pr-co__main">' + mainCard(c) + "</section>" +
-        '<aside class="pr-co__right">' + contactsCard(c) + workflowsCard(c) + "</aside>" +
+        '<aside class="pr-co__right">' + contactsCard(c) + dealsCard(c) + workflowsCard(c) + "</aside>" +
       "</div>";
   }
 
@@ -146,7 +146,36 @@
     return m ? ' <span class="pr-bulk-tag" title="Cambio hecho con Editar en masa"><i class="fa-solid fa-layer-group"></i> Edición masiva · ' + m[1] + "</span>" : "";
   }
 
+  /* Evento de un NEGOCIO (deal_id): etapa, campos, cuenta / oportunidad del hub. */
+  function dealEventText(ev) {
+    var D = (P.options().deals || {});
+    var subject = '<span class="pr-co-ev__contact"><i class="fa-solid fa-handshake"></i> ' + esc(ev.deal_name || "Negocio") + "</span> ";
+    var v = String(ev.new_value || ""), what;
+    var stageName = function (k) {
+      var hit = null;
+      (D.pipelines || []).forEach(function (p) { (p.stages || []).forEach(function (s) { if (s.key === k && !hit) hit = s.label; }); });
+      return hit || k || "—";
+    };
+    var hub = /^hub_(\w+):(\d+)$/.exec(v);
+    if (ev.field === "stage") what = "Etapa: " + esc(stageName(ev.old_value)) + " → <strong>" + esc(stageName(ev.new_value)) + "</strong>";
+    else if (ev.field) {
+      var f = (D.fields || []).filter(function (x) { return x.key === ev.field; })[0];
+      var lbl = ev.field === "company" ? "Empresa" : ev.field === "contacts" ? "Contactos" : ev.field === "pipeline" ? "Pipeline" : (f ? f.label : ev.field);
+      what = esc(lbl) + ": " + esc(f ? fmtVal(f, ev.old_value) : (ev.old_value || "—")) + " → <strong>" + esc(f ? fmtVal(f, ev.new_value) : (ev.new_value || "—")) + "</strong>";
+    }
+    else if (v === "deal_created") what = "Se creó el negocio";
+    else if (v.indexOf("deal_deleted:") === 0) what = "Se borró el negocio " + esc(v.slice(13));
+    else if (hub) what = ({ account: "Cuenta del CRM #", opportunity: "Oportunidad del hub creada #",
+      opportunity_linked: "Vinculado a la oportunidad #", opportunity_unlinked: "Desvinculado de la oportunidad #" }[hub[1]] || hub[1] + " #") + hub[2];
+    else what = esc(v);
+    var src = String(ev.source || "");
+    var who = src.indexOf("hubspot") === 0 ? "HubSpot" : src === "opportunity" ? "Oportunidad del hub" : src === "hub" ? "Hub"
+      : (P.ownerName(ev.actor) || ev.actor || src);
+    return { who: who, wf: false, html: subject + what, icon: "fa-solid fa-handshake" };
+  }
+
   function eventText(ev) {
+    if (ev.deal_id) return dealEventText(ev);
     var wf = String(ev.source || "").indexOf("workflow:") === 0;
     var who = wf ? "Workflow #" + ev.source.slice(9) : ev.source === "clay" ? "Clay" : ev.source === "seed" ? "Datos de prueba"
       : (P.ownerName(ev.actor) || ev.actor || ev.source);
@@ -200,6 +229,24 @@
       (cards || '<p class="pr-note">Todavía no hay contactos.</p>') + "</div>";
   }
 
+  function dealsCard(c) {
+    var list = c.deals || [];
+    if (!window.ProspectingDeals) return "";
+    var money = function (n) { return Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " US$"; };
+    var cards = list.map(function (d) {
+      return '<button type="button" class="pr-co-contact" data-deal="' + d.id + '">' +
+        '<span class="pr-co-avatar pr-co-avatar--sm"><i class="fa-solid fa-handshake"></i></span>' +
+        '<span class="pr-co-contact__body"><strong>' + esc(d.name) + "</strong>" +
+          '<span class="pr-note">' + esc(d.stage_label || d.stage_key) + (d.amount ? " · " + money(d.amount) : "") + "</span>" +
+          '<span class="pr-co-contact__tags">' + (d.opportunity_id ? '<span class="pr-wf-stat">Opp #' + d.opportunity_id + "</span>" : "") +
+            (d.hub_status === "waiting" ? '<span class="pr-wf-stat pr-wf-stat--failed">Esperando decisión</span>' : "") + "</span>" +
+        "</span></button>";
+    }).join("");
+    return '<div class="pr-co-card"><div class="pr-co-card__head"><h3 class="pr-section__title">Negocios (' + list.length + ")</h3>" +
+      '<button type="button" class="pr-btn" data-act="add-deal"><i class="fa-solid fa-plus"></i> Agregar</button></div>' +
+      (cards || '<p class="pr-note">Todavía no hay negocios.</p>') + "</div>";
+  }
+
   function workflowsCard(c) {
     var list = c.enrollments || [];
     if (!list.length) return "";
@@ -235,12 +282,14 @@
       if (k) patch(k, e.target.value);
     });
     root.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-tab],[data-act],[data-contact]");
+      var b = e.target.closest("[data-tab],[data-act],[data-contact],[data-deal]");
       if (!b) return;
       if (b.getAttribute("data-tab")) { tab = b.getAttribute("data-tab"); render(); return; }
       var act = b.getAttribute("data-act");
       if (act === "add-contact") C.open({ companyId: company.id, companyName: company.name, onSaved: function () { load(); } });
       else if (act === "complete") C.completeFlow(company, company.contacts, function () { load(); });
+      else if (act === "add-deal") window.ProspectingDeals.open({ companyId: company.id, companyName: company.name, onSaved: function () { load(); } });
+      else if (b.getAttribute("data-deal")) window.ProspectingDeals.open({ dealId: Number(b.getAttribute("data-deal")), onSaved: function () { load(); } });
       else if (b.getAttribute("data-contact")) {
         C.open({ contactId: Number(b.getAttribute("data-contact")), companyId: company.id,
           requireQualified: company.contact_incomplete, onSaved: function () { load(); } });

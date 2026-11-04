@@ -97,7 +97,7 @@ def history_filter(obj: str) -> str:
     """Condición sobre `e` (prospect_company_events) para el historial del objeto."""
     t = OBJECTS[obj]["table"]
     if obj == "company":
-        return f"e.company_id = {t}.id AND e.contact_id IS NULL"
+        return f"e.company_id = {t}.id AND e.contact_id IS NULL AND e.deal_id IS NULL"
     return f"e.contact_id = {t}.id"
 
 

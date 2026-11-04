@@ -1268,3 +1268,370 @@ def dummy_delete():
             return denied
         deleted = store.delete_dummies(cur)
     return jsonify({"deleted": deleted})
+
+
+# --------------------------------------------------------------------------- #
+# Negocios (deals, 2026-11-04): el pipeline de HubSpot dentro del Hub.
+# Ver prospecting/deals.py (tablas) y prospecting/deal_to_hub.py (cuenta / oportunidad).
+# --------------------------------------------------------------------------- #
+def _deal_filters(raw: dict) -> dict:
+    f = {k: v for k, v in (raw or {}).items() if v not in (None, "")}
+    f.pop("ids", None)
+    if f.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
+        f["dummy"] = "exclude"
+    return f
+
+
+def _deal_out(cur, deal_id: int, hub: dict | None = None) -> dict:
+    from prospecting import deal_to_hub, deals as deals_store
+
+    # Lo que pasó en su oportunidad (etapa + valores de Signed / Close Win / Closed Lost).
+    cur.execute("SAVEPOINT deal_reflect")
+    try:
+        deals_store.reflect(cur, [deal_id], values=True)
+        cur.execute("RELEASE SAVEPOINT deal_reflect")
+    except Exception:  # noqa: BLE001 — leer el negocio no puede fallar por esto
+        cur.execute("ROLLBACK TO SAVEPOINT deal_reflect")
+    out = deals_store.get_deal(cur, deal_id) or {}
+    if out:
+        out["candidates"] = deal_to_hub.waiting_candidates(cur, out)
+        ok, why = deal_to_hub.applies(out)
+        out["hub_rule"] = None if ok else why
+    if hub:
+        out["hub"] = {k: v for k, v in hub.items() if k != "after_commit"}
+    return out
+
+
+def _deal_write(fn):
+    """Corre `fn(cur)` -> (deal_id, status) y después el puente con el hub; el Slack de
+    Sourcing sale después del commit. Errores de validación -> 400 / 409."""
+    from prospecting import deal_to_hub, deals as deals_store
+
+    hub: dict = {}
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            res = fn(cur)
+            deal_id, status = res[0], res[1]
+            fill = res[2] if len(res) > 2 else None
+            if deal_id is None:
+                return jsonify({"error": "not_found"}), 404
+            # Lo cargado en el popup rellena los vacíos de la empresa / contacto (y eso son
+            # cambios de verdad: disparan sus workflows como cualquier edición).
+            if fill:
+                for obj, rid, cid, changes in deals_store.fill_related(cur, deal_id, fill, _current_email()):
+                    _run_instant(cur, cid, "updated", changes, _current_email(), obj=obj, record_id=rid)
+            cur.execute("SAVEPOINT deal_hub")
+            try:
+                hub = deal_to_hub.run(cur, deal_id, _current_email())
+                cur.execute("RELEASE SAVEPOINT deal_hub")
+            except Exception as exc:  # noqa: BLE001 — el negocio se guarda igual
+                cur.execute("ROLLBACK TO SAVEPOINT deal_hub")
+                hub = {"error": f"No se pudo crear/actualizar la cuenta u oportunidad del hub: {str(exc)[:200]}"}
+            out = _deal_out(cur, deal_id, hub)
+    except deals_store.MissingFields as exc:
+        return jsonify({"error": str(exc), "needs_fields": exc.missing, "stage_key": exc.stage_key}), 409
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    deal_to_hub.after_commit(hub)
+    return jsonify(_json_safe(out)), status
+
+
+@bp.get("/deals/board")
+def deals_board():
+    from prospecting import deals as deals_store
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        f = _deal_filters(request.args.to_dict())
+        # Lo que pasó en las oportunidades del hub se ve al abrir el tablero (no espera al cron).
+        if not f.get("offset"):
+            deals_store.reflect(cur, pipeline=f.get("pipeline"))
+        data = deals_store.board(cur, f)
+    return jsonify(_json_safe(data))
+
+
+@bp.get("/deals")
+def deals_list():
+    from prospecting import deals as deals_store
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        data = deals_store.list_deals(cur, _deal_filters(request.args.to_dict()))
+        data["pipelines"] = deals_store.pipelines(cur)
+    return jsonify(_json_safe(data))
+
+
+@bp.get("/deals/pipelines")
+def deals_pipelines():
+    from prospecting import deals as deals_store
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        data = deals_store.pipelines(cur)
+    return jsonify(_json_safe({"pipelines": data}))
+
+
+@bp.get("/deals/<int:deal_id>/stage-form")
+def deal_stage_form(deal_id: int):
+    """«Propiedades dependientes» de la etapa `?stage=`: campos con su valor o el prellenado."""
+    from prospecting import deals as deals_store
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        deal = deals_store.get_deal(cur, deal_id)
+        if deal is None:
+            return jsonify({"error": "not_found"}), 404
+        data = deals_store.stage_form(cur, request.args.get("stage") or "", deal=deal)
+    return jsonify(_json_safe(data))
+
+
+@bp.post("/deals/stage-form")
+def deal_stage_form_draft():
+    """Lo mismo para un negocio que todavía no existe: {stage_key, company_id, contact_ids, values}."""
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        data = deals_store.stage_form(cur, str(body.get("stage_key") or ""), deal=body.get("values") or {},
+                                      company_id=store._to_int(body.get("company_id")),
+                                      contact_ids=[store._to_int(x) for x in body.get("contact_ids") or []])
+    return jsonify(_json_safe(data))
+
+
+@bp.get("/deals/<int:deal_id>")
+def deal_get(deal_id: int):
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        out = _deal_out(cur, deal_id)
+    if not out:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe(out))
+
+
+@bp.post("/deals")
+def deal_create():
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+    is_dummy = bool(body.pop("is_dummy", False)) and _sees_dummies(_current_email())
+
+    def go(cur):
+        row = deals_store.create_deal(cur, dict(body), _current_email(), is_dummy=is_dummy)
+        return row["id"], 201, body
+    return _deal_write(go)
+
+
+@bp.patch("/deals/<int:deal_id>")
+def deal_patch(deal_id: int):
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+
+    def go(cur):
+        deals_store.update_deal(cur, deal_id, body, _current_email())
+        return deal_id, 200
+    return _deal_write(go)
+
+
+@bp.patch("/deals/<int:deal_id>/stage")
+def deal_move(deal_id: int):
+    """{stage_key, pipeline_key?, fields?}: `fields` son los del popup de obligatorios.
+    409 + `needs_fields` si falta alguno (la página abre el popup)."""
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+
+    def go(cur):
+        deals_store.move_stage(cur, deal_id, str(body.get("stage_key") or ""), _current_email(),
+                               patch=body.get("fields") or None, pipeline_key=body.get("pipeline_key") or None)
+        return deal_id, 200, body.get("fields")
+    return _deal_write(go)
+
+
+@bp.patch("/deals/<int:deal_id>/company")
+def deal_set_company(deal_id: int):
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+
+    def go(cur):
+        deals_store.set_company(cur, deal_id, store._to_int(body.get("company_id")), _current_email())
+        return deal_id, 200
+    return _deal_write(go)
+
+
+@bp.put("/deals/<int:deal_id>/contacts")
+def deal_set_contacts(deal_id: int):
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+
+    def go(cur):
+        ids = [store._to_int(x) for x in (body.get("contact_ids") or [])]
+        deals_store.set_contacts(cur, deal_id, [x for x in ids if x], _current_email())
+        return deal_id, 200
+    return _deal_write(go)
+
+
+@bp.post("/deals/<int:deal_id>/link-opportunity")
+def deal_link_opportunity(deal_id: int):
+    from prospecting import deal_to_hub
+
+    body = request.get_json(silent=True) or {}
+    opp_id = store._to_int(body.get("opportunity_id"))
+    if not opp_id:
+        return jsonify({"error": "Falta opportunity_id."}), 400
+
+    def go(cur):
+        deal_to_hub.link_opportunity(cur, deal_id, opp_id, _current_email())
+        return deal_id, 200
+    return _deal_write(go)
+
+
+@bp.delete("/deals/<int:deal_id>/link-opportunity")
+def deal_unlink_opportunity(deal_id: int):
+    from prospecting import deal_to_hub
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        try:
+            deal_to_hub.unlink_opportunity(cur, deal_id, _current_email())
+        except LookupError:
+            return jsonify({"error": "not_found"}), 404
+        out = _deal_out(cur, deal_id)
+    return jsonify(_json_safe(out))
+
+
+@bp.post("/deals/<int:deal_id>/mark-new")
+def deal_mark_new(deal_id: int):
+    """«Es nueva, creala»: el negocio no es ninguna de las oportunidades de la cuenta."""
+    def go(cur):
+        cur.execute("UPDATE prospect_deals SET hub_mark_new = TRUE, hub_status = NULL, hub_note = NULL "
+                    "WHERE id = %s RETURNING id", (deal_id,))
+        r = cur.fetchone()
+        return (r["id"] if r else None), 200
+    return _deal_write(go)
+
+
+@bp.delete("/deals/<int:deal_id>")
+def deal_delete(deal_id: int):
+    from prospecting import deals as deals_store
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        ok = deals_store.delete_deal(cur, deal_id, _current_email())
+    return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
+
+
+@bp.get("/deals/<int:deal_id>/history")
+def deal_history(deal_id: int):
+    from prospecting import deals as deals_store
+
+    field = request.args.get("field") or ""
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        deal = deals_store.get_deal(cur, deal_id)
+        if deal is None:
+            return jsonify({"error": "not_found"}), 404
+        cur.execute(
+            "SELECT actor, source, old_value, new_value, at FROM prospect_company_events "
+            "WHERE deal_id = %s AND field = %s ORDER BY at DESC, id DESC LIMIT 500",
+            (deal_id, field),
+        )
+        changes = [dict(r) for r in cur.fetchall()]
+    created = {"actor": deal.get("created_by"), "source": None, "at": deal.get("created_at"),
+               "value": changes[-1]["old_value"] if changes else store._fmt(deal.get(field))}
+    return jsonify(_json_safe({"field": field, "current": store._fmt(deal.get(field)), "changes": changes,
+                               "created": created}))
+
+
+@bp.post("/deals/export")
+def deals_export():
+    import csv
+    import io
+    from flask import Response
+    from prospecting import deals as deals_store
+
+    body = request.get_json(silent=True) or {}
+    catalog = deals_store.export_fields()
+    by_key = {f["key"]: f for f in catalog}
+    cols = [k for k in (body.get("columns") or [f["key"] for f in catalog]) if k in by_key]
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        if isinstance(body.get("ids"), list):
+            ids = [int(x) for x in body["ids"] if str(x).isdigit()]
+        else:
+            ids = deals_store.deal_ids(cur, _deal_filters(body.get("filters") or {}))
+        ids = ids[:EXPORT_MAX]
+        rows = deals_store.export_rows(cur, ids, body.get("sort") or (body.get("filters") or {}).get("sort"))
+    buf = io.StringIO()
+    buf.write("﻿")
+    w = csv.writer(buf)
+    w.writerow([by_key[k]["label"] for k in cols])
+    for r in rows:
+        w.writerow([_csv_cell(by_key[k], r.get(k)) for k in cols])
+    name = f"prospecting-negocios-{date.today().isoformat()}.csv"
+    return Response(buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@bp.post("/hubspot/sync-deals")
+def hubspot_deals_sync():
+    """Negocios de HubSpot -> Hub (prospecting/hubspot_deals.py). Tercer paso del cron, después
+    de empresas y contactos: un negocio nuevo encuentra su empresa y sus contactos."""
+    from prospecting import hubspot_deals as hs_deals
+
+    by_cron = _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token")
+    if not by_cron and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    dry = request.args.get("dry") in ("1", "true")
+    try:
+        limit = max(1, min(5000, int(request.args.get("limit") or 2000)))
+    except ValueError:
+        limit = 2000
+    conn = get_connection()
+    try:
+        report = hs_deals.sync(conn, dry_run=dry, max_deals=limit)
+    finally:
+        conn.close()
+    if report.get("status") == "busy":
+        return jsonify(report), 409
+    return jsonify(_json_safe(report))
+
+
+@bp.get("/hubspot/sync-deals/last")
+def hubspot_deals_sync_last():
+    from prospecting import hubspot_companies as hs_companies
+    from prospecting import hubspot_deals as hs_deals
+
+    if not _token_ok("DASHBOARD_AUDIT_TOKEN", "X-Audit-Token") and not _is_admin(_current_email()):
+        return jsonify({"error": "forbidden"}), 403
+    with _Db() as cur:
+        row = hs_companies.last_report(cur, hs_deals.SYNC_KEY)
+    return jsonify(_json_safe(dict(row) if row else {}))

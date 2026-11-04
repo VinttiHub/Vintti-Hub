@@ -49,6 +49,7 @@
             var err = new Error(data.error || ("HTTP " + res.status));
             err.status = res.status;
             err.errors = data.errors || null;  // detalle de validación de un workflow
+            err.data = data;  // p. ej. needs_fields de un negocio (409)
             throw err;
           }
           return data;
@@ -1858,14 +1859,15 @@
   }
 
   /* Secciones del menú de arriba. Cada una muestra sólo sus vistas al lado del menú:
-     Empresas las de empresas, Contactos las de contactos; Workflows y Negocios, ninguna. */
+     Empresas las de empresas, Contactos las de contactos; Workflows y Negocios, ninguna
+     (Negocios tiene su propia barra: pipeline, filtros y tablero / tabla, en prospecting-deals.js). */
   var SECTIONS = [
     { key: "table", label: "Empresas", icon: "fa-solid fa-building", tone: "violet",
       sub: "Empresas que manda Clay para que las prospecten los BDRs." },
     { key: "contacts", label: "Contactos", icon: "fa-solid fa-user", tone: "cyan",
       sub: "Las personas de esas empresas: las cargan los BDRs o llegan de Calendly." },
-    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", soon: true,
-      sub: "Los negocios de prospección. Todavía no están." },
+    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag",
+      sub: "El pipeline de ventas (Proceso De Contratación y Vintti AI): SQL crea la cuenta, Deep Dive la oportunidad." },
     { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue",
       sub: "Automatizaciones sobre empresas y contactos." },
     // Sólo owner + editoras de workflows (ME.can_configure): el server frena igual.
@@ -1910,6 +1912,7 @@
     if (kind === "table") { renderTabs(); load(); }
     else if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
     else if (kind === "contacts") { renderCtTabs(); loadContacts(); }
+    else if (kind === "deals") { if (window.ProspectingDeals) window.ProspectingDeals.show(); }
   }
 
   function applyTab(key) {
@@ -2518,6 +2521,7 @@
     ownerName: ownerName,
     options: function () { return OPTS; },
     me: function () { return ME; },
+    apiBase: function () { return API; },
     reloadTable: function () { return load(); },
   };
 
