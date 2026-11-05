@@ -88,16 +88,40 @@ def _ctx(cur, self_id=None, obj: str = "company") -> Ctx:
     cur.execute("SELECT id FROM prospect_workflows")
     ids = {r["id"] for r in cur.fetchall()}
     return Ctx(owners=[b["email"] for b in list_bdrs(cur)], workflow_ids=ids, self_id=self_id, obj=obj,
-               users=[u["email"] for u in list_users(cur)])
+               users=[u["email"] for u in list_users(cur)], deal_options=deal_condition_options(cur))
+
+
+def deal_condition_options(cur) -> dict:
+    """{campo de negocio: [{value, label}]} para las condiciones `deal.*`: la etapa y el
+    pipeline salen de prospect_deal_stages; los desplegables, de deals.field_defs (las
+    opciones de HubSpot encima de las de fábrica). Lo usan la validación (sólo los
+    `value`) y el editor de la página."""
+    from prospecting import deals
+    from prospecting.objects import OBJECTS
+
+    pipes = deals.pipelines(cur)
+    out = {
+        "stage": [{"value": f"{p['key']}:{s['key']}", "label": f"{s['label']} ({p['label']})"}
+                  for p in pipes for s in p["stages"]],
+        "pipeline": [{"value": p["key"], "label": p["label"]} for p in pipes],
+    }
+    dyn = deals.defs_by_key(cur)
+    for key, f in OBJECTS["deal"]["fields"].items():
+        if f["type"] != "enum" or key in out:
+            continue
+        d = dyn.get(key) or {}
+        opts = (d.get("options") if d.get("type") == "enum" else None) or f.get("options") or []
+        out[key] = [{"value": o, "label": o} for o in opts]
+    return out
 
 
 def clean_definition(cur, body: dict, self_id=None, require_name: bool = True, obj: str | None = None) -> dict:
     """Valida lo que manda el editor. Levanta InvalidWorkflow con todos los errores.
     `obj` (empresas / contactos) no se puede cambiar una vez creado: lo fija quien llama."""
-    from prospecting.objects import OBJECTS
+    from prospecting.objects import WORKFLOW_OBJECTS
 
     obj = obj or body.get("object") or "company"
-    if obj not in OBJECTS:
+    if obj not in WORKFLOW_OBJECTS:
         raise InvalidWorkflow(["Elegí si el workflow es de empresas o de contactos."])
     name = (body.get("name") or "").strip()
     errors = [] if name or not require_name else ["Ponele un nombre al workflow."]

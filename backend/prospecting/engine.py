@@ -187,7 +187,8 @@ def field_label(obj: str, key: str) -> str:
     target, f, cross = resolve(obj, key)
     if not f:
         return key
-    return ("Empresa · " if cross and target == "company" else "") + f["label"]
+    prefix = {"company": "Empresa · ", "contact": "Algún contacto · ", "deal": "Algún negocio · "}
+    return (prefix.get(target, "") if cross else "") + f["label"]
 
 
 # --------------------------------------------------------------------------- #
@@ -242,18 +243,42 @@ def load_history(cur, record_ids, obj: str = "company") -> dict:
     return out
 
 
-def related_of(cur, obj: str, row: dict) -> dict:
+def deals_of(cur, obj: str, record_id: int) -> list[dict]:
+    """Los negocios asociados (de un contacto por prospect_deal_contacts, de una empresa por
+    company_id), como los lee una condición `deal.*`: props aplanadas + `stage` y `pipeline`
+    con el mismo valor que su expresión SQL en objects._deal_condition_fields()."""
+    from prospecting.deals import _flatten
+
+    if obj == "contact":
+        cur.execute("SELECT d.* FROM prospect_deals d JOIN prospect_deal_contacts dc ON dc.deal_id = d.id "
+                    "WHERE dc.contact_id = %s", (record_id,))
+    else:
+        cur.execute("SELECT d.* FROM prospect_deals d WHERE d.company_id = %s", (record_id,))
+    out = []
+    for r in cur.fetchall():
+        d = _flatten(r)
+        d["stage"] = f"{r['pipeline_key']}:{r['stage_key']}"
+        d["pipeline"] = r["pipeline_key"]
+        # _flatten pasa amount a float y close_date a texto (es para la API): la condición
+        # compara como el SQL, con número y fecha.
+        d["close_date"] = r["close_date"]
+        out.append(d)
+    return out
+
+
+def related_of(cur, obj: str, row: dict, deals: bool = True) -> dict:
     """Lo que necesita una condición cruzada: la empresa de un contacto, o los contactos
-    de una empresa (con su historial)."""
+    de una empresa (con su historial), y los negocios asociados de cualquiera de los dos."""
+    rel = {"deals": deals_of(cur, obj, row["id"])} if deals else {}
     if obj == "contact":
         if row.get("company_id") is None:
-            return {}  # contacto sin empresa: toda condición `company.*` es falsa (igual que en SQL)
+            return rel  # contacto sin empresa: toda condición `company.*` es falsa (igual que en SQL)
         comp = load_company(cur, row["company_id"])
         h = load_history(cur, [row["company_id"]], "company").get(row["company_id"], {})
-        return {"company": {"row": comp, "history": h}} if comp else {}
+        return {**rel, "company": {"row": comp, "history": h}} if comp else rel
     contacts = store.company_contacts(cur, row["id"])
     hist = load_history(cur, [c["id"] for c in contacts], "contact")
-    return {"contacts": [{"row": c, "history": hist.get(c["id"], {})} for c in contacts]}
+    return {**rel, "contacts": [{"row": c, "history": hist.get(c["id"], {})} for c in contacts]}
 
 
 def _row_matches(cur, conditions, row: dict, now: datetime, obj: str = "company",
@@ -672,7 +697,7 @@ def render_tokens(cur, text: str, row: dict, obj: str = "company") -> str:
                 if not company:
                     company = load_company(cur, _company_id_of(obj, row)) or {}
                 src = company
-            return _token_text(f, src.get(f["key"]))
+            return _token_text(f, src.get(f["key"]), cur)
 
         text = _CAMPO_RE.sub(_sub, text)
     return text
@@ -681,9 +706,44 @@ def render_tokens(cur, text: str, row: dict, obj: str = "company") -> str:
 _CAMPO_RE = re.compile(r"\{campo:([a-z0-9_.]+)\}")
 
 
-def _token_text(f: dict, v) -> str:
+# Tipos cuyo valor es el email de una persona: en un texto sale su nombre.
+_PERSON_TYPES = ("user", "owner")
+
+
+def _slack_mention(cur, key: str | None, row: dict, obj: str, test: bool) -> tuple[str, str]:
+    """(mrkdwn de la mención, nombre para el log) de la persona en la propiedad `key`.
+
+    Sin ID de Slack la persona sale en negrita y no le suena (mismo criterio que
+    sourcing_slack). Sobre un registro dummy NUNCA se menciona de verdad: sólo el nombre,
+    para que una prueba no le haga sonar Slack a nadie.
+    """
+    if not key:
+        return "", ""
+    target, f, cross = resolve(obj, key)
+    if not f or f.get("type") not in _PERSON_TYPES or (cross and target != "company"):
+        return "", ""
+    src = (load_company(cur, _company_id_of(obj, row)) or {}) if cross else row
+    email = src.get(f["key"])
+    if not email or not isinstance(email, str):
+        return "", ""
+    from utils import slack
+
+    name = _user_name(cur, email)
+    sid = None
+    if not test:
+        try:
+            from daily_digest.people import slack_id
+            sid = slack_id(email)
+        except Exception:  # noqa: BLE001 — sin directorio de Slack, va el nombre
+            logging.warning("prospecting: no se pudo resolver el Slack ID de %s", email, exc_info=True)
+    return (f"<@{sid}>" if sid else f"*{slack.esc(name)}*"), name
+
+
+def _token_text(f: dict, v, cur=None) -> str:
     if v is None or v == "":
         return ""
+    if cur is not None and f.get("type") in _PERSON_TYPES and isinstance(v, str):
+        return _user_name(cur, v)
     if isinstance(v, list):
         return ", ".join(str(x) for x in v)
     if isinstance(v, bool):
@@ -776,6 +836,11 @@ def describe_action(obj: str, a: dict) -> str:
         return f"Pregunta a la IA y guarda la respuesta en {dest}"
     if t == "create_contact":
         return "Crea un contacto asociado a la empresa"
+    if t == "create_deal":
+        return (f"Crea un negocio en {a.get('stage_key')} ({a.get('pipeline_key')})"
+                + (f" para {a.get('owner_email')}" if a.get("owner_email") else ""))
+    if t == "send_slack" and a.get("mention_field"):
+        return f"Envía un Slack mencionando a {field_label(obj, a.get('mention_field'))}"
     if t == "sheets_append":
         return f"Agrega una fila a la pestaña «{a.get('sheet')}» de un Google Sheet"
     return ACTIONS.get(t, {}).get("label", t)
@@ -961,17 +1026,20 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         return {"summary": summary}
 
     if t == "send_slack":
+        from utils import slack
+
         text = render_tokens(cur, a["text"], row, obj)
         channel = (a.get("channel") or "").strip() or None
         if test:
             text = f"[TEST] {text}"
             channel = TEST_SLACK_CHANNEL
-        summary = f"Slack{(' a ' + channel) if channel else ''}: {text}"
+        mention, who = _slack_mention(cur, a.get("mention_field"), row, obj, test)
+        summary = f"Slack{(' a ' + channel) if channel else ''}{(' mencionando a ' + who) if who else ''}: {text}"
         if ctx.dry:
             return {"summary": summary}
-        from utils import slack
-
-        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": slack.esc(text)}}]
+        # La mención va DESPUÉS de esc(): `<@U…>` es mrkdwn y esc() le escaparía el `<`.
+        mrkdwn = (mention + " " if mention else "") + slack.esc(text)
+        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": mrkdwn}}]
         res = slack.post_blocks(blocks, text, channel_override=channel)
         if not res.get("sent"):
             raise RuntimeError(f"Slack no lo aceptó: {res.get('error')}")
@@ -1045,6 +1113,10 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
             raise RuntimeError(f"No se pudo crear el contacto: {exc}") from exc
         emit_event(cur, "contact", created["id"], "created", created.pop("_changes", []), ctx.now, ctx.actor)
         return {"summary": summary + f" (#{created['id']})"}
+
+    # ---- Crear registro (negocio) ----------------------------------------- #
+    if t == "create_deal":
+        return _create_deal(cur, a, row, ctx, test)
 
     # ---- Otros workflows -------------------------------------------------- #
     if t in ("enroll_workflow", "unenroll_workflow"):
@@ -1133,6 +1205,45 @@ def sheets_service_account() -> str | None:
         return None
 
 
+def _create_deal(cur, a: dict, row: dict, ctx: Ctx, test: bool) -> dict:
+    """Negocio nuevo asociado al registro: en un contacto, el contacto y su empresa; en una
+    empresa, la empresa. No pasa por deal_to_hub (eso corre al mover de etapa, como siempre).
+    Crea uno por ejecución aunque ya haya otro abierto (decisión de la owner, igual que HubSpot)."""
+    from prospecting import deals
+
+    obj = ctx.obj
+    name = render_tokens(cur, a.get("name") or "", row, obj).strip()
+    if not name:
+        raise RuntimeError("El nombre del negocio quedó vacío (¿falta la propiedad que usa?).")
+    data = {"name": name[:255], "pipeline_key": a["pipeline_key"], "stage_key": a["stage_key"]}
+    if a.get("owner_email"):
+        data["owner_email"] = a["owner_email"]
+    for item in a.get("values") or []:
+        f = OBJECTS["deal"]["fields"][item["field"]]
+        v = item.get("value")
+        if isinstance(v, str) and f["type"] in ("text", "longtext", "url", "email", "phone"):
+            v = render_tokens(cur, v, row, obj).strip()
+            if not v:
+                continue
+        data[item["field"]] = v
+    company_id = _company_id_of(obj, row)
+    if company_id is not None:
+        data["company_id"] = company_id
+    if obj == "contact":
+        data["contact_ids"] = [row["id"]]
+    owner = _user_name(cur, a.get("owner_email")) if a.get("owner_email") else "sin dueño"
+    st = deals._stage(cur, a["pipeline_key"], a["stage_key"]) or {}
+    where = f"{st.get('label') or a['stage_key']} ({st.get('pipeline_label') or a['pipeline_key']})"
+    summary = f"Crea el negocio «{name}» en {where} para {owner}"
+    if ctx.dry:
+        return {"summary": summary}
+    try:
+        deal = deals.create_deal(cur, data, ctx.actor, source=ctx.source, is_dummy=test, check_required=False)
+    except (ValueError, LookupError) as exc:
+        raise RuntimeError(f"No se pudo crear el negocio: {exc}") from exc
+    return {"summary": summary + f" (#{deal['id']})"}
+
+
 def _sheets_append(cur, a: dict, row: dict, ctx: Ctx, test: bool) -> dict:
     obj = ctx.obj
     values, company = [], None
@@ -1144,7 +1255,7 @@ def _sheets_append(cur, a: dict, row: dict, ctx: Ctx, test: bool) -> dict:
                 if company is None:
                     company = load_company(cur, _company_id_of(obj, row)) or {}
                 src = company
-            values.append(_token_text(f, src.get(f["key"])))
+            values.append(_token_text(f, src.get(f["key"]), cur))
         else:
             values.append(render_tokens(cur, c.get("text") or "", row, obj))
     sheet = (a.get("sheet") or "").strip()

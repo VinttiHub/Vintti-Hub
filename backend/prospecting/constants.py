@@ -362,6 +362,9 @@ ACTIONS = {
     # Sólo workflows de empresa: crea un contacto asociado a la empresa.
     "create_contact": {"label": "Crear registro (contacto)", "group": "CRM", "objects": ["company"],
                        "desc": "Crea un contacto asociado a la empresa con los valores que definas."},
+    # Contactos y empresas: crea un negocio (deal) asociado al registro (2026-11-05).
+    "create_deal":    {"label": "Crear registro (negocio)", "group": "CRM",
+                       "desc": "Crea un negocio en el pipeline y la etapa que elijas, asociado al registro."},
     "set":            {"label": "Editar registro: definir valor", "group": "CRM", "field": True,
                        "desc": "Define el valor de una propiedad."},
     "set_today":      {"label": "Poner la fecha de hoy", "group": "CRM", "field": True, "types": ["date"], "hidden": True,

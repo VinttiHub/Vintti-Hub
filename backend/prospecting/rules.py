@@ -239,15 +239,22 @@ def normalize_tree(obj) -> None:
 class Ctx:
     """Lo que la validación necesita saber de afuera."""
 
-    def __init__(self, owners=None, workflow_ids=None, self_id=None, obj="company", users=None):
+    def __init__(self, owners=None, workflow_ids=None, self_id=None, obj="company", users=None,
+                 deal_options=None):
         self.owners = owners          # emails de BDRs (None = no chequear)
         self.users = users            # emails de usuarios activos (None = no chequear)
+        # {campo de negocio: valores válidos} — salen de la base (None = no chequear).
+        self.deal_options = deal_options
         self.workflow_ids = workflow_ids or set()
         self.self_id = self_id
         self.obj = obj
 
 
-def _allowed_values(field: dict, ctx: Ctx):
+def _allowed_values(field: dict, ctx: Ctx, obj: str | None = None):
+    if obj == "deal" and field["type"] == "enum":
+        if ctx.deal_options is None:
+            return None
+        return [o["value"] for o in ctx.deal_options.get(field["key"], [])]
     if field["type"] == "enum" or (field["type"] == "multi" and field.get("options")):
         return field.get("options") or []
     if field["type"] == "owner":
@@ -277,7 +284,7 @@ def _check_rule(rule: dict, where: str, ctx: Ctx, obj: str) -> list[str]:
     if kind == "list":
         if not isinstance(v, list) or not v:
             return [f"{label}: elegí al menos un valor."]
-        allowed = _allowed_values(field, ctx)
+        allowed = _allowed_values(field, ctx, owner_obj)
         if allowed is not None:
             bad = [x for x in v if x not in allowed]
             if bad:
@@ -488,6 +495,8 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
         return []
     if t == "create_contact":
         return _check_create_contact(a, where, ctx)
+    if t == "create_deal":
+        return _check_create_deal(a, where, ctx)
     if t == "ask_ai":
         return _check_ask_ai(a, where, ctx)
     if t == "sheets_append":
@@ -522,6 +531,11 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
         ch = (a.get("channel") or "").strip()
         if ch and not _SLACK_CHANNEL_RE.match(ch):
             errs.append(f"{where}: el canal tiene que ser un id de Slack (C0…).")
+        mk = a.get("mention_field")
+        if mk:
+            target, field, cross = resolve(ctx.obj, mk)
+            if not field or field["type"] not in ("owner", "user") or (cross and target != "company"):
+                errs.append(f"{where}: «Mencionar a» tiene que ser una propiedad de usuario.")
         return errs
     if t == "add_note":
         return [] if (a.get("text") or "").strip() else [f"{where}: escribí la nota."]
@@ -574,6 +588,45 @@ def _check_create_contact(a: dict, where: str, ctx: Ctx) -> list[str]:
                 errs.append(f"{where} ({f['label']}): falta el valor.")
         else:
             errs += check_value_for_field(f, v, f"{where} ({f['label']})", Ctx(obj="contact", users=ctx.users))
+    return errs
+
+
+def _check_create_deal(a: dict, where: str, ctx: Ctx) -> list[str]:
+    """Pipeline + etapa, dueño, nombre (admite {tokens}) y propiedades opcionales del negocio.
+    Las etapas válidas salen de la base (Ctx.deal_options["stage"], "<pipeline>:<etapa>")."""
+    errs = []
+    stage = f"{a.get('pipeline_key') or ''}:{a.get('stage_key') or ''}"
+    if ctx.deal_options is not None and stage not in [o["value"] for o in ctx.deal_options.get("stage", [])]:
+        errs.append(f"{where}: elegí el pipeline y la etapa del negocio.")
+    owner = a.get("owner_email")
+    if owner and ctx.users is not None and owner not in ctx.users:
+        errs.append(f"{where}: el dueño del negocio no es un usuario activo del Hub.")
+    if not (isinstance(a.get("name"), str) and a["name"].strip()):
+        errs.append(f"{where}: falta el nombre del negocio.")
+    values = a.get("values") or []
+    if not isinstance(values, list):
+        return errs + [f"{where}: propiedades inválidas."]
+    seen = set()
+    for i, item in enumerate(values, 1):
+        key = item.get("field") if isinstance(item, dict) else None
+        f = OBJECTS["deal"]["fields"].get(key) if isinstance(key, str) else None
+        if not f or f.get("storage") == "expr" or key in ("name", "owner_email"):
+            errs.append(f"{where} (propiedad {i}): elegí la propiedad.")
+            continue
+        if key in seen:
+            errs.append(f"{where}: «{f['label']}» está dos veces.")
+        seen.add(key)
+        v = item.get("value")
+        label = f"{where} ({f['label']})"
+        if f["type"] in ("text", "longtext", "url", "email", "phone"):
+            if not (isinstance(v, str) and v.strip()):
+                errs.append(f"{label}: falta el valor.")
+        elif f["type"] == "enum":
+            allowed = _allowed_values(f, ctx, "deal")
+            if v in (None, "") or (allowed is not None and v not in allowed):
+                errs.append(f"{label}: elegí un valor de la lista.")
+        else:
+            errs += check_value_for_field(f, v, label, Ctx(obj="contact", users=ctx.users))
     return errs
 
 
@@ -679,6 +732,8 @@ def _check_branch(b: dict, where: str, ctx: Ctx) -> list[str]:
     errs = []
     if k == "value":
         _o, field, _c = resolve(ctx.obj, b.get("field"))
+        if _o == "deal":  # un registro puede tener N negocios: no hay «un valor» por el que ramificar
+            field = None
         if not field or field["type"] not in ("enum", "owner", "user"):
             return [f"{where}: elegí una propiedad de lista (status, owner, Lead Life…)."]
         seen = set()
@@ -1103,6 +1158,8 @@ def _rule_py(rule: dict, row: dict, as_of: date, now: datetime, history: dict, o
     if target == "company":
         comp = related.get("company")
         return bool(comp) and _rule_py_on(field, rule, comp["row"], as_of, now, comp["history"], target)
+    if target == "deal":
+        return any(_rule_py_on(field, rule, d, as_of, now, {}, target) for d in related.get("deals") or [])
     return any(_rule_py_on(field, rule, c["row"], as_of, now, c["history"], target) for c in related.get("contacts") or [])
 
 
@@ -1110,7 +1167,8 @@ def matches(conditions, row: dict, as_of: date, now: datetime, history: dict | N
             obj: str = "company", related: dict | None = None) -> bool:
     """¿La fila cumple? Sin condiciones = sí (para filtros opcionales).
     `related`: {"company": {"row", "history"}} en un contacto,
-               {"contacts": [{"row", "history"}, ...]} en una empresa."""
+               {"contacts": [{"row", "history"}, ...]} en una empresa,
+               y en los dos {"deals": [fila, ...]} (filas de engine.deals_of)."""
     if not has_conditions(conditions):
         return True
     history = history or {}

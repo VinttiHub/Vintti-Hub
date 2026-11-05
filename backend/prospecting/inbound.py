@@ -161,6 +161,9 @@ def map_payload(payload: dict) -> tuple[dict, dict]:
             continue
         if nk in _WEBSITE:
             extra["website"] = store._clean_text(v)
+            # Y también es la propiedad «URL del sitio web» del contacto (2026-11-05).
+            if extra["website"] and "website" not in data:
+                data["website"] = extra["website"]
             continue
         if nk in _EVENT_NAME:
             extra["event_name"] = store._clean_text(v)

@@ -1275,6 +1275,37 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   "Abandoned Calendar"` (`ABANDONED_ORIGIN_DETAIL`). Esa llegada **nunca trae reunión**: se tira
   la fecha que venga (era la hora del form y, como la reunión se pisa siempre, borraba la real), y
   si el mail ya tiene reunión no se marca. Agendar después no borra la marca (fill-if-empty).
+- **Slack en workflows (2026-11-05)**: `send_slack` acepta `mention_field` (una propiedad `user` /
+  `owner`, también `company.<key>`) → `<@ID>` al principio vía `daily_digest.people.slack_id()`,
+  puesta **después** de `slack.esc()`; sin ID, el nombre en negrita; sobre un dummy nunca menciona.
+  En cualquier texto, `{campo:<clave>}` de una propiedad de persona sale con el **nombre**, no el
+  email (`_token_text`). Para el workflow «propiedades incompletas» volvieron al contacto
+  `website` («URL del sitio web», también la guarda la llegada de Calendly) y `headcount`
+  (opciones de HubSpot), con el mismo `name` que HubSpot para que el sync las traiga.
+- **Condiciones sobre negocios asociados (2026-11-05)**: en un workflow de contacto o de
+  empresa (y en los filtros avanzados), `deal.<key>` = «tiene algún negocio asociado que…»
+  (contacto: `prospect_deal_contacts`; empresa: `prospect_deals.company_id`). **Sólo
+  condiciones**: no hay acciones ni `{campo:deal.x}`, ni ramas por valor, ni operadores de
+  historial. `objects.OBJECTS["deal"]` es destino de cruce, no objeto de workflow
+  (`WORKFLOW_OBJECTS`). Campos sintéticos: `stage` = `"<pipeline_key>:<stage_key>"` («Closed
+  Win (Proceso De Contratación)») y `pipeline`. Las opciones salen de la base
+  (`workflows.deal_condition_options()` → `Ctx.deal_options` y `workflow_schema.deal_fields`);
+  en Python, `engine.deals_of()` arma las mismas columnas que la expresión SQL.
+- **Acción «Crear registro (negocio)» (`create_deal`, 2026-11-05)**: contactos y empresas.
+  `pipeline_key` + `stage_key` (validados contra `Ctx.deal_options["stage"]`), `owner_email`,
+  `name` con tokens y `values` opcionales del catálogo de negocios. `engine._create_deal()` →
+  `deals.create_deal(check_required=False)` asociado al contacto y a su empresa; un registro dummy
+  crea un negocio dummy. **No pasa por `deal_to_hub`** (eso corre al mover de etapa) y **crea uno
+  nuevo en cada ejecución** aunque ya haya otro abierto (decisión de la owner, como HubSpot). Para
+  el workflow «reunión agendada → negocio» volvieron al contacto `vintti_ai` (bool) y
+  `date_of_meeting_scheduled` (date), con el `name` de HubSpot. **Mientras siga prendido en HubSpot
+  el workflow que crea ese negocio, el del Hub tiene que quedar inactivo**: el sync de negocios
+  traería el de HubSpot y habría dos.
+- **Desplegables con buscador (2026-11-05)**: `docs/assets/js/prospecting-select-search.js`
+  (en `prospecting.html` y `prospecting-company.html`) reemplaza la lista nativa de todo
+  `<select>` simple con 8+ opciones por un panel que filtra al tipear (sin acentos, por palabras,
+  también por el `<optgroup>`). Elige poniendo el valor y disparando `change` con bubbles: los
+  listeners de siempre no cambian. `data-nosearch` lo excluye.
 - **Qualified / SQL exigen contacto**: si la empresa queda en esos status sin un contacto con
   `REQUIRED_ON_QUALIFIED` completos, `contact_incomplete = TRUE`. El PATCH responde
   `needs_contact` y la página abre «Completá el contacto». Se recalcula en cada cambio de

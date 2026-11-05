@@ -7,7 +7,8 @@ una línea acá: las que no son columna propia viven en `prospect_contacts.props
 (JSONB), así que no hace falta ALTER.
 
 Quedan afuera, a propósito, las que la planilla marca DESACTIVADO o "ya no se
-usa": Painpoint (Intro Call), Pain Point y Headcount.
+usa": Painpoint (Intro Call) y Pain Point. Headcount también estaba afuera y volvió
+el 2026-11-05: lo pide el workflow «propiedades incompletas → Slack» de HubSpot.
 
 `storage`: "col" = columna de prospect_contacts (las que se filtran / ordenan
 seguido); por defecto, "props".
@@ -94,6 +95,10 @@ CONTACT_FIELDS = [
        description="Fecha y hora de la reunión agendada."),
     _f("combined_lead_scoring", "Combined Lead Scoring", "number", G[1]),
     _f("intent", "Intent", "text", G[1], description="(Antes: Contact Reason)"),
+    # 2026-11-05, para el workflow «reunión agendada → negocio» (mismo `name` que HubSpot).
+    _f("vintti_ai", "Vintti AI", "bool", G[1], description="Lead de Vintti AI: su negocio va al pipeline de Mia."),
+    _f("date_of_meeting_scheduled", "Date of Meeting Scheduled", "date", G[1],
+       description="Día en que se agendó la reunión."),
     _f("role_to_hire", "Role to Hire", "longtext", G[1], description="Qué rol busca contratar este contacto."),
     _f("what_looking_for", "What are you looking for?", "text", G[1],
        description="Sólo leads de Vintti AI, al agendar la Intro Call."),
@@ -116,6 +121,10 @@ CONTACT_FIELDS = [
     _f("outsourced_before", "Outsourced before", "multi", G[2],
        ["NA", "No", "Philippines", "India", "LATAM", "South Africa", "Yes", "No Info"]),
     _f("company_linkedin_url", "Linkedin URL - Company", "url", G[2]),
+    # 2026-11-05, para el workflow «propiedades incompletas → Slack». Mismo `name` que en
+    # HubSpot (website / headcount): el sync de contactos las trae solas.
+    _f("website", "URL del sitio web", "url", G[2]),
+    _f("headcount", "Headcount", "enum", G[2], ["1-10", "11-50", "51-200", "201-500", "+500"]),
     # ---- Seguimiento BDR --------------------------------------------------- #
     _f("bdr_follow_up_result", "BDR Follow Up Result", "enum", G[3], _FOLLOW_UP,
        "Resultado del último follow up del BDR."),

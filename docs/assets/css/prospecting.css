@@ -2292,3 +2292,27 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
   border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
 .pd-req__list .pc-field.is-missing .pr-filter__input { border-color: color-mix(in srgb, var(--pr-mag) 55%, #fff); }
 .pd-req__msg { color: #a3128e; min-height: 1em; }
+
+/* ---- Buscador de desplegables (prospecting-select-search.js) ---------------- */
+.pr-ss {
+  position: fixed; z-index: 4000; display: flex; flex-direction: column;
+  background: var(--pr-card); border: 1px solid var(--pr-rule); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(13, 18, 30, .16); overflow: hidden; font-family: inherit;
+}
+.pr-ss__q {
+  margin: 8px; padding: 7px 10px; border: 1px solid var(--pr-rule); border-radius: 8px;
+  font: inherit; font-size: 13.5px; color: var(--pr-ink); background: var(--pr-card-soft); outline: none;
+}
+.pr-ss__q:focus { border-color: color-mix(in srgb, var(--pr-violet) 55%, #fff); background: var(--pr-card); }
+.pr-ss__list { overflow-y: auto; padding: 0 6px 6px; min-height: 0; flex: 1; }
+.pr-ss__group {
+  padding: 8px 8px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--pr-ink-3);
+}
+.pr-ss__opt {
+  padding: 7px 10px; border-radius: 7px; font-size: 13.5px; color: var(--pr-ink); cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.pr-ss__opt.is-selected { font-weight: 700; }
+.pr-ss__opt.is-active { background: color-mix(in srgb, var(--pr-violet) 12%, #fff); }
+.pr-ss__empty { padding: 4px 16px 12px; font-size: 13px; color: var(--pr-ink-3); }

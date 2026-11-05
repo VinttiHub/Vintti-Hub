@@ -1188,6 +1188,21 @@ def _deal_schema(cur) -> dict:
             "groups": DEAL_GROUPS, "pipelines": deals.pipelines(cur), "export_fields": deals.export_fields()}
 
 
+def _deal_condition_schema(cur) -> list[dict]:
+    from prospecting.objects import OBJECTS
+    from prospecting.workflows import deal_condition_options
+
+    opts = deal_condition_options(cur)
+    out = []
+    for key, f in OBJECTS["deal"]["fields"].items():
+        g = {k: v for k, v in f.items() if k != "sql"}
+        g.update(editable=False, history=False)
+        if g["type"] == "enum":
+            g["options"] = opts.get(key, [])
+        out.append(g)
+    return out
+
+
 def options(cur) -> dict:
     bdrs = list_bdrs(cur)
     return {
@@ -1225,6 +1240,9 @@ def options(cur) -> dict:
             "weekdays": WEEKDAYS,
             "history_fields": sorted(set(EDITABLE_FIELDS) | set(CLAY_FIELDS)),
             "objects": _object_schema(),
+            # Campos de negocio para las condiciones `deal.*` («Algún negocio · …»). Aparte
+            # de `objects`: no hay workflows de negocio.
+            "deal_fields": _deal_condition_schema(cur),
             # jsonify ordena las claves alfabéticamente: el orden de los menús va aparte.
             "order": {
                 "actions": list(ACTIONS), "triggers": list(TRIGGERS), "events": list(EVENTS),

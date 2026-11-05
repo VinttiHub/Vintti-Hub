@@ -37,12 +37,16 @@
      propiedades se ofrecen y qué significa `company.<key>` / `contact.<key>`. */
   var curObj = "company";
   var CROSS = { company: "contact", contact: "company" };
-  var CROSS_PREFIX_LABEL = { company: "Empresa · ", contact: "Algún contacto · " };
+  var CROSS_PREFIX_LABEL = { company: "Empresa · ", contact: "Algún contacto · ", deal: "Algún negocio · " };
+  /* Objetos asociados que puede mirar una CONDICIÓN (`deal.x` = «tiene algún negocio que…»).
+     Las acciones y los textos sólo usan CROSS. Igual que objects.CROSS_TARGETS. */
+  var CROSS_TARGETS = { company: ["contact", "deal"], contact: ["company", "deal"] };
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return P.esc(v); }
   function S() { return P.options().workflow_schema || {}; }
   function objFields(obj) {
+    if (obj === "deal") return S().deal_fields || [];
     var o = (S().objects || {})[obj];
     return o ? o.fields : (obj === "company" ? (S().fields || []) : []);
   }
@@ -52,7 +56,7 @@
     var i = String(key).indexOf(".");
     if (i !== -1) {
       var pre = key.slice(0, i), k = key.slice(i + 1);
-      if (pre !== CROSS[curObj]) return null;
+      if ((CROSS_TARGETS[curObj] || []).indexOf(pre) === -1) return null;
       var f = objFields(pre).filter(function (x) { return x.key === k; })[0];
       return f ? Object.assign({}, f, { key: key, label: CROSS_PREFIX_LABEL[pre] + f.label, cross: pre }) : null;
     }
@@ -100,7 +104,7 @@
     if (!f) return [];
     if (f.type === "owner") return bdrChoices();
     if (f.type === "user") return (P.options().users || []).map(function (u) { return { value: u.email, label: u.name || u.email }; });
-    return (f.options || []).map(function (o) { return { value: o, label: o }; });
+    return (f.options || []).map(function (o) { return o && typeof o === "object" ? o : { value: o, label: o }; });
   }
   function choiceLabel(f, v) {
     var hit = choices(f).filter(function (c) { return c.value === v; })[0];
@@ -132,15 +136,17 @@
   /* Opciones de propiedad: las del objeto y, con `cross`, las del objeto asociado
      (en un <optgroup> aparte). En un workflow de contacto, "Empresa · X" es la
      empresa del contacto; en uno de empresa, "Algún contacto · X". */
-  function fieldOptions(selected, filterFn, cross) {
+  function fieldOptions(selected, filterFn, cross, withDeals) {
     var ok = filterFn || function () { return true; };
     var own = objFields(curObj).filter(ok).map(function (f) { return { value: f.key, label: f.label }; });
     var objs = S().objects || {};
     if (!cross || !objs[curObj]) return optionTags(own, selected);
     var other = CROSS[curObj];
     var theirs = objFields(other).filter(ok).map(function (f) { return { value: other + "." + f.key, label: CROSS_PREFIX_LABEL[other] + f.label }; });
+    var deals = withDeals ? objFields("deal").filter(ok).map(function (f) { return { value: "deal." + f.key, label: CROSS_PREFIX_LABEL.deal + f.label }; }) : [];
     return '<optgroup label="' + esc(curObj === "contact" ? "Contacto" : "Empresa") + '">' + optionTags(own, selected) + "</optgroup>" +
-      (theirs.length ? '<optgroup label="' + esc(curObj === "contact" ? "Empresa asociada" : "Algún contacto de la empresa") + '">' + optionTags(theirs, selected) + "</optgroup>" : "");
+      (theirs.length ? '<optgroup label="' + esc(curObj === "contact" ? "Empresa asociada" : "Algún contacto de la empresa") + '">' + optionTags(theirs, selected) + "</optgroup>" : "") +
+      (deals.length ? '<optgroup label="Algún negocio asociado">' + optionTags(deals, selected) + "</optgroup>" : "");
   }
   function defaultField() { return curObj === "contact" ? "lead_life" : "prospecting_status"; }
   function dis() { return canEdit ? "" : " disabled"; }
@@ -205,7 +211,7 @@
       case "associate_company": return "Asocia el contacto con la empresa de su dominio de email";
       case "create_todo": return "Crea un To-Do: <em>" + esc(a.text || "—") + "</em>";
       case "send_email": return "Manda un mail: <em>" + esc(a.subject || "—") + "</em>";
-      case "send_slack": return "Avisa por Slack: <em>" + esc(a.text || "—") + "</em>";
+      case "send_slack": return "Avisa por Slack" + (a.mention_field ? " mencionando a <strong>" + esc((field(a.mention_field) || {}).label || a.mention_field) + "</strong>" : "") + ": <em>" + esc(a.text || "—") + "</em>";
       case "add_note": return "Agrega una nota";
       case "webhook": return "Manda un webhook";
       case "enroll_workflow": return "Inscribe en otro workflow";
@@ -213,6 +219,11 @@
       case "format_phone": return "Valida y formatea <strong>" + esc(label) + "</strong> al formato internacional";
       case "ask_ai": return "Pregunta a la IA y guarda la respuesta en <strong>" + esc(a.field === "__note__" ? "una nota" : label) + "</strong>";
       case "create_contact": return "Crea un contacto asociado a la empresa";
+      case "create_deal":
+        var sf = objFields("deal").filter(function (x) { return x.key === "stage"; })[0];
+        return "Crea un negocio en <strong>" + esc(choiceLabel(sf, (a.pipeline_key || "") + ":" + (a.stage_key || "")) || "—") + "</strong>" +
+          (a.owner_email ? " y lo asigna a <strong>" + esc(choiceLabel({ type: "user" }, a.owner_email)) + "</strong>" : "") +
+          ": <em>" + esc(a.name || "—") + "</em>";
       case "sheets_append": return "Agrega una fila a <strong>" + esc(a.sheet || "—") + "</strong> (" + (a.columns || []).length + " columnas)";
     }
     return esc(a.type);
@@ -994,6 +1005,10 @@
     if (a.type === "format_phone") a.country = "AR";
     if (a.type === "ask_ai") { a.prompt = ""; a.field = aiTargets()[0] ? aiTargets()[0].value : "__note__"; }
     if (a.type === "create_contact") a.values = [{ field: "first_name", value: "" }, { field: "email", value: "" }];
+    if (a.type === "create_deal") {
+      a.pipeline_key = "hiring"; a.stage_key = "intro_call"; a.owner_email = "";
+      a.name = curObj === "contact" ? "{campo:company_name}" : "{empresa}"; a.values = [];
+    }
     if (a.type === "sheets_append") { a.spreadsheet = ""; a.sheet = "Hoja 1"; a.columns = [{ field: curObj === "contact" ? "email" : "name" }, { text: "{owner}" }]; }
     return a;
   }
@@ -1830,14 +1845,16 @@
     var groups = (conds.groups || []).map(function (g, gi) {
       var rules = (g.rules || []).map(function (r, ri) {
         var f = field(r.field);
-        var opOptions = ((S().operators_by_type || {})[f ? f.type : "text"] || []).map(function (o) {
+        var opOptions = ((S().operators_by_type || {})[f ? f.type : "text"] || []).filter(function (o) {
+          return !(f && f.history === false && opDef(o).history);  // sin historial (negocios): sin «alguna vez…»
+        }).map(function (o) {
           return '<option value="' + esc(o) + '"' + (o === r.op ? " selected" : "") + ">" +
             esc(opDef(o).label) + "</option>";
         }).join("");
         var path = key + "|" + gi + "|" + ri;
         return (ri ? '<div class="pr-wf-joiner">y</div>' : "") +
           '<div class="pr-wf-rule"><div class="pr-wf-rule__row"><div class="pr-wf-rule__sel">' +
-            '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true) + "</select>" +
+            '<select class="pr-filter__input" data-rfield="' + path + '"' + dis() + ">" + fieldOptions(r.field, null, true, true) + "</select>" +
             '<select class="pr-filter__input" data-rop="' + path + '"' + dis() + ">" + opOptions + "</select></div>" +
             helpBadge(r.op, f) +
             (canEdit && g.rules.length < MAX_RULES ? '<button type="button" class="pr-wf-x" data-rdup="' + path + '" title="Duplicar condición"><i class="fa-regular fa-copy"></i></button>' : "") +
@@ -1964,9 +1981,37 @@
   function area(id, key, value, ph) {
     return '<textarea class="pr-filter__input pr-wf-area" rows="3" data-a="' + key + '" data-node="' + id + '" placeholder="' + esc(ph || "") + '"' + dis() + ">" + esc(value || "") + "</textarea>";
   }
+  /* «Insertar propiedad»: agrega {campo:clave} al final del texto `key` de la acción. */
+  function tokenPicker(id, key) {
+    return '<div class="pr-wf-row"><span class="pr-wf-lbl">Insertar propiedad</span><select class="pr-filter__input" data-token-node="' + id + '" data-token-key="' + key + '"' + dis() + '><option value="">Elegir…</option>' +
+      fieldOptions("", null, curObj === "contact") + "</select></div>";
+  }
+  function isPersonField(f) { return f.type === "user" || f.type === "owner"; }
   var TOKENS_COMPANY = '<p class="pr-note pr-wf-tokens">Podés usar: {empresa} {dominio} {owner} {status} {semana} {not_icp} {link} · y cualquier propiedad con {campo:clave}</p>';
   var TOKENS_CONTACT = '<p class="pr-note pr-wf-tokens">Podés usar: {contacto} {email_contacto} {empresa} {owner} {status} {link} · y cualquier propiedad con {campo:clave}</p>';
   var TOKENS = TOKENS_COMPANY;
+
+  /* Filas propiedad = valor de «Crear registro» (contacto o negocio), sobre `a.values`.
+     `minRows`: cuántas filas quedan sin botón de quitar. */
+  function valueRows(id, a, cfs, minRows) {
+    return (a.values || []).map(function (it, i) {
+            var cf = cfs.filter(function (x) { return x.key === it.field; })[0];
+            var valInput;
+            if (cf && (cf.type === "enum" || cf.type === "owner" || cf.type === "user")) {
+              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + '><option value="">Elegir…</option>' + optionTags(choices(cf), it.value) + "</select>";
+            } else if (cf && cf.type === "bool") {
+              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + ">" +
+                optionTags([{ value: "", label: "Elegir…" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }], it.value === true ? "true" : it.value === false ? "false" : (it.value || "")) + "</select>";
+            } else {
+              var ty = cf && (cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text");
+              valInput = '<input type="' + (ty || "text") + '" class="pr-filter__input" data-cc="' + id + "|" + i + '|value" value="' + esc(it.value == null ? "" : it.value) + '" placeholder="Valor (admite {empresa}…)"' + dis() + ">";
+            }
+            return '<div class="pr-wf-kv"><select class="pr-filter__input" data-cc="' + id + "|" + i + '|field"' + dis() + '><option value="">Propiedad…</option>' +
+              optionTags(cfs.filter(function (x) { return x.type !== "multi" && x.type !== "datetime"; }).map(function (x) { return { value: x.key, label: x.label }; }), it.field) + "</select>" +
+              valInput + (canEdit && (a.values || []).length > minRows ? '<button type="button" class="pr-wf-x" data-cc-del="' + id + "|" + i + '" title="Quitar"><i class="fa-solid fa-xmark"></i></button>' : "") + "</div>";
+          }).join("") +
+          (canEdit ? '<button type="button" class="pr-wf-add" data-cc-add="' + id + '"><i class="fa-solid fa-plus"></i> Agregar propiedad</button>' : "");
+  }
 
   function actionParams(id, a, meta) {
     TOKENS = curObj === "contact" ? TOKENS_CONTACT : TOKENS_COMPANY;
@@ -2028,8 +2073,12 @@
           inp(id, "to_others", others, "text", ' placeholder="otros mails @vintti.com, separados por coma"') +
           inp(id, "subject", a.subject, "text", ' placeholder="Asunto"') + area(id, "body", a.body, "Texto del mail") + TOKENS + "</div>";
       case "send_slack":
-        return '<div class="pr-wf-full">' + area(id, "text", a.text, "Mensaje") +
-          inp(id, "channel", a.channel, "text", ' placeholder="Canal (id C0…). Vacío = el canal por defecto del Hub"') + TOKENS + "</div>";
+        return '<div class="pr-wf-full">' + area(id, "text", a.text, "Mensaje") + tokenPicker(id, "text") +
+          inp(id, "channel", a.channel, "text", ' placeholder="Canal (id C0…). Vacío = el canal por defecto del Hub"') +
+          '<div class="pr-wf-row"><span class="pr-wf-lbl">Mencionar a</span><select class="pr-filter__input" data-a="mention_field" data-node="' + id + '"' + dis() + ">" +
+            '<option value="">Nadie</option>' + fieldOptions(a.mention_field || "", isPersonField, curObj === "contact") + "</select></div>" +
+          '<p class="pr-note">La persona de esa propiedad recibe una @mención al principio del mensaje. Con registros de prueba sólo sale su nombre.</p>' +
+          TOKENS + "</div>";
       case "add_note":
         return '<div class="pr-wf-full">' + area(id, "text", a.text, "Nota para el historial de la empresa") + TOKENS + "</div>";
       case "webhook":
@@ -2037,32 +2086,26 @@
           '<p class="pr-note">Manda un POST con los datos de la empresa. Sobre empresas dummy se registra y no se manda.</p></div>';
       case "ask_ai":
         return '<div class="pr-wf-full">' + area(id, "prompt", a.prompt, "Qué le preguntás. Ej.: ¿A qué se dedica {empresa} ({dominio})? Respondé en una frase.") +
-          '<div class="pr-wf-row"><span class="pr-wf-lbl">Insertar propiedad</span><select class="pr-filter__input" data-token-node="' + id + '"' + dis() + '><option value="">Elegir…</option>' +
-            fieldOptions("", null, curObj === "contact") + "</select></div>" +
+          tokenPicker(id, "prompt") +
           '<span class="pr-wf-lbl">Guardar la respuesta en</span><select class="pr-filter__input" data-a="field" data-node="' + id + '"' + dis() + ">" +
             optionTags(aiTargets(), a.field) + "</select>" + TOKENS +
           '<p class="pr-note">Usa ' + esc(S().ai_model || "gpt-4o-mini") + '. En la prueba y la vista previa no se llama a la IA.</p></div>';
       case "create_contact":
-        var cfs = objFields("contact");
         return '<div class="pr-wf-full"><span class="pr-wf-lbl">Propiedades del contacto nuevo</span>' +
-          (a.values || []).map(function (it, i) {
-            var cf = cfs.filter(function (x) { return x.key === it.field; })[0];
-            var valInput;
-            if (cf && (cf.type === "enum" || cf.type === "owner" || cf.type === "user")) {
-              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + '><option value="">Elegir…</option>' + optionTags(choices(cf), it.value) + "</select>";
-            } else if (cf && cf.type === "bool") {
-              valInput = '<select class="pr-filter__input" data-cc="' + id + "|" + i + '|value"' + dis() + ">" +
-                optionTags([{ value: "", label: "Elegir…" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }], it.value === true ? "true" : it.value === false ? "false" : (it.value || "")) + "</select>";
-            } else {
-              var ty = cf && (cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text");
-              valInput = '<input type="' + (ty || "text") + '" class="pr-filter__input" data-cc="' + id + "|" + i + '|value" value="' + esc(it.value == null ? "" : it.value) + '" placeholder="Valor (admite {empresa}…)"' + dis() + ">";
-            }
-            return '<div class="pr-wf-kv"><select class="pr-filter__input" data-cc="' + id + "|" + i + '|field"' + dis() + '><option value="">Propiedad…</option>' +
-              optionTags(cfs.filter(function (x) { return x.type !== "multi" && x.type !== "datetime"; }).map(function (x) { return { value: x.key, label: x.label }; }), it.field) + "</select>" +
-              valInput + (canEdit && (a.values || []).length > 1 ? '<button type="button" class="pr-wf-x" data-cc-del="' + id + "|" + i + '" title="Quitar"><i class="fa-solid fa-xmark"></i></button>' : "") + "</div>";
-          }).join("") +
-          (canEdit ? '<button type="button" class="pr-wf-add" data-cc-add="' + id + '"><i class="fa-solid fa-plus"></i> Agregar propiedad</button>' : "") +
+          valueRows(id, a, objFields("contact"), 1) +
           TOKENS + '<p class="pr-note">Se crea dentro de la empresa (si es dummy, el contacto también). Si el email ya existe en otro contacto, el paso falla y queda en el historial.</p></div>';
+      case "create_deal":
+        var stageF = objFields("deal").filter(function (x) { return x.key === "stage"; })[0];
+        var dealFs = objFields("deal").filter(function (x) { return x.storage !== "expr" && x.key !== "name" && x.key !== "owner_email"; });
+        return '<div class="pr-wf-full">' +
+          '<span class="pr-wf-lbl">Pipeline y etapa del negocio</span><select class="pr-filter__input" data-a="deal_stage" data-node="' + id + '"' + dis() + ">" +
+            optionTags(choices(stageF), (a.pipeline_key || "") + ":" + (a.stage_key || "")) + "</select>" +
+          '<span class="pr-wf-lbl">Asignar negocio a</span><select class="pr-filter__input" data-a="owner_email" data-node="' + id + '"' + dis() + '><option value="">Nadie</option>' +
+            optionTags(choices({ type: "user" }), a.owner_email || "") + "</select>" +
+          '<span class="pr-wf-lbl">Nombre del negocio</span>' + inp(id, "name", a.name, "text", ' placeholder="Ej.: {campo:company_name}"') + tokenPicker(id, "name") +
+          '<span class="pr-wf-lbl">Más propiedades (opcional)</span>' + valueRows(id, a, dealFs, 0) +
+          TOKENS + '<p class="pr-note">El negocio queda asociado al ' + (curObj === "contact" ? "contacto y a su empresa" : "registro") +
+          '. Se crea uno nuevo cada vez que el paso corre. Con registros de prueba, el negocio también es de prueba.</p></div>';
       case "sheets_append":
         var sa = S().sheets_service_account;
         return '<div class="pr-wf-full">' +
@@ -2383,6 +2426,9 @@
     if (key === "to_others") {
       var owner = (act.to || []).indexOf("owner") !== -1 ? ["owner"] : [];
       act.to = owner.concat(value.split(/[,\s;]+/).map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean));
+    } else if (key === "deal_stage") {  // "<pipeline>:<etapa>" → los dos parámetros del negocio
+      var ps = String(value).split(":");
+      act.pipeline_key = ps[0] || ""; act.stage_key = ps.slice(1).join(":");
     } else act[key] = value;
   }
 
@@ -2449,8 +2495,8 @@
       cols[Number(sp[1])] = el.value === "__text__" ? { text: "" } : { field: el.value };
     } else if ((a = el.getAttribute("data-token-node"))) {
       if (!el.value) return;
-      var tn = draft.steps.nodes[a].action;
-      tn.prompt = (tn.prompt || "") + (tn.prompt && !/\s$/.test(tn.prompt) ? " " : "") + "{campo:" + el.value + "}";
+      var tn = draft.steps.nodes[a].action, tk = el.getAttribute("data-token-key") || "prompt";
+      tn[tk] = (tn[tk] || "") + (tn[tk] && !/\s$/.test(tn[tk]) ? " " : "") + "{campo:" + el.value + "}";
     } else if ((a = el.getAttribute("data-d"))) {
       n = draft.steps.nodes[el.getAttribute("data-node")];
       if (a === "kind") {

@@ -8,7 +8,9 @@ registro le dice a rules.py / engine.py, por cada objeto:
 
 Condiciones cruzadas: en un workflow de contacto, un campo `company.<key>` es de
 su empresa asociada; en uno de empresa, `contact.<key>` significa "tiene algún
-contacto que…". Las acciones de "Editar registro" sobre `company.<key>` editan la
+contacto que…". Desde los dos, `deal.<key>` es "tiene algún negocio asociado que…"
+(2026-11-05; sólo condiciones: un negocio no se edita ni se lee en textos desde un
+workflow). Las acciones de "Editar registro" sobre `company.<key>` editan la
 empresa asociada (el "Editar la empresa asociada" de HubSpot).
 
 Las claves vienen de catálogos fijos y sólo tienen [a-z0-9_]: nunca del JSON de un
@@ -20,6 +22,29 @@ import re
 
 from prospecting.constants import CLAY_FIELDS, EDITABLE_FIELDS, FIELDS_BY_KEY, TIMEZONE
 from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
+from prospecting.deal_fields import DEAL_FIELDS
+
+
+def _deal_condition_fields() -> dict:
+    """Campos del negocio para condiciones. Las opciones de los desplegables y de la
+    etapa salen de la base (deals.field_defs / prospect_deal_stages): la validación las
+    recibe en `Ctx.deal_options`. Un desplegable sin opciones de fábrica va como texto
+    (el mismo criterio de deals.field_defs sin HubSpot), así el tipo —y con él los
+    operadores— no depende de lo que haya en la base."""
+    out = {
+        # Valor = "<pipeline_key>:<stage_key>": la misma etapa existe en los dos pipelines.
+        "stage": {"key": "stage", "label": "Etapa del negocio", "type": "enum", "storage": "expr",
+                  "sql": "(prospect_deals.pipeline_key || ':' || prospect_deals.stage_key)"},
+        "pipeline": {"key": "pipeline", "label": "Pipeline", "type": "enum", "storage": "expr",
+                     "sql": "prospect_deals.pipeline_key"},
+    }
+    for f in DEAL_FIELDS:
+        g = {k: v for k, v in f.items() if k != "hubspot"}
+        if g["type"] == "enum" and not g.get("options"):
+            g["type"] = "text"
+            g.pop("options", None)
+        out[g["key"]] = g
+    return out
 
 OBJECTS = {
     "company": {
@@ -42,8 +67,23 @@ OBJECTS = {
         "owner_field": "owner_email",
         "cross": "company",
     },
+    # Sólo como destino de condiciones cruzadas (`deal.<key>`): no hay workflows de negocio.
+    "deal": {
+        "label": "Negocios",
+        "table": "prospect_deals",
+        "fields": _deal_condition_fields(),
+        "editable": set(),
+        "history": set(),
+        "event_fk": "deal_id",
+        "owner_field": "owner_email",
+        "cross": None,
+    },
 }
-OBJECT_KEYS = list(OBJECTS)
+# Objetos con los que se arman workflows (el negocio no es uno).
+WORKFLOW_OBJECTS = ("company", "contact")
+OBJECT_KEYS = list(WORKFLOW_OBJECTS)
+# Objetos asociados que una condición puede mirar, por objeto del workflow.
+CROSS_TARGETS = {"company": ("contact", "deal"), "contact": ("company", "deal")}
 
 TEXTUAL = ("enum", "owner", "user", "text", "longtext", "url", "email", "phone")
 _KEY_RE = re.compile(r"^[a-z0-9_]+$")
@@ -55,7 +95,7 @@ def resolve(obj: str, key):
         return None, None, False
     if "." in key:
         prefix, k = key.split(".", 1)
-        if prefix != OBJECTS[obj]["cross"]:
+        if prefix not in CROSS_TARGETS.get(obj, ()):
             return None, None, False
         f = OBJECTS[prefix]["fields"].get(k)
         return (prefix, f, True) if f else (None, None, False)
@@ -68,6 +108,8 @@ def sql_expr(obj: str, field: dict) -> str:
     t = OBJECTS[obj]["table"]
     key = field["key"]
     assert _KEY_RE.match(key)
+    if field.get("storage") == "expr":
+        return field["sql"]
     if obj == "company" or field.get("storage") == "col":
         return f"{t}.{key}"
     raw = f"({t}.props->>'{key}')"
@@ -109,4 +151,10 @@ def cross_wrap(ctx_obj: str, target_obj: str, inner_sql: str) -> str:
     if ctx_obj == "company" and target_obj == "contact":
         return ("EXISTS (SELECT 1 FROM prospect_contacts WHERE "
                 f"prospect_contacts.company_id = prospect_companies.id AND {inner_sql})")
+    if ctx_obj == "contact" and target_obj == "deal":
+        return ("EXISTS (SELECT 1 FROM prospect_deal_contacts dc JOIN prospect_deals ON prospect_deals.id = dc.deal_id "
+                f"WHERE dc.contact_id = prospect_contacts.id AND {inner_sql})")
+    if ctx_obj == "company" and target_obj == "deal":
+        return ("EXISTS (SELECT 1 FROM prospect_deals WHERE "
+                f"prospect_deals.company_id = prospect_companies.id AND {inner_sql})")
     raise ValueError("cruce inválido")
