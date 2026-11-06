@@ -34,7 +34,8 @@ FILTER_KEYS = ("owner", "week", "status", "start_from", "start_to", "q", "contac
 # Vistas de contactos: `name` (nombre + apellido, abre la ficha) y `hub_company` (la empresa
 # del Hub; `company_name` ya es una propiedad del contacto) son columnas de la tabla, no campos.
 CONTACT_EXTRA_COLUMNS = {"name", "hub_company"}
-CONTACT_FILTER_KEYS = ("q", "lead_life", "owner", "dummy")
+# `company` = any / none (con / sin empresa): faltaba y se perdía al guardar (2026-11-06).
+CONTACT_FILTER_KEYS = ("q", "lead_life", "owner", "company", "dummy")
 OBJECTS = ("company", "contact")
 SEGMENT_MAX = 5000
 PAGE_SIZES = (25, 50, 100)
@@ -103,13 +104,21 @@ def clean_segment(raw) -> list[int] | None:
     return ids
 
 
-def _clean_contact_config(cfg) -> dict:
+def _clean_contact_config(cfg, ctx=None) -> dict:
     from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
 
     raw_f = cfg.get("filters") if isinstance(cfg.get("filters"), dict) else {}
     filters = {k: str(raw_f[k])[:200] for k in CONTACT_FILTER_KEYS if raw_f.get(k) not in (None, "", False)}
     if filters.get("dummy") and filters["dummy"] not in ("exclude", "include", "only"):
         filters.pop("dummy")
+    if filters.get("company") and filters["company"] not in ("any", "none"):
+        filters.pop("company")
+    # Filtros avanzados de contacto (2026-11-06): la misma lista blanca de los workflows.
+    advanced = cfg.get("advanced") if has_conditions(cfg.get("advanced")) else None
+    if advanced and ctx is not None:
+        errors = validate_conditions(advanced, "Filtros avanzados", ctx, required=False, obj="contact")
+        if errors:
+            raise InvalidWorkflow(errors)
     cols, seen = [], set()
     for c in cfg.get("columns") or []:
         if isinstance(c, str) and c not in seen and (c in CONTACT_FIELDS_BY_KEY or c in CONTACT_EXTRA_COLUMNS):
@@ -123,7 +132,8 @@ def _clean_contact_config(cfg) -> dict:
     except (TypeError, ValueError):
         page_size = 25
     sort = cfg.get("sort") if parse_sort(cfg.get("sort"), "contact") else None
-    return {"filters": filters, "columns": cols, "page_size": page_size if page_size in PAGE_SIZES else 25, "sort": sort}
+    return {"filters": filters, "advanced": advanced, "columns": cols,
+            "page_size": page_size if page_size in PAGE_SIZES else 25, "sort": sort}
 
 
 def clean_config(cfg, ctx, obj: str = "company") -> dict:
@@ -132,7 +142,7 @@ def clean_config(cfg, ctx, obj: str = "company") -> dict:
         cfg = {}
     segment = clean_segment(cfg.get("segment_ids"))
     if obj == "contact":
-        out = _clean_contact_config(cfg)
+        out = _clean_contact_config(cfg, ctx)
         if segment is not None:
             out["segment_ids"] = segment
         return out

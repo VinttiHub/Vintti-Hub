@@ -174,14 +174,29 @@ def _company_filters(cur, raw: dict):
     return filters, None
 
 
-def _contact_filters(cur, raw: dict) -> dict:
+def _contact_filters(cur, raw: dict):
+    """Filtros de la pestaña Contacts, listos para store. Devuelve (filtros, None) o
+    (None, respuesta de error), como _company_filters()."""
     filters = {k: v for k, v in (raw or {}).items() if v is not None}
     filters.pop("ids", None)
     if filters.get("dummy") in ("include", "only") and not _sees_dummies(_current_email()):
         filters["dummy"] = "exclude"
     if filters.get("segment"):
         filters["ids"] = views_store.segment_ids_of(cur, _current_email(), filters["segment"], "contact")
-    return filters
+    # Filtros avanzados (2026-11-06): condiciones de workflow de CONTACTO, validadas con la
+    # misma lista blanca antes de llegar al SQL.
+    raw_adv = filters.pop("advanced", None)
+    if raw_adv:
+        try:
+            adv = json.loads(raw_adv) if isinstance(raw_adv, str) else raw_adv
+        except ValueError:
+            return None, (jsonify({"error": "Filtros avanzados inválidos."}), 400)
+        errors = validate_conditions(adv, "Filtros avanzados", wf_store._ctx(cur, obj="contact"), required=False,
+                                     obj="contact")
+        if errors:
+            return None, (jsonify({"error": "Los filtros avanzados tienen errores.", "errors": errors}), 400)
+        filters["advanced"] = adv
+    return filters, None
 
 
 # --------------------------------------------------------------------------- #
@@ -432,7 +447,10 @@ def contacts_list():
         denied = _gate(cur)
         if denied:
             return denied
-        data = store.list_contacts(cur, _contact_filters(cur, request.args.to_dict()))
+        filters, err = _contact_filters(cur, request.args.to_dict())
+        if err:
+            return err
+        data = store.list_contacts(cur, filters)
     return jsonify(_json_safe(data))
 
 
@@ -611,7 +629,10 @@ def _bulk_target_ids(cur, body: dict, obj: str, limit: int = BULK_MAX):
                 return None, err
             ids = store.company_ids(cur, filters)
         else:
-            ids = store.contact_ids(cur, _contact_filters(cur, body["filters"]))
+            filters, err = _contact_filters(cur, body["filters"])
+            if err:
+                return None, err
+            ids = store.contact_ids(cur, filters)
     else:
         return None, (jsonify({"error": "Mandá `ids` o `filters`."}), 400)
     if not ids:

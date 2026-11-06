@@ -2820,7 +2820,7 @@
 
   function withExt(fn) {
     var saved = { obj: curObj, edit: canEdit };
-    curObj = "company";
+    curObj = (ext && ext.obj) || "company";  // filtros avanzados de empresas o de contactos
     canEdit = true;
     try { return fn(); } finally { curObj = saved.obj; canEdit = saved.edit; }
   }
@@ -2899,9 +2899,9 @@
 
   /* Dibuja el armador en `el` sobre una COPIA de `conds`. onChange recibe las
      condiciones (o null) en cada cambio; nada se aplica hasta que la tabla lo pide. */
-  function conditionsPanel(el, conds, onChange) {
+  function conditionsPanel(el, conds, onChange, obj) {
     P = P || window.Prospecting;
-    ext = { holder: { conditions: hasConds(conds) ? clone(conds) : null }, el: el, onChange: onChange };
+    ext = { holder: { conditions: hasConds(conds) ? clone(conds) : null }, el: el, onChange: onChange, obj: obj || "company" };
     el.onclick = extClick;
     el.onchange = extChange;
     el.oninput = extInput;
@@ -2911,9 +2911,12 @@
       clear: function () { if (ext && ext.el === el) { ext.holder.conditions = null; extChanged(true); } },
     };
   }
-  function conditionsSummary(conds) {
+  function conditionsSummary(conds, obj) {
     P = P || window.Prospecting;
-    return withExt(function () { return conditionsText(conds); });
+    var saved = { obj: curObj, edit: canEdit };
+    curObj = obj || "company";
+    canEdit = true;
+    try { return conditionsText(conds); } finally { curObj = saved.obj; canEdit = saved.edit; }
   }
 
   window.ProspectingWorkflows = {

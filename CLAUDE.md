@@ -1544,6 +1544,14 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (`bindHeaderDrag()`, empresas y contactos); en «Todos los contactos» quedan en el navegador y no entran en las pestañas de empresas. En `/contacts`,
   `company_name` sigue siendo la empresa del Hub (la leen workflows y fichas); la propiedad del
   contacto viaja como `contact_company_name` y la del Hub también como `hub_company`.
+- **Vistas de contactos al nivel de Empresas (2026-11-06)**: la tira de Contactos tiene `+` (crear
+  desde la vista actual o en blanco, compartida o no), botón **Columns** y **Advanced filters**. La
+  vista guarda búsqueda / Lead Life / Owner / **Company** (`any`/`none`; faltaba en
+  `CONTACT_FILTER_KEYS` y se perdía al guardar) + filtros avanzados + columnas + orden. Los avanzados
+  son condiciones de workflow de CONTACTO (`conditionsPanel(..., "contact")`, validadas en
+  `_contact_filters()` y `views._clean_contact_config()`); `_contact_where()` los mete como
+  `ct.id IN (SELECT … FROM prospect_contacts WHERE <compile_conditions(…, "contact")>)` porque el
+  compilador escribe sin alias. Verificado: mismo resultado que `engine.matching_ids()`.
 - **Carpetas de workflows (2026-11-03)**, anidadas como en HubSpot: tabla `prospect_wf_folders`
   (`parent_id` NULL = raíz) + `prospect_workflows.folder_id`, autocreadas en `ensure_schema()`.
   Lógica en `backend/prospecting/folders.py`; rutas `POST/PATCH/DELETE /prospecting/workflow-folders`

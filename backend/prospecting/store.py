@@ -1849,6 +1849,17 @@ def _contact_where(f: dict) -> tuple[str, list]:
     if q:
         where.append("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s OR c.name ILIKE %s)")
         params += [f"%{q}%"] * 3
+    # Filtros avanzados (vistas de contactos, 2026-11-06): el route ya los validó. El
+    # compilador de los workflows escribe para `FROM prospect_contacts` sin alias, y acá
+    # la tabla es `ct` con LEFT JOIN `c`: por eso va como subconsulta.
+    advanced = f.get("advanced")
+    if isinstance(advanced, dict) and advanced.get("groups"):
+        from prospecting.engine import as_of_of
+        from prospecting.rules import compile_conditions
+        now = datetime.now().astimezone()
+        adv_sql, adv_params = compile_conditions(advanced, as_of_of(now), now, "contact")
+        where.append(f"ct.id IN (SELECT prospect_contacts.id FROM prospect_contacts WHERE {adv_sql})")
+        params += adv_params
     return (("WHERE " + " AND ".join(where)) if where else ""), params
 
 

@@ -1138,6 +1138,8 @@
   /* Vistas de contactos (la tira de arriba de la pestaña): `null` = «Todos los contactos».
      Las crea «Por segmento» o «Duplicar»; guardan columnas y, si es segmento, los ids. */
   var CT_VIEWS = [], ctView = null, CT_VIEW_KEY = "prospecting_ct_view";
+  // Filtros avanzados de contactos (condiciones de workflow de CONTACTO), se guardan en la vista.
+  var ctAdvanced = null;
   var CT_DEFAULT_COLS = ["name", "hub_company", "email", "position", "lead_life", "owner_email", "meeting_datetime"];
   var CT_SHORT = { name: "Name", hub_company: "Company", owner_email: "Owner", meeting_datetime: "Meeting" };
   function ctViewObj() { return CT_VIEWS.filter(function (v) { return v.id === ctView; })[0] || null; }
@@ -1239,7 +1241,8 @@
     var hiddenN = CT_VIEWS.length - shown.length;
     $("prCtTabs").innerHTML = tab(null, "Todos los contactos", null) + shown.map(function (v) { return tab(v.id, v.name, v); }).join("") +
       (hiddenN > 0 ? '<button type="button" class="pr-tab pr-tab--overflow" id="prCtTabsMore" title="More views" aria-haspopup="menu">' +
-        '<i class="fa-solid fa-ellipsis"></i> ' + hiddenN + " more</button>" : "");
+        '<i class="fa-solid fa-ellipsis"></i> ' + hiddenN + " more</button>" : "") +
+      '<button type="button" class="pr-tab pr-tab--add" id="prCtViewAdd" title="Create a view" aria-label="Create a view"><i class="fa-solid fa-plus"></i></button>';
   }
   function ctShownViews() {
     var shown = CT_VIEWS.slice(0, MAX_TABS - 1);
@@ -1273,6 +1276,9 @@
     $("prCtLead").value = f.lead_life || "";
     $("prCtOwner").value = f.owner || "";
     $("prCtCompany").value = f.company || "";
+    var adv = ((ctViewObj() || {}).config || {}).advanced;
+    ctAdvanced = hasAdvanced(adv) ? JSON.parse(JSON.stringify(adv)) : null;
+    renderCtAdvSummary();
     ctState.page = 1;
     ctSelected = {};
     ctSelAll = null;
@@ -1343,7 +1349,9 @@
   }
   function ctIsDirty() {
     var v = ctViewObj();
+    var savedAdv = ((v || {}).config || {}).advanced;
     return canon(ctFilterInputs()) !== canon(ctSavedFilters(v)) ||
+      canon(hasAdvanced(ctAdvanced) ? ctAdvanced : null) !== canon(hasAdvanced(savedAdv) ? savedAdv : null) ||
       (!!v && canon(ctColumns()) !== canon(normCtCols(v.config && v.config.columns))) ||
       (!!v && ctSort !== ((v.config && v.config.sort) || ""));
   }
@@ -1367,7 +1375,8 @@
     var filters = Object.assign(ctFilterInputs(), (((v || {}).config || {}).filters || {}).dummy ? { dummy: v.config.filters.dummy } : {});
     if (act === "reset") { applyCtView(ctView); return; }
     if (act === "save" && v && v.mine) {
-      patchView(v, { config: Object.assign({}, v.config, { filters: filters, columns: ctColumns(), sort: ctSort || null }) }).then(function () {
+      patchView(v, { config: Object.assign({}, v.config, { filters: filters, advanced: hasAdvanced(ctAdvanced) ? ctAdvanced : null,
+        columns: ctColumns(), sort: ctSort || null }) }).then(function () {
         ctCols = null;
         renderCtViewBar();
         toast('<i class="fa-solid fa-floppy-disk"></i> Saved <strong>' + esc(v.name) + "</strong>.");
@@ -1377,7 +1386,7 @@
     if (act === "saveas") {
       var name = prompt("Name for the new view:", v ? v.name + " (copy)" : "");
       if (!name || !name.trim()) return;
-      var config = { filters: filters, columns: ctColumns(), page_size: 25, sort: ctSort || null };
+      var config = { filters: filters, advanced: hasAdvanced(ctAdvanced) ? ctAdvanced : null, columns: ctColumns(), page_size: 25, sort: ctSort || null };
       if (v && v.config && Array.isArray(v.config.segment_ids)) config.segment_ids = v.config.segment_ids;
       api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name.trim(), object: "contact", config: config, shared: false }) })
         .then(function (nv) {
@@ -1397,8 +1406,96 @@
       dummy: vf.dummy || (ME.sees_dummies ? $("prFDummy").value : "exclude"),
     };
     if (v && v.config && Array.isArray(v.config.segment_ids)) f.segment = v.id;
+    if (hasAdvanced(ctAdvanced)) f.advanced = JSON.stringify(ctAdvanced);
     return f;
   }
+
+  /* ---------- Contactos: filtros avanzados, columnas y «+» (2026-11-06) ----------
+     Lo mismo que en Empresas: el armador de condiciones de Workflows (objeto contacto), el
+     modal de columnas y el popover para crear una vista. Todo se guarda con la vista. */
+  function renderCtAdvSummary() {
+    var n = ruleCount(ctAdvanced);
+    $("prCtAdvCount").textContent = n ? "(" + n + ")" : "";
+    $("prCtAdvBtn").classList.toggle("is-on", n > 0);
+    var box = $("prCtAdvSummary");
+    if (!n || !window.ProspectingWorkflows) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<span class="pr-adv-summary__label"><i class="fa-solid fa-sliders"></i> Advanced</span>' +
+      '<span class="pr-adv-summary__text">' + window.ProspectingWorkflows.conditionsSummary(ctAdvanced, "contact") + "</span>" +
+      '<button type="button" class="pr-btn" data-ctadv="edit">Edit</button>' +
+      '<button type="button" class="pr-btn" data-ctadv="clear" title="Remove advanced filters"><i class="fa-solid fa-xmark"></i></button>';
+  }
+  function openCtAdvanced() {
+    if (!window.ProspectingWorkflows) return;
+    drawerSave = null;
+    $("prDrawerEyebrow").textContent = "Filters";
+    $("prDrawerTitle").textContent = "Advanced filters · Contacts";
+    $("prDrawerSub").textContent = "Groups are joined by OR; conditions inside a group, by AND. Same properties as the contact workflows.";
+    $("prDrawerBody").innerHTML = '<div class="pr-adv-panel" id="prCtAdvPanel"></div>' +
+      '<div class="pr-row" style="margin-top:12px"><button type="button" class="pr-btn" id="prCtAdvClearAll"><i class="fa-solid fa-trash"></i> Clear all</button></div>';
+    $("prDrawerStatus").textContent = "";
+    $("prDrawerFoot").hidden = false;
+    $("prDrawerSave").textContent = "Apply";
+    openDrawer();
+    var panel = window.ProspectingWorkflows.conditionsPanel($("prCtAdvPanel"), ctAdvanced, function () {
+      $("prDrawerStatus").textContent = "";
+    }, "contact");
+    $("prCtAdvClearAll").onclick = function () { panel.clear(); };
+    drawerSave = function () {
+      var conds = panel.get();
+      conds = hasAdvanced(conds) ? conds : null;
+      // Se prueba antes de cerrar: una condición incompleta deja el error a la vista.
+      var probe = Object.assign(ctFilters(), { page: 1, page_size: 5 });
+      delete probe.advanced;
+      if (conds) probe.advanced = JSON.stringify(conds);
+      $("prDrawerStatus").textContent = "Checking…";
+      api("/prospecting/contacts?" + qs(probe)).then(function () {
+        ctAdvanced = conds ? JSON.parse(JSON.stringify(conds)) : null;
+        ctState.page = 1;
+        closeDrawer();
+        renderCtAdvSummary();
+        loadContacts();
+      }).catch(function (err) {
+        $("prDrawerStatus").innerHTML = esc(err.errors ? err.errors.join(" · ") : err.message);
+      });
+    };
+  }
+  /* Columns: en «Todos los contactos» quedan en este navegador; en una vista, como cambio sin
+     guardar (barra Save view / Save as new view), igual que en Empresas. */
+  function openCtColumns() {
+    var v = ctViewObj();
+    columnsModal({
+      title: "Columnas" + (v ? " de «" + esc(v.name) + "»" : ""), fields: ctCatalog(), tableCols: ctColumns(),
+      goIcon: "fa-check", goLabel: "Aplicar", busyLabel: "Aplicando…",
+      onGo: function (cols) { setCtCols(cols); return Promise.resolve(); },
+    });
+  }
+  function ctAddMenu(anchor) {
+    openPop(anchor,
+      '<div class="pr-pop__head">Create new view</div>' +
+      '<form class="pr-pop__form" id="prCtViewCreate">' +
+        '<input class="pr-filter__input" id="prCtViewName" maxlength="60" placeholder="View name" autocomplete="off" required>' +
+        '<label class="pr-check"><input type="radio" name="prCtViewFrom" value="current" checked> Start from the current view (filters, advanced filters, columns, sort)</label>' +
+        '<label class="pr-check"><input type="radio" name="prCtViewFrom" value="blank"> Start blank</label>' +
+        '<label class="pr-check"><input type="checkbox" id="prCtViewShared"> Share with the team</label>' +
+        '<button type="submit" class="pr-btn pr-btn--primary"><i class="fa-solid fa-plus"></i> Create view</button>' +
+      "</form>");
+    setTimeout(function () { var n = $("prCtViewName"); if (n) n.focus(); }, 0);
+  }
+  function createCtView(name, fromCurrent, shared) {
+    var v = ctViewObj();
+    var config = fromCurrent
+      ? { filters: Object.assign(ctFilterInputs(), (((v || {}).config || {}).filters || {}).dummy ? { dummy: v.config.filters.dummy } : {}),
+          advanced: hasAdvanced(ctAdvanced) ? ctAdvanced : null, columns: ctColumns(), page_size: 25, sort: ctSort || null }
+      : { filters: {}, advanced: null, columns: CT_DEFAULT_COLS.slice(), page_size: 25, sort: null };
+    return api("/prospecting/views", { method: "POST", body: JSON.stringify({ name: name, object: "contact", config: config, shared: !!shared }) })
+      .then(function (nv) {
+        CT_VIEWS.push(nv);
+        applyCtView(nv.id);
+        toast('<i class="fa-solid fa-table-list"></i> View <strong>' + esc(nv.name) + "</strong> created" + (shared ? " and shared with the team." : ". Only you can see it."));
+      });
+  }
+
   function renderCtBulk() {
     var bar = $("prCtBulk");
     var ids = Object.keys(ctSelected);
@@ -1508,6 +1605,7 @@
     });
     $("prCtTabs").addEventListener("click", function (e) {
       if (e.target.closest("#prCtTabsMore")) { e.stopPropagation(); ctMoreMenu($("prCtTabsMore")); return; }
+      if (e.target.closest("#prCtViewAdd")) { e.stopPropagation(); ctAddMenu($("prCtViewAdd")); return; }
       var more = e.target.closest("[data-ctv-menu]");
       if (more) { e.stopPropagation(); ctViewMenu(more, Number(more.getAttribute("data-ctv-menu"))); return; }
       var t = e.target.closest("[data-ctv]");
@@ -2377,6 +2475,15 @@
     });
     $("prViewPop").addEventListener("submit", function (e) {
       e.preventDefault();
+      if (e.target.id === "prCtViewCreate") {  // «+» de la tira de contactos
+        var ctName = $("prCtViewName").value.trim();
+        if (!ctName) return;
+        var ctFrom = (document.querySelector('input[name="prCtViewFrom"]:checked') || {}).value !== "blank";
+        var ctShared = $("prCtViewShared").checked;
+        closePop();
+        createCtView(ctName, ctFrom, ctShared).catch(viewError);
+        return;
+      }
       var name = $("prViewName").value.trim();
       if (!name) return;
       var fromCurrent = (document.querySelector('input[name="prViewFrom"]:checked') || {}).value !== "blank";
@@ -2393,6 +2500,17 @@
       if (b) onViewBar(b.getAttribute("data-vb"));
     });
     $("prAdvBtn").addEventListener("click", openAdvanced);
+    $("prCtAdvBtn").addEventListener("click", openCtAdvanced);
+    $("prCtColsBtn").addEventListener("click", openCtColumns);
+    $("prCtAdvSummary").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-ctadv]");
+      if (!b) return;
+      if (b.getAttribute("data-ctadv") === "edit") { openCtAdvanced(); return; }
+      ctAdvanced = null;
+      ctState.page = 1;
+      renderCtAdvSummary();
+      loadContacts();
+    });
     $("prAdvSummary").addEventListener("click", function (e) {
       var b = e.target.closest("[data-adv]");
       if (!b) return;
