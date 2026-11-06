@@ -1240,7 +1240,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `tick()` corre al instante (PATCH de una empresa y webhook de Clay, acotado a esa empresa), en
   el cron horario `.github/workflows/prospecting-workflows.yml` (**prendido desde el 2026-11-03**) y en
   "Avanzar el reloj" del Test panel (hora simulada, sólo dummies). Tope de 50 pasos por corrida
-  contra loops de "ir a".
+  contra loops de "ir a". **`tick()` da varias pasadas** (disparadores → acciones, hasta 6 si es
+  acotado y 2 en el cron global, corta cuando una pasada no inscribe a nadie): un workflow escribe
+  el campo que hace cumplir a otro (23 pone Origin → 27 MQL Source). Con una sola pasada, el
+  encadenado esperaba a la próxima edición del registro o al cron (PRUEBA 2 HUB, 2026-11-06).
 - **Fin de la fase de prueba (2026-11-03)**: `AUTOMATION_REAL_DATA = True` + cron prendido. Con
   `False` todo lo automático sólo tocaba dummies, y por eso las empresas reales de Clay no
   disparaban el workflow 2: había que inscribirlas a mano. Además, al crear una empresa Clay

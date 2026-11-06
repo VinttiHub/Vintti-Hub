@@ -1620,16 +1620,28 @@ def tick(cur, now: datetime | None = None, automatic: bool = True, company_id: i
                 return {"now": now.isoformat(), "dummy_only": dummy_only, "enrolled": 0, "closed": 0,
                         "advanced": 0, "completed": 0, "failed": 0}
     wfs = {w["id"]: w for w in enabled_workflows(cur)}
-    enrolled = 0
+    enrolled = closed = 0
+    stats = {"advanced": 0, "completed": 0, "failed": 0}
     scoped = company_id is not None or contact_ids is not None
-    for wf in wfs.values():
-        t = wf["trigger"].get("type")
-        if t == "filter":
-            enrolled += _sync_filter(cur, wf, now, dummy_only, company_id, actor, contact_ids)
-        elif t == "schedule" and not scoped:
-            enrolled += _fire_schedule(cur, wf, now, dummy_only, actor)
-    closed = _close_by_conditions(cur, wfs, now, dummy_only, company_id, contact_ids) if wfs else 0
-    stats = advance(cur, now, dummy_only, company_id, actor=actor, contact_ids=contact_ids)
+    # Varias pasadas: un workflow puede escribir el campo que hace cumplir a otro (el 23
+    # pone Origin y el 27 pide Origin conocido). Con una sola, el segundo esperaba a la
+    # próxima edición o al cron (PRUEBA 2 HUB, 2026-11-06). Sin riesgo de loop: _sync_filter
+    # sólo inscribe en la transición no cumple → cumple. El cron global, que revisa todas
+    # las tablas, da 2 pasadas; lo que quede lo toma la corrida siguiente.
+    for i in range(6 if scoped else 2):
+        n = 0
+        for wf in wfs.values():
+            t = wf["trigger"].get("type")
+            if t == "filter":
+                n += _sync_filter(cur, wf, now, dummy_only, company_id, actor, contact_ids)
+            elif t == "schedule" and not scoped and i == 0:
+                n += _fire_schedule(cur, wf, now, dummy_only, actor)
+        enrolled += n
+        if i > 0 and n == 0:
+            break
+        closed += _close_by_conditions(cur, wfs, now, dummy_only, company_id, contact_ids) if wfs else 0
+        for k, v in advance(cur, now, dummy_only, company_id, actor=actor, contact_ids=contact_ids).items():
+            stats[k] = stats.get(k, 0) + v
     return {"now": now.isoformat(), "dummy_only": dummy_only, "enrolled": enrolled, "closed": closed, **stats}
 
 
