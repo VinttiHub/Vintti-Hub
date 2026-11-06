@@ -22,7 +22,11 @@ import re
 
 from prospecting.constants import CLAY_FIELDS, EDITABLE_FIELDS, FIELDS_BY_KEY, TIMEZONE
 from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY
-from prospecting.deal_fields import DEAL_FIELDS
+from prospecting.deal_fields import DEAL_FIELDS, DEFAULT_PIPELINES, DEFAULT_STAGES
+
+
+def entered_key(pipeline_key: str, stage_key: str) -> str:
+    return f"entered_{pipeline_key}_{stage_key}"
 
 
 def _deal_condition_fields() -> dict:
@@ -38,6 +42,15 @@ def _deal_condition_fields() -> dict:
         "pipeline": {"key": "pipeline", "label": "Pipeline", "type": "enum", "storage": "expr",
                      "sql": "prospect_deals.pipeline_key"},
     }
+    # «Date entered "<Etapa> (<Pipeline>)"» de HubSpot: deals.stage_dates (última entrada).
+    # Clave entered_<pipeline>_<etapa>; engine.deals_of() arma la misma en Python.
+    for pk, plabel in DEFAULT_PIPELINES:
+        for sk, slabel, *_ in DEFAULT_STAGES:
+            out[entered_key(pk, sk)] = {
+                "key": entered_key(pk, sk), "label": f'Date entered "{slabel} ({plabel})"',
+                "type": "datetime", "storage": "expr",
+                "sql": f"NULLIF(prospect_deals.stage_dates->>'{pk}:{sk}', '')::timestamptz",
+            }
     for f in DEAL_FIELDS:
         g = {k: v for k, v in f.items() if k != "hubspot"}
         if g["type"] == "enum" and not g.get("options"):

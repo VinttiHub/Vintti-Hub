@@ -163,6 +163,9 @@ CONTACT_FIELDS = [
     _f("last_closed_win_date", "Last Closed Win Date", "date", G[6]),
     _f("last_closed_lost_date", "Last Closed Lost Date", "date", G[6]),
     _f("lost_reason_detail", "Lost Reason Detail", "longtext", G[6]),
+    _f("sql_lost_reason", "SQL Lost Reason", "enum", G[6],
+       ["Pricing", "Internal Competition", "Shopping", "Ghosting", "Other", "Timing", "Vintti's Fault",
+        "External Competition"], description="Viene del SQL (AE) Lost Reason del negocio."),
     # Tampoco estaba en la planilla; la usa el workflow 5 de HubSpot. Texto libre
     # hasta que pasen sus opciones (en HubSpot es probablemente una lista).
     _f("mql_ae_lost_reason", "MQL (AE) Lost Reason", "text", G[6],
@@ -189,6 +192,8 @@ CONTACT_FIELDS = [
     _f("referred_by", "Referred By", "text", G[10]),
     _f("referred_by_company", "Referred By (Company)", "text", G[10]),
     _f("referrer_email", "Referrer Email", "email", G[10]),
+    _f("credit_loop", "Credit Loop?", "bool", G[10]),
+    _f("role_hired", "Role Hired", "text", G[10], description="El puesto que se contrató (viene del negocio ganado)."),
     _f("credits_won", "Credits Won", "number", G[10]),
     _f("credits_expiring_date", "Credits Expiring Date", "date", G[10]),
     # Casillas múltiples en HubSpot, pero la planilla no trae sus opciones: texto

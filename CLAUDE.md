@@ -1291,6 +1291,36 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   Win (Proceso De Contratación)») y `pipeline`. Las opciones salen de la base
   (`workflows.deal_condition_options()` → `Ctx.deal_options` y `workflow_schema.deal_fields`);
   en Python, `engine.deals_of()` arma las mismas columnas que la expresión SQL.
+- **Fecha de entrada a cada etapa (2026-11-06)**: `prospect_deals.stage_dates` JSONB
+  `{"<pipeline>:<etapa>": ts}`, la **última** entrada (como `hs_v2_date_entered_*`). La sellan
+  `create_deal`, `move_stage` y `reflect()` (`deals.STAMP_STAGE`); el sync / la importación de
+  HubSpot la pisan con la fecha real de HubSpot **después** del move (`_merge_stage_dates`).
+  Candidate Signed no tiene esa propiedad en HubSpot. En condiciones: `deal.entered_<pipeline>_<etapa>`
+  («Date entered "NDA Sent (Proceso De Contratación)"», tipo datetime; `objects.entered_key()`, la
+  misma clave en `engine.deals_of()`). Backfill ya aplicado: `scripts/backfill_deal_stage_dates.py`
+  (historial del Hub → etapa actual → HubSpot).
+- **Propiedades sincronizadas contacto ↔ negocio ↔ empresa (2026-11-06)**: reemplaza las dos
+  subcarpetas de workflows de HubSpot que copiaban propiedades entre objetos. **No son workflows**
+  (no editan negocios): una tabla `LINKS` en `backend/prospecting/prop_sync.py` + `propagate()`,
+  enganchado al final de `store.update_contact`, `store.update_company` y `deals.update_deal` (cubre
+  UI, edición masiva, workflows, popup y syncs). Políticas del doc de la owner: `contact` (contacto →
+  sus negocios **abiertos**, pisa: Origin, LinkedIn del contacto), `deal` (negocio → todos sus
+  contactos, pisa: MQL/SQL Lost Reason, Model, Role Hired), `common` (el último cambio gana entre
+  contacto y negocios abiertos; la **empresa sólo rellena vacíos**, nunca se pisa lo de Clay). Un
+  negocio cerrado no recibe cambios del contacto, pero lo suyo sí viaja. Anti-loop: lo que escribe
+  lleva `source = "sync:<obj>:<id>"` y eso no se re-propaga; dispara `emit_event` (las condiciones lo
+  ven en el próximo tick). Un valor que no entra en el destino (otra lista) se saltea. Negocio nuevo
+  o contacto recién asociado → `pull_into_deal()` rellena los vacíos del negocio. **Se llena solo
+  sin HubSpot** (`deals.after_stage()`, en create/move/reflect): Lead Life (Deal) por etapa
+  (`LEAD_LIFE_BY_STAGE`), First Deep Dive Date (Deal) al entrar a Deep Dive, y en el contacto First /
+  Last Deep Dive Date = la primera y la última de sus negocios; Credit Loop / Credits Won / Expiring
+  al Close Win desde `account_credit_loop` (`deals._credit_values`). Closed Lost antes de SQL pide
+  **MQL (AE) Lost Reason** en vez de SQL (`deals.lost_before_sql()` → `form_for(before_sql=)`).
+  Propiedades nuevas: negocio `mql_lost_reason`, `lead_life_deal`, `first_deep_dive_date`,
+  `follow_up_date`, `credit_loop`, `credits_won`, `credits_expiring_date`; contacto `credit_loop`,
+  `sql_lost_reason`, `role_hired` (mismo `name` que HubSpot). Datos existentes:
+  `scripts/backfill_prop_sync.py` (en seco reporta diferencias; `--apply` completa sólo las nuevas
+  vacías, primero desde HubSpot). Lead Life del contacto NO está en el mapa (lo manejan workflows).
 - **Acción «Crear registro (negocio)» (`create_deal`, 2026-11-05)**: contactos y empresas.
   `pipeline_key` + `stage_key` (validados contra `Ctx.deal_options["stage"]`), `owner_email`,
   `name` con tokens y `values` opcionales del catálogo de negocios. `engine._create_deal()` →

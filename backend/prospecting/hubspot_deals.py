@@ -74,8 +74,28 @@ class DealMapping:
                 self.fields[f["key"]] = cands
         self._owner = OwnerResolver(self.meta.get("hubspot_owner_id") or {"name": "hubspot_owner_id"}, owners, users)
 
+        self.entered: dict[str, str] = {}  # hs_v2_date_entered_<stage id> -> "<pipeline>:<etapa>"
+
+    def set_stages(self, rows: list[dict]) -> None:
+        """Las etapas con id de HubSpot. Sólo pide las propiedades que existen: las etapas
+        «NDA Sent» y «Candidate Signed» no tienen hs_v2_date_entered_*."""
+        for r in rows:
+            prop = f"hs_v2_date_entered_{r['hubspot_stage_id']}"
+            if prop in self.meta:
+                self.entered[prop] = f"{r['pipeline_key']}:{r['stage_key']}"
+
     def properties(self) -> list[str]:
-        return sorted({p for pl in self.fields.values() for p in pl} | set(ALWAYS))
+        return sorted({p for pl in self.fields.values() for p in pl} | set(ALWAYS) | set(self.entered))
+
+    def stage_dates(self, rec: dict) -> dict:
+        """{"<pipeline>:<etapa>": ISO} con la última entrada a cada etapa según HubSpot."""
+        props = rec.get("properties") or {}
+        out = {}
+        for prop, ps in self.entered.items():
+            dt = _dt(props.get(prop))
+            if dt:
+                out[ps] = dt.isoformat()
+        return out
 
     def _translate(self, prop: str, raw):
         meta = self.meta.get(prop) or {}
@@ -117,7 +137,11 @@ class DealMapping:
 
 
 def load_mapping(cur, client: HubSpotClient) -> DealMapping:
-    return DealMapping(client.get_properties("deals"), client.list_owners(), store.list_users(cur), D.defs_by_key(cur))
+    m = DealMapping(client.get_properties("deals"), client.list_owners(), store.list_users(cur), D.defs_by_key(cur))
+    cur.execute("SELECT pipeline_key, stage_key, hubspot_stage_id FROM prospect_deal_stages "
+                "WHERE hubspot_stage_id IS NOT NULL")
+    m.set_stages(cur.fetchall())
+    return m
 
 
 def _dt(v):
@@ -164,7 +188,7 @@ def build_items(cur, recs: list[dict], mapping: DealMapping, assoc: dict | None,
         seen[STAGE_SEEN] = f"{ps[0]}:{ps[1]}"
         items.append({
             "hs_id": hs_id, "data": data, "invalid": invalid, "seen": seen,
-            "pipeline_key": ps[0], "stage_key": ps[1],
+            "pipeline_key": ps[0], "stage_key": ps[1], "stage_dates": mapping.stage_dates(rec),
             "raw": {k: v for k, v in props.items() if v not in (None, "")},
             "companies": (assoc or {}).get(("companies", hs_id)) if assoc is not None else _assoc(rec, "companies"),
             "contacts": (assoc or {}).get(("contacts", hs_id)) if assoc is not None else _assoc(rec, "contacts"),
@@ -225,15 +249,15 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
         props = {k: v for k, v in d.items() if v is not None and k not in cols}
         tuples.append(tuple([it["pipeline_key"], it["stage_key"], it["company_id"]] + [d.get(c) for c in cols]) + (
             Json(props), IMPORT_SOURCE, it["created_at"], it["modified_at"] or it["created_at"], it["hs_id"],
-            Json(it["seen"]), Json(it["raw"])))
+            Json(it["seen"]), Json(it["raw"]), Json(it.get("stage_dates") or {})))
     res = execute_values(
         cur,
         f"INSERT INTO prospect_deals (pipeline_key, stage_key, company_id, {', '.join(cols)}, props, created_by, "
-        f"created_at, stage_entered_at, hubspot_deal_id, hubspot_seen, raw_payload) VALUES %s "
+        f"created_at, stage_entered_at, hubspot_deal_id, hubspot_seen, raw_payload, stage_dates) VALUES %s "
         f"ON CONFLICT (hubspot_deal_id) WHERE hubspot_deal_id IS NOT NULL DO NOTHING "
         f"RETURNING id, company_id, hubspot_deal_id, created_at",
         tuples,
-        template="(" + ", ".join(["%s"] * (3 + len(cols))) + ", %s, %s, COALESCE(%s, NOW()), COALESCE(%s, NOW()), %s, %s, %s)",
+        template="(" + ", ".join(["%s"] * (3 + len(cols))) + ", %s, %s, COALESCE(%s, NOW()), COALESCE(%s, NOW()), %s, %s, %s, %s)",
         page_size=len(tuples),
         fetch=True,
     )
@@ -287,6 +311,7 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
                     "created_at = COALESCE(%s, created_at) WHERE id = %s",
                     (it["hs_id"], Json(it["seen"]), Json(it["raw"]), it["created_at"], row["id"]))
         it["deal_id"] = row["id"]
+        _merge_stage_dates(cur, row["id"], it)
         return "created", out
 
     it["deal_id"] = ex["id"]
@@ -336,7 +361,16 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
         D.set_contacts(cur, ex["id"], sorted(have | set(add_contacts)), None, source=SYNC_SOURCE)
     if move:
         D.move_stage(cur, ex["id"], move[1], None, source=SYNC_SOURCE, check_required=False, pipeline_key=move[0])
+    # Después del move: la fecha real de HubSpot pisa el NOW() que selló move_stage.
+    _merge_stage_dates(cur, ex["id"], it)
     return ("updated" if out else "same"), out
+
+
+def _merge_stage_dates(cur, deal_id: int, it: dict) -> None:
+    """Las fechas de entrada de HubSpot ganan sobre las del Hub (son la última entrada real)."""
+    if it.get("stage_dates"):
+        cur.execute("UPDATE prospect_deals SET stage_dates = COALESCE(stage_dates, '{}'::jsonb) || %s WHERE id = %s",
+                    (Json(it["stage_dates"]), deal_id))
 
 
 def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False, max_deals: int = 2000,

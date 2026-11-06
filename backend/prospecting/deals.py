@@ -103,6 +103,9 @@ def ensure_schema(cur) -> None:
         )
         """
     )
+    # Fecha de entrada a cada etapa («Date entered …» de HubSpot), {"<pipeline>:<etapa>": ts}.
+    # Guarda la ÚLTIMA entrada, como hs_v2_date_entered_*; se sella en STAMP_STAGE.
+    cur.execute("ALTER TABLE prospect_deals ADD COLUMN IF NOT EXISTS stage_dates JSONB NOT NULL DEFAULT '{}'::jsonb")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_deals_board ON prospect_deals (pipeline_key, stage_key)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_prospect_deals_company ON prospect_deals (company_id)")
     cur.execute(
@@ -559,8 +562,52 @@ def _log_hub(cur, deal: dict, actor: str | None, what: str) -> None:
     store.log_event(cur, deal.get("company_id"), "hub", actor, None, None, f"hub_{what}", deal_id=deal["id"])
 
 
+def lost_before_sql(deal: dict) -> bool:
+    """¿El negocio nunca llegó a SQL? (etapa actual y todas por las que pasó, antes de SQL).
+    Un negocio sin etapa todavía (borrador del popup) cuenta como antes de SQL."""
+    sql = rank("sql")
+    stages = [deal.get("stage_key")] + [k.partition(":")[2] for k in (deal.get("stage_dates") or {})]
+    ranks = [rank(s) for s in stages if s]
+    return all(r is None or r < sql for r in ranks)
+
+
 def missing_for(deal: dict, stage_key: str) -> list[str]:
-    return [k for k in required_for(stage_key) if deal.get(k) in (None, "", [])]
+    return [k for k in required_for(stage_key, before_sql=lost_before_sql(deal)) if deal.get(k) in (None, "", [])]
+
+
+# Lead Life (Deal) por etapa (decisión de la owner, 2026-11-06). Etapas de HubSpot sin rank
+# (hs_*) no la tocan.
+LEAD_LIFE_BY_STAGE = {
+    "intro_call": "MQL (AE)", "sql": "SQL (AE)", "deep_dive": "SQL (AE)", "nda_sent": "SQL (AE)",
+    "nda_signed": "SQL (AE)", "signed": "SQL (AE)", "closed_won": "Active Client", "closed_lost": "Closed Lost",
+}
+
+
+def after_stage(cur, deal_id: int, pipeline: str, stage: str, actor: str | None) -> None:
+    """Lo que se llena solo al entrar a una etapa (sin depender de HubSpot): Lead Life (Deal),
+    y en Deep Dive la First Deep Dive Date del negocio (si está vacía) + First / Last Deep Dive
+    Date de sus contactos."""
+    cur.execute("SELECT * FROM prospect_deals WHERE id = %s", (deal_id,))
+    raw = cur.fetchone()
+    if raw is None:
+        return
+    d = _flatten(raw)
+    patch = {}
+    ll = LEAD_LIFE_BY_STAGE.get(stage)
+    if ll and d.get("lead_life_deal") != ll:
+        patch["lead_life_deal"] = ll
+    if stage == "deep_dive" and not d.get("first_deep_dive_date"):
+        patch["first_deep_dive_date"] = ((raw.get("stage_dates") or {}).get(f"{pipeline}:deep_dive")
+                                         or datetime.now(timezone.utc).isoformat())
+    if patch:
+        update_deal(cur, deal_id, patch, actor, source="deal_stage")
+    if stage == "deep_dive" or "first_deep_dive_date" in patch:
+        from prospecting import prop_sync
+        prop_sync.deep_dive_dates_for_contacts(cur, deal_id, actor)
+
+
+# Sella la entrada a una etapa en stage_dates (parámetro: "<pipeline>:<etapa>").
+STAMP_STAGE = "stage_dates = COALESCE(stage_dates, '{}'::jsonb) || jsonb_build_object(%s::text, to_jsonb(NOW()))"
 
 
 def create_deal(cur, data: dict, actor: str | None, source: str = "user", is_dummy: bool = False,
@@ -590,12 +637,13 @@ def create_deal(cur, data: dict, actor: str | None, source: str = "user", is_dum
     names = list(cols)
     cur.execute(
         f"""
-        INSERT INTO prospect_deals (pipeline_key, stage_key, company_id, is_dummy, props, created_by
+        INSERT INTO prospect_deals (pipeline_key, stage_key, company_id, is_dummy, props, created_by, stage_dates
                                     {''.join(', ' + c for c in names)})
-        VALUES (%s, %s, %s, %s, %s, %s {''.join(', %s' for _ in names)})
+        VALUES (%s, %s, %s, %s, %s, %s, jsonb_build_object(%s::text, to_jsonb(NOW())) {''.join(', %s' for _ in names)})
         RETURNING *
         """,
-        [pipeline, stage, company_id, bool(is_dummy), Json({k: v for k, v in props.items() if v is not None}), actor]
+        [pipeline, stage, company_id, bool(is_dummy), Json({k: v for k, v in props.items() if v is not None}), actor,
+         f"{pipeline}:{stage}"]
         + [cols[c] for c in names],
     )
     row = _flatten(cur.fetchone())
@@ -606,7 +654,12 @@ def create_deal(cur, data: dict, actor: str | None, source: str = "user", is_dum
             _log(cur, row, source, actor, k, None, v)
     if contact_ids:
         set_contacts(cur, row["id"], contact_ids, actor, source, log=True)
-    return row
+    else:
+        from prospecting import prop_sync
+        prop_sync.pull_into_deal(cur, row["id"], actor)
+    after_stage(cur, row["id"], pipeline, stage, actor)
+    cur.execute("SELECT * FROM prospect_deals WHERE id = %s", (row["id"],))
+    return _flatten(cur.fetchone())
 
 
 def update_deal(cur, deal_id: int, patch: dict, actor: str | None, source: str = "user") -> tuple[dict, list]:
@@ -630,6 +683,8 @@ def update_deal(cur, deal_id: int, patch: dict, actor: str | None, source: str =
                     [cols[c] for c in cols] + [Json(new_props), deal_id])
         for ch in changes:
             _log(cur, before, source, actor, ch["field"], ch["old"], ch["new"])
+        from prospecting import prop_sync
+        prop_sync.propagate(cur, "deal", deal_id, changes, actor, source)
     cur.execute("SELECT * FROM prospect_deals WHERE id = %s", (deal_id,))
     return _flatten(cur.fetchone()), changes
 
@@ -676,13 +731,14 @@ def move_stage(cur, deal_id: int, stage_key: str, actor: str | None, source: str
         if miss:
             raise MissingFields(stage_key, miss)
     cur.execute(
-        "UPDATE prospect_deals SET stage_key = %s, pipeline_key = %s, stage_entered_at = NOW(), updated_at = NOW() "
-        "WHERE id = %s",
-        (stage_key, pipeline, deal_id),
+        "UPDATE prospect_deals SET stage_key = %s, pipeline_key = %s, stage_entered_at = NOW(), updated_at = NOW(), "
+        + STAMP_STAGE + " WHERE id = %s",
+        (stage_key, pipeline, f"{pipeline}:{stage_key}", deal_id),
     )
     if pipeline != deal["pipeline_key"]:
         _log(cur, deal, source, actor, "pipeline", deal["pipeline_key"], pipeline)
     _log(cur, deal, source, actor, "stage", old, stage_key)
+    after_stage(cur, deal_id, pipeline, stage_key, actor)
     cur.execute("SELECT * FROM prospect_deals WHERE id = %s", (deal_id,))
     return {"deal": _flatten(cur.fetchone()), "old_stage": old, "changed": True}
 
@@ -734,8 +790,9 @@ def stage_form(cur, stage_key: str, deal: dict | None = None, company_id=None, c
     company, contact = _related(cur, company_id, contact_ids)
     defs = defs_by_key(cur)
     form = []
-    req = set(required_for(stage_key))
-    keys = [x["key"] for x in form_for(stage_key)]
+    before_sql = lost_before_sql(deal)
+    req = set(required_for(stage_key, before_sql=before_sql))
+    keys = [x["key"] for x in form_for(stage_key, before_sql=before_sql)]
     # Role to hire / Model (sin eso no hay oportunidad) sólo se piden si faltan.
     keys += [k for k in req if k not in keys and deal.get(k) in (None, "", [])]
     for k in keys:
@@ -834,6 +891,9 @@ def set_contacts(cur, deal_id: int, contact_ids: list[int], actor: str | None, s
                         (deal_id, cid))
     if drop:
         cur.execute("DELETE FROM prospect_deal_contacts WHERE deal_id = %s AND contact_id = ANY(%s)", (deal_id, drop))
+    if add:
+        from prospecting import prop_sync
+        prop_sync.pull_into_deal(cur, deal_id, actor)
     if log and (add or drop):
         names = _contact_names(cur, add + drop)
         if add:
@@ -942,6 +1002,8 @@ def copy_closing_values(cur, deal_id: int) -> int:
         if r.get("opp_close_date"):
             patch["closed_lost_date"] = str(r["opp_close_date"])[:10]
             patch["close_date"] = str(r["opp_close_date"])[:10]
+    if stage == "close win":
+        patch.update(_credit_values(cur, r["opportunity_id"], r.get("account_id")))
     if not patch:
         return 0
     try:
@@ -949,6 +1011,30 @@ def copy_closing_values(cur, deal_id: int) -> int:
     except ValueError:
         return 0
     return len(changes)
+
+
+def _credit_values(cur, opportunity_id: int, account_id) -> dict:
+    """Credit Loop? / Credits Won / Credits Expiring Date del Close Win, desde el Credit Loop del
+    hub: el crédito que generó ESA oportunidad (utils/credit_loop.create_credit_for_close_win).
+    Sin crédito, Credit Loop? sale de `account.credit_loop` (texto Yes/No) si está cargado."""
+    cur.execute("SELECT credit_amount, expires_at, status FROM account_credit_loop "
+                "WHERE source_opportunity_id = %s AND status <> 'reversed' ORDER BY credit_id DESC LIMIT 1",
+                (opportunity_id,))
+    c = cur.fetchone()
+    if c:
+        out = {"credit_loop": True, "credits_expiring_date": str(c["expires_at"])[:10]}
+        if c["credit_amount"] is not None:
+            out["credits_won"] = float(c["credit_amount"])
+        return out
+    if account_id:
+        cur.execute("SELECT credit_loop FROM account WHERE account_id = %s", (account_id,))
+        a = cur.fetchone()
+        v = str((a or {}).get("credit_loop") or "").strip().lower()
+        if v in ("yes", "true", "si", "sí"):
+            return {"credit_loop": True}
+        if v in ("no", "false"):
+            return {"credit_loop": False}
+    return {}
 
 
 def reflect(cur, deal_ids: list[int] | None = None, pipeline: str | None = None, values: bool = False) -> dict:
@@ -1018,10 +1104,12 @@ def reflect(cur, deal_ids: list[int] | None = None, pipeline: str | None = None,
         if _stage(cur, r["pipeline_key"], target) is None:
             continue
         cur.execute(
-            "UPDATE prospect_deals SET stage_key = %s, stage_entered_at = NOW(), updated_at = NOW() WHERE id = %s",
-            (target, r["id"]),
+            "UPDATE prospect_deals SET stage_key = %s, stage_entered_at = NOW(), updated_at = NOW(), "
+            + STAMP_STAGE + " WHERE id = %s",
+            (target, f"{r['pipeline_key']}:{target}", r["id"]),
         )
         store.log_event(cur, r["company_id"], "opportunity", None, "stage", r["stage_key"], target, deal_id=r["id"])
+        after_stage(cur, r["id"], r["pipeline_key"], target, None)
         moved += 1
     # Los valores de Signed / Close Win / Closed Lost: en el cron, al abrir un negocio y cuando la
     # etapa recién se movió (no en cada carga del tablero: es una consulta por oportunidad).

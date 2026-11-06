@@ -27,7 +27,7 @@ DEAL_GROUPS = ["Negocio", "Calificación (SQL)", "Empresa y contacto", "Origen",
 # Fallback de las listas cuando todavía no se leyeron de HubSpot (las de verdad las guarda
 # deals.seed_stages_from_hubspot() en prospect_deal_field_options, desde la definición de
 # cada propiedad de deal en HubSpot: así los desplegables son iguales a los de HubSpot).
-from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY as _CF  # noqa: E402
+from prospecting.contact_fields import CONTACT_FIELDS_BY_KEY as _CF, LEAD_LIFE as _LEAD_LIFE  # noqa: E402
 
 _POSITIONS = _CF["position"]["options"]
 _COMPANY_TYPES = _CF["company_type"]["options"]
@@ -35,6 +35,10 @@ _INDUSTRIES = _CF["industria"]["options"]
 _ORIGINS = _CF["origin"]["options"]
 _CHANNELS = _CF["conversion_channel"]["options"]
 _OUTSOURCED = _CF["outsourced_before"]["options"]
+# Opciones de «MQL (AE) Lost Reason (Deal)» en HubSpot (deal_lost_reason, 2026-11-06).
+MQL_LOST_REASONS = ["Ghosting", "Internal Competition", "Shopping", "Pricing", "Blacklist", "Timing",
+                    "Vintti's Fault", "Other", "External Competition", "Vendor", "Challenge", "Role Fit",
+                    "Not decision maker"]
 _SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001-10000", "10001+"]
 
 
@@ -126,6 +130,21 @@ DEAL_FIELDS = [
     _f("lost_reason", "Lost Reason", "enum", G[7], LOST_REASONS, hubspot=["sql_ae_lost_reason"]),
     _f("lost_reason_detail", "Lost Reason Detail", "longtext", G[7], hubspot=["lost_reason_detail_deal"]),
     _f("closed_lost_date", "Closed Lost Date", "date", G[7], hubspot=["closed_lost_date_deal", "Closed Lost Date (Deal)"]),
+    # ---- 2026-11-06: las que copiaban los workflows «negocio ↔ contacto» de HubSpot ----- #
+    # (prop_sync.py las mantiene iguales; las del Hub se llenan solas, ver deals.py).
+    _f("mql_lost_reason", "MQL (AE) Lost Reason", "enum", G[7], MQL_LOST_REASONS,
+       hubspot=["deal_lost_reason", "MQL (AE) Lost Reason"],
+       description="Se pide en Closed Lost si el negocio se perdió antes de llegar a SQL."),
+    _f("lead_life_deal", "Lead Life (Deal)", "enum", G[0], _LEAD_LIFE, hubspot=["lead_life_deal", "Lead Life (Deal)"],
+       description="Se pone sola según la etapa (deals.LEAD_LIFE_BY_STAGE)."),
+    _f("first_deep_dive_date", "First Deep Dive Date (Deal)", "datetime", G[4],
+       hubspot=["deep_dive_date", "First Deep Dive Date (Deal)"],
+       description="La primera vez que el negocio entró a Deep Dive."),
+    _f("follow_up_date", "Follow Up Date", "date", G[2], hubspot=["follow_up_date", "Follow Up Date"]),
+    _f("credit_loop", "Credit Loop?", "bool", G[6], hubspot=["credit_loop", "Credit Loop?"]),
+    _f("credits_won", "Credits Won", "number", G[6], hubspot=["credits_won", "Credits Won"]),
+    _f("credits_expiring_date", "Credits Expiring Date", "date", G[6],
+       hubspot=["credits_expiring_date", "Credits Expiring Date"]),
 ]
 DEAL_FIELDS_BY_KEY = {f["key"]: f for f in DEAL_FIELDS}
 DEAL_COLUMNS = [f["key"] for f in DEAL_FIELDS if f["storage"] == "col"]
@@ -206,13 +225,21 @@ DEFAULT_STAGES = [
 ]
 
 
-def form_for(stage_key: str) -> list[dict]:
-    return [{"key": k, "required": r} for k, r in STAGE_FORMS.get(stage_key, [])]
+def _form_rows(stage_key: str, before_sql: bool = False) -> list[tuple]:
+    rows = STAGE_FORMS.get(stage_key, [])
+    # Perdido antes de SQL (en Intro Call): el motivo es el de MQL, como en HubSpot.
+    if stage_key == "closed_lost" and before_sql:
+        rows = [("mql_lost_reason", r) if k == "lost_reason" else (k, r) for k, r in rows]
+    return rows
 
 
-def required_for(stage_key: str, from_stage: str | None = None) -> list[str]:
+def form_for(stage_key: str, before_sql: bool = False) -> list[dict]:
+    return [{"key": k, "required": r} for k, r in _form_rows(stage_key, before_sql)]
+
+
+def required_for(stage_key: str, from_stage: str | None = None, before_sql: bool = False) -> list[str]:
     """Campos obligatorios para llegar a `stage_key`."""
-    out = [k for k, r in STAGE_FORMS.get(stage_key, []) if r]
+    out = [k for k, r in _form_rows(stage_key, before_sql) if r]
     rank = STAGE_RANK.get(stage_key)
     if rank is not None and rank >= STAGE_RANK["deep_dive"]:
         out += [k for k in MIN_FOR_OPPORTUNITY if k not in out]

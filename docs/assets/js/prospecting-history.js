@@ -42,6 +42,10 @@
     var src = String(ev.source || "");
     if (src.indexOf("bulk:") === 0) return esc(P().ownerName(ev.actor) || ev.actor || "—") + bulkTag(src);
     if (src.indexOf("workflow:") === 0) return '<i class="fa-solid fa-diagram-project"></i> Workflow #' + esc(src.slice(9));
+    /* Propiedades sincronizadas (backend/prospecting/prop_sync.py): source = "sync:<obj>:<id>". */
+    var sy = /^sync:(contact|deal|company):(\d+)$/.exec(src);
+    if (sy) return '<i class="fa-solid fa-arrows-rotate"></i> Copiado ' + ({ contact: "del contacto", deal: "del negocio", company: "de la empresa" })[sy[1]] + " #" + sy[2];
+    if (src === "deal_stage") return '<i class="fa-solid fa-handshake"></i> Cambio de etapa del negocio';
     if (src === "clay") return "Clay";
     if (src === "zapier" || src === "calendly") return "Calendly (Zapier)";
     if (src === "seed") return "Datos de prueba";

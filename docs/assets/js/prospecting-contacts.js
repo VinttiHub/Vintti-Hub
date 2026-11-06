@@ -330,7 +330,9 @@
   function historyHtml(events) {
     if (!events.length) return '<p class="pr-note">Sin cambios todavía.</p>';
     return '<ul class="pr-events">' + events.map(function (ev) {
+      var sy = /^sync:(contact|deal|company):(\d+)$/.exec(String(ev.source || ""));
       var who = String(ev.source || "").indexOf("workflow:") === 0 ? "Workflow " + ev.source.slice(9)
+        : sy ? "Copiado " + ({ contact: "del contacto", deal: "del negocio", company: "de la empresa" })[sy[1]] + " #" + sy[2]
         : ev.source === "seed" ? "Datos de prueba" : (P().ownerName(ev.actor) || ev.actor || ev.source);
       var what = ev.field === "__note__" ? "Nota: " + esc(ev.new_value)
         : ev.field ? esc(label(ev.field)) + ": " + esc(fmtEv(ev.field, ev.old_value)) + " → " + esc(fmtEv(ev.field, ev.new_value))

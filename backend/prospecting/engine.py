@@ -248,6 +248,7 @@ def deals_of(cur, obj: str, record_id: int) -> list[dict]:
     company_id), como los lee una condición `deal.*`: props aplanadas + `stage` y `pipeline`
     con el mismo valor que su expresión SQL en objects._deal_condition_fields()."""
     from prospecting.deals import _flatten
+    from prospecting.objects import entered_key
 
     if obj == "contact":
         cur.execute("SELECT d.* FROM prospect_deals d JOIN prospect_deal_contacts dc ON dc.deal_id = d.id "
@@ -262,6 +263,10 @@ def deals_of(cur, obj: str, record_id: int) -> list[dict]:
         # _flatten pasa amount a float y close_date a texto (es para la API): la condición
         # compara como el SQL, con número y fecha.
         d["close_date"] = r["close_date"]
+        # Date entered de cada etapa: misma clave que objects.entered_key().
+        for ps, ts in (r.get("stage_dates") or {}).items():
+            pk, _, sk = ps.partition(":")
+            d[entered_key(pk, sk)] = ts
         out.append(d)
     return out
 

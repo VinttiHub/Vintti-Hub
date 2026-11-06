@@ -803,6 +803,9 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
     updated = cur.fetchone()
     for col, old, new in changes:
         log_event(cur, company_id, source, actor, col, old, new)
+    from prospecting import prop_sync  # lazy: prop_sync importa store
+    prop_sync.propagate(cur, "company", company_id, [{"field": f, "old": o, "new": n} for f, o, n in changes],
+                        actor, source)
     out = dict(updated)
     if "prospecting_status" in patch:
         out["contact_incomplete"] = recompute_contact_incomplete(cur, company_id, status=out["prospecting_status"])
@@ -1459,6 +1462,8 @@ def update_contact(cur, contact_id: int, patch: dict, actor: str | None, source:
         for ch in changes:
             log_event(cur, raw["company_id"], source, actor, ch["field"], ch["old"], ch["new"], contact_id=contact_id)
         recompute_contact_incomplete(cur, raw["company_id"])
+        from prospecting import prop_sync  # lazy: prop_sync importa store
+        prop_sync.propagate(cur, "contact", contact_id, changes, actor, source)
     cur.execute("SELECT * FROM prospect_contacts WHERE id = %s", (contact_id,))
     return {**_flatten_contact(cur.fetchone()), "_changes": changes}
 
