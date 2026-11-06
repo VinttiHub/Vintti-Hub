@@ -198,7 +198,7 @@
   /* ---------- Columnas ----------
      Los 21 campos de la planilla de propiedades de HubSpot, con el mismo nombre.
      Cada persona elige cuáles ver (botón Columns); se recuerda en este navegador.
-     `def: true` = visibles por defecto (las de la vista "Prospecting Companies"). */
+     `def: true` = visibles por defecto (las de la vista "Companies"). */
   function cellText(v) { return v == null || v === "" ? "—" : esc(v); }
   function cellLong(v) {
     return v == null || v === "" ? "—" : '<span class="pr-long" title="' + esc(v) + '">' + esc(v) + "</span>";
@@ -1840,17 +1840,10 @@
      Qué pestañas ve cada persona y en qué orden también se guarda en el servidor:
      las 4 fijas se pueden ocultar. Backend: backend/prospecting/views.py.
      ===================================================================== */
-  var SYS_TABS = {
-    "sys:all": "Prospecting Companies",
-    "sys:mine": "My companies",
-    "sys:unassigned": "Unassigned",
-    "sys:recycled": "Recycled",
-  };
-  var SYS_OVERRIDES = {
-    "sys:mine": { owner: "__me__" },
-    "sys:unassigned": { owner: "__none__" },
-    "sys:recycled": { status: "Recycled" },
-  };
+  // Una sola vista fija para todos, «Companies» (2026-11-06): siempre primera, no se oculta
+  // ni se arrastra. My companies / Unassigned / Recycled se arman con + (vistas propias).
+  var SYS_TABS = { "sys:all": "Companies" };
+  var SYS_OVERRIDES = {};
   var ACTIVE_KEY = "prospecting_active_tab";
   var VIEWS = { views: [], tabs: Object.keys(SYS_TABS) };
   var baseline = "";      // la vista tal como está guardada, para saber si hay cambios
@@ -2074,7 +2067,7 @@
       var active = onTable && key === state.view;
       var icon = v && v.shared ? ' <i class="fa-solid fa-user-group pr-tab__shared" title="' +
         esc(v.mine ? "Shared with the team" : "Shared by " + (v.owner_name || v.owner_email)) + '"></i>' : "";
-      return '<button type="button" class="pr-tab pr-tab--view' + (active ? " is-active" : "") + '" role="tab" draggable="true" data-tab="' + esc(key) + '">' +
+      return '<button type="button" class="pr-tab pr-tab--view' + (active ? " is-active" : "") + '" role="tab" draggable="' + (isSys(key) ? "false" : "true") + '" data-tab="' + esc(key) + '">' +
         '<i class="fa-solid ' + (segmentOf(key) ? "fa-layer-group" : "fa-table-list") + ' pr-tab__icon"></i>' + esc(tabLabel(key)) + icon +
         (active ? '<span class="pr-tab__more" data-tab-menu="' + esc(key) + '" title="View options" role="button"><i class="fa-solid fa-ellipsis"></i></span>' : "") +
         "</button>";
@@ -2171,9 +2164,8 @@
     var last = VIEWS.tabs.length <= 1;
     var html = '<div class="pr-pop__head">' + esc(tabLabel(key)) + "</div>";
     if (isSys(key)) {
-      html += '<p class="pr-pop__note">Default view. You can hide it from your tabs.</p>' +
-        item("duplicate", "fa-copy", "Save a copy as my view") +
-        (last ? "" : item("remove", "fa-eye-slash", "Hide from my tabs"));
+      html += '<p class="pr-pop__note">Vista de todos, con todas las empresas. Para filtrar a tu manera, guardá una copia o creá una vista con +.</p>' +
+        item("duplicate", "fa-copy", "Save a copy as my view");
     } else if (v && v.mine) {
       html += item("rename", "fa-pen", "Rename") +
         item("duplicate", "fa-copy", "Duplicate") +
@@ -2331,7 +2323,7 @@
       if (!dragTab || !t) return;
       e.preventDefault();
       var target = t.getAttribute("data-tab");
-      if (target === dragTab) { dragTab = null; return; }
+      if (target === dragTab || isSys(target) || isSys(dragTab)) { dragTab = null; return; }  // Companies queda primera
       var tabs = VIEWS.tabs.filter(function (k) { return k !== dragTab; });
       var at = tabs.indexOf(target);
       if (VIEWS.tabs.indexOf(dragTab) < VIEWS.tabs.indexOf(target)) at++;

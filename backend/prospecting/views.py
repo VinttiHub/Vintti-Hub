@@ -7,8 +7,9 @@ Dos tablas, autocreadas desde `store.ensure_schema()`:
     `shared`. Privada por defecto; compartida = cualquiera con acceso a Prospecting
     la puede AGREGAR a sus pestañas y duplicar, pero sólo la dueña la edita.
   * `prospect_view_prefs` — por persona, la lista ordenada de pestañas que ve:
-    `"sys:<all|mine|unassigned|recycled>"` (las fijas, que se pueden ocultar) y
-    `"v:<id>"`. NULL = nunca tocó nada → las 4 fijas + sus vistas.
+    `"sys:all"` («Companies», la única fija desde el 2026-11-06: siempre primera, no se
+    oculta) y `"v:<id>"`. NULL = nunca tocó nada → Companies + sus vistas. Las fijas viejas
+    (`sys:mine` / `sys:unassigned` / `sys:recycled`) guardadas en prefs se caen al leer.
 
 `object` = 'company' (pestañas de la tabla de empresas) o 'contact' (la tira de vistas de
 la pestaña Contacts, en orden de creación). Un **segmento** (Acciones → «Por segmento») es una
@@ -25,7 +26,8 @@ from psycopg2.extras import Json
 from prospecting.constants import FIELDS_BY_KEY, STATUSES
 from prospecting.rules import InvalidWorkflow, has_conditions, normalize_tree, validate_conditions
 
-SYSTEM_TABS = ["sys:all", "sys:mine", "sys:unassigned", "sys:recycled"]
+# Una sola vista fija para todos (pedido de la owner, 2026-11-06): cada uno arma las suyas.
+SYSTEM_TABS = ["sys:all"]
 # Columnas de la tabla que no son campo (se muestran, no se filtran ni ordenan).
 EXTRA_COLUMNS = {"contacts_count"}
 FILTER_KEYS = ("owner", "week", "status", "start_from", "start_to", "q", "contact_incomplete", "dummy")
@@ -250,8 +252,8 @@ def get_tabs(cur, email: str, visible: set[int] | None = None, views: list | Non
             cur.execute("SELECT id FROM prospect_saved_views WHERE owner_email = %s AND object = 'company' ORDER BY created_at, id", (email,))
             own = [x["id"] for x in cur.fetchall()]
         return SYSTEM_TABS + [f"v:{i}" for i in own]
-    # Una vista borrada o que dejó de compartirse se cae sola.
-    return [t for t in r["tabs"] if t in SYSTEM_TABS or (t.startswith("v:") and _tab_id(t) in visible)]
+    # Una vista borrada o que dejó de compartirse se cae sola. «Companies» va siempre primera.
+    return SYSTEM_TABS + [t for t in r["tabs"] if t.startswith("v:") and _tab_id(t) in visible]
 
 
 def _tab_id(t: str) -> int | None:
@@ -269,8 +271,9 @@ def set_tabs(cur, email: str, tabs) -> list[str]:
     for t in tabs:
         if not isinstance(t, str) or t in out:
             continue
-        if t in SYSTEM_TABS or (t.startswith("v:") and _tab_id(t) in visible):
+        if t.startswith("v:") and _tab_id(t) in visible:
             out.append(t)
+    out = SYSTEM_TABS + out  # «Companies» siempre primera: no se oculta ni se mueve
     cur.execute(
         """
         INSERT INTO prospect_view_prefs (user_email, tabs, updated_at) VALUES (%s, %s, NOW())
