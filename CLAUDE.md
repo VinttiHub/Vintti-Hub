@@ -1498,6 +1498,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **lista de bloqueo**: `upsert_from_clay` (clay_record_id o dominio) y los syncs de HubSpot
   (`hubspot_id`) no lo recrean. Calendly sí (un lead que vuelve a agendar es nuevo). Configuración →
   «Registros eliminados» → «Permitir que vuelva» lo saca de la lista.
+- **Alta manual de empresas (2026-11-06)**: botón «Nueva empresa» (sección Empresas) y «Crear
+  empresa "…"» al final del buscador de empresa del panel del contacto (queda asociada al guardar).
+  Un solo modal, `ProspectingContacts.newCompanyModal()`. `POST /prospecting/companies` →
+  `store.create_company()`: cualquiera con acceso, `lead_source = 'Manual'`, owner sólo BDR activo,
+  **dominio repetido → 409 con la existente** («Usar esta»). La lista de borrados no la frena (lo
+  decide una persona). Cada campo con valor queda como cambio desde vacío y pasa por
+  `_run_instant()`, así el owner dispara el workflow 2 igual que con Clay.
 - **Exportar a CSV (2026-10-29)**: Acciones → «Exportar a CSV», con las columnas que se elijan
   (arranca con las de la tabla). `POST /prospecting/companies/export` y `/contacts/export`, mismos
   `ids` / `filters` que la edición masiva (`_bulk_target_ids()`), tope `EXPORT_MAX` = 20000. El

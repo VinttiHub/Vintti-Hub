@@ -335,6 +335,31 @@ def contact_history(contact_id: int):
     return _history("contact", contact_id)
 
 
+@bp.post("/companies")
+def company_create():
+    """Alta manual de una empresa (Empresas → «Nueva empresa», o «Crear empresa» desde el
+    panel del contacto). Cualquiera con acceso, como crear un contacto. Dominio repetido →
+    409 con la existente, para que la página ofrezca usarla."""
+    body = request.get_json(silent=True) or {}
+    actor = _current_email()
+    try:
+        with _Db() as cur:
+            denied = _gate(cur)
+            if denied:
+                return denied
+            row = store.create_company(cur, body, actor)
+            applied = _run_instant(cur, row["id"], "created", row.pop("_changes"), actor)
+            row = engine.load_company(cur, row["id"])
+    except store.CompanyExists as exc:
+        return jsonify({"error": "exists", "existing": _json_safe(exc.existing)}), 409
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    row.pop("raw_payload", None)
+    row.pop("hubspot_seen", None)
+    row["workflows_applied"] = [a["name"] for a in applied]
+    return jsonify(_json_safe(row)), 201
+
+
 @bp.patch("/companies/<int:company_id>")
 def patch_company(company_id: int):
     body = request.get_json(silent=True) or {}

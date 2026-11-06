@@ -796,6 +796,59 @@ def resolve_owner(cur, data: dict) -> str | None:
     return None
 
 
+MANUAL_COMPANY_FIELDS = ("name", "website", "linkedin_url", "industry", "size", "city", "state", "country",
+                         "prospecting_owner_email")
+
+
+class CompanyExists(LookupError):
+    """Ya hay una empresa real con ese dominio: la ruta responde 409 con ella."""
+
+    def __init__(self, existing: dict):
+        super().__init__("exists")
+        self.existing = existing
+
+
+def create_company(cur, data: dict, actor: str | None) -> dict:
+    """Alta manual (botón «Nueva empresa» y «Crear empresa» del panel del contacto).
+
+    Freno por dominio contra las empresas reales (no se duplica lo de Clay / HubSpot). La
+    lista de borrados NO frena: lo decide una persona. Cada campo con valor queda como
+    cambio desde vacío (igual que Clay), así «cambia una propiedad» / «actualizado hoy»
+    la ven y el owner dispara el workflow 2. Devuelve la fila con `_changes`."""
+    vals = {}
+    for k in MANUAL_COMPANY_FIELDS:
+        v = clean_value(k, data.get(k))
+        if v not in (None, ""):
+            vals[k] = v
+    if not vals.get("name"):
+        raise ValueError("Falta el nombre de la empresa.")
+    if vals.get("size") and vals["size"] not in SIZES:
+        raise ValueError(f"Size inválido: {vals['size']}.")
+    owner = vals.get("prospecting_owner_email")
+    if owner and owner not in {b["email"] for b in list_bdrs(cur)}:
+        raise ValueError("El Prospecting Owner tiene que ser un BDR activo.")
+    domain = normalize_domain(vals.get("website"))
+    if domain:
+        cur.execute("SELECT id, name, domain FROM prospect_companies WHERE domain = %s AND NOT is_dummy ORDER BY id LIMIT 1",
+                    (domain,))
+        hit = cur.fetchone()
+        if hit:
+            raise CompanyExists(dict(hit))
+    cols = list(vals) + ["domain", "lead_source", "is_dummy"]
+    params = list(vals.values()) + [domain, "Manual", False]
+    cur.execute(
+        f"INSERT INTO prospect_companies ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) RETURNING *",
+        params,
+    )
+    row = dict(cur.fetchone())
+    log_event(cur, row["id"], "user", actor, None, None, "created")
+    changes = [{"field": k, "old": None, "new": v} for k, v in vals.items()] + \
+              [{"field": "lead_source", "old": None, "new": "Manual"}]
+    for ch in changes:
+        log_event(cur, row["id"], "user", actor, ch["field"], None, ch["new"])
+    return {**row, "_changes": changes}
+
+
 def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user",
                    current: dict | None = None) -> dict | None:
     """Aplica `patch` (ya filtrado a columnas editables) y deja un evento por campo.

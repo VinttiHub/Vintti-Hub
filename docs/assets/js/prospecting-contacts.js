@@ -286,10 +286,12 @@
       if (!text) { box.hidden = true; return; }
       t = setTimeout(function () {
         P().api("/prospecting/companies?q=" + encodeURIComponent(text) + "&page_size=10").then(function (r) {
-          box.innerHTML = r.rows.length ? r.rows.map(function (co) {
+          box.innerHTML = (r.rows.length ? r.rows.map(function (co) {
             return '<button type="button" data-co="' + co.id + '" data-name="' + esc(co.name) + '"><strong>' + esc(co.name) + "</strong>" +
               (co.domain ? ' <span class="pr-note">' + esc(co.domain) + "</span>" : "") + "</button>";
-          }).join("") : '<span class="pr-note">Ninguna empresa coincide.</span>';
+          }).join("") : '<span class="pr-note">Ninguna empresa coincide.</span>') +
+            // Alta manual (2026-11-06): si no está, se crea acá y queda asociada al guardar.
+            '<button type="button" data-co-new="1"><i class="fa-solid fa-plus"></i> Crear empresa <strong>«' + esc(text) + "»</strong></button>";
           box.hidden = false;
         }).catch(function (err) { box.innerHTML = '<span class="pr-note">' + esc(err.message) + "</span>"; box.hidden = false; });
       }, 250);
@@ -298,6 +300,16 @@
       setTimeout(function () { box.hidden = true; if (q.value.trim() !== (pcCompany.name || "")) q.value = pcCompany.name || ""; }, 200);
     });
     box.addEventListener("mousedown", function (e) {
+      var nb = e.target.closest("[data-co-new]");
+      if (nb) {
+        e.preventDefault();
+        box.hidden = true;
+        var emailEl = document.querySelector('#pcBody [data-k="email"]');
+        newCompanyModal({ name: q.value.trim(), website: websiteFromEmail(emailEl ? emailEl.value : "") }, function (co) {
+          setCompany(co.id, co.name);
+        });
+        return;
+      }
       var b = e.target.closest("[data-co]");
       if (!b) return;
       e.preventDefault();
@@ -429,6 +441,89 @@
   }
 
   // fieldControl / readFieldValue: el mismo input por tipo, para la edición masiva de prospecting.js.
+  /* ---------- Alta manual de una empresa (2026-11-06) ----------
+     Lo usan «Nueva empresa» (sección Empresas) y «Crear empresa» del buscador del panel
+     del contacto. POST /prospecting/companies: un dominio que ya existe vuelve 409 con la
+     empresa, y se ofrece usarla en vez de duplicarla. onCreated(row) recibe {id, name, …}. */
+  var FREE_MAIL = ["gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "live.com", "yahoo.com",
+                   "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com"];
+  function websiteFromEmail(email) {
+    var m = /@([^@\s]+)$/.exec(String(email || "").trim().toLowerCase());
+    return m && FREE_MAIL.indexOf(m[1]) === -1 ? m[1] : "";
+  }
+  function newCompanyModal(prefill, onCreated) {
+    prefill = prefill || {};
+    var O = P().options() || {}, me = P().me() || {};
+    var bdrs = O.bdrs || [];
+    var mine = bdrs.some(function (b) { return b.email === me.email; }) ? me.email : "";
+    var inp = function (id, label, val, ph) {
+      return '<label class="pr-filter"><span class="pr-filter__label">' + label + '</span><input type="text" class="pr-filter__input" id="' + id +
+        '" value="' + esc(val || "") + '" placeholder="' + esc(ph || "") + '" autocomplete="off"></label>';
+    };
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit" role="dialog" aria-modal="true">' +
+      "<h3>Nueva empresa</h3>" +
+      inp("ncName", "Nombre de la empresa *", prefill.name) +
+      inp("ncWeb", "Sitio web", prefill.website, "empresa.com") +
+      inp("ncLi", "Página de LinkedIn", "", "https://www.linkedin.com/company/…") +
+      inp("ncInd", "Industria", "") +
+      '<label class="pr-filter"><span class="pr-filter__label">Size</span><select class="pr-filter__input" id="ncSize"><option value="">—</option>' +
+        (O.sizes || []).map(function (x) { return '<option value="' + esc(x) + '">' + esc(x) + "</option>"; }).join("") + "</select></label>" +
+      inp("ncCountry", "País", "") + inp("ncCity", "Ciudad", "") +
+      '<label class="pr-filter"><span class="pr-filter__label">Prospecting Owner</span><select class="pr-filter__input" id="ncOwner"><option value="">Sin owner</option>' +
+        bdrs.map(function (b) { return '<option value="' + esc(b.email) + '"' + (b.email === mine ? " selected" : "") + ">" + esc(b.name || b.email) + "</option>"; }).join("") +
+        "</select></label>" +
+      '<p class="pr-note">Entra con Lead Source «Manual». Si tiene owner, los workflows le ponen status y start date como a las de Clay.</p>' +
+      '<div class="pr-bulkedit__err" id="ncErr" hidden></div>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-nc="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-nc="go"><i class="fa-solid fa-plus"></i> Crear empresa</button></div></div>';
+    document.body.appendChild(box);
+    var q = function (id) { return box.querySelector("#" + id); };
+    var running = false;
+    var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    var err = function (html) { var el = q("ncErr"); el.innerHTML = html; el.hidden = !html; };
+    var done = function (row) { close(); if (onCreated) onCreated(row); };
+    setTimeout(function () { q(prefill.name ? "ncWeb" : "ncName").focus(); }, 0);
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var use = e.target.closest("[data-nc-use]");
+      if (use) { done({ id: Number(use.getAttribute("data-nc-use")), name: use.getAttribute("data-name") }); return; }
+      var b = e.target.closest("[data-nc]");
+      if (!b || running) return;
+      if (b.getAttribute("data-nc") === "cancel") return close();
+      var body = { name: q("ncName").value.trim(), website: q("ncWeb").value.trim(), linkedin_url: q("ncLi").value.trim(),
+        industry: q("ncInd").value.trim(), size: q("ncSize").value, country: q("ncCountry").value.trim(),
+        city: q("ncCity").value.trim(), prospecting_owner_email: q("ncOwner").value };
+      if (!body.name) return err("Poné el nombre de la empresa.");
+      running = true;
+      b.disabled = true;
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando…';
+      err("");
+      P().api("/prospecting/companies", { method: "POST", body: JSON.stringify(body) }).then(function (row) {
+        running = false;
+        var wfs = row.workflows_applied || [];
+        P().toast('<i class="fa-solid fa-building"></i> Empresa <strong>' + esc(row.name) + "</strong> creada" +
+          (wfs.length ? " · corrieron " + wfs.map(function (w) { return "<strong>" + esc(w) + "</strong>"; }).join(", ") : "") + ".");
+        done(row);
+      }).catch(function (e2) {
+        running = false;
+        b.disabled = false;
+        b.innerHTML = '<i class="fa-solid fa-plus"></i> Crear empresa';
+        var ex = e2.existing || (e2.data && e2.data.existing);
+        if (ex) {
+          err("Ya existe <strong>" + esc(ex.name) + "</strong> (" + esc(ex.domain || "") + "). " +
+            '<button type="button" class="pr-wf-link" data-nc-use="' + ex.id + '" data-name="' + esc(ex.name) + '">Usar esta</button> · ' +
+            '<a href="prospecting-company.html?id=' + ex.id + '" target="_blank" rel="noopener">Abrir</a>');
+        } else {
+          err(esc(e2.message));
+        }
+      });
+    });
+  }
+
   window.ProspectingContacts = { open: open, completeFlow: completeFlow, close: close, fmtLocal: fmtLocal,
-    fieldControl: control, readFieldValue: readValue };
+    fieldControl: control, readFieldValue: readValue, newCompanyModal: newCompanyModal };
 })();

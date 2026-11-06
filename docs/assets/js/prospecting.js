@@ -1569,6 +1569,13 @@
         companyId: Number(tr.getAttribute("data-co")) || null,
         onSaved: function () { loadContacts(); } });
     });
+    // Empresa a mano (2026-11-06): al crearla (o elegir la que ya existía) se abre su vista rápida.
+    $("prCoNew").addEventListener("click", function () {
+      window.ProspectingContacts.newCompanyModal({}, function (co) {
+        load();
+        showCompany(co.id);
+      });
+    });
     // Contacto desde cero, con o sin empresa (como en HubSpot, 2026-11-04).
     $("prCtNew").addEventListener("click", function () {
       window.ProspectingContacts.open({ onSaved: function () { loadContacts(); } });
