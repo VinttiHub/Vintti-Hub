@@ -1665,7 +1665,7 @@
     drawerSave = null;
     $("prDrawerEyebrow").textContent = "Test panel";
     $("prDrawerTitle").textContent = "Dummies y reloj de prueba";
-    $("prDrawerSub").textContent = "Solo lo ven mia, manuela y pgonzales. Los BDRs no ven las empresas dummy.";
+    $("prDrawerSub").textContent = "Solo lo ven mia, manuela, bahia y pgonzales. Los BDRs no ven las empresas dummy.";
     $("prDrawerFoot").hidden = true;
     $("prDrawerBody").innerHTML =
       '<section class="pr-section"><h3 class="pr-section__title">1 · Dummy companies</h3>' +

@@ -1222,7 +1222,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **días hábiles / franja horaria** (hora AR). `rules.py` valida y traduce las condiciones a SQL
   **sólo con la lista blanca** `FIELDS` / `OPERATORS` de `constants.py`, y además las evalúa en
   Python para ramas y pruebas: **las dos tienen que dar lo mismo** (hay test de paridad; si tocás
-  un operador, tocá los dos). Editan **pgonzales, manuela y mia** (`WORKFLOW_EDITORS`).
+  un operador, tocá los dos). Editan **pgonzales, manuela, mia y bahia** (`WORKFLOW_EDITORS`).
 - **Los operadores (filtros avanzados + condiciones de workflows) son los del doc de la owner**
   («Hubspot - Hub : NUEVO CRM», 2026-10-28): nombre literal y misma función, en el orden del
   doc (los del tipo → históricos → «Es conocido / Se actualizó…»). Los del hub que el doc no
@@ -1577,7 +1577,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   Cambiar de sección no descarta nada y la última queda en `localStorage`. **Negocios es un
   «Próximamente»**: no existen en Prospecting. **Configuración** (2026-11-03) junta «BDR IDs
   (Clay)» y el «Test panel», que antes eran botones del header sólo para pgonzales: la ven
-  pgonzales, mia y manuela (`can_configure` de `/prospecting/me` = admin o `WORKFLOW_EDITORS`;
+  pgonzales, mia, manuela y bahia (`can_configure` de `/prospecting/me` = admin o `WORKFLOW_EDITORS`;
   `POST /dummy/seed` y `DELETE /dummy` piden lo mismo con `_gate(cur, settings=True)`).
 - **Vistas guardadas por persona (2026-10-14)**, como las de HubSpot: el `+` de las pestañas
   crea una vista con filtros, **filtros avanzados**, columnas en el orden que se arrastren,
@@ -1719,7 +1719,7 @@ sumar su email a ninguna lista.** `sidebar.js` pregunta a `GET /users/access`
   permiten además los detalles (candidate-details, resume-readonly, account-details,
   opportunity-detail, prospecting-company) y profile: `BDR_ALLOWED_PAGES`, por nombre exacto. Antes vivía en `crm.js`
   con 4 emails fijos y de los 15 BDRs sólo alcanzaba a abril. No es
-  `prospecting.store.has_access()`: ese incluye a los editores de workflows (mia, manuela).
+  `prospecting.store.has_access()`: ese incluye a los editores de workflows (mia, manuela, bahia).
 - **Recruiter Power** restringe al revés que antes: ven a todas sólo `FULL_VIEW_EMAILS`
   (pgonzales, agostina, lara, agustin); cualquier otra persona ve sólo su fila.
 - El link de applicants de `opportunity-detail.js` ya caía a `/users/recruiters`.

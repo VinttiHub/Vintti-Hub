@@ -13,7 +13,7 @@
    disparadores) sale de GET /prospecting/options → workflow_schema: no hay una
    segunda copia de esas listas acá.
 
-   Editan: pgonzales, manuela y mia. El resto, sólo lectura.
+   Editan: pgonzales, manuela, mia y bahia. El resto, sólo lectura.
    Depende de window.Prospecting (prospecting.js).
    ===================================================================== */
 (function () {
@@ -438,7 +438,7 @@
       '<div class="pr-wf-top">' +
         '<div><h2 class="pr-wf-title">Workflows</h2>' +
         '<p class="pr-note" style="margin:0">Reglas que trabajan las empresas y los contactos solos, como los workflows de HubSpot.' +
-        (canEdit ? "" : " Sólo pgonzales, manuela y mia pueden editarlos.") + "</p></div>" +
+        (canEdit ? "" : " Sólo pgonzales, manuela, mia y bahia pueden editarlos.") + "</p></div>" +
         (canEdit ? '<div class="pr-wf-top__acts"><button type="button" class="pr-btn" id="prWfNewFolder"><i class="fa-solid fa-folder-plus"></i> Nueva carpeta</button>' +
           '<button type="button" class="pr-btn pr-btn--primary" id="prWfNew"><i class="fa-solid fa-plus"></i> Crear workflow</button></div>' : "") +
       "</div>" + testBanner() +

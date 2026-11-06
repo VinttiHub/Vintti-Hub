@@ -79,6 +79,7 @@ WORKFLOW_EDITORS = {
     "pgonzales@vintti.com",
     "manuela@vintti.com",
     "mia@vintti.com",
+    "bahia@vintti.com",  # 2026-11-06, a pedido de la owner
 }
 
 # Freno de la fase de prueba. Con False, lo AUTOMÁTICO (al editar una empresa, al
