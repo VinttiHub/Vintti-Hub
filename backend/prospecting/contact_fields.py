@@ -145,7 +145,10 @@ CONTACT_FIELDS = [
     _f("how_did_you_find_us", "How did you find us?", "text", G[5],
        description="Respuesta libre del formulario de Calendly (llega por Zapier)."),
     _f("conversion_channel", "Conversion Channel", "enum", G[5],
-       _ORIGINS + ["Email Marketing", "Other", "Newsletter"], "Canal por el que agendó la reunión."),
+       # Instagram / TikTok / Facebook: pedido de la owner (2026-11-06), para el workflow
+       # «UTM Source --> Conversion Channel». En HubSpot no existen.
+       _ORIGINS + ["Email Marketing", "Other", "Newsletter", "Outbound - Instagram", "Outbound - TikTok",
+                   "Outbound - Facebook"], "Canal por el que agendó la reunión."),
     _f("mql_source", "MQL Source", "enum", G[5],
        ["Inbound MQL", "Outbound MQL", "Import", "Event MQL", "Referral MQL", "NA"]),
     _f("booking_source", "Booking Source", "enum", G[5],

@@ -32,6 +32,7 @@ from prospecting.deal_fields import (
     DEAL_FIELDS_BY_KEY,
     DEFAULT_PIPELINES,
     DEFAULT_STAGES,
+    HUB_EXTRA_OPTIONS,
     LOST_REASONS,
     OPPORTUNITY_OWNED_STAGES,
     PREFILL,
@@ -256,7 +257,8 @@ def field_defs(cur) -> list[dict]:
     for f in DEAL_FIELDS:
         g = {k: v for k, v in f.items() if k != "hubspot"}
         if f["type"] == "enum":
-            opts = hs.get(f["key"]) or f.get("options") or []
+            opts = list(hs.get(f["key"]) or f.get("options") or [])
+            opts += [o for o in HUB_EXTRA_OPTIONS.get(f["key"], []) if o not in opts]
             if opts:
                 g["options"] = opts
             else:

@@ -147,6 +147,11 @@ DEAL_FIELDS = [
        hubspot=["credits_expiring_date", "Credits Expiring Date"]),
 ]
 DEAL_FIELDS_BY_KEY = {f["key"]: f for f in DEAL_FIELDS}
+# Opciones que existen sólo en el Hub: se suman a las de HubSpot (deals.field_defs), que si
+# no las reemplazarían. Las mismas que se agregaron al contacto (pedido de la owner, 2026-11-06).
+HUB_EXTRA_OPTIONS = {
+    "conversion_channel": ["Outbound - Instagram", "Outbound - TikTok", "Outbound - Facebook"],
+}
 DEAL_COLUMNS = [f["key"] for f in DEAL_FIELDS if f["storage"] == "col"]
 
 # Orden del pipeline (ranking para "sólo hacia adelante"). Las etapas que HubSpot tenga
