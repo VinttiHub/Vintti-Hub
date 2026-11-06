@@ -46,6 +46,8 @@ LINKS = [
     ("sql_lost_reason", "lost_reason", None, "deal"),
     ("model", "model", None, "deal"),
     ("role_hired", "role_hired", None, "deal"),
+    # 2026-11-06: el Slack de «Pipeline Closed Lost --> Lead Life Closed Lost» lo lee del contacto.
+    ("lost_reason_detail", "lost_reason_detail", None, "deal"),
     # ---- En común ---- #
     ("company_linkedin_url", "linkedin_company", "linkedin_url", "common"),
     ("website", "website", "website", "common"),

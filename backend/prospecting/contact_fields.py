@@ -150,9 +150,9 @@ CONTACT_FIELDS = [
        _ORIGINS + ["Email Marketing", "Other", "Newsletter", "Outbound - Instagram", "Outbound - TikTok",
                    "Outbound - Facebook"], "Canal por el que agendó la reunión."),
     _f("mql_source", "MQL Source", "enum", G[5],
-       ["Inbound MQL", "Outbound MQL", "Import", "Event MQL", "Referral MQL", "NA"]),
+       ["Inbound MQL", "Outbound MQL", "Import MQL", "Event MQL", "Referral MQL", "NA", "Other"]),
     _f("booking_source", "Booking Source", "enum", G[5],
-       ["Inbound MQL", "Outbound MQL", "Referral MQL", "Event MQL", "NA"]),
+       ["Inbound MQL", "Outbound MQL", "Referral MQL", "Event MQL", "NA", "Other"]),
     _f("scheduled_by", "Scheduled By", "user", G[5], description="Quién del equipo agendó la reunión."),
     # ---- Funnel ------------------------------------------------------------ #
     _f("first_intro_call_completed", "First Intro Call Completed", "bool", G[6]),
