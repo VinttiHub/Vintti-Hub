@@ -567,6 +567,11 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
             if row is None and not d.get("name"):
                 stats["sin_nombre"] += 1
                 continue
+            # Eliminada en el Hub (Acciones → Eliminar): no se recrea.
+            if row is None and store.is_deleted(cur, "company", hubspot_id=d["hubspot_company_id"],
+                                                domain=d.get("domain")):
+                stats["eliminada en el Hub (no se recrea)"] += 1
+                continue
             cur.execute("SAVEPOINT hs_company")
             try:
                 kind, out, changes = _apply_one(cur, d, row, mapping, owner, fields, dry_run,

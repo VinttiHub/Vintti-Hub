@@ -411,6 +411,27 @@ def ensure_schema(cur) -> None:
         ON CONFLICT DO NOTHING
         """
     )
+    # Registros eliminados (Acciones → Eliminar, 2026-11-06): quién borró qué, y la lista
+    # que frena a Clay y al sync de HubSpot de volver a crearlos (is_deleted()).
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_deleted_records (
+            id              BIGSERIAL PRIMARY KEY,
+            object          TEXT NOT NULL,
+            record_id       BIGINT NOT NULL,
+            name            TEXT,
+            hubspot_id      TEXT,
+            clay_record_id  TEXT,
+            domain          TEXT,
+            email           TEXT,
+            deleted_by      TEXT,
+            deleted_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_hs_idx ON prospect_deleted_records (object, hubspot_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_clay_idx ON prospect_deleted_records (clay_record_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_domain_idx ON prospect_deleted_records (object, domain)")
     # Vistas guardadas de la tabla, por persona (views.py).
     from prospecting import views
     views.ensure_schema(cur)
@@ -670,6 +691,9 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
         )
         existing = cur.fetchone()
 
+    if existing is None and not is_dummy and is_deleted(cur, "company", clay_record_id=clay_id, domain=domain):
+        raise ValueError("Esta empresa se eliminó en el Hub: no se vuelve a crear. "
+                         "Para que vuelva, quitala de «Registros eliminados» (Configuración).")
     if existing is None:
         cols = ["name", "clay_record_id", "domain", "is_dummy", "raw_payload"]
         vals = [data["name"], clay_id, domain, is_dummy, Json(payload)]
@@ -1469,14 +1493,160 @@ def update_contact(cur, contact_id: int, patch: dict, actor: str | None, source:
 
 
 def delete_contact(cur, contact_id: int, actor: str | None) -> bool:
-    cur.execute("DELETE FROM prospect_contacts WHERE id = %s RETURNING company_id, first_name, last_name, email", (contact_id,))
-    r = cur.fetchone()
-    if r is None:
+    return delete_contacts(cur, [contact_id], actor)["deleted"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Eliminar (Acciones → Eliminar). Lo borrado queda en prospect_deleted_records:
+# es el registro y además la lista que frena a Clay / HubSpot de recrearlo.
+# --------------------------------------------------------------------------- #
+def _close_open_enrollments(cur, col: str, ids: list[int], why: str) -> None:
+    cur.execute(
+        f"""
+        UPDATE prospect_wf_enrollments
+           SET status = 'unenrolled', finished_at = NOW(), wake_at = NULL, wait_deadline = NULL, last_error = %s
+         WHERE {col} = ANY(%s) AND status IN ('active', 'waiting')
+        """,
+        (why, ids),
+    )
+
+
+def _forget_matches(cur, obj: str, ids: list[int]) -> None:
+    """La memoria «ya cumplía» de los workflows de ese objeto (record_id no tiene FK)."""
+    cur.execute(
+        """
+        DELETE FROM prospect_wf_match m USING prospect_workflows w
+         WHERE w.id = m.workflow_id AND COALESCE(w.object, 'company') = %s AND m.record_id = ANY(%s)
+        """,
+        (obj, ids),
+    )
+
+
+def delete_contacts(cur, ids: list[int], actor: str | None) -> dict:
+    """Borra contactos. Su historial queda (prospect_company_events no tiene FK al
+    contacto) con un evento `contact_deleted:<nombre>`; sus inscripciones abiertas se
+    cierran; el id de HubSpot queda bloqueado para que el sync no lo recree."""
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return {"deleted": 0}
+    cur.execute(
+        "DELETE FROM prospect_contacts WHERE id = ANY(%s) "
+        "RETURNING id, company_id, first_name, last_name, email, hubspot_contact_id",
+        (ids,),
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    if not rows:
+        return {"deleted": 0}
+    gone = [r["id"] for r in rows]
+    _close_open_enrollments(cur, "contact_id", gone, "El contacto se eliminó.")
+    _forget_matches(cur, "contact", gone)
+    companies = set()
+    for r in rows:
+        name = " ".join(x for x in (r["first_name"], r["last_name"]) if x) or r["email"] or f"#{r['id']}"
+        cur.execute(
+            """
+            INSERT INTO prospect_deleted_records (object, record_id, name, hubspot_id, email, deleted_by)
+            VALUES ('contact', %s, %s, %s, %s, %s)
+            """,
+            (r["id"], name, r["hubspot_contact_id"], (r["email"] or "").lower() or None, actor),
+        )
+        log_event(cur, r["company_id"], "user", actor, None, None, f"contact_deleted:{name}", contact_id=r["id"])
+        if r["company_id"] is not None:
+            companies.add(r["company_id"])
+    for cid in companies:
+        recompute_contact_incomplete(cur, cid)
+    return {"deleted": len(rows)}
+
+
+def delete_companies(cur, ids: list[int], actor: str | None) -> dict:
+    """Borra empresas. Como en HubSpot, sus contactos NO se borran: quedan sin empresa,
+    con su historial y sus inscripciones (las FK de company_id son ON DELETE CASCADE:
+    hay que soltarlos antes). Los negocios quedan sin empresa (FK SET NULL)."""
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return {"deleted": 0, "contacts_unlinked": 0}
+    cur.execute(
+        "SELECT id, name, hubspot_company_id, clay_record_id, domain FROM prospect_companies WHERE id = ANY(%s)",
+        (ids,),
+    )
+    comps = [dict(r) for r in cur.fetchall()]
+    if not comps:
+        return {"deleted": 0, "contacts_unlinked": 0}
+    ids = [c["id"] for c in comps]
+    names = {c["id"]: c["name"] for c in comps}
+    cur.execute("SELECT id, company_id FROM prospect_contacts WHERE company_id = ANY(%s) FOR UPDATE", (ids,))
+    was = {r["id"]: r["company_id"] for r in cur.fetchall()}
+    unlinked = sorted(was)
+    if unlinked:
+        cur.execute(
+            "UPDATE prospect_contacts SET company_id = NULL, is_primary = FALSE, updated_at = NOW() WHERE id = ANY(%s)",
+            (unlinked,),
+        )
+        # Historial e inscripciones del contacto sobreviven a la empresa.
+        cur.execute(
+            "UPDATE prospect_company_events SET company_id = NULL WHERE company_id = ANY(%s) AND contact_id IS NOT NULL",
+            (ids,),
+        )
+        cur.execute(
+            "UPDATE prospect_wf_enrollments SET company_id = NULL WHERE company_id = ANY(%s) AND contact_id IS NOT NULL",
+            (ids,),
+        )
+        for ctid in unlinked:
+            log_event(cur, None, "user", actor, "company", names.get(was.get(ctid)) or "(empresa eliminada)", None,
+                      contact_id=ctid)
+    _forget_matches(cur, "company", ids)
+    for c in comps:
+        cur.execute(
+            """
+            INSERT INTO prospect_deleted_records (object, record_id, name, hubspot_id, clay_record_id, domain, deleted_by)
+            VALUES ('company', %s, %s, %s, %s, %s, %s)
+            """,
+            (c["id"], c["name"], c["hubspot_company_id"], c["clay_record_id"], c["domain"], actor),
+        )
+    cur.execute("DELETE FROM prospect_companies WHERE id = ANY(%s)", (ids,))
+    return {"deleted": len(comps), "contacts_unlinked": len(unlinked)}
+
+
+def is_deleted(cur, obj: str, hubspot_id=None, clay_record_id=None, domain=None) -> bool:
+    """¿Alguien lo eliminó en el Hub? Lo preguntan Clay y el sync de HubSpot antes de CREAR
+    (Calendly no: una persona que vuelve a agendar es un lead nuevo)."""
+    conds, params = [], [obj]
+    if hubspot_id:
+        conds.append("hubspot_id = %s")
+        params.append(str(hubspot_id))
+    if clay_record_id:
+        conds.append("clay_record_id = %s")
+        params.append(str(clay_record_id))
+    if domain:
+        conds.append("domain = %s")
+        params.append(domain)
+    if not conds:
         return False
-    name = " ".join(x for x in (r["first_name"], r["last_name"]) if x) or r["email"] or f"#{contact_id}"
-    log_event(cur, r["company_id"], "user", actor, None, None, f"contact_deleted:{name}", contact_id=contact_id)
-    recompute_contact_incomplete(cur, r["company_id"])
-    return True
+    cur.execute(f"SELECT 1 FROM prospect_deleted_records WHERE object = %s AND ({' OR '.join(conds)}) LIMIT 1", params)
+    return cur.fetchone() is not None
+
+
+def deleted_hubspot_ids(cur, obj: str, hs_ids: list) -> set:
+    if not hs_ids:
+        return set()
+    cur.execute("SELECT hubspot_id FROM prospect_deleted_records WHERE object = %s AND hubspot_id = ANY(%s)",
+                (obj, [str(x) for x in hs_ids]))
+    return {r["hubspot_id"] for r in cur.fetchall()}
+
+
+def list_deleted(cur, limit: int = 500) -> list[dict]:
+    cur.execute(
+        "SELECT id, object, record_id, name, hubspot_id, clay_record_id, domain, email, deleted_by, deleted_at "
+        "FROM prospect_deleted_records ORDER BY deleted_at DESC, id DESC LIMIT %s",
+        (limit,),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def allow_back(cur, deleted_id: int) -> bool:
+    """Saca un registro de la lista de bloqueo: vuelve con el próximo envío de Clay / HubSpot."""
+    cur.execute("DELETE FROM prospect_deleted_records WHERE id = %s", (deleted_id,))
+    return cur.rowcount == 1
 
 
 def set_contact_company(cur, contact_id: int, company_id: int | None, actor: str | None,

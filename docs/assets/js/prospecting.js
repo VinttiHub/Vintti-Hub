@@ -493,7 +493,9 @@
       item("edit", "fa-pen", "Editar propiedad") +
       item("export", "fa-file-csv", "Exportar a CSV") +
       item("segment", "fa-layer-group", "Por segmento", false, "Vista nueva sólo con estas filas") +
-      (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : ""));
+      (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : "") +
+      // Eliminar: sólo admin + editoras (ME.can_configure); el server frena igual.
+      (ME.can_configure ? item("delete", "fa-trash", "Eliminar", false, "No se puede deshacer").replace("pr-pop__item", "pr-pop__item is-danger") : ""));
     $("prViewPop").classList.add("pr-pop--actions");
   }
 
@@ -856,6 +858,96 @@
         err(esc(e2.message) + (e2.errors ? "<br>" + e2.errors.map(esc).join("<br>") : ""));
       });
     });
+  }
+
+  /* ---------- Acciones → «Eliminar» (sólo admin + editoras) ----------
+     Los tildados o todos los del filtro. Una empresa borrada deja sus contactos SIN
+     empresa (como HubSpot). Lo borrado queda en «Registros eliminados» (Configuración)
+     y Clay / HubSpot no lo vuelven a crear. Más de 25: hay que escribir ELIMINAR. */
+  function openBulkDelete(kind) {
+    var isCo = kind === "company";
+    var sel = isCo ? selected : ctSelected, all = isCo ? selAll : ctSelAll;
+    var ids = Object.keys(sel).map(Number);
+    var n = all ? all.total : ids.length;
+    var noun = isCo ? (n === 1 ? "empresa" : "empresas") : (n === 1 ? "contacto" : "contactos");
+    var strict = n > 25;
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit" role="dialog" aria-modal="true">' +
+      "<h3>Eliminar " + (all ? "las " : "") + n.toLocaleString() + " " + noun + (all ? " que coinciden con los filtros" : "") + "</h3>" +
+      '<p class="pr-note">' + (isCo
+        ? "Sus contactos <strong>no se borran</strong>: quedan sin empresa, con su historial. Sus negocios también quedan sin empresa."
+        : "Se borran con sus datos; su actividad queda en el historial de la empresa. Sus negocios no se borran.") + "</p>" +
+      '<p class="pr-note">No se puede deshacer. Clay y la sincronización con HubSpot no los vuelven a crear ' +
+        "(se habilita de nuevo desde Configuración → Registros eliminados)." + (isCo ? "" : " Si la persona vuelve a agendar por Calendly, entra como contacto nuevo.") + "</p>" +
+      (strict ? '<label class="pr-filter"><span class="pr-filter__label">Escribí ELIMINAR para confirmar</span>' +
+        '<input type="text" class="pr-filter__input" id="prDelConfirm" autocomplete="off"></label>' : "") +
+      '<p class="pr-bulkedit__err" id="prDelErr" hidden></p>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-del="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--danger" data-del="go"><i class="fa-solid fa-trash"></i> Eliminar ' + n.toLocaleString() + "</button></div></div>";
+    document.body.appendChild(box);
+    var running = false;
+    var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    var err = function (msg) { var el = box.querySelector("#prDelErr"); el.innerHTML = msg; el.hidden = !msg; };
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var b = e.target.closest("[data-del]");
+      if (!b || running) return;
+      if (b.getAttribute("data-del") === "cancel") return close();
+      if (strict && box.querySelector("#prDelConfirm").value.trim().toUpperCase() !== "ELIMINAR") return err("Escribí ELIMINAR para confirmar.");
+      if (!strict && !confirm("¿Eliminar " + n.toLocaleString() + " " + noun + "? No se puede deshacer.")) return;
+      running = true;
+      box.querySelectorAll("button, input").forEach(function (x) { x.disabled = true; });
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Eliminando…';
+      err("");
+      var body = all ? { filters: all.filters } : { ids: ids };
+      api("/prospecting/" + (isCo ? "companies" : "contacts") + "/delete", { method: "POST", body: JSON.stringify(body) }).then(function (r) {
+        running = false;
+        close();
+        toast('<i class="fa-solid fa-trash"></i> Se eliminaron <strong>' + r.deleted + "</strong> " + (isCo ? (r.deleted === 1 ? "empresa" : "empresas") : (r.deleted === 1 ? "contacto" : "contactos")) +
+          (r.contacts_unlinked ? " · " + r.contacts_unlinked + " contacto" + (r.contacts_unlinked === 1 ? "" : "s") + " quedaron sin empresa" : "") + ".");
+        if (isCo) { selected = {}; selAll = null; load(); } else { ctSelected = {}; ctSelAll = null; loadContacts(); }
+      }).catch(function (e2) {
+        running = false;
+        box.querySelectorAll("button, input").forEach(function (x) { x.disabled = false; });
+        b.innerHTML = '<i class="fa-solid fa-trash"></i> Eliminar ' + n.toLocaleString();
+        err(esc(e2.message));
+      });
+    });
+  }
+
+  /* Configuración → «Registros eliminados»: lista de lo borrado y «Permitir que vuelva»
+     (lo saca de la lista de bloqueo; el registro vuelve con el próximo envío de Clay/HubSpot). */
+  function showDeleted() {
+    drawerSave = null;
+    $("prDrawerEyebrow").textContent = "Configuración";
+    $("prDrawerTitle").textContent = "Registros eliminados";
+    $("prDrawerSub").textContent = "Clay y la sincronización con HubSpot no los vuelven a crear mientras estén en esta lista.";
+    $("prDrawerFoot").hidden = true;
+    $("prDrawerBody").innerHTML = '<p class="pr-note">Cargando…</p>';
+    openDrawer();
+    api("/prospecting/deleted").then(function (r) {
+      var rows = r.records || [];
+      $("prDrawerBody").innerHTML = rows.length
+        ? '<table class="pr-table"><thead><tr><th>Tipo</th><th>Nombre</th><th>Dominio / email</th><th>Eliminado</th><th></th></tr></thead><tbody>' +
+          rows.map(function (x) {
+            return "<tr><td>" + (x.object === "company" ? "Empresa" : "Contacto") + "</td><td><strong>" + esc(x.name || "#" + x.record_id) + "</strong></td>" +
+              "<td>" + esc(x.domain || x.email || "—") + "</td>" +
+              "<td>" + esc(String(x.deleted_at || "").slice(0, 10)) + '<div class="pr-note">' + esc(x.deleted_by || "") + "</div></td>" +
+              '<td><button type="button" class="pr-btn" data-allow="' + x.id + '" title="Clay / HubSpot lo pueden volver a crear">Permitir que vuelva</button></td></tr>';
+          }).join("") + "</tbody></table>"
+        : '<p class="pr-note">No hay registros eliminados.</p>';
+      $("prDrawerBody").querySelectorAll("[data-allow]").forEach(function (btn) {
+        btn.onclick = function () {
+          api("/prospecting/deleted/" + btn.getAttribute("data-allow"), { method: "DELETE" }).then(function () {
+            btn.closest("tr").remove();
+            toast("Listo: puede volver con el próximo envío de Clay o HubSpot.");
+          }).catch(function (e) { alert(e.message); });
+        };
+      });
+    }).catch(function (e) { $("prDrawerBody").innerHTML = '<p class="pr-note">' + esc(e.message) + "</p>"; });
   }
 
   // Si la fila tiene un valor que ya no está en la lista (dato viejo), igual se muestra.
@@ -2251,6 +2343,7 @@
         if (act === "edit") openBulkEdit(kind);
         else if (act === "export") openExport(kind);
         else if (act === "segment") openSegment(kind);
+        else if (act === "delete") openBulkDelete(kind);
         else openEnrollModal(kind);
         return;
       }
@@ -2478,6 +2571,7 @@
     $("prDrawerSave").addEventListener("click", function () { if (drawerSave) drawerSave(); });
     $("prTestBtn").addEventListener("click", showTestPanel);
     $("prBdrIdsBtn").addEventListener("click", showBdrIds);
+    $("prDeletedBtn").addEventListener("click", showDeleted);
   }
 
   function init() {

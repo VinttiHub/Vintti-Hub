@@ -509,12 +509,61 @@ def contact_patch(contact_id: int):
 
 @bp.delete("/contacts/<int:contact_id>")
 def contact_delete(contact_id: int):
+    # Eliminar es de admin + editoras (decisión de la owner, 2026-11-06), igual que en masa.
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, settings=True)
         if denied:
             return denied
         ok = store.delete_contact(cur, contact_id, _current_email())
     return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
+
+
+# --------------------------------------------------------------------------- #
+# Eliminar en masa (Acciones → Eliminar): tildados o todos los del filtro.
+# Sólo admin + editoras (_can_configure). Lo borrado queda en «Registros eliminados»
+# y Clay / HubSpot no lo recrean (store.is_deleted).
+# --------------------------------------------------------------------------- #
+def _bulk_delete(obj: str):
+    body = request.get_json(silent=True) or {}
+    actor = _current_email()
+    with _Db() as cur:
+        denied = _gate(cur, settings=True)
+        if denied:
+            return denied
+        ids, err = _bulk_target_ids(cur, body, obj)
+        if err:
+            return err
+        out = store.delete_companies(cur, ids, actor) if obj == "company" else store.delete_contacts(cur, ids, actor)
+    return jsonify({"total": len(ids), **out})
+
+
+@bp.post("/companies/delete")
+def companies_delete():
+    return _bulk_delete("company")
+
+
+@bp.post("/contacts/delete")
+def contacts_delete():
+    return _bulk_delete("contact")
+
+
+@bp.get("/deleted")
+def deleted_list():
+    with _Db() as cur:
+        denied = _gate(cur, settings=True)
+        if denied:
+            return denied
+        return jsonify(_json_safe({"records": store.list_deleted(cur)}))
+
+
+@bp.delete("/deleted/<int:deleted_id>")
+def deleted_allow_back(deleted_id: int):
+    with _Db() as cur:
+        denied = _gate(cur, settings=True)
+        if denied:
+            return denied
+        ok = store.allow_back(cur, deleted_id)
+    return (jsonify({"ok": True}), 200) if ok else (jsonify({"error": "not_found"}), 404)
 
 
 # --------------------------------------------------------------------------- #

@@ -1488,6 +1488,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `emit_event()` por registro y un `tick()` por empresa. Lo usa cualquiera con acceso (como la
   edición de a uno); inscribir en workflow sigue siendo de `WORKFLOW_EDITORS`. Empresas: sólo
   `EDITABLE_FIELDS`; contactos: todo el catálogo menos `email` (único). Tope `BULK_MAX` = 1000.
+- **Eliminar (2026-11-06)**: Acciones → «Eliminar» (tildados o todos los del filtro), sólo
+  pgonzales / mia / manuela (`_gate(cur, settings=True)`; también el `DELETE /contacts/<id>` del
+  panel). `POST /prospecting/companies/delete` y `/contacts/delete`, mismos `ids` / `filters` que la
+  edición masiva. **Borrar una empresa NO borra sus contactos** (como HubSpot): las FK de `company_id`
+  son ON DELETE CASCADE, así que `store.delete_companies()` primero los deja sin empresa y suelta su
+  historial e inscripciones (`company_id = NULL`). Un contacto borrado cierra sus inscripciones
+  abiertas (`contact_id` no tiene FK). Todo queda en `prospect_deleted_records`, que además es la
+  **lista de bloqueo**: `upsert_from_clay` (clay_record_id o dominio) y los syncs de HubSpot
+  (`hubspot_id`) no lo recrean. Calendly sí (un lead que vuelve a agendar es nuevo). Configuración →
+  «Registros eliminados» → «Permitir que vuelva» lo saca de la lista.
 - **Exportar a CSV (2026-10-29)**: Acciones → «Exportar a CSV», con las columnas que se elijan
   (arranca con las de la tabla). `POST /prospecting/companies/export` y `/contacts/export`, mismos
   `ids` / `filters` que la edición masiva (`_bulk_target_ids()`), tope `EXPORT_MAX` = 20000. El

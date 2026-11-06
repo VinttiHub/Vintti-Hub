@@ -245,7 +245,8 @@
     bindCompanyBox();
     updateCounts();
     var del = document.getElementById("pcDelete");
-    del.hidden = isNew;
+    // Eliminar: sólo admin + editoras (can_configure de /prospecting/me); el server frena igual.
+    del.hidden = isNew || !((P().me() || {}).can_configure);
     del.onclick = function () {
       if (!confirm("¿Borrar el contacto «" + c.name + "»?")) return;
       P().api("/prospecting/contacts/" + c.id, { method: "DELETE" }).then(function () {

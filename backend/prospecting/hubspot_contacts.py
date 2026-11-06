@@ -250,6 +250,15 @@ def find_existing(cur, items: list[dict]) -> None:
         it["waiting"] = waiting.get(it["hs_id"])
 
 
+def drop_deleted(cur, items: list[dict], stats: Counter) -> list[dict]:
+    """Saca los contactos NUEVOS que alguien eliminó en el Hub (prospect_deleted_records):
+    si no, el sync los volvería a crear cada vez que HubSpot los toque."""
+    blocked = store.deleted_hubspot_ids(cur, "contact", [it["hs_id"] for it in items if it["existing"] is None])
+    if blocked:
+        stats["eliminado en el Hub (no se recrea)"] += sum(1 for it in items if it["hs_id"] in blocked)
+    return [it for it in items if it["existing"] is not None or it["hs_id"] not in blocked]
+
+
 def _resolve_waiting(cur, it: dict, contact_id: int, company_id) -> None:
     """La fila que esperaba en la bandeja (de antes de los contactos sin empresa) queda
     resuelta: el contacto ya existe."""
@@ -311,6 +320,7 @@ def import_batch(cur, items: list[dict], apply: bool, stats: Counter, sample: li
         return
     resolve_companies(cur, items)
     find_existing(cur, items)
+    items = drop_deleted(cur, items, stats)
     new = [it for it in items if it["existing"] is None]
     fills = [it for it in items if it["existing"] is not None]
     stats["nuevos_con_empresa"] += sum(1 for it in new if it["company_id"] is not None)
@@ -561,6 +571,7 @@ def _sync_page(cur, items: list[dict], dry_run: bool, stats: Counter, sample: li
         return
     resolve_companies(cur, items)
     find_existing(cur, items)
+    items = drop_deleted(cur, items, stats)
     now = engine.utcnow()
     companies: set[int] = set()
     orphans: set[int] = set()
