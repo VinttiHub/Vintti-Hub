@@ -87,6 +87,9 @@ class ContactMapping:
         self._owners = owners
         self._resolvers: dict[tuple, OwnerResolver] = {}
         self._bdrs, self._users = bdrs, users
+        # Propiedades tipo `user` (Scheduled By…) de gente que ya no está en el Hub: se
+        # guarda el email del owner de HubSpot y su nombre va a prospect_people.
+        self.fallback_people: dict[str, str | None] = {}
 
     def properties(self) -> list[str]:
         return sorted({p for pl in self.fields.values() for p in pl} | set(ALWAYS))
@@ -120,7 +123,15 @@ class ContactMapping:
             f = CONTACT_FIELDS_BY_KEY[key]
             raw = props[prop]
             if f["type"] in _PERSON_TYPES:
-                email, why = self._resolver(prop, f["type"]).resolve(raw)
+                resolver = self._resolver(prop, f["type"])
+                email, why = resolver.resolve(raw)
+                if not email and f["type"] == "user":
+                    # Histórico (2026-11-06): Scheduled By de alguien que se fue sigue
+                    # siendo quién agendó. Sólo `user`; Contact Owner exige un BDR activo.
+                    hs_email, hs_name = resolver.describe(store._clean_text(raw) or "")
+                    if hs_email and "@" in hs_email:
+                        email = hs_email
+                        self.fallback_people.setdefault(hs_email, hs_name)
                 if not email:
                     invalid.add(key)
                     notes[f"{f['label']}: «{raw}» {why}"] += 1
@@ -526,6 +537,8 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
             assoc = client.contact_company_associations([r["id"] for r in recs]) if recs else {}
             items = build_items(recs, mapping, assoc, notes)
             _sync_page(cur, items, dry_run, stats, sample, errors)
+            if not dry_run and mapping.fallback_people:
+                store.remember_people(cur, mapping.fallback_people, "hubspot")
             processed += len(results)
             page_ts = max((it["modified_at"] for it in items if it["modified_at"]), default=None)
             if not dry_run:

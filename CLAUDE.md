@@ -1553,6 +1553,22 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `_contact_filters()` y `views._clean_contact_config()`); `_contact_where()` los mete como
   `ct.id IN (SELECT … FROM prospect_contacts WHERE <compile_conditions(…, "contact")>)` porque el
   compilador escribe sin alias. Verificado: mismo resultado que `engine.matching_ids()`.
+- **Paneles (métricas de BDRs, 2026-11-06)**: sección «Paneles» del menú, los reportes de HubSpot
+  que la owner pasa de a uno. `GET /prospecting/panels/<key>?from=&to=` (cualquiera con acceso) →
+  `backend/prospecting/panels.py` (`PANELS`) devuelve **filas a nivel registro**, y
+  `docs/assets/js/prospecting-panels.js` agrupa por período (mes / semana / trimestre) y persona:
+  barra, celda del ranking y detalle salen de las mismas filas. En vivo, sin caché. **SQLs by BDR** =
+  contactos distintos por SQL Date del negocio asociado × Scheduled By, con los 5 filtros del reporte
+  de HubSpot: Scheduled By conocido y fuera de `EXCLUDED_SCHEDULERS` (bahia, agustin, mariano,
+  valentinacadirola), email fuera de `@vintti.com` («Internal Team»), Meeting Date & Time conocido
+  (HubSpot pedía > 2026-01-01; acá el corte lo da Desde/Hasta) y negocio con SQL Date. Cuadra exacto
+  con HubSpot (ene–nov 2026: 6/8/12/12/19/14/14/6/9/16/2). **No hay datos antes de dic-2025**: «SQL
+  Date» arranca el 25-11-2025. Cada BDR tiene un color fijo en el ranking (`PALETTE`, por email).
+  **Sólo cuadra porque las propiedades tipo `user` aceptan gente que ya no está**: el sync de
+  contactos resolvía Scheduled By contra usuarios ACTIVOS y descartaba a los ex-BDRs (93 contactos).
+  Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y
+  su nombre en `prospect_people`; `owner` (Contact Owner) sigue exigiendo un BDR activo. Backfill ya
+  aplicado: `scripts/backfill_scheduled_by.py` (blinda los workflows por condiciones).
 - **Carpetas de workflows (2026-11-03)**, anidadas como en HubSpot: tabla `prospect_wf_folders`
   (`parent_id` NULL = raíz) + `prospect_workflows.folder_id`, autocreadas en `ensure_schema()`.
   Lógica en `backend/prospecting/folders.py`; rutas `POST/PATCH/DELETE /prospecting/workflow-folders`

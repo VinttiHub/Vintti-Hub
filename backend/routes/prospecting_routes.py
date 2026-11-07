@@ -610,6 +610,32 @@ def deleted_allow_back(deleted_id: int):
 
 
 # --------------------------------------------------------------------------- #
+# Paneles (métricas de BDRs, 2026-11-06): filas a nivel registro, el front agrupa.
+# --------------------------------------------------------------------------- #
+@bp.get("/panels/<key>")
+def panel_data(key: str):
+    from datetime import date as _date
+    from prospecting import panels
+
+    fn = panels.PANELS.get(key)
+    if not fn:
+        return jsonify({"error": "not_found"}), 404
+
+    def _d(name):
+        v = (request.args.get(name) or "").strip()
+        try:
+            return _date.fromisoformat(v) if v else None
+        except ValueError:
+            return None
+
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        return jsonify(_json_safe(fn(cur, _d("from"), _d("to"))))
+
+
+# --------------------------------------------------------------------------- #
 # Edición masiva (botón «Editar» con varias filas tildadas)
 # --------------------------------------------------------------------------- #
 BULK_MAX = 1000

@@ -2060,6 +2060,8 @@
       sub: "El pipeline de ventas (Proceso De Contratación y Vintti AI): SQL crea la cuenta, Deep Dive la oportunidad." },
     { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue",
       sub: "Automatizaciones sobre empresas y contactos." },
+    { key: "panels", label: "Paneles", icon: "fa-solid fa-chart-column", tone: "cyan",
+      sub: "Métricas de los BDRs, en vivo con los datos del Hub." },
     // Sólo owner + editoras de workflows (ME.can_configure): el server frena igual.
     { key: "settings", label: "Configuración", icon: "fa-solid fa-gear", tone: "violet", restricted: true,
       sub: "IDs de los BDRs para Clay y panel de pruebas." }
@@ -2077,6 +2079,7 @@
     $("prContactsView").hidden = section !== "contacts";
     $("prDealsView").hidden = section !== "deals";
     $("prSettingsView").hidden = section !== "settings";
+    $("prPanelsView").hidden = section !== "panels";
     $("prCoStrip").hidden = section !== "table";
     $("prCtTabs").hidden = section !== "contacts";
     $("prTabs").hidden = section !== "table" && section !== "contacts";
@@ -2103,6 +2106,7 @@
     else if (kind === "workflows") { if (window.ProspectingWorkflows) window.ProspectingWorkflows.show(); }
     else if (kind === "contacts") { renderCtTabs(); loadContacts(); }
     else if (kind === "deals") { if (window.ProspectingDeals) window.ProspectingDeals.show(); }
+    else if (kind === "panels") { if (window.ProspectingPanels) window.ProspectingPanels.show(); }
   }
 
   function applyTab(key) {

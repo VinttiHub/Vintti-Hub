@@ -433,6 +433,18 @@ def ensure_schema(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_hs_idx ON prospect_deleted_records (object, hubspot_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_clay_idx ON prospect_deleted_records (clay_record_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_domain_idx ON prospect_deleted_records (object, domain)")
+    # Gente que aparece en propiedades de persona (Scheduled By) y no está en `users`:
+    # ex-BDRs que sólo existen como owners de HubSpot. Sólo para mostrar su nombre.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_people (
+            email       TEXT PRIMARY KEY,
+            name        TEXT,
+            source      TEXT,
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
     # Vistas guardadas de la tabla, por persona (views.py).
     from prospecting import views
     views.ensure_schema(cur)
@@ -1923,6 +1935,21 @@ def list_contacts(cur, f: dict) -> dict:
     # `company_name` acá es la empresa del Hub (lo leen workflows y fichas); la propiedad del
     # contacto con ese nombre viaja como `contact_company_name` para las columnas de las vistas.
     return {"total": total, "page": page, "page_size": size, "rows": [_flatten_contact(r) for r in cur.fetchall()]}
+
+
+def remember_people(cur, people: dict, source: str) -> None:
+    """{email: nombre} -> prospect_people. Un nombre vacío no pisa uno conocido."""
+    for email, name in (people or {}).items():
+        if not email:
+            continue
+        cur.execute(
+            """
+            INSERT INTO prospect_people (email, name, source) VALUES (%s, %s, %s)
+            ON CONFLICT (email) DO UPDATE
+               SET name = COALESCE(EXCLUDED.name, prospect_people.name), updated_at = NOW()
+            """,
+            (email.strip().lower(), name, source),
+        )
 
 
 def list_users(cur) -> list[dict]:
