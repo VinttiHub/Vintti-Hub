@@ -1187,7 +1187,8 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 `prospect_company_events` (historial por campo), `prospect_workflow_runs`.
 
 - **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales siempre**
-  (`ADMIN_EMAILS`). El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
+  (`ADMIN_EMAILS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; no es
+  owner ni ve Configuración). El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
   La UI limitada de `crm.js` (abril, luca, felipe, felicitas) deja pasar el link por texto.
 - **Clay**: columna "HTTP API" → `POST /prospecting/clay/webhook` con `X-Clay-Token`
   (= env `CLAY_WEBHOOK_TOKEN`, propia). Acepta snake_case o los nombres de la planilla de

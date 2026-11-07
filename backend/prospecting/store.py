@@ -35,6 +35,7 @@ from prospecting.constants import (
     TRIGGERS,
     WEEKDAYS,
     ADMIN_EMAILS,
+    EXTRA_ACCESS_EMAILS,
     AUTOMATION_REAL_DATA,
     DEFAULT_WORKFLOWS,
     EDITABLE_FIELDS,
@@ -494,7 +495,7 @@ def has_access(cur, email: str) -> bool:
     email = (email or "").strip().lower()
     if not email:
         return False
-    if email in ADMIN_EMAILS or email in WORKFLOW_EDITORS:
+    if email in ADMIN_EMAILS or email in WORKFLOW_EDITORS or email in EXTRA_ACCESS_EMAILS:
         return True
     return any(b["email"] == email for b in list_bdrs(cur))
 
