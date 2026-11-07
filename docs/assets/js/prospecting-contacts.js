@@ -203,6 +203,11 @@
       body += '<div class="pc-banner"><i class="fa-solid fa-circle-exclamation"></i><div><strong>La empresa pasó a Qualified / SQL.</strong> ' +
         "Completá los campos con <span class=\"pc-req\">*</span> para que deje de figurar como «Contacto incompleto».</div></div>";
     }
+    // Buscador de propiedades (2026-11-06): filtra entre todas las secciones.
+    body += '<div class="pc-propsearch"><i class="fa-solid fa-magnifying-glass"></i>' +
+      '<input type="search" class="pr-filter__input" id="pcPropQ" placeholder="Buscar propiedad…" autocomplete="off">' +
+      '<button type="button" class="pc-propsearch__clear" id="pcPropClear" hidden aria-label="Limpiar">&times;</button></div>' +
+      '<p class="pr-note" id="pcPropNone" hidden>Ninguna propiedad coincide.</p>';
     (schema().groups || []).forEach(function (g) {
       var fs = fieldsOf(g);
       if (!fs.length) return;
@@ -213,6 +218,7 @@
           var isReq = req.indexOf(f.key) !== -1;
           var wide = f.type === "longtext" || f.type === "multi";
           return '<label class="pc-field' + (isReq ? " is-required" : "") + (wide ? " pc-field--wide" : "") + '"' +
+            ' data-search="' + esc(propNorm([f.label, f.key, f.description, g].join(" "))) + '"' +
             (f.description ? ' title="' + esc(f.description) + '"' : "") + ">" +
             '<span class="pr-filter__label">' + esc(f.label) + (isReq ? ' <span class="pc-req">*</span>' : "") +
               (!isNew && window.ProspectingHistory ? window.ProspectingHistory.button("contact", c.id, f.key) : "") + "</span>" +
@@ -221,28 +227,29 @@
     });
     if (!isNew) {
       if (c.company_id) {
-        body += '<label class="pr-check pc-primary"><input type="checkbox" id="pcPrimary"' + (c.is_primary ? " checked" : "") + "> Contacto principal de la empresa</label>";
+        body += '<label class="pr-check pc-primary" data-pc-extra><input type="checkbox" id="pcPrimary"' + (c.is_primary ? " checked" : "") + "> Contacto principal de la empresa</label>";
       }
       if ((c.enrollments || []).length) {
-        body += '<section class="pr-section"><h3 class="pr-section__title">Workflows</h3><ul class="pr-events">' +
+        body += '<section class="pr-section" data-pc-extra><h3 class="pr-section__title">Workflows</h3><ul class="pr-events">' +
           c.enrollments.map(function (e) {
             return '<li><span class="pr-events__src pr-events__src--wf">' + esc(e.workflow_name) + "</span> · " + esc(e.status) +
               (e.last_step ? '<div class="pr-note">' + esc(e.last_step) + "</div>" : "") + "</li>";
           }).join("") + "</ul></section>";
       }
       if (window.ProspectingDeals) {
-        body += '<section class="pr-section"><h3 class="pr-section__title">Negocios (' + (c.deals || []).length + ")" +
+        body += '<section class="pr-section" data-pc-extra><h3 class="pr-section__title">Negocios (' + (c.deals || []).length + ")" +
           ' <button type="button" class="pr-btn pd-mini" data-pc-adddeal><i class="fa-solid fa-plus"></i> Agregar</button></h3>' +
           ((c.deals || []).length ? '<ul class="pr-events">' + c.deals.map(function (d) {
             return '<li><button type="button" class="pc-deal" data-pc-deal="' + d.id + '"><strong>' + esc(d.name) + "</strong> · " +
               esc(d.stage_label || d.stage_key) + (d.opportunity_id ? " · Opp #" + d.opportunity_id : "") + "</button></li>";
           }).join("") + "</ul>" : '<p class="pr-note">Sin negocios.</p>') + "</section>";
       }
-      body += '<details class="pc-group"><summary><span>Historial</span><span class="pc-group__count">' + (c.events || []).length + "</span></summary>" +
+      body += '<details class="pc-group" data-pc-extra><summary><span>Historial</span><span class="pc-group__count">' + (c.events || []).length + "</span></summary>" +
         historyHtml(c.events || []) + "</details>";
     }
     document.getElementById("pcBody").innerHTML = body;
     bindCompanyBox();
+    bindPropSearch();
     updateCounts();
     var del = document.getElementById("pcDelete");
     // Eliminar: sólo admin + editoras (can_configure de /prospecting/me); el server frena igual.
@@ -256,6 +263,51 @@
       }).catch(function (err) { alert(err.message); });
     };
     document.getElementById("pcSave").onclick = function () { save(c, isNew, opts); };
+  }
+
+  /* Buscador de propiedades: sin acentos, por palabras (todas tienen que estar). */
+  function propNorm(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+  function filterProps(text) {
+    var words = propNorm(text).split(/\s+/).filter(Boolean);
+    var on = words.length > 0, any = false;
+    panel.querySelectorAll(".pc-group:not([data-pc-extra])").forEach(function (g) {
+      var hits = 0;
+      g.querySelectorAll(".pc-field").forEach(function (f) {
+        var hay = f.getAttribute("data-search") || "";
+        var ok = !on || words.every(function (w) { return hay.indexOf(w) !== -1; });
+        f.hidden = !ok;
+        if (ok) hits++;
+      });
+      if (on) {
+        if (!g.hasAttribute("data-was-open")) g.setAttribute("data-was-open", g.open ? "1" : "0");
+        g.hidden = !hits;
+        if (hits) g.open = true;
+      } else {
+        g.hidden = false;
+        if (g.hasAttribute("data-was-open")) { g.open = g.getAttribute("data-was-open") === "1"; g.removeAttribute("data-was-open"); }
+      }
+      if (hits) any = true;
+    });
+    panel.querySelectorAll("[data-pc-extra]").forEach(function (el) { el.hidden = on; });
+    document.getElementById("pcPropNone").hidden = !on || any;
+    document.getElementById("pcPropClear").hidden = !on;
+  }
+  function bindPropSearch() {
+    var q = document.getElementById("pcPropQ");
+    q.addEventListener("input", function () { filterProps(q.value); });
+    q.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && q.value) { e.stopPropagation(); e.preventDefault(); q.value = ""; filterProps(""); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        var first = Array.prototype.find.call(panel.querySelectorAll(".pc-group:not([data-pc-extra]) .pc-field"),
+          function (f) { return !f.hidden; });
+        var ctl = first && first.querySelector("input, select, textarea, button");
+        if (ctl) ctl.focus();
+      }
+    });
+    document.getElementById("pcPropClear").addEventListener("click", function () { q.value = ""; filterProps(""); q.focus(); });
   }
 
   /* Empresa del contacto: buscar y elegir, cambiar o quitar. Se guarda con «Guardar». */

@@ -1527,6 +1527,19 @@ a.pr-company__name:hover { color: var(--pr-violet); text-decoration: underline; 
 .pc-field.is-missing .pr-filter__input { border-color: color-mix(in srgb, var(--pr-mag) 55%, #fff); background: color-mix(in srgb, var(--pr-mag) 4%, #fff); }
 .pc-field.is-missing .pr-wf-chips { outline: 1px dashed color-mix(in srgb, var(--pr-mag) 55%, #fff); outline-offset: 4px; border-radius: 8px; }
 .pc-primary { margin: 6px 0 14px; }
+/* Buscador de propiedades del panel del contacto (2026-11-06) */
+.pc-propsearch {
+  position: sticky; top: -18px; z-index: 3; margin: 0 -24px 12px; padding: 10px 24px;
+  background: #fff; border-bottom: 1px solid var(--pr-rule);
+}
+.pc-propsearch > .fa-magnifying-glass { position: absolute; left: 38px; top: 50%; transform: translateY(-50%); color: var(--pr-ink-3); font-size: 13px; pointer-events: none; }
+.pc-propsearch .pr-filter__input { width: 100%; padding-left: 36px; padding-right: 34px; }
+.pc-propsearch .pr-filter__input::-webkit-search-cancel-button { display: none; }
+.pc-propsearch__clear {
+  position: absolute; right: 32px; top: 50%; transform: translateY(-50%); border: 0; background: none;
+  font-size: 18px; line-height: 1; color: var(--pr-ink-3); cursor: pointer;
+}
+.pc-field[hidden], .pc-group[hidden], [data-pc-extra][hidden] { display: none !important; }
 
 /* Formulario «Completá el contacto» */
 .pc-picklist { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
