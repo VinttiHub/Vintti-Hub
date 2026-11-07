@@ -9,15 +9,18 @@
   function P() { return window.Prospecting; }
   function esc(v) { return P().esc(v); }
 
-  /* Un color por persona (pedido de la owner: que no sea todo violeta). Tonos medios, legibles
-     con texto blanco a intensidad alta. Se asignan por orden alfabético del email entre todas
-     las personas que trae el panel, así no cambian al filtrar. */
-  var PALETTE = ["#6c38ff", "#003bff", "#1f8fe0", "#0f9488", "#2f9e44", "#7a8b12",
-    "#d48806", "#e8590c", "#e03e3e", "#d61fb4", "#e64980", "#4c3fbf"];
+  /* Un color por persona, EL MISMO en todos los paneles (pedido de la owner: Abril siempre
+     del mismo color). El orden lo da el backend (`people_order`: todas las personas con algún
+     Scheduled By, por orden de aparición), igual para todos los paneles; alguien nuevo va al
+     final y no le cambia el color a nadie. Tonos medios, legibles con texto blanco. */
+  var PALETTE = ["#6c38ff", "#003bff", "#0f9488", "#e8590c", "#d61fb4", "#2f9e44",
+    "#1f8fe0", "#d48806", "#e03e3e", "#4c3fbf", "#7a8b12", "#e64980",
+    "#0b7285", "#9c36b5", "#5c940d", "#c2410c", "#1864ab", "#a61e4d",
+    "#087f5b", "#8f5a00", "#3b5bdb", "#c92a2a", "#5f3dc4", "#2b8a3e"];
   var personColor = {};
   function setPeople(emails) {
     personColor = {};
-    emails.slice().sort().forEach(function (e, i) { personColor[e] = PALETTE[i % PALETTE.length]; });
+    emails.forEach(function (e, i) { personColor[e] = PALETTE[i % PALETTE.length]; });
   }
   function colorOf(email) { return personColor[email] || "#8a90a0"; }
   function dot(email) { return '<span class="pp-pdot" style="--c:' + colorOf(email) + '"></span>'; }
@@ -60,20 +63,105 @@
      Shell de la sección
      ================================================================= */
   var root = null, bound = false;
+  /* Registro de paneles. `group` agrupa en el selector (<optgroup>) y se ve arriba del nombre. */
+  var G_SQL_YTD = "SQLs - Monthly YTD";  // nombre del grupo en el selector
+  // El título de arriba sigue a la frecuencia del panel visible (Monthly / Weekly / Quarterly).
+  var FREQ_EN = { month: "Monthly", week: "Weekly", quarter: "Quarterly" };
+  function sqlPanel(key, title, team) {
+    return { key: key, title: title, group: G_SQL_YTD,
+      render: function (el) { return SqlsByBdr(el, { key: key, title: title, team: team }); },
+      heading: function (inst) { return "SQLs - " + FREQ_EN[(inst && inst.freq()) || "month"] + " YTD"; } };
+  }
   var PANELS = [
-    { key: "sqls_by_bdr", render: SqlsByBdr }
+    sqlPanel("sqls_by_bdr", "SQLs by BDR"),
+    sqlPanel("sqls_by_bdr_vinttikids", "SQLs by BDR · VinttiKids", "VinttiKids"),
+    sqlPanel("sqls_by_bdr_nextgen", "SQLs by BDR · NextGen", "NextGen")
   ];
+
+  /* Uno a la vez: barra con ‹ selector › arriba. Cada panel se arma la primera vez que se
+     muestra (no pide datos de los que no se ven) y después sólo se oculta, así conserva sus
+     filtros. El último visto queda en el navegador. */
+  var CUR_KEY = "pp_current_v1";
+  var current = 0;
 
   function show() {
     root = document.getElementById("prPanelsView");
     if (!root) return;
     if (!bound) {
-      root.innerHTML = PANELS.map(function (p) { return '<section class="pp-card" id="pp-' + p.key + '"></section>'; }).join("");
-      PANELS.forEach(function (p) { p.inst = p.render(document.getElementById("pp-" + p.key)); });
+      try {
+        var saved = localStorage.getItem(CUR_KEY);
+        PANELS.forEach(function (p, i) { if (p.key === saved) current = i; });
+      } catch (e) {}
+      var groups = [];
+      PANELS.forEach(function (p) { if (groups.indexOf(p.group) === -1) groups.push(p.group); });
+      root.innerHTML =
+        '<nav class="pp-nav" aria-label="Paneles">' +
+          '<button type="button" class="pp-nav__arrow" data-nav="-1" aria-label="Panel anterior"><i class="fa-solid fa-chevron-left"></i></button>' +
+          '<div class="pp-nav__mid"><span class="pp-nav__group" data-nav-group></span>' +
+            '<select class="pr-filter__input pp-nav__select" data-nav-select aria-label="Elegir panel">' +
+            groups.map(function (g) {
+              return '<optgroup label="' + esc(g) + '">' + PANELS.map(function (p, i) {
+                return p.group === g ? '<option value="' + i + '">' + esc(p.title) + "</option>" : "";
+              }).join("") + "</optgroup>";
+            }).join("") + "</select></div>" +
+          '<span class="pp-nav__count" data-nav-count></span>' +
+          '<button type="button" class="pp-nav__arrow" data-nav="1" aria-label="Panel siguiente"><i class="fa-solid fa-chevron-right"></i></button>' +
+        "</nav>" +
+        PANELS.map(function (p) { return '<section class="pp-card" id="pp-' + p.key + '" hidden></section>'; }).join("");
+      root.querySelector(".pp-nav").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-nav]");
+        if (b) go(current + Number(b.getAttribute("data-nav")));
+      });
+      root.querySelector("[data-nav-select]").addEventListener("change", function (e) { go(Number(e.target.value)); });
+      document.addEventListener("keydown", function (e) {
+        if (root.hidden || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+        if (e.target.closest && e.target.closest("input, select, textarea, [contenteditable]")) return;
+        if (document.querySelector(".pr-drawer.is-open")) return;
+        go(current + (e.key === "ArrowRight" ? 1 : -1));
+      });
+      // Los filtros del panel quedan pegados debajo de la barra: su `top` es el alto de la barra.
+      var nav = root.querySelector(".pp-nav");
+      var setNavH = function () { root.style.setProperty("--pp-nav-h", nav.offsetHeight + "px"); };
+      setNavH();
+      if (window.ResizeObserver) new ResizeObserver(setNavH).observe(nav);
+      // Sombra bajo los filtros sólo cuando ya están pegados.
+      root.addEventListener("scroll", function () {
+        var head = root.querySelector(".pp-card:not([hidden]) > .pp-card__head");
+        if (head) head.classList.toggle("is-stuck", root.scrollTop > 8);
+      }, { passive: true });
       bound = true;
+      go(current, true);
     } else {
-      PANELS.forEach(function (p) { if (p.inst && p.inst.reload) p.inst.reload(); });
+      var p = PANELS[current];
+      if (p.inst && p.inst.reload) p.inst.reload();
     }
+  }
+
+  function refreshHeading() {
+    if (!root || !bound) return;
+    var p = PANELS[current];
+    root.querySelector("[data-nav-group]").textContent = p.heading ? p.heading(p.inst) : p.group;
+  }
+
+  function go(i, first) {
+    var n = PANELS.length;
+    i = ((i % n) + n) % n;  // las flechas dan la vuelta
+    current = i;
+    try { localStorage.setItem(CUR_KEY, PANELS[i].key); } catch (e) {}
+    PANELS.forEach(function (p, j) {
+      var el = document.getElementById("pp-" + p.key);
+      el.hidden = j !== i;
+      if (j === i) {
+        el.classList.remove("pp-in");
+        void el.offsetWidth;  // reinicia la animación
+        el.classList.add("pp-in");
+        if (!p.inst) p.inst = p.render(el);
+      }
+    });
+    root.querySelector("[data-nav-select]").value = String(i);
+    refreshHeading();
+    root.querySelector("[data-nav-count]").textContent = (i + 1) + " de " + n;
+    if (!first) root.scrollTop = 0;
   }
 
   /* =================================================================
@@ -156,15 +244,17 @@
   /* =================================================================
      SQLs by BDR
      ================================================================= */
-  function SqlsByBdr(el) {
+  /* opts: {key (panel del backend), title, team?}. El mismo panel sirve para todo el equipo y
+     para un equipo (VinttiKids): cambian sólo las filas que manda el backend. */
+  function SqlsByBdr(el, opts) {
     var today = P().todayIso();
     var DEF = { freq: "month", from: today.slice(0, 4) + "-01-01", to: today };
     var st = { freq: DEF.freq, from: DEF.from, to: DEF.to, bdrs: null, rows: [], def: null, loading: true };
-    var PREF = "pp_sqls_by_bdr_v1";
+    var PREF = "pp_" + opts.key + "_v1";
     try { var saved = JSON.parse(localStorage.getItem(PREF) || "null"); if (saved && saved.freq) st.freq = saved.freq; } catch (e) {}
 
     el.innerHTML =
-      '<header class="pp-card__head"><div class="pp-card__title"><h2>SQLs by BDR</h2>' +
+      '<header class="pp-card__head"><div class="pp-card__title"><h2>' + esc(opts.title) + '</h2>' +
         '<button type="button" class="pp-info" data-pp-info aria-label="Cómo se calcula"><i class="fa-solid fa-circle-info"></i></button></div>' +
         '<div class="pp-controls">' +
           '<div class="pp-seg" role="group">' + FREQS.map(function (f) {
@@ -191,12 +281,10 @@
     function load() {
       st.loading = true;
       render();
-      return P().api("/prospecting/panels/sqls_by_bdr?from=" + encodeURIComponent(st.from) + "&to=" + encodeURIComponent(st.to))
+      return P().api("/prospecting/panels/" + opts.key + "?from=" + encodeURIComponent(st.from) + "&to=" + encodeURIComponent(st.to))
         .then(function (r) {
           st.rows = r.rows || []; st.def = r.definition || null; st.loading = false;
-          var seen = {};
-          st.rows.forEach(function (x) { seen[x.scheduled_by] = 1; });
-          setPeople(Object.keys(seen));
+          if (r.people_order) setPeople(r.people_order);
           render();
         })
         .catch(function (err) { st.loading = false; q("[data-chart]").innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>"; });
@@ -216,6 +304,7 @@
       var d = st.def || {};
       q("[data-def]").innerHTML = "<strong>Cómo se cuenta.</strong> Contactos con un negocio que tiene <em>SQL Date</em>, " +
         "agrupados por la SQL Date del negocio y por <em>Scheduled By</em> del contacto (quién agendó la reunión). " +
+        (d.team ? "Sólo el equipo " + esc(opts.team || "") + ": " + esc(d.team.join(", ")) + ". " : "") +
         "Igual que el reporte de HubSpot: Scheduled By conocido y fuera de " + esc((d.excluded_schedulers || []).join(", ")) +
         "; contactos fuera del equipo interno (" + esc((d.internal_domains || []).map(function (x) { return "@" + x; }).join(", ")) + ")" +
         "; con Meeting Date &amp; Time cargada. «SQL Date» existe desde fines de nov-2025: antes no hay datos. " +
@@ -247,6 +336,7 @@
 
     function render() {
       q("[data-reset]").hidden = isDefault();
+      refreshHeading();
       el.querySelectorAll("[data-freq]").forEach(function (b) { b.classList.toggle("is-on", b.getAttribute("data-freq") === st.freq); });
       renderDef();
       if (st.loading) {
@@ -341,7 +431,7 @@
         return r.sql_date >= st.from && r.sql_date <= st.to &&
           (!period || k === period) && (!bdr || r.scheduled_by === bdr);
       });
-      var who = bdr ? (rows[0] && rows[0].scheduled_by_name) || bdr : (st.bdrs ? q("[data-ms-label]").textContent : "Todos los BDRs");
+      var who = bdr ? (rows[0] && rows[0].scheduled_by_name) || bdr : (st.bdrs ? q("[data-ms-label]").textContent : (opts.team || "Todos los BDRs"));
       var when = period ? periodLabel(period, st.freq) : P().fmtDate(st.from) + " – " + P().fmtDate(st.to);
       openDetail("SQLs · " + who + " · " + when, rows.length + " contacto" + (rows.length === 1 ? "" : "s"), rows);
     }
@@ -380,7 +470,7 @@
     });
 
     load();
-    return { reload: load };
+    return { reload: load, freq: function () { return st.freq; } };
   }
 
   window.ProspectingPanels = { show: show };

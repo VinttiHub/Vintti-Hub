@@ -1564,6 +1564,17 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (HubSpot pedía > 2026-01-01; acá el corte lo da Desde/Hasta) y negocio con SQL Date. Cuadra exacto
   con HubSpot (ene–nov 2026: 6/8/12/12/19/14/14/6/9/16/2). **No hay datos antes de dic-2025**: «SQL
   Date» arranca el 25-11-2025. Cada BDR tiene un color fijo en el ranking (`PALETTE`, por email).
+  **SQLs by BDR · VinttiKids** = el mismo panel con `team="vinttikids"`: además Scheduled By ∈
+  `panels.TEAMS["vinttikids"]` (abril, victoria, valeria, catalina, joel, bartolome, marcos). Un
+  equipo nuevo = una entrada en `TEAMS` + una en `PANELS` y en el `PANELS` del front. Ídem
+  **NextGen** (`TEAMS["nextgen"]`). **El color de cada persona es el mismo en todos los paneles**:
+  sale de `people_order` (quienes tienen algún SQL, por fecha de su primer SQL; 24 colores en `PALETTE`), no de las filas
+  del panel; alguien nuevo va al final y no corre a nadie.
+  **Se ven de a uno** (2026-11-06): barra ‹ selector › arriba (`PANELS` del front con `title` +
+  `group`; el grupo es un `<optgroup>` y se lee arriba del nombre). Los 3 de SQLs van en el grupo
+  «SQLs - Monthly YTD». Cada panel se arma la primera vez que se muestra y después sólo se oculta
+  (conserva sus filtros); el último visto queda en `localStorage` (`pp_current_v1`). ← / → también
+  cambian de panel.
   **Sólo cuadra porque las propiedades tipo `user` aceptan gente que ya no está**: el sync de
   contactos resolvía Scheduled By contra usuarios ACTIVOS y descartaba a los ex-BDRs (93 contactos).
   Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y
