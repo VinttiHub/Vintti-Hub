@@ -54,7 +54,7 @@ def _can_configure(email: str) -> bool:
 
 def _is_staff(email: str) -> bool:
     # Negocios y Workflows: la owner, las editoras de workflows y EXTRA_ACCESS_EMAILS
-    # (mariano, justo, ana, agustinmorrone). Los BDRs no (2026-11-09, pedido de la owner).
+    # (mariano, justo, ana, agustin). Los BDRs no (2026-11-09, pedido de la owner).
     return _is_admin(email) or _is_wf_editor(email) or email in EXTRA_ACCESS_EMAILS
 
 

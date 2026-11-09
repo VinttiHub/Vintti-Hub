@@ -1188,7 +1188,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 
 - **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales siempre**
   (`ADMIN_EMAILS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; justo, ana y
-  agustinmorrone, 2026-11-09; no son owners ni ven Configuración). **Negocios y Workflows
+  agustin (Morrone), 2026-11-09; no son owners ni ven Configuración). **Negocios y Workflows
   no son para los BDRs** (2026-11-09): sólo admin + `WORKFLOW_EDITORS` + `EXTRA_ACCESS_EMAILS`
   (`_is_staff()` en `prospecting_routes.py`, `_gate(cur, staff=True)` en las rutas `/deals*` y
   de lectura de workflows; `/me` → `can_see_deals` / `can_see_workflows`). La ficha de empresa
