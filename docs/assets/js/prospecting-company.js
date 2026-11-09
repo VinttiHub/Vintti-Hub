@@ -52,7 +52,7 @@
     if (!id) { $("prCo").innerHTML = '<p class="pr-note">Falta el id de la empresa.</p>'; return Promise.resolve(); }
     return P.api("/prospecting/companies/" + id).then(function (c) {
       company = c;
-      document.title = c.name + " · Prospecting · Vintti Hub";
+      document.title = c.name + " · Business Dev · Vintti Hub";
       render();
     }).catch(function (err) {
       $("prCo").innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>";
@@ -87,7 +87,7 @@
         "not_icp_reason", "week_label", "name"].indexOf(f.key) === -1;
     });
     return '<div class="pr-co-card">' +
-        '<a class="pr-co-back" href="prospecting.html"><i class="fa-solid fa-chevron-left"></i> Prospecting</a>' +
+        '<a class="pr-co-back" href="prospecting.html"><i class="fa-solid fa-chevron-left"></i> Business Dev</a>' +
         '<div class="pr-co-id"><span class="pr-co-avatar">' + esc(initials(c.name)) + "</span>" +
           '<div><h1 class="pr-co-name">' + esc(c.name) + (c.is_dummy ? ' <span class="pr-dummy-tag">DUMMY</span>' : "") + "</h1>" +
           (url ? '<a class="pr-co-domain" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(c.domain || url) +

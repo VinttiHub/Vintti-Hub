@@ -2052,20 +2052,14 @@
      Empresas las de empresas, Contactos las de contactos; Workflows y Negocios, ninguna
      (Negocios tiene su propia barra: pipeline, filtros y tablero / tabla, en prospecting-deals.js). */
   var SECTIONS = [
-    { key: "table", label: "Empresas", icon: "fa-solid fa-building", tone: "violet",
-      sub: "Empresas que manda Clay para que las prospecten los BDRs." },
-    { key: "contacts", label: "Contactos", icon: "fa-solid fa-user", tone: "cyan",
-      sub: "Las personas de esas empresas: las cargan los BDRs o llegan de Calendly." },
+    { key: "table", label: "Empresas", icon: "fa-solid fa-building", tone: "violet" },
+    { key: "contacts", label: "Contactos", icon: "fa-solid fa-user", tone: "cyan" },
     // Negocios y Workflows no son para los BDRs (2026-11-09): /prospecting/me los da; el server frena igual.
-    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", requires: "can_see_deals",
-      sub: "El pipeline de ventas (Proceso De Contratación y Vintti AI): SQL crea la cuenta, Deep Dive la oportunidad." },
-    { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue", requires: "can_see_workflows",
-      sub: "Automatizaciones sobre empresas y contactos." },
-    { key: "panels", label: "Paneles", icon: "fa-solid fa-chart-column", tone: "cyan",
-      sub: "Métricas de los BDRs, en vivo con los datos del Hub." },
+    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", requires: "can_see_deals" },
+    { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue", requires: "can_see_workflows" },
+    { key: "panels", label: "Paneles", icon: "fa-solid fa-chart-column", tone: "cyan" },
     // Sólo owner + editoras de workflows (ME.can_configure): el server frena igual.
-    { key: "settings", label: "Configuración", icon: "fa-solid fa-gear", tone: "violet", restricted: true,
-      sub: "IDs de los BDRs para Clay y panel de pruebas." }
+    { key: "settings", label: "Configuración", icon: "fa-solid fa-gear", tone: "violet", restricted: true }
   ];
   function visibleSections() {
     return SECTIONS.filter(function (x) {
@@ -2090,7 +2084,6 @@
     $("prTabs").hidden = section !== "table" && section !== "contacts";
     var x = sectionOf(section);
     $("prSectionBtn").innerHTML = esc(x.label) + '<span class="pr-secbtn__caret"><i class="fa-solid fa-chevron-down"></i></span>';
-    $("prHeadSub").textContent = x.sub;
   }
   function sectionMenu(anchor) {
     $("prViewPop").classList.add("pr-pop--sections");  // antes de medir: es más ancho
@@ -2098,7 +2091,7 @@
       return '<button type="button" class="pr-secitem' + (x.key === section ? " is-on" : "") + '" data-section-go="' + x.key + '">' +
         '<span class="pr-secitem__icon pr-tone--' + x.tone + '"><i class="' + x.icon + '"></i></span>' +
         '<span class="pr-secitem__text"><strong>' + esc(x.label) +
-        (x.soon ? ' <span class="pr-soon-chip">Próximamente</span>' : "") + "</strong><small>" + esc(x.sub) + "</small></span>" +
+        (x.soon ? ' <span class="pr-soon-chip">Próximamente</span>' : "") + "</strong></span>" +
         (x.key === section ? '<i class="fa-solid fa-check pr-secitem__check"></i>' : "") + "</button>";
     }).join(""));
   }
@@ -2726,7 +2719,7 @@
       });
     }).catch(function (err) {
       $("prDenied").hidden = false;
-      $("prDenied").querySelector("p").textContent = "Could not load Prospecting: " + err.message;
+      $("prDenied").querySelector("p").textContent = "Could not load Business Dev: " + err.message;
     });
   }
 

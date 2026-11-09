@@ -112,7 +112,7 @@ def _gate(cur, admin_only: bool = False, settings: bool = False, staff: bool = F
     else:
         ok = store.has_access(cur, email)
     if not ok:
-        return jsonify({"error": "You do not have access to Prospecting."}), 403
+        return jsonify({"error": "You do not have access to Business Dev."}), 403
     return None
 
 
