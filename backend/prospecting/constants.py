@@ -40,7 +40,7 @@ EXTRA_ACCESS_EMAILS = {
     "mariano@vintti.com",
     "justo@vintti.com",
     "ana@vintti.com",
-    "agustinmorrone@vintti.com",
+    "agustin@vintti.com",  # Agustín Morrone (en el Hub; agustinmorrone@ es sólo su mail de Slack)
 }
 
 # `users.role` es texto libre: cuenta como BDR cualquier rol que contenga esto.
