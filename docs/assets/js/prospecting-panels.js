@@ -16,7 +16,8 @@
   var PALETTE = ["#6c38ff", "#003bff", "#0f9488", "#e8590c", "#d61fb4", "#2f9e44",
     "#1f8fe0", "#d48806", "#e03e3e", "#4c3fbf", "#7a8b12", "#e64980",
     "#0b7285", "#9c36b5", "#5c940d", "#c2410c", "#1864ab", "#a61e4d",
-    "#087f5b", "#8f5a00", "#3b5bdb", "#c92a2a", "#5f3dc4", "#2b8a3e"];
+    "#087f5b", "#8f5a00", "#3b5bdb", "#c92a2a", "#5f3dc4", "#2b8a3e",
+    "#b8860b", "#0c8599", "#ae3ec9", "#f76707", "#364fc7", "#d6336c", "#74b816", "#495057"];
   var personColor = {};
   function setPeople(emails) {
     personColor = {};
@@ -24,6 +25,15 @@
   }
   function colorOf(email) { return personColor[email] || "#8a90a0"; }
   function dot(email) { return '<span class="pp-pdot" style="--c:' + colorOf(email) + '"></span>'; }
+  /* Motivos (Lead Quality): color fijo por motivo, en el orden de la lista del backend. */
+  var REASON_PALETTE = ["#0f6e6e", "#7cc4d6", "#b8417f", "#f2a7c9", "#2350a0", "#f08b5a", "#e8b931",
+    "#4caf63", "#b08ad4", "#e03e3e", "#495057", "#8f5a00", "#0b7285"];
+  var reasonColorMap = {};
+  function setReasons(list) {
+    reasonColorMap = {};
+    list.forEach(function (r, i) { reasonColorMap[r] = REASON_PALETTE[i % REASON_PALETTE.length]; });
+  }
+  function reasonColor(r) { return reasonColorMap[r] || "#8a90a0"; }
 
   var MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   var FREQS = [["month", "Mensual"], ["week", "Semanal"], ["quarter", "Trimestral"]];
@@ -64,19 +74,58 @@
      ================================================================= */
   var root = null, bound = false;
   /* Registro de paneles. `group` agrupa en el selector (<optgroup>) y se ve arriba del nombre. */
-  var G_SQL_YTD = "SQLs - Monthly YTD";  // nombre del grupo en el selector
   // El título de arriba sigue a la frecuencia del panel visible (Monthly / Weekly / Quarterly).
   var FREQ_EN = { month: "Monthly", week: "Weekly", quarter: "Quarterly" };
-  function sqlPanel(key, title, team) {
-    return { key: key, title: title, group: G_SQL_YTD,
-      render: function (el) { return SqlsByBdr(el, { key: key, title: title, team: team }); },
-      heading: function (inst) { return "SQLs - " + FREQ_EN[(inst && inst.freq()) || "month"] + " YTD"; } };
+  /* Qué cambia entre métricas; el panel (CountByBdr) es el mismo. */
+  var METRICS = {
+    sql: { name: "SQLs", noun: "SQLs", one: "SQL", many: "SQLs", dateLabel: "SQL Date", withDeal: true,
+      def: "Contactos con un negocio que tiene <em>SQL Date</em>, agrupados por la SQL Date del negocio y por " +
+        "<em>Scheduled By</em> del contacto (quién agendó la reunión). Un contacto cuenta una vez por SQL Date. " +
+        "«SQL Date» existe desde fines de nov-2025: antes no hay datos." },
+    intro: { name: "Intro Calls", noun: "Intro calls", one: "intro call", many: "intro calls", dateLabel: "Date of Meeting Scheduled", withDeal: false,
+      def: "Contactos con reunión agendada, agrupados por <em>Date of Meeting Scheduled</em> (el día en que se agendó) y por " +
+        "<em>Scheduled By</em> (quién la agendó). Un contacto, una intro call." },
+    // Lead Quality (2026-11-07): por qué las intro calls no pasaron a SQL. El general desglosa
+    // por motivo; «x BDR» por persona, con un desplegable de motivo que arranca en Timing.
+    lq: { name: "Lead Quality", fixedHeading: true, subtitle: "Reasons why intro call were not SQL",
+      noun: "Leads perdidos", one: "lead perdido", many: "leads perdidos", dateLabel: "Meeting Date & Time", withDeal: false,
+      showReason: true, groupKey: "reason", topLabel: "Motivo principal",
+      word: { all: "Todos los motivos", none: "Ningún motivo", plural: "motivos", one: "1 motivo", head: "Motivo", icon: "fa-tags" },
+      def: "Intro calls que no pasaron a SQL: contactos con <em>MQL (AE) Lost Reason</em> (incluye el motivo copiado de su " +
+        "negocio), agrupados por mes de <em>Meeting Date &amp; Time</em> y por motivo." },
+    lqb: { name: "Lead Quality", fixedHeading: true, subtitle: "Reasons why intro call were not SQL",
+      noun: "Leads perdidos", one: "lead perdido", many: "leads perdidos", dateLabel: "Meeting Date & Time", withDeal: false,
+      showReason: true, reasonFilter: "Timing",
+      def: "Intro calls que no pasaron a SQL: contactos con <em>MQL (AE) Lost Reason</em> (incluye el motivo copiado de su " +
+        "negocio), agrupados por mes de <em>Meeting Date &amp; Time</em> y por <em>Scheduled By</em>. El desplegable " +
+        "<em>Motivo</em> arranca en Timing, como el reporte de HubSpot." }
+  };
+  var BDR_WORD = { all: "Todos los BDRs", none: "Ningún BDR", plural: "BDRs", one: "1 BDR", head: "BDR", icon: "fa-user-group" };
+  function panel(metric, key, title, team) {
+    var m = METRICS[metric];
+    return { key: key, title: title, group: m.fixedHeading ? m.name : m.name + " - Monthly YTD", subtitle: m.subtitle || "",
+      render: function (el) { return CountByBdr(el, { key: key, uid: this.uid, title: title, team: team, m: m }); },
+      heading: function (inst) {
+        return m.fixedHeading ? m.name : m.name + " - " + FREQ_EN[(inst && inst.freq()) || "month"] + " YTD";
+      } };
   }
   var PANELS = [
-    sqlPanel("sqls_by_bdr", "SQLs by BDR"),
-    sqlPanel("sqls_by_bdr_vinttikids", "SQLs by BDR · VinttiKids", "VinttiKids"),
-    sqlPanel("sqls_by_bdr_nextgen", "SQLs by BDR · NextGen", "NextGen")
+    panel("sql", "sqls_by_bdr", "SQLs by BDR"),
+    panel("sql", "sqls_by_bdr_vinttikids", "SQLs by BDR · VinttiKids", "VinttiKids"),
+    panel("sql", "sqls_by_bdr_nextgen", "SQLs by BDR · NextGen", "NextGen"),
+    panel("intro", "intro_calls", "Intro calls by BDR"),
+    panel("intro", "intro_calls_vinttikids", "Intro calls by BDR · VinttiKids", "VinttiKids"),
+    panel("intro", "intro_calls_nextgen", "Intro calls by BDR · NextGen", "NextGen"),
+    panel("lq", "lead_quality", "Lead Quality"),
+    panel("lq", "lead_quality_vinttikids", "Lead Quality · VinttiKids", "VinttiKids"),
+    panel("lq", "lead_quality_nextgen", "Lead Quality · NextGen", "NextGen"),
+    panel("lqb", "lead_quality", "Lead Quality x BDR"),
+    panel("lqb", "lead_quality_vinttikids", "Lead Quality x BDR · VinttiKids", "VinttiKids"),
+    panel("lqb", "lead_quality_nextgen", "Lead Quality x BDR · NextGen", "NextGen")
   ];
+  // Dos paneles pueden leer el mismo endpoint (Lead Quality y su «x BDR»): el id del DOM y la
+  // preferencia guardada van por `uid`, no por `key`.
+  PANELS.forEach(function (p, i) { p.uid = p.key + "__" + i; });
 
   /* Uno a la vez: barra con ‹ selector › arriba. Cada panel se arma la primera vez que se
      muestra (no pide datos de los que no se ven) y después sólo se oculta, así conserva sus
@@ -90,7 +139,7 @@
     if (!bound) {
       try {
         var saved = localStorage.getItem(CUR_KEY);
-        PANELS.forEach(function (p, i) { if (p.key === saved) current = i; });
+        PANELS.forEach(function (p, i) { if (p.uid === saved || p.key === saved) current = i; });
       } catch (e) {}
       var groups = [];
       PANELS.forEach(function (p) { if (groups.indexOf(p.group) === -1) groups.push(p.group); });
@@ -98,6 +147,7 @@
         '<nav class="pp-nav" aria-label="Paneles">' +
           '<button type="button" class="pp-nav__arrow" data-nav="-1" aria-label="Panel anterior"><i class="fa-solid fa-chevron-left"></i></button>' +
           '<div class="pp-nav__mid"><span class="pp-nav__group" data-nav-group></span>' +
+            '<span class="pp-nav__sub" data-nav-sub hidden></span>' +
             '<select class="pr-filter__input pp-nav__select" data-nav-select aria-label="Elegir panel">' +
             groups.map(function (g) {
               return '<optgroup label="' + esc(g) + '">' + PANELS.map(function (p, i) {
@@ -107,7 +157,7 @@
           '<span class="pp-nav__count" data-nav-count></span>' +
           '<button type="button" class="pp-nav__arrow" data-nav="1" aria-label="Panel siguiente"><i class="fa-solid fa-chevron-right"></i></button>' +
         "</nav>" +
-        PANELS.map(function (p) { return '<section class="pp-card" id="pp-' + p.key + '" hidden></section>'; }).join("");
+        PANELS.map(function (p) { return '<section class="pp-card" id="pp-' + p.uid + '" hidden></section>'; }).join("");
       root.querySelector(".pp-nav").addEventListener("click", function (e) {
         var b = e.target.closest("[data-nav]");
         if (b) go(current + Number(b.getAttribute("data-nav")));
@@ -141,15 +191,18 @@
     if (!root || !bound) return;
     var p = PANELS[current];
     root.querySelector("[data-nav-group]").textContent = p.heading ? p.heading(p.inst) : p.group;
+    var sub = root.querySelector("[data-nav-sub]");
+    sub.textContent = p.subtitle || "";
+    sub.hidden = !p.subtitle;
   }
 
   function go(i, first) {
     var n = PANELS.length;
     i = ((i % n) + n) % n;  // las flechas dan la vuelta
     current = i;
-    try { localStorage.setItem(CUR_KEY, PANELS[i].key); } catch (e) {}
+    try { localStorage.setItem(CUR_KEY, PANELS[i].uid); } catch (e) {}
     PANELS.forEach(function (p, j) {
-      var el = document.getElementById("pp-" + p.key);
+      var el = document.getElementById("pp-" + p.uid);
       el.hidden = j !== i;
       if (j === i) {
         el.classList.remove("pp-in");
@@ -167,7 +220,7 @@
   /* =================================================================
      Detalle (drawer) compartido
      ================================================================= */
-  var drawer = null, drawerRows = [], drawerTitle = "";
+  var drawer = null, drawerRows = [], drawerTitle = "", drawerM = null;
   function ensureDrawer() {
     if (drawer) return drawer;
     drawer = document.createElement("div");
@@ -202,34 +255,40 @@
   }
   function closeDrawer() { drawer.classList.remove("is-open"); drawer.setAttribute("aria-hidden", "true"); }
 
-  function openDetail(title, sub, rows) {
+  function openDetail(title, sub, rows, m) {
     ensureDrawer();
     drawerRows = rows;
     drawerTitle = title;
+    drawerM = m;
     document.getElementById("ppDTitle").textContent = title;
     document.getElementById("ppDSub").textContent = sub;
     document.getElementById("ppDBody").innerHTML = rows.length ? '<div class="pp-dtable-wrap"><table class="pp-dtable"><thead><tr>' +
-      "<th>Contacto</th><th>Empresa</th><th>Negocio</th><th>SQL Date</th><th>Meeting</th><th>Scheduled By</th></tr></thead><tbody>" +
+      "<th>Contacto</th><th>Empresa</th>" + (m.withDeal ? "<th>Negocio</th>" : "") + "<th>" + esc(m.dateLabel) + "</th>" +
+      (m.showReason ? "<th>Motivo</th>" : "") + "<th>Meeting</th><th>Scheduled By</th></tr></thead><tbody>" +
       rows.map(function (r) {
         return "<tr><td>" + '<button type="button" class="pp-link" data-pp-contact="' + r.contact_id + '"><strong>' +
             esc(r.contact_name || r.email || "#" + r.contact_id) + "</strong></button>" +
             (r.contact_name && r.email ? '<div class="pr-note">' + esc(r.email) + "</div>" : "") + "</td>" +
           "<td>" + (r.company_id ? '<a class="pp-link" href="prospecting-company.html?id=' + r.company_id + '" target="_blank" rel="noopener">' +
             esc(r.company_name || "—") + "</a>" : '<span class="pr-note">Sin empresa</span>') + "</td>" +
-          '<td><button type="button" class="pp-link" data-pp-deal="' + r.deal_id + '">' + esc(r.deal_name || "#" + r.deal_id) + "</button>" +
-            (r.stage_label ? '<div class="pr-note">' + esc(r.stage_label) + "</div>" : "") + "</td>" +
-          "<td>" + esc(P().fmtDate(r.sql_date)) + "</td>" +
+          (m.withDeal ? '<td><button type="button" class="pp-link" data-pp-deal="' + r.deal_id + '">' + esc(r.deal_name || "#" + r.deal_id) + "</button>" +
+            (r.stage_label ? '<div class="pr-note">' + esc(r.stage_label) + "</div>" : "") + "</td>" : "") +
+          "<td>" + esc(P().fmtDate(r.date)) + "</td>" +
+          (m.showReason ? '<td><span class="pp-pdot" style="--c:' + reasonColor(r.reason) + '"></span>' + esc(r.reason || "—") + "</td>" : "") +
           "<td>" + esc(r.meeting_datetime ? P().fmtDateTime(r.meeting_datetime) : "—") + "</td>" +
           "<td>" + dot(r.scheduled_by) + esc(r.scheduled_by_name || r.scheduled_by) + "</td></tr>";
-      }).join("") + "</tbody></table></div>" : '<p class="pr-note">Sin SQLs en esta selección.</p>';
+      }).join("") + "</tbody></table></div>" : '<p class="pr-note">Sin ' + esc(m.many) + " en esta selección.</p>";
     drawer.classList.add("is-open");
     drawer.setAttribute("aria-hidden", "false");
   }
 
   function exportCsv() {
-    var cols = [["contact_name", "Contacto"], ["email", "Email"], ["company_name", "Empresa"], ["deal_name", "Negocio"],
-      ["stage_label", "Etapa"], ["sql_date", "SQL Date"], ["meeting_datetime", "Meeting Date & Time"],
-      ["scheduled_by_name", "Scheduled By"], ["scheduled_by", "Scheduled By (email)"]];
+    var m = drawerM || METRICS.sql;
+    var cols = [["contact_name", "Contacto"], ["email", "Email"], ["company_name", "Empresa"]]
+      .concat(m.withDeal ? [["deal_name", "Negocio"], ["stage_label", "Etapa"]] : [["lead_life", "Lead Life"]])
+      .concat(m.showReason ? [["reason", "MQL (AE) Lost Reason"]] : [])
+      .concat([["date", m.dateLabel], ["meeting_datetime", "Meeting Date & Time"],
+        ["scheduled_by_name", "Scheduled By"], ["scheduled_by", "Scheduled By (email)"]]);
     var q = function (v) { v = v == null ? "" : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var csv = "﻿" + cols.map(function (c) { return q(c[1]); }).join(",") + "\n" +
       drawerRows.map(function (r) { return cols.map(function (c) { return q(r[c[0]]); }).join(","); }).join("\n");
@@ -242,15 +301,22 @@
   }
 
   /* =================================================================
-     SQLs by BDR
+     Panel de conteo por persona (SQLs, Intro calls…)
      ================================================================= */
   /* opts: {key (panel del backend), title, team?}. El mismo panel sirve para todo el equipo y
      para un equipo (VinttiKids): cambian sólo las filas que manda el backend. */
-  function SqlsByBdr(el, opts) {
+  function CountByBdr(el, opts) {
+    var M = opts.m;
+    var W = M.word || BDR_WORD;
+    // Por qué se desglosa: la persona (Scheduled By) o el motivo (Lead Quality).
+    var GK = M.groupKey || "scheduled_by";
+    function gName(r) { return GK === "reason" ? r.reason : (r.scheduled_by_name || r.scheduled_by); }
+    function gColor(k) { return GK === "reason" ? reasonColor(k) : colorOf(k); }
+    function gDot(k) { return '<span class="pp-pdot" style="--c:' + gColor(k) + '"></span>'; }
     var today = P().todayIso();
-    var DEF = { freq: "month", from: today.slice(0, 4) + "-01-01", to: today };
-    var st = { freq: DEF.freq, from: DEF.from, to: DEF.to, bdrs: null, rows: [], def: null, loading: true };
-    var PREF = "pp_" + opts.key + "_v1";
+    var DEF = { freq: "month", from: today.slice(0, 4) + "-01-01", to: today, reason: M.reasonFilter || "" };
+    var st = { freq: DEF.freq, from: DEF.from, to: DEF.to, reason: DEF.reason, bdrs: null, rows: [], def: null, loading: true };
+    var PREF = "pp_" + (opts.uid || opts.key) + "_v1";
     try { var saved = JSON.parse(localStorage.getItem(PREF) || "null"); if (saved && saved.freq) st.freq = saved.freq; } catch (e) {}
 
     el.innerHTML =
@@ -262,9 +328,10 @@
           }).join("") + "</div>" +
           '<label class="pp-date"><span>Desde</span><input type="date" class="pr-filter__input" data-from></label>' +
           '<label class="pp-date"><span>Hasta</span><input type="date" class="pr-filter__input" data-to></label>' +
-          '<details class="pp-ms"><summary class="pr-btn"><i class="fa-solid fa-user-group"></i> <span data-ms-label>Todos los BDRs</span></summary>' +
+          (M.reasonFilter ? '<label class="pp-date"><span>Motivo</span><select class="pr-filter__input pp-reason" data-reason data-nosearch></select></label>' : "") +
+          '<details class="pp-ms"><summary class="pr-btn"><i class="fa-solid ' + W.icon + '"></i> <span data-ms-label>' + esc(W.all) + "</span></summary>" +
             '<div class="pp-ms__pop" data-ms-pop></div></details>' +
-          '<button type="button" class="pr-btn pp-reset" data-reset hidden title="Volver a Mensual, este año y todos los BDRs">' +
+          '<button type="button" class="pr-btn pp-reset" data-reset hidden title="Volver a los filtros de inicio">' +
             '<i class="fa-solid fa-rotate-left"></i> Restablecer</button>' +
         "</div></header>" +
       '<div class="pp-def" data-def hidden></div>' +
@@ -285,6 +352,7 @@
         .then(function (r) {
           st.rows = r.rows || []; st.def = r.definition || null; st.loading = false;
           if (r.people_order) setPeople(r.people_order);
+          if (r.reasons) setReasons(r.reasons);
           render();
         })
         .catch(function (err) { st.loading = false; q("[data-chart]").innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>"; });
@@ -292,23 +360,24 @@
 
     function people() {
       var m = {};
-      st.rows.forEach(function (r) { m[r.scheduled_by] = r.scheduled_by_name || r.scheduled_by; });
+      st.rows.forEach(function (r) { m[r[GK]] = gName(r); });
       return Object.keys(m).map(function (e) { return { email: e, name: m[e] }; })
         .sort(function (a, b) { return a.name.localeCompare(b.name, "es"); });
     }
     function rowsOn() {
-      return st.bdrs ? st.rows.filter(function (r) { return st.bdrs.indexOf(r.scheduled_by) !== -1; }) : st.rows;
+      return st.rows.filter(function (r) {
+        return (!st.bdrs || st.bdrs.indexOf(r[GK]) !== -1) && (!st.reason || r.reason === st.reason);
+      });
     }
 
     function renderDef() {
       var d = st.def || {};
-      q("[data-def]").innerHTML = "<strong>Cómo se cuenta.</strong> Contactos con un negocio que tiene <em>SQL Date</em>, " +
-        "agrupados por la SQL Date del negocio y por <em>Scheduled By</em> del contacto (quién agendó la reunión). " +
+      q("[data-def]").innerHTML = "<strong>Cómo se cuenta.</strong> " + M.def + " " +
         (d.team ? "Sólo el equipo " + esc(opts.team || "") + ": " + esc(d.team.join(", ")) + ". " : "") +
         "Igual que el reporte de HubSpot: Scheduled By conocido y fuera de " + esc((d.excluded_schedulers || []).join(", ")) +
-        "; contactos fuera del equipo interno (" + esc((d.internal_domains || []).map(function (x) { return "@" + x; }).join(", ")) + ")" +
-        "; con Meeting Date &amp; Time cargada. «SQL Date» existe desde fines de nov-2025: antes no hay datos. " +
-        "Un contacto cuenta una vez por SQL Date. Se calcula en vivo con los datos del Hub.";
+        ((d.internal_domains || []).length ? "; contactos fuera del equipo interno (" +
+          esc(d.internal_domains.map(function (x) { return "@" + x; }).join(", ")) + ")" : "") +
+        "; con Meeting Date &amp; Time cargada. Se calcula en vivo con los datos del Hub.";
     }
 
     function renderMs() {
@@ -316,18 +385,31 @@
       q("[data-ms-pop]").innerHTML = '<label class="pr-check"><input type="checkbox" data-ms-all' + (st.bdrs ? "" : " checked") + "> <strong>Todos</strong></label>" +
         ps.map(function (p) {
           var on = !st.bdrs || st.bdrs.indexOf(p.email) !== -1;
-          return '<label class="pr-check"><input type="checkbox" data-ms="' + esc(p.email) + '"' + (on ? " checked" : "") + "> " + dot(p.email) + esc(p.name) + "</label>";
+          return '<label class="pr-check"><input type="checkbox" data-ms="' + esc(p.email) + '"' + (on ? " checked" : "") + "> " + gDot(p.email) + esc(p.name) + "</label>";
         }).join("");
-      q("[data-ms-label]").textContent = !st.bdrs ? "Todos los BDRs" :
-        !st.bdrs.length ? "Ningún BDR" :
-        st.bdrs.length === 1 ? (ps.filter(function (p) { return p.email === st.bdrs[0]; })[0] || {}).name || "1 BDR" :
-        st.bdrs.length + " BDRs";
+      q("[data-ms-label]").textContent = !st.bdrs ? W.all :
+        !st.bdrs.length ? W.none :
+        st.bdrs.length === 1 ? (ps.filter(function (p) { return p.email === st.bdrs[0]; })[0] || {}).name || W.one :
+        st.bdrs.length + " " + W.plural;
+    }
+    /* Desplegable de motivo («x BDR»): los motivos que hay en las filas, más «Todos». */
+    function renderReasonSel() {
+      var sel = q("[data-reason]");
+      if (!sel) return;
+      var seen = {};
+      st.rows.forEach(function (r) { if (r.reason) seen[r.reason] = (seen[r.reason] || 0) + 1; });
+      var list = Object.keys(seen).sort(function (a, b) { return seen[b] - seen[a] || a.localeCompare(b); });
+      if (st.reason && list.indexOf(st.reason) === -1) list.unshift(st.reason);
+      sel.innerHTML = '<option value="">Todos los motivos</option>' + list.map(function (r) {
+        return '<option value="' + esc(r) + '">' + esc(r) + "</option>";
+      }).join("");
+      sel.value = st.reason;
     }
 
-    function isDefault() { return st.freq === DEF.freq && st.from === DEF.from && st.to === DEF.to && !st.bdrs; }
+    function isDefault() { return st.freq === DEF.freq && st.from === DEF.from && st.to === DEF.to && !st.bdrs && st.reason === DEF.reason; }
     function reset() {
       var reload = st.from !== DEF.from || st.to !== DEF.to;
-      st.freq = DEF.freq; st.from = DEF.from; st.to = DEF.to; st.bdrs = null;
+      st.freq = DEF.freq; st.from = DEF.from; st.to = DEF.to; st.bdrs = null; st.reason = DEF.reason;
       q("[data-from]").value = st.from;
       q("[data-to]").value = st.to;
       savePref();
@@ -346,17 +428,19 @@
         return;
       }
       renderMs();
+      renderReasonSel();
       var rows = rowsOn();
       var periods = periodsBetween(st.from, st.to, st.freq);
       var tot = {}, by = {}, names = {};
       periods.forEach(function (k) { tot[k] = 0; });
       rows.forEach(function (r) {
-        var k = periodKey(r.sql_date, st.freq);
+        var k = periodKey(r.date, st.freq);
         if (!(k in tot)) return;
         tot[k]++;
-        by[r.scheduled_by] = by[r.scheduled_by] || {};
-        by[r.scheduled_by][k] = (by[r.scheduled_by][k] || 0) + 1;
-        names[r.scheduled_by] = r.scheduled_by_name || r.scheduled_by;
+        var g = r[GK];
+        by[g] = by[g] || {};
+        by[g][k] = (by[g][k] || 0) + 1;
+        names[g] = gName(r);
       });
       var total = periods.reduce(function (s, k) { return s + tot[k]; }, 0);
       var ranking = Object.keys(by).map(function (e) {
@@ -376,13 +460,13 @@
       var avgLabel = { month: "promedio mensual", week: "promedio semanal", quarter: "promedio trimestral" }[st.freq];
       var fname = { month: "mes", week: "semana", quarter: "trimestre" }[st.freq];
       q("[data-kpis]").innerHTML =
-        kpi("SQLs en el rango", total, periods.length + " " + (fname === "mes" ? "meses" : fname + "s") + " · " + avgLabel + " " + fmt1(avg) +
+        kpi(M.noun + " en el rango", total, periods.length + " " + (fname === "mes" ? "meses" : fname + "s") + " · " + avgLabel + " " + fmt1(avg) +
           (full.length < periods.length ? " · sin " + periodLabel(curK, st.freq, true) + " (en curso)" : "")) +
         kpi(capital(fname) + " actual · " + (last ? periodLabel(last, st.freq) : "—"), last ? tot[last] : 0,
           delta == null ? "" : '<span class="pp-delta ' + (delta > 0 ? "is-up" : delta < 0 ? "is-down" : "") + '">' +
             (delta > 0 ? "▲ +" : delta < 0 ? "▼ " : "= ") + delta + "</span> vs " + periodLabel(prev, st.freq), true) +
         kpi("Mejor " + fname, best && tot[best] ? tot[best] : 0, best && tot[best] ? periodLabel(best, st.freq) : "—") +
-        kpi("Más SQLs", ranking[0] ? ranking[0].total : 0, ranking[0] ? esc(ranking[0].name) : "—", true);
+        kpi(M.topLabel || ("Más " + M.many), ranking[0] ? ranking[0].total : 0, ranking[0] ? esc(ranking[0].name) : "—", true);
 
       // Barras del total
       var max = Math.max.apply(null, periods.map(function (k) { return tot[k]; }).concat([1]));
@@ -390,7 +474,7 @@
       q("[data-chart]").innerHTML = '<div class="pp-bars" style="--n:' + periods.length + '">' + periods.map(function (k, i) {
         var h = tot[k] ? Math.max(4, Math.round(tot[k] / max * 100)) : 0;
         return '<button type="button" class="pp-bar' + (k === last ? " is-current" : "") + '" data-period="' + k + '" title="' +
-            esc(periodLabel(k, st.freq) + ": " + tot[k] + " SQL" + (tot[k] === 1 ? "" : "s")) + '">' +
+            esc(periodLabel(k, st.freq) + ": " + tot[k] + " " + (tot[k] === 1 ? M.one : M.many)) + '">' +
           '<span class="pp-bar__track"><span class="pp-bar__fill" style="height:' + h + '%">' +
             (tot[k] ? '<span class="pp-bar__val">' + tot[k] + "</span>" : "") + "</span></span>" +
           '<span class="pp-bar__x">' + (i % step === 0 ? esc(periodLabel(k, st.freq, true)) : "&nbsp;") + "</span></button>";
@@ -399,15 +483,15 @@
       // Ranking (mapa de calor)
       var cmax = 1;
       ranking.forEach(function (p) { periods.forEach(function (k) { cmax = Math.max(cmax, by[p.email][k] || 0); }); });
-      q("[data-rank]").innerHTML = ranking.length ? '<div class="pp-rank__wrap"><table class="pp-heat"><thead><tr><th class="pp-heat__name">BDR</th>' +
+      q("[data-rank]").innerHTML = ranking.length ? '<div class="pp-rank__wrap"><table class="pp-heat"><thead><tr><th class="pp-heat__name">' + esc(W.head) + "</th>" +
         periods.map(function (k) { return '<th><button type="button" data-period="' + k + '">' + esc(periodLabel(k, st.freq, true)) + "</button></th>"; }).join("") +
         '<th class="pp-heat__tot">Total</th></tr></thead><tbody>' +
         ranking.map(function (p, i) {
-          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + colorOf(p.email) + '">' + (i + 1) + "</span>" + esc(p.name) + "</button></th>" +
+          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + gColor(p.email) + '">' + (i + 1) + "</span>" + esc(p.name) + "</button></th>" +
             periods.map(function (k) {
               var v = by[p.email][k] || 0;
               var pct = v ? Math.round(14 + v / cmax * 76) : 0;
-              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-period="' + k + '" style="--pct:' + pct + '%;--c:' + colorOf(p.email) + '"' +
+              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-period="' + k + '" style="--pct:' + pct + '%;--c:' + gColor(p.email) + '"' +
                 (pct > 55 ? ' data-dark="1"' : "") + ' title="' + esc(p.name + " · " + periodLabel(k, st.freq) + ": " + v) + '">' + v + "</button>" : '<span class="pp-dot">·</span>') + "</td>";
             }).join("") +
             '<td class="pp-heat__tot"><button type="button" data-bdr="' + esc(p.email) + '">' + p.total + "</button></td></tr>";
@@ -415,7 +499,7 @@
         '</tbody><tfoot><tr><th class="pp-heat__name">Total</th>' +
         periods.map(function (k) { return '<td><button type="button" data-period="' + k + '">' + (tot[k] || '<span class="pp-dot">·</span>') + "</button></td>"; }).join("") +
         '<td class="pp-heat__tot"><button type="button" data-all>' + total + "</button></td></tr></tfoot></table></div>"
-        : '<p class="pr-note">Sin SQLs en este rango.</p>';
+        : '<p class="pr-note">Sin ' + esc(M.many) + " en este rango.</p>";
     }
 
     function kpi(label, value, sub, accent) {
@@ -427,13 +511,14 @@
 
     function detail(period, bdr) {
       var rows = rowsOn().filter(function (r) {
-        var k = periodKey(r.sql_date, st.freq);
-        return r.sql_date >= st.from && r.sql_date <= st.to &&
-          (!period || k === period) && (!bdr || r.scheduled_by === bdr);
+        var k = periodKey(r.date, st.freq);
+        return r.date >= st.from && r.date <= st.to &&
+          (!period || k === period) && (!bdr || r[GK] === bdr);
       });
-      var who = bdr ? (rows[0] && rows[0].scheduled_by_name) || bdr : (st.bdrs ? q("[data-ms-label]").textContent : (opts.team || "Todos los BDRs"));
+      var who = bdr ? (rows[0] && gName(rows[0])) || bdr : (st.bdrs ? q("[data-ms-label]").textContent : (opts.team || W.all));
+      if (st.reason) who = st.reason + " · " + who;
       var when = period ? periodLabel(period, st.freq) : P().fmtDate(st.from) + " – " + P().fmtDate(st.to);
-      openDetail("SQLs · " + who + " · " + when, rows.length + " contacto" + (rows.length === 1 ? "" : "s"), rows);
+      openDetail(M.noun + " · " + who + " · " + when, rows.length + " contacto" + (rows.length === 1 ? "" : "s"), rows, M);
     }
 
     // Eventos
@@ -456,6 +541,7 @@
         return;
       }
       // «Todos» prende o apaga a todos: apagado = ninguno, para después elegir de a uno.
+      if (t.matches("[data-reason]")) { st.reason = t.value; render(); return; }
       if (t.matches("[data-ms-all]")) { st.bdrs = t.checked ? null : []; render(); el.querySelector(".pp-ms").open = true; return; }
       if (t.matches("[data-ms]")) {
         var on = Array.prototype.map.call(el.querySelectorAll("[data-ms]:checked"), function (x) { return x.getAttribute("data-ms"); });

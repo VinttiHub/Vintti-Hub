@@ -1575,6 +1575,26 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   «SQLs - Monthly YTD». Cada panel se arma la primera vez que se muestra y después sólo se oculta
   (conserva sus filtros); el último visto queda en `localStorage` (`pp_current_v1`). ← / → también
   cambian de panel.
+  **Intro Calls** (grupo «Intro Calls - Monthly YTD», 2026-11-07): `panels.intro_calls()` + equipos,
+  contactos por **Date of Meeting Scheduled** × Scheduled By, sin negocios: Scheduled By conocido y
+  fuera de `EXCLUDED_SCHEDULERS`, fuera de Internal Team, Meeting Date & Time conocido, Date of
+  Meeting Scheduled conocido. Ene–oct 2026 = 17/26/28/35/45/26/30/26/36/54, igual que HubSpot (el
+  contacto 4230 tenía la fecha vieja: en HubSpot cambió y la importación no la aplicó; corregido a mano
+  el 2026-11-07). En
+  el front es el mismo panel (`CountByBdr`) con `METRICS.sql` / `METRICS.intro`; las filas traen
+  `date` (la dimensión). `people_order` une SQLs e intro calls (sin los excluidos): 28 personas, 32
+  colores en `PALETTE`.
+  **Lead Quality** (subtítulo «Reasons why intro call were not SQL», 2026-11-07): `panels.lead_quality()`
+  = contactos con **MQL (AE) Lost Reason** por mes de Meeting Date & Time (UTC); Scheduled By conocido y
+  fuera de `LQ_EXCLUDED_SCHEDULERS` (bahia, agustin, mariano: **Valentina sí cuenta**, va al final de
+  `people_order` para no correr colores). «Lead Life alguna vez Closed Lost» no se aplica: todos los
+  que tienen motivo lo cumplen. **Cuenta el motivo del Hub, incluido el copiado del negocio por
+  `prop_sync`** (decisión de la owner): da 175 contra 162 de HubSpot, cuyos contactos no tienen el
+  motivo que sí tiene su negocio (`deal_lost_reason`). El panel general desglosa por motivo
+  (`groupKey: "reason"`, colores fijos `REASON_PALETTE` en el orden de `MQL_LOST_REASONS`), también por
+  equipo (= «Lead Quality - VinttiKids/NextGen» de HubSpot, todos los motivos); «Lead
+  Quality x BDR» (+ VinttiKids / NextGen) desglosa por persona con un desplegable de motivo que
+  arranca en Timing. Dos paneles leen el mismo endpoint: el DOM y las preferencias van por `uid`.
   **Sólo cuadra porque las propiedades tipo `user` aceptan gente que ya no está**: el sync de
   contactos resolvía Scheduled By contra usuarios ACTIVOS y descartaba a los ex-BDRs (93 contactos).
   Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y

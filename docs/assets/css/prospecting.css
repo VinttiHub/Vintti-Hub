@@ -2474,6 +2474,8 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pp-nav__arrow:hover { background: color-mix(in srgb, var(--pr-violet) 8%, #fff); color: var(--pr-violet); border-color: color-mix(in srgb, var(--pr-violet) 30%, #fff); }
 .pp-nav__mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .pp-nav__group { font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: var(--pr-violet); line-height: 1.2; }
+.pp-nav__sub { font-size: 13px; color: var(--pr-ink-2); margin-top: -2px; }
+.pp-reason { height: 34px; min-width: 170px; }
 .pp-nav__select { width: min(420px, 100%); height: 38px; font-weight: 700 !important; text-align: center; text-align-last: center; }
 .pp-nav__count { flex: 0 0 auto; font-size: 12.5px; color: var(--pr-ink-3); min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
 .pp-card[hidden] { display: none; }

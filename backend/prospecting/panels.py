@@ -123,6 +123,7 @@ def sqls_by_bdr(cur, date_from: date | None, date_to: date | None, team: str | N
     for r in cur.fetchall():
         r = dict(r)
         r["sql_date"] = r["sql_date"].isoformat() if r["sql_date"] else None
+        r["date"] = r["sql_date"]  # la dimensión: el front agrupa siempre por `date`
         r.pop("pipeline_key", None)
         r.pop("stage_key", None)
         rows.append(r)
@@ -137,23 +138,178 @@ def sqls_by_bdr(cur, date_from: date | None, date_to: date | None, team: str | N
     }
 
 
+def intro_calls(cur, date_from: date | None, date_to: date | None, team: str | None = None) -> dict:
+    """Intro calls: contactos por Date of Meeting Scheduled y Scheduled By (2026-11-07).
+
+    Los filtros del reporte «Intro calls by BDR» de HubSpot:
+      1. Scheduled By conocido y fuera de EXCLUDED_SCHEDULERS.
+      2. Contacto fuera del segmento Internal Team (email de INTERNAL_DOMAINS).
+      3. Meeting Date & Time conocido (HubSpot: dentro de 2026; acá lo corta Desde/Hasta).
+      4. Date of Meeting Scheduled conocido: es la dimensión.
+    Sin negocios: un contacto, una intro call. Con `team`, Scheduled By ∈ TEAMS[team]."""
+    where, params = [], []
+    members = list(TEAMS[team]) if team else None
+    if members:
+        where.append("LOWER(ct.props->>'scheduled_by') = ANY(%s)")
+        params.append(members)
+    if date_from:
+        where.append("(ct.props->>'date_of_meeting_scheduled')::date >= %s")
+        params.append(date_from)
+    if date_to:
+        where.append("(ct.props->>'date_of_meeting_scheduled')::date <= %s")
+        params.append(date_to)
+    extra = "".join(" AND " + w for w in where)
+    domains = " AND ".join("ct.email NOT ILIKE %s" for _ in INTERNAL_DOMAINS)
+    cur.execute(
+        f"""
+        WITH base AS (
+            SELECT ct.id AS contact_id,
+                   NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name,
+                   ct.email,
+                   ct.company_id,
+                   c.name AS company_name,
+                   (ct.props->>'date_of_meeting_scheduled')::date AS date,
+                   ct.props->>'meeting_datetime' AS meeting_datetime,
+                   ct.lead_life,
+                   LOWER(ct.props->>'scheduled_by') AS scheduled_by
+              FROM prospect_contacts ct
+              LEFT JOIN prospect_companies c ON c.id = ct.company_id
+             WHERE NOT ct.is_dummy
+               AND NULLIF(ct.props->>'scheduled_by', '') IS NOT NULL
+               AND LOWER(ct.props->>'scheduled_by') <> ALL(%s)
+               AND ({domains} OR ct.email IS NULL)
+               AND NULLIF(ct.props->>'meeting_datetime', '') IS NOT NULL
+               AND NULLIF(ct.props->>'date_of_meeting_scheduled', '') IS NOT NULL
+               {extra}
+        )
+        SELECT b.*, {_person_name_sql('b.scheduled_by')} AS scheduled_by_name
+          FROM base b
+         ORDER BY b.date, b.contact_id
+        """,
+        [list(EXCLUDED_SCHEDULERS), *[f"%@{d}" for d in INTERNAL_DOMAINS], *params],
+    )
+    rows = []
+    for r in cur.fetchall():
+        r = dict(r)
+        r["date"] = r["date"].isoformat() if r["date"] else None
+        rows.append(r)
+    return {
+        "rows": rows,
+        "people_order": people_order(cur),
+        "definition": {
+            "excluded_schedulers": list(EXCLUDED_SCHEDULERS),
+            "internal_domains": list(INTERNAL_DOMAINS),
+            "team": _names(cur, members) if members else None,
+        },
+    }
+
+
+# Lead Quality: el reporte de HubSpot excluye a estos 3 (Valentina Cadirola sí cuenta acá).
+LQ_EXCLUDED_SCHEDULERS = ("bahia@vintti.com", "agustin@vintti.com", "mariano@vintti.com")
+
+
+def lead_quality(cur, date_from: date | None, date_to: date | None, team: str | None = None) -> dict:
+    """Lead Quality: por qué las intro calls no pasaron a SQL (2026-11-07).
+
+    Contactos con «MQL (AE) Lost Reason» por mes de Meeting Date & Time (UTC, como HubSpot),
+    con el motivo (`reason`) y Scheduled By en cada fila: el panel general desglosa por
+    motivo y «x BDR» por persona. Filtros del reporte de HubSpot:
+      1. MQL (AE) Lost Reason conocido. Incluye el que vino del negocio (prop_sync, decisión
+         de la owner 2026-11-07): por eso da 175 y HubSpot 162.
+      2. Lead Life alguna vez Closed Lost: no se aplica, todos los que tienen motivo lo
+         cumplen (verificado en HubSpot y en el Hub).
+      3. Scheduled By conocido y fuera de LQ_EXCLUDED_SCHEDULERS.
+      4. Meeting Date & Time conocido (es la dimensión)."""
+    where, params = [], []
+    members = list(TEAMS[team]) if team else None
+    if members:
+        where.append("LOWER(ct.props->>'scheduled_by') = ANY(%s)")
+        params.append(members)
+    day = "((ct.props->>'meeting_datetime')::timestamptz AT TIME ZONE 'UTC')::date"
+    if date_from:
+        where.append(f"{day} >= %s")
+        params.append(date_from)
+    if date_to:
+        where.append(f"{day} <= %s")
+        params.append(date_to)
+    extra = "".join(" AND " + w for w in where)
+    cur.execute(
+        f"""
+        WITH base AS (
+            SELECT ct.id AS contact_id,
+                   NULLIF(TRIM(CONCAT_WS(' ', ct.first_name, ct.last_name)), '') AS contact_name,
+                   ct.email,
+                   ct.company_id,
+                   c.name AS company_name,
+                   {day} AS date,
+                   ct.props->>'meeting_datetime' AS meeting_datetime,
+                   ct.props->>'mql_ae_lost_reason' AS reason,
+                   ct.lead_life,
+                   LOWER(ct.props->>'scheduled_by') AS scheduled_by
+              FROM prospect_contacts ct
+              LEFT JOIN prospect_companies c ON c.id = ct.company_id
+             WHERE NOT ct.is_dummy
+               AND NULLIF(ct.props->>'mql_ae_lost_reason', '') IS NOT NULL
+               AND NULLIF(ct.props->>'scheduled_by', '') IS NOT NULL
+               AND LOWER(ct.props->>'scheduled_by') <> ALL(%s)
+               AND NULLIF(ct.props->>'meeting_datetime', '') IS NOT NULL
+               {extra}
+        )
+        SELECT b.*, {_person_name_sql('b.scheduled_by')} AS scheduled_by_name
+          FROM base b
+         ORDER BY b.date, b.contact_id
+        """,
+        [list(LQ_EXCLUDED_SCHEDULERS), *params],
+    )
+    rows = []
+    for r in cur.fetchall():
+        r = dict(r)
+        r["date"] = r["date"].isoformat() if r["date"] else None
+        rows.append(r)
+    from prospecting.deal_fields import MQL_LOST_REASONS
+    return {
+        "rows": rows,
+        "people_order": people_order(cur),
+        "reasons": list(MQL_LOST_REASONS),  # orden fijo = color fijo por motivo
+        "definition": {
+            "excluded_schedulers": list(LQ_EXCLUDED_SCHEDULERS),
+            "internal_domains": [],
+            "team": _names(cur, members) if members else None,
+        },
+    }
+
+
 def people_order(cur) -> list[str]:
-    """Las personas con algún SQL (Scheduled By de un contacto con negocio con SQL Date), en
-    orden de aparición (su primer SQL). El front asigna los colores con esta lista en TODOS
-    los paneles: así Abril tiene el mismo color en cada gráfico, y alguien nuevo se agrega
-    al final sin correr a nadie. Sólo quienes tienen SQLs, para que alcance la paleta."""
+    """Las personas con algún SQL o alguna intro call, en orden de aparición (su primera).
+    El front asigna los colores con esta lista en TODOS los paneles: así Abril tiene el
+    mismo color en cada gráfico, y alguien nuevo se agrega al final sin correr a nadie.
+    Sin los que no salen en ningún panel (LQ_EXCLUDED_SCHEDULERS) para que alcance la paleta."""
     cur.execute(
         """
-        SELECT LOWER(ct.props->>'scheduled_by') AS email
-          FROM prospect_contacts ct
-          JOIN prospect_deal_contacts dc ON dc.contact_id = ct.id
-          JOIN prospect_deals d ON d.id = dc.deal_id
-         WHERE NOT ct.is_dummy AND NOT d.is_dummy
-           AND NULLIF(ct.props->>'scheduled_by', '') IS NOT NULL
-           AND NULLIF(d.props->>'sql_date', '') IS NOT NULL
+        WITH firsts AS (
+            SELECT LOWER(ct.props->>'scheduled_by') AS email, (d.props->>'sql_date')::date AS at
+              FROM prospect_contacts ct
+              JOIN prospect_deal_contacts dc ON dc.contact_id = ct.id
+              JOIN prospect_deals d ON d.id = dc.deal_id
+             WHERE NOT ct.is_dummy AND NOT d.is_dummy
+               AND NULLIF(ct.props->>'scheduled_by', '') IS NOT NULL
+               AND NULLIF(d.props->>'sql_date', '') IS NOT NULL
+            UNION ALL
+            SELECT LOWER(ct.props->>'scheduled_by'), (ct.props->>'date_of_meeting_scheduled')::date
+              FROM prospect_contacts ct
+             WHERE NOT ct.is_dummy
+               AND NULLIF(ct.props->>'scheduled_by', '') IS NOT NULL
+               AND NULLIF(ct.props->>'meeting_datetime', '') IS NOT NULL
+               AND NULLIF(ct.props->>'date_of_meeting_scheduled', '') IS NOT NULL
+        )
+        SELECT email FROM firsts
+         WHERE email <> ALL(%s)
          GROUP BY 1
-         ORDER BY MIN((d.props->>'sql_date')::date), 1
-        """
+         ORDER BY BOOL_OR(email = ANY(%s)), MIN(at), 1
+        """,
+        # Quien sólo sale en Lead Quality (excluido de SQLs/Intro, p. ej. Valentina Cadirola)
+        # va al final: así sumarla no le corre el color a nadie.
+        (list(LQ_EXCLUDED_SCHEDULERS), list(EXCLUDED_SCHEDULERS)),
     )
     return [r["email"] for r in cur.fetchall()]
 
@@ -170,4 +326,10 @@ PANELS = {
     "sqls_by_bdr": sqls_by_bdr,
     "sqls_by_bdr_vinttikids": lambda cur, f, t: sqls_by_bdr(cur, f, t, team="vinttikids"),
     "sqls_by_bdr_nextgen": lambda cur, f, t: sqls_by_bdr(cur, f, t, team="nextgen"),
+    "intro_calls": intro_calls,
+    "intro_calls_vinttikids": lambda cur, f, t: intro_calls(cur, f, t, team="vinttikids"),
+    "intro_calls_nextgen": lambda cur, f, t: intro_calls(cur, f, t, team="nextgen"),
+    "lead_quality": lead_quality,
+    "lead_quality_vinttikids": lambda cur, f, t: lead_quality(cur, f, t, team="vinttikids"),
+    "lead_quality_nextgen": lambda cur, f, t: lead_quality(cur, f, t, team="nextgen"),
 }
