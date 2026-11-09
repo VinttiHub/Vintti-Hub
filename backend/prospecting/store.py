@@ -1018,6 +1018,11 @@ def _company_where(f: dict) -> tuple[str, list]:
     week = f.get("week")
     if week == "__none__":
         where.append("NULLIF(week_label, '') IS NULL")
+    elif week == "__current__":
+        # Vista fija «This Week» (2026-11-09): la semana ISO de hoy en hora Argentina,
+        # sin importar mayúsculas ni espacios (hay «semana 44» y «SEMANA 41» cargadas).
+        where.append("LOWER(BTRIM(week_label)) = LOWER(%s)")
+        params.append(current_week_label())
     elif week:
         where.append("week_label = %s")
         params.append(week)
@@ -1153,6 +1158,14 @@ def property_history(cur, obj: str, record_id: int, field: str) -> dict | None:
     initial = changes[-1]["old_value"] if changes else _fmt(rec.get("value"))
     created["value"] = initial
     return {"field": field, "current": _fmt(rec.get("value")), "changes": changes, "created": created}
+
+
+def current_week_label() -> str:
+    """«Semana N» de hoy (semana ISO, lunes a domingo, hora Argentina): el formato de
+    `week_label` que mandan Clay y HubSpot."""
+    from dashboards.datasets._now import today_ar
+
+    return f"Semana {today_ar().isocalendar()[1]}"
 
 
 def list_weeks(cur) -> list[str]:

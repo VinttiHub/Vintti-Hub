@@ -1940,8 +1940,16 @@
      ===================================================================== */
   // Una sola vista fija para todos, «Companies» (2026-11-06): siempre primera, no se oculta
   // ni se arrastra. My companies / Unassigned / Recycled se arman con + (vistas propias).
-  var SYS_TABS = { "sys:all": "Companies" };
-  var SYS_OVERRIDES = {};
+  // Desde el 2026-11-09 también «Recycled» (status Recycled), fija para todos los que entran
+  // a Business Dev, segunda. Una fija nueva = una entrada acá, en SYS_OVERRIDES y en
+  // SYSTEM_TABS de backend/prospecting/views.py.
+  // «This Week» (2026-11-09): las empresas de quien mira en la semana actual; el server
+  // traduce "__current__" a «Semana N» (store.current_week_label()).
+  var SYS_TABS = { "sys:all": "Companies", "sys:recycled": "Recycled", "sys:week": "This Week" };
+  var SYS_OVERRIDES = {
+    "sys:recycled": { status: "Recycled" },
+    "sys:week": { owner: "__me__", week: "__current__" },
+  };
   var ACTIVE_KEY = "prospecting_active_tab";
   var VIEWS = { views: [], tabs: Object.keys(SYS_TABS) };
   var baseline = "";      // la vista tal como está guardada, para saber si hay cambios
@@ -2264,7 +2272,10 @@
     var last = VIEWS.tabs.length <= 1;
     var html = '<div class="pr-pop__head">' + esc(tabLabel(key)) + "</div>";
     if (isSys(key)) {
-      html += '<p class="pr-pop__note">Vista de todos, con todas las empresas. Para filtrar a tu manera, guardá una copia o creá una vista con +.</p>' +
+      html += '<p class="pr-pop__note">' + (key === "sys:recycled" ? "Vista de todos: las empresas en Recycled."
+          : key === "sys:week" ? "Vista de todos: tus empresas de la semana actual. Cambia sola cada lunes."
+          : "Vista de todos, con todas las empresas.") +
+        " Para filtrar a tu manera, guardá una copia o creá una vista con +.</p>" +
         item("duplicate", "fa-copy", "Save a copy as my view");
     } else if (v && v.mine) {
       html += item("rename", "fa-pen", "Rename") +
@@ -2369,7 +2380,7 @@
       api("/prospecting/views/" + v.id, { method: "DELETE" }).then(function () {
         VIEWS.views = VIEWS.views.filter(function (x) { return x.id !== v.id; });
         VIEWS.tabs = VIEWS.tabs.filter(function (k) { return k !== key; });
-        if (!VIEWS.tabs.length) VIEWS.tabs = ["sys:all"];
+        if (!VIEWS.tabs.length) VIEWS.tabs = Object.keys(SYS_TABS);
         if (state.view === key) applyTab(VIEWS.tabs[0]); else renderTabs();
       }).catch(viewError);
     }

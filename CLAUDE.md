@@ -1665,7 +1665,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   orden de filas y tamaño de página. Todo en `backend/prospecting/views.py`: tablas
   `prospect_saved_views` (privada salvo `shared`; compartida = otros la agregan y la
   duplican, **sólo la dueña la edita**, lo frena el server) y `prospect_view_prefs`
-  (pestañas que ve cada uno y en qué orden). Desde el 2026-11-06 hay UNA sola fija, «Companies» (`sys:all`), siempre primera: no se oculta ni se arrastra; My companies / Unassigned / Recycled se arman como vistas propias.
+  (pestañas que ve cada uno y en qué orden). Desde el 2026-11-06 hay UNA sola fija, «Companies» (`sys:all`), siempre primera: no se oculta ni se arrastra; My companies / Unassigned se arman como vistas propias. Desde el 2026-11-09 «Recycled» (`sys:recycled`, status Recycled) y «This Week» (`sys:week`: owner = quien mira + `week="__current__"`, que `_company_where()` traduce a la «Semana N» ISO de hoy en hora AR, sin importar mayúsculas) son fijas para todos, en ese orden (`SYSTEM_TABS` en `views.py` + `SYS_TABS` / `SYS_OVERRIDES` en `prospecting.js`).
   Los filtros avanzados son condiciones de workflow: el param `advanced` de
   `GET /prospecting/companies` pasa por `rules.validate_conditions()` +
   `compile_conditions()`, la misma lista blanca. En el front reusa `conditionsEditor()` de
