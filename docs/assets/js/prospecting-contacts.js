@@ -252,8 +252,8 @@
     bindPropSearch();
     updateCounts();
     var del = document.getElementById("pcDelete");
-    // Eliminar: sólo admin + editoras (can_configure de /prospecting/me); el server frena igual.
-    del.hidden = isNew || !((P().me() || {}).can_configure);
+    // Eliminar: todos menos los BDRs (can_delete de /prospecting/me, 2026-11-09); el server frena igual.
+    del.hidden = isNew || !((P().me() || {}).can_delete);
     del.onclick = function () {
       if (!confirm("¿Borrar el contacto «" + c.name + "»?")) return;
       P().api("/prospecting/contacts/" + c.id, { method: "DELETE" }).then(function () {

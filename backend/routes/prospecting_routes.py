@@ -132,6 +132,7 @@ def me():
             "sees_dummies": _sees_dummies(email),
             "can_see_deals": _is_staff(email),
             "can_see_workflows": _is_staff(email),
+            "can_delete": _is_staff(email),
         })
 
 
@@ -568,9 +569,9 @@ def contact_patch(contact_id: int):
 
 @bp.delete("/contacts/<int:contact_id>")
 def contact_delete(contact_id: int):
-    # Eliminar es de admin + editoras (decisión de la owner, 2026-11-06), igual que en masa.
+    # Eliminar: todos los que no son BDR (_is_staff), nunca un BDR (2026-11-09), igual que en masa.
     with _Db() as cur:
-        denied = _gate(cur, settings=True)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         ok = store.delete_contact(cur, contact_id, _current_email())
@@ -586,7 +587,7 @@ def _bulk_delete(obj: str):
     body = request.get_json(silent=True) or {}
     actor = _current_email()
     with _Db() as cur:
-        denied = _gate(cur, settings=True)
+        denied = _gate(cur, staff=True)  # Eliminar: no-BDR, 2026-11-09
         if denied:
             return denied
         ids, err = _bulk_target_ids(cur, body, obj)

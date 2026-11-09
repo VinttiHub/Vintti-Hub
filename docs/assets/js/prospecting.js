@@ -494,8 +494,8 @@
       item("export", "fa-file-csv", "Exportar a CSV") +
       item("segment", "fa-layer-group", "Por segmento", false, "Vista nueva sólo con estas filas") +
       (canEnroll() ? item("enroll", "fa-diagram-project", "Inscribir en workflow", !!all, all ? "Sólo con filas tildadas" : "") : "") +
-      // Eliminar: sólo admin + editoras (ME.can_configure); el server frena igual.
-      (ME.can_configure ? item("delete", "fa-trash", "Eliminar", false, "No se puede deshacer").replace("pr-pop__item", "pr-pop__item is-danger") : ""));
+      // Eliminar: todos menos los BDRs (ME.can_delete, 2026-11-09); el server frena igual.
+      (ME.can_delete ? item("delete", "fa-trash", "Eliminar", false, "No se puede deshacer").replace("pr-pop__item", "pr-pop__item is-danger") : ""));
     $("prViewPop").classList.add("pr-pop--actions");
   }
 

@@ -1493,9 +1493,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `emit_event()` por registro y un `tick()` por empresa. Lo usa cualquiera con acceso (como la
   edición de a uno); inscribir en workflow sigue siendo de `WORKFLOW_EDITORS`. Empresas: sólo
   `EDITABLE_FIELDS`; contactos: todo el catálogo menos `email` (único). Tope `BULK_MAX` = 1000.
-- **Eliminar (2026-11-06)**: Acciones → «Eliminar» (tildados o todos los del filtro), sólo
-  pgonzales / mia / manuela (`_gate(cur, settings=True)`; también el `DELETE /contacts/<id>` del
-  panel). `POST /prospecting/companies/delete` y `/contacts/delete`, mismos `ids` / `filters` que la
+- **Eliminar (2026-11-06)**: Acciones → «Eliminar» (tildados o todos los del filtro), desde el
+  2026-11-09 todos menos los BDRs (`_gate(cur, staff=True)` = admin + `WORKFLOW_EDITORS` +
+  `EXTRA_ACCESS_EMAILS`, `can_delete` de `/me`; también el `DELETE /contacts/<id>` del panel).
+  «Registros eliminados» sigue en Configuración. `POST /prospecting/companies/delete` y `/contacts/delete`, mismos `ids` / `filters` que la
   edición masiva. **Borrar una empresa NO borra sus contactos** (como HubSpot): las FK de `company_id`
   son ON DELETE CASCADE, así que `store.delete_companies()` primero los deja sin empresa y suelta su
   historial e inscripciones (`company_id = NULL`). Un contacto borrado cierra sus inscripciones
