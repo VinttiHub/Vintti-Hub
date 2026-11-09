@@ -96,7 +96,7 @@
           'la empresa está en ' + esc(c.prospecting_status) + ' y le falta un contacto con los datos obligatorios.' +
           ' <button type="button" class="pr-wf-link" data-act="complete">Completar</button></div>' : "") +
       "</div>" +
-      '<div class="pr-co-card"><h3 class="pr-section__title">Prospecting</h3>' +
+      '<div class="pr-co-card"><h3 class="pr-section__title">Business Dev</h3>' +
         '<span class="pr-filter__label">Prospecting Status' + hist("company", c.id, "prospecting_status") + "</span>" +
         '<div class="pr-co-status">' +
           '<select class="pr-cell-select pr-status" data-edit="prospecting_status" data-status="' + esc(c.prospecting_status || "") + '">' +

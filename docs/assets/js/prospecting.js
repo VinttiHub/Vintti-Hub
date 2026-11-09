@@ -1770,7 +1770,7 @@
       };
       var H = function (field) { return [c.id, field]; };
       $("prDrawerBody").innerHTML =
-        '<section class="pr-section"><h3 class="pr-section__title">Prospecting</h3><div class="pr-grid">' +
+        '<section class="pr-section"><h3 class="pr-section__title">Business Dev</h3><div class="pr-grid">' +
           f("prospecting_status", "Prospecting Status",
             '<select class="pr-filter__input" data-edit="prospecting_status">' + optionsHtml(withCurrent(OPTS.statuses, c.prospecting_status), c.prospecting_status || "", "—") + "</select>") +
           f("not_icp_reason", "Not ICP Reason",
