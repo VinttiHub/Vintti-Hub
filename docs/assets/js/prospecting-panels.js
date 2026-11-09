@@ -243,7 +243,7 @@
         return window.ProspectingContacts.open({ contactId: Number(ct.getAttribute("data-pp-contact")) });
       }
       var dl = e.target.closest("[data-pp-deal]");
-      if (dl && window.ProspectingDeals) return window.ProspectingDeals.open({ dealId: Number(dl.getAttribute("data-pp-deal")) });
+      if (dl && window.ProspectingDeals && (P().me() || {}).can_see_deals) return window.ProspectingDeals.open({ dealId: Number(dl.getAttribute("data-pp-deal")) });
     });
     document.getElementById("ppDCsv").addEventListener("click", exportCsv);
     document.addEventListener("keydown", function (e) {
@@ -271,7 +271,10 @@
             (r.contact_name && r.email ? '<div class="pr-note">' + esc(r.email) + "</div>" : "") + "</td>" +
           "<td>" + (r.company_id ? '<a class="pp-link" href="prospecting-company.html?id=' + r.company_id + '" target="_blank" rel="noopener">' +
             esc(r.company_name || "—") + "</a>" : '<span class="pr-note">Sin empresa</span>') + "</td>" +
-          (m.withDeal ? '<td><button type="button" class="pp-link" data-pp-deal="' + r.deal_id + '">' + esc(r.deal_name || "#" + r.deal_id) + "</button>" +
+          // Los BDRs no abren negocios (2026-11-09: el server les da 403): sólo el nombre, sin link.
+          (m.withDeal ? "<td>" + ((P().me() || {}).can_see_deals
+              ? '<button type="button" class="pp-link" data-pp-deal="' + r.deal_id + '">' + esc(r.deal_name || "#" + r.deal_id) + "</button>"
+              : "<span>" + esc(r.deal_name || "#" + r.deal_id) + "</span>") +
             (r.stage_label ? '<div class="pr-note">' + esc(r.stage_label) + "</div>" : "") + "</td>" : "") +
           "<td>" + esc(P().fmtDate(r.date)) + "</td>" +
           (m.showReason ? '<td><span class="pp-pdot" style="--c:' + reasonColor(r.reason) + '"></span>' + esc(r.reason || "—") + "</td>" : "") +

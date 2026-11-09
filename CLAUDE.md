@@ -1187,8 +1187,12 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 `prospect_company_events` (historial por campo), `prospect_workflow_runs`.
 
 - **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales siempre**
-  (`ADMIN_EMAILS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; no es
-  owner ni ve Configuración). El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
+  (`ADMIN_EMAILS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; justo, ana y
+  agustinmorrone, 2026-11-09; no son owners ni ven Configuración). **Negocios y Workflows
+  no son para los BDRs** (2026-11-09): sólo admin + `WORKFLOW_EDITORS` + `EXTRA_ACCESS_EMAILS`
+  (`_is_staff()` en `prospecting_routes.py`, `_gate(cur, staff=True)` en las rutas `/deals*` y
+  de lectura de workflows; `/me` → `can_see_deals` / `can_see_workflows`). La ficha de empresa
+  y de contacto les llega con `deals` e `enrollments` vacíos. Paneles los siguen viendo. El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
   La UI limitada de `crm.js` (abril, luca, felipe, felicitas) deja pasar el link por texto.
 - **Clay**: columna "HTTP API" → `POST /prospecting/clay/webhook` con `X-Clay-Token`
   (= env `CLAY_WEBHOOK_TOKEN`, propia). Acepta snake_case o los nombres de la planilla de

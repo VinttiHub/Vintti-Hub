@@ -2056,9 +2056,10 @@
       sub: "Empresas que manda Clay para que las prospecten los BDRs." },
     { key: "contacts", label: "Contactos", icon: "fa-solid fa-user", tone: "cyan",
       sub: "Las personas de esas empresas: las cargan los BDRs o llegan de Calendly." },
-    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag",
+    // Negocios y Workflows no son para los BDRs (2026-11-09): /prospecting/me los da; el server frena igual.
+    { key: "deals", label: "Negocios", icon: "fa-solid fa-handshake", tone: "mag", requires: "can_see_deals",
       sub: "El pipeline de ventas (Proceso De Contratación y Vintti AI): SQL crea la cuenta, Deep Dive la oportunidad." },
-    { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue",
+    { key: "workflows", label: "Workflows", icon: "fa-solid fa-diagram-project", tone: "blue", requires: "can_see_workflows",
       sub: "Automatizaciones sobre empresas y contactos." },
     { key: "panels", label: "Paneles", icon: "fa-solid fa-chart-column", tone: "cyan",
       sub: "Métricas de los BDRs, en vivo con los datos del Hub." },
@@ -2066,7 +2067,11 @@
     { key: "settings", label: "Configuración", icon: "fa-solid fa-gear", tone: "violet", restricted: true,
       sub: "IDs de los BDRs para Clay y panel de pruebas." }
   ];
-  function visibleSections() { return SECTIONS.filter(function (x) { return !x.restricted || ME.can_configure; }); }
+  function visibleSections() {
+    return SECTIONS.filter(function (x) {
+      return (!x.restricted || ME.can_configure) && (!x.requires || ME[x.requires]);
+    });
+  }
   var SECTION_KEY = "prospecting_section_v1";
   var section = "table";
   function sectionOf(key) { return visibleSections().filter(function (x) { return x.key === key; })[0] || SECTIONS[0]; }

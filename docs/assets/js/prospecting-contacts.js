@@ -236,7 +236,7 @@
               (e.last_step ? '<div class="pr-note">' + esc(e.last_step) + "</div>" : "") + "</li>";
           }).join("") + "</ul></section>";
       }
-      if (window.ProspectingDeals) {
+      if (window.ProspectingDeals && (P().me() || {}).can_see_deals) {  // los BDRs no (2026-11-09)
         body += '<section class="pr-section" data-pc-extra><h3 class="pr-section__title">Negocios (' + (c.deals || []).length + ")" +
           ' <button type="button" class="pr-btn pd-mini" data-pc-adddeal><i class="fa-solid fa-plus"></i> Agregar</button></h3>' +
           ((c.deals || []).length ? '<ul class="pr-events">' + c.deals.map(function (d) {

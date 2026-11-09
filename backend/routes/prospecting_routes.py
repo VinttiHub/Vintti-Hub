@@ -28,7 +28,7 @@ from prospecting import folders as wf_folders
 from prospecting import workflows as wf_store
 from prospecting import views as views_store
 from prospecting.rules import validate_conditions
-from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, WORKFLOW_EDITORS
+from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, EXTRA_ACCESS_EMAILS, WORKFLOW_EDITORS
 from prospecting.rules import InvalidWorkflow
 
 bp = Blueprint("prospecting", __name__, url_prefix="/prospecting")
@@ -50,6 +50,12 @@ def _can_configure(email: str) -> bool:
     # Sección «Configuración» de la página (BDR IDs de Clay + Test panel):
     # la owner y las editoras de workflows (mia, manuela), 2026-11-03.
     return _is_admin(email) or _is_wf_editor(email)
+
+
+def _is_staff(email: str) -> bool:
+    # Negocios y Workflows: la owner, las editoras de workflows y EXTRA_ACCESS_EMAILS
+    # (mariano, justo, ana, agustinmorrone). Los BDRs no (2026-11-09, pedido de la owner).
+    return _is_admin(email) or _is_wf_editor(email) or email in EXTRA_ACCESS_EMAILS
 
 
 def _sees_dummies(email: str) -> bool:
@@ -95,9 +101,11 @@ class _Db:
         return False
 
 
-def _gate(cur, admin_only: bool = False, settings: bool = False):
+def _gate(cur, admin_only: bool = False, settings: bool = False, staff: bool = False):
     email = _current_email()
-    if settings:
+    if staff:
+        ok = _is_staff(email)
+    elif settings:
         ok = _can_configure(email)
     elif admin_only:
         ok = _is_admin(email)
@@ -122,6 +130,8 @@ def me():
             "can_edit_workflows": _is_wf_editor(email),
             "can_configure": _can_configure(email),
             "sees_dummies": _sees_dummies(email),
+            "can_see_deals": _is_staff(email),
+            "can_see_workflows": _is_staff(email),
         })
 
 
@@ -319,6 +329,9 @@ def company(company_id: int):
             row["enrollments"] = wf_store.company_enrollments(cur, company_id)
     if row is None:
         return jsonify({"error": "not_found"}), 404
+    if not _is_staff(_current_email()):
+        row["deals"] = []
+        row["enrollments"] = []
     if not _is_admin(_current_email()):
         row.pop("raw_payload", None)
         row.pop("hubspot_seen", None)
@@ -475,6 +488,9 @@ def contact_get(contact_id: int):
             row["enrollments"] = [dict(r) for r in cur.fetchall()]
     if row is None:
         return jsonify({"error": "not_found"}), 404
+    if not _is_staff(_current_email()):
+        row["deals"] = []
+        row["enrollments"] = []
     return jsonify(_json_safe(row))
 
 
@@ -1079,7 +1095,7 @@ def _editor_only():
 @bp.get("/workflows")
 def workflows_list():
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         rows = wf_store.list_workflows(cur)
@@ -1090,7 +1106,7 @@ def workflows_list():
 @bp.get("/workflows/<int:wf_id>")
 def workflow_get(wf_id: int):
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         row = wf_store.get_workflow(cur, wf_id)
@@ -1314,7 +1330,7 @@ def workflow_unenroll(wf_id: int):
 @bp.get("/workflows/<int:wf_id>/enrollments")
 def workflow_enrollments(wf_id: int):
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         rows = wf_store.list_enrollments(cur, wf_id, request.args.get("status") or None)
@@ -1324,7 +1340,7 @@ def workflow_enrollments(wf_id: int):
 @bp.get("/workflows/enrollments/<int:enrollment_id>")
 def workflow_enrollment(enrollment_id: int):
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         row = wf_store.enrollment_detail(cur, enrollment_id)
@@ -1431,7 +1447,7 @@ def _deal_write(fn):
     hub: dict = {}
     try:
         with _Db() as cur:
-            denied = _gate(cur)
+            denied = _gate(cur, staff=True)
             if denied:
                 return denied
             res = fn(cur)
@@ -1467,7 +1483,7 @@ def deals_board():
     from prospecting import deals as deals_store
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         f = _deal_filters(request.args.to_dict())
@@ -1483,7 +1499,7 @@ def deals_list():
     from prospecting import deals as deals_store
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         data = deals_store.list_deals(cur, _deal_filters(request.args.to_dict()))
@@ -1496,7 +1512,7 @@ def deals_pipelines():
     from prospecting import deals as deals_store
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         data = deals_store.pipelines(cur)
@@ -1509,7 +1525,7 @@ def deal_stage_form(deal_id: int):
     from prospecting import deals as deals_store
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         deal = deals_store.get_deal(cur, deal_id)
@@ -1526,7 +1542,7 @@ def deal_stage_form_draft():
 
     body = request.get_json(silent=True) or {}
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         data = deals_store.stage_form(cur, str(body.get("stage_key") or ""), deal=body.get("values") or {},
@@ -1538,7 +1554,7 @@ def deal_stage_form_draft():
 @bp.get("/deals/<int:deal_id>")
 def deal_get(deal_id: int):
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         out = _deal_out(cur, deal_id)
@@ -1632,7 +1648,7 @@ def deal_unlink_opportunity(deal_id: int):
     from prospecting import deal_to_hub
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         try:
@@ -1659,7 +1675,7 @@ def deal_delete(deal_id: int):
     from prospecting import deals as deals_store
 
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         ok = deals_store.delete_deal(cur, deal_id, _current_email())
@@ -1672,7 +1688,7 @@ def deal_history(deal_id: int):
 
     field = request.args.get("field") or ""
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         deal = deals_store.get_deal(cur, deal_id)
@@ -1702,7 +1718,7 @@ def deals_export():
     by_key = {f["key"]: f for f in catalog}
     cols = [k for k in (body.get("columns") or [f["key"] for f in catalog]) if k in by_key]
     with _Db() as cur:
-        denied = _gate(cur)
+        denied = _gate(cur, staff=True)
         if denied:
             return denied
         if isinstance(body.get("ids"), list):

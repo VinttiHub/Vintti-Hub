@@ -32,8 +32,16 @@ ADMIN_EMAILS = {"pgonzales@vintti.com"}
 
 # Entran a la página sin ser BDR ni editores de workflows: no son owners de
 # empresas ni ven Configuración. Mariano maneja sobre todo los negocios
-# (2026-11-06, a pedido de la owner).
-EXTRA_ACCESS_EMAILS = {"mariano@vintti.com"}
+# (2026-11-06, a pedido de la owner). Justo y Ana desde el 2026-11-09, y Agustín
+# Morrone ("vista de todo" menos Configuración), también 2026-11-09.
+# Estas personas, la owner y las editoras de workflows son las únicas que ven las
+# secciones Negocios y Workflows: los BDRs no (2026-11-09, a pedido de la owner).
+EXTRA_ACCESS_EMAILS = {
+    "mariano@vintti.com",
+    "justo@vintti.com",
+    "ana@vintti.com",
+    "agustinmorrone@vintti.com",
+}
 
 # `users.role` es texto libre: cuenta como BDR cualquier rol que contenga esto.
 BDR_ROLE_PATTERN = "%BDR%"

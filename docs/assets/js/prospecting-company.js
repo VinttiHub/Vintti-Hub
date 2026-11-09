@@ -231,7 +231,8 @@
 
   function dealsCard(c) {
     var list = c.deals || [];
-    if (!window.ProspectingDeals) return "";
+    // Negocios no es para los BDRs (2026-11-09): /prospecting/me -> can_see_deals.
+    if (!window.ProspectingDeals || !(P.me() || {}).can_see_deals) return "";
     var money = function (n) { return Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " US$"; };
     var cards = list.map(function (d) {
       return '<button type="button" class="pr-co-contact" data-deal="' + d.id + '">' +
