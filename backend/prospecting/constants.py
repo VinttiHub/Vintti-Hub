@@ -9,12 +9,17 @@ STATUS_QUALIFIED = "Qualified"
 STATUS_SQL = "SQL"
 STATUSES = [STATUS_IN_PROGRESS, STATUS_DQL, STATUS_RECYCLED, STATUS_QUALIFIED, STATUS_SQL]
 
-# Not ICP Reason. Las dos primeras salen de HubSpot; el resto se completa
-# cuando pasen la lista entera.
+# Not ICP Reason: los 6 de HubSpot, con el texto literal (es el value interno) y en el
+# orden del reporte «Not ICP Reason». Hasta el 2026-11-10 eran 3 («Other» en vez de «Otro»)
+# y la importación / el sync descartaban los otros 4: ~4,5 k empresas quedaron sin motivo
+# (las recuperó scripts/backfill_not_icp_reason.py). El orden fija el color en Paneles.
 NOT_ICP_REASONS = [
     "Equipo en Asia",
+    "Empresa de staffing",
+    "Sin contactos validos/ actividad en LinkedIn",
+    "Industria no objetivo",
     "+500 empleados",
-    "Other",
+    "Otro",
 ]
 
 SIZES = [

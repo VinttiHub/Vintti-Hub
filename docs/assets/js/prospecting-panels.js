@@ -98,7 +98,12 @@
       showReason: true, reasonFilter: "Timing",
       def: "Intro calls que no pasaron a SQL: contactos con <em>MQL (AE) Lost Reason</em> (incluye el motivo copiado de su " +
         "negocio), agrupados por mes de <em>Meeting Date &amp; Time</em> y por <em>Scheduled By</em>. El desplegable " +
-        "<em>Motivo</em> arranca en Timing, como el reporte de HubSpot." }
+        "<em>Motivo</em> arranca en Timing, como el reporte de HubSpot." },
+    // Not ICP Reason: empresas (no contactos), sin fecha. Drawer y CSV de empresas.
+    icp: { kind: "company", noun: "Empresas Not ICP", one: "empresa", many: "empresas",
+      def: "Todas las empresas con <em>Not ICP Reason</em> cargado (cualquiera de los 6 motivos), por motivo y por " +
+        "<em>Prospecting Owner</em>. Sin fecha, igual que el reporte de HubSpot. Las que no tienen owner van como «Sin owner». " +
+        "Se calcula en vivo con los datos del Hub." }
   };
   var BDR_WORD = { all: "Todos los BDRs", none: "Ningún BDR", plural: "BDRs", one: "1 BDR", head: "BDR", icon: "fa-user-group" };
   function panel(metric, key, title, team) {
@@ -121,7 +126,13 @@
     panel("lq", "lead_quality_nextgen", "Lead Quality · NextGen", "NextGen"),
     panel("lqb", "lead_quality", "Lead Quality x BDR"),
     panel("lqb", "lead_quality_vinttikids", "Lead Quality x BDR · VinttiKids", "VinttiKids"),
-    panel("lqb", "lead_quality_nextgen", "Lead Quality x BDR · NextGen", "NextGen")
+    panel("lqb", "lead_quality_nextgen", "Lead Quality x BDR · NextGen", "NextGen"),
+    // Rendimiento de Islas (2026-11-10): reportes de empresas, sin eje de tiempo.
+    { key: "not_icp_reason", title: "Not ICP Reason", group: "Rendimiento de Islas",
+      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason", m: METRICS.icp }); } },
+    // Mismas filas, eje dado vuelta: una barra por BDR, tramos por motivo.
+    { key: "not_icp_reason", title: "Not ICP Reason <> BDR", group: "Rendimiento de Islas",
+      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason <> BDR", m: METRICS.icp, pivot: true }); } }
   ];
   // Dos paneles pueden leer el mismo endpoint (Lead Quality y su «x BDR»): el id del DOM y la
   // preferencia guardada van por `uid`, no por `key`.
@@ -262,6 +273,23 @@
     drawerM = m;
     document.getElementById("ppDTitle").textContent = title;
     document.getElementById("ppDSub").textContent = sub;
+    if (m.kind === "company") {
+      document.getElementById("ppDBody").innerHTML = rows.length ? '<div class="pp-dtable-wrap"><table class="pp-dtable"><thead><tr>' +
+        "<th>Empresa</th><th>Motivo</th><th>Status</th><th>Owner</th></tr></thead><tbody>" +
+        rows.slice(0, 1500).map(function (r) {
+          return '<tr><td><a class="pp-link" href="prospecting-company.html?id=' + r.company_id + '" target="_blank" rel="noopener"><strong>' +
+              esc(r.name || r.domain || "#" + r.company_id) + "</strong></a>" +
+              (r.domain ? '<div class="pr-note">' + esc(r.domain) + "</div>" : "") + "</td>" +
+            '<td><span class="pp-pdot" style="--c:' + reasonColor(r.reason) + '"></span>' + esc(r.reason) + "</td>" +
+            "<td>" + esc(r.status || "—") + "</td>" +
+            "<td>" + (r.owner ? dot(r.owner) + esc(r.owner_name || r.owner) : '<span class="pr-note">Sin owner</span>') + "</td></tr>";
+        }).join("") + "</tbody></table></div>" +
+        (rows.length > 1500 ? '<p class="pr-note">Se muestran 1500 de ' + rows.length + ": el CSV trae todas.</p>" : "")
+        : '<p class="pr-note">Sin ' + esc(m.many) + " en esta selección.</p>";
+      drawer.classList.add("is-open");
+      drawer.setAttribute("aria-hidden", "false");
+      return;
+    }
     document.getElementById("ppDBody").innerHTML = rows.length ? '<div class="pp-dtable-wrap"><table class="pp-dtable"><thead><tr>' +
       "<th>Contacto</th><th>Empresa</th>" + (m.withDeal ? "<th>Negocio</th>" : "") + "<th>" + esc(m.dateLabel) + "</th>" +
       (m.showReason ? "<th>Motivo</th>" : "") + "<th>Meeting</th><th>Scheduled By</th></tr></thead><tbody>" +
@@ -287,7 +315,10 @@
 
   function exportCsv() {
     var m = drawerM || METRICS.sql;
-    var cols = [["contact_name", "Contacto"], ["email", "Email"], ["company_name", "Empresa"]]
+    var cols = m.kind === "company"
+      ? [["name", "Empresa"], ["domain", "Dominio"], ["reason", "Not ICP Reason"], ["status", "Prospecting Status"],
+         ["owner_name", "Prospecting Owner"], ["owner", "Prospecting Owner (email)"], ["company_id", "ID"]]
+      : [["contact_name", "Contacto"], ["email", "Email"], ["company_name", "Empresa"]]
       .concat(m.withDeal ? [["deal_name", "Negocio"], ["stage_label", "Etapa"]] : [["lead_life", "Lead Life"]])
       .concat(m.showReason ? [["reason", "MQL (AE) Lost Reason"]] : [])
       .concat([["date", m.dateLabel], ["meeting_datetime", "Meeting Date & Time"],
@@ -560,6 +591,237 @@
 
     load();
     return { reload: load, freq: function () { return st.freq; } };
+  }
+
+  /* =================================================================
+     Panel por categoría (Not ICP Reason): barras apiladas, sin tiempo
+     ================================================================= */
+  /* Una barra por motivo (en el orden fijo del backend) con un tramo por owner, en su color de
+     siempre; abajo el mapa de calor owner × motivo. Barra, celda y detalle salen de las mismas filas. */
+  var NONE = "__none__";
+  function ByCategory(el, opts) {
+    var M = opts.m, W = BDR_WORD, PIV = !!opts.pivot;
+    var st = { bdrs: null, rows: [], reasons: [], loading: true };
+    function ok(r) { return r.owner || NONE; }
+    function oName(r) { return r.owner ? (r.owner_name || r.owner) : "Sin owner"; }
+    function oColor(k) { return k === NONE ? "#c3c7d1" : colorOf(k); }
+    function oDot(k) { return '<span class="pp-pdot" style="--c:' + oColor(k) + '"></span>'; }
+
+    el.innerHTML =
+      '<header class="pp-card__head"><div class="pp-card__title"><h2>' + esc(opts.title) + '</h2>' +
+        '<button type="button" class="pp-info" data-pp-info aria-label="Cómo se calcula"><i class="fa-solid fa-circle-info"></i></button></div>' +
+        '<div class="pp-controls">' +
+          '<details class="pp-ms"><summary class="pr-btn"><i class="fa-solid ' + W.icon + '"></i> <span data-ms-label>' + esc(W.all) + "</span></summary>" +
+            '<div class="pp-ms__pop" data-ms-pop></div></details>' +
+          '<button type="button" class="pr-btn pp-reset" data-reset hidden title="Volver a los filtros de inicio">' +
+            '<i class="fa-solid fa-rotate-left"></i> Restablecer</button>' +
+        "</div></header>" +
+      '<div class="pp-def" data-def hidden><strong>Cómo se cuenta.</strong> ' + M.def + "</div>" +
+      '<div class="pp-kpis" data-kpis></div>' +
+      '<div class="pp-chart" data-chart></div>' +
+      '<div class="pp-rank" data-rank></div>';
+    var q = function (sel) { return el.querySelector(sel); };
+
+    function load() {
+      st.loading = true;
+      render();
+      return P().api("/prospecting/panels/" + opts.key)
+        .then(function (r) {
+          st.rows = r.rows || []; st.reasons = r.reasons || []; st.loading = false;
+          if (r.people_order) setPeople(r.people_order);
+          if (r.reasons) setReasons(r.reasons);
+          render();
+        })
+        .catch(function (err) { st.loading = false; q("[data-chart]").innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>"; });
+    }
+    function people() {
+      var m = {};
+      st.rows.forEach(function (r) { m[ok(r)] = oName(r); });
+      return Object.keys(m).map(function (e) { return { email: e, name: m[e] }; })
+        .sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || a.name.localeCompare(b.name, "es"); });
+    }
+    function rowsOn() { return st.rows.filter(function (r) { return !st.bdrs || st.bdrs.indexOf(ok(r)) !== -1; }); }
+
+    function renderMs() {
+      var ps = people();
+      q("[data-ms-pop]").innerHTML = '<label class="pr-check"><input type="checkbox" data-ms-all' + (st.bdrs ? "" : " checked") + "> <strong>Todos</strong></label>" +
+        ps.map(function (p) {
+          var on = !st.bdrs || st.bdrs.indexOf(p.email) !== -1;
+          return '<label class="pr-check"><input type="checkbox" data-ms="' + esc(p.email) + '"' + (on ? " checked" : "") + "> " + oDot(p.email) + esc(p.name) + "</label>";
+        }).join("");
+      q("[data-ms-label]").textContent = !st.bdrs ? W.all : !st.bdrs.length ? W.none :
+        st.bdrs.length === 1 ? (ps.filter(function (p) { return p.email === st.bdrs[0]; })[0] || {}).name || W.one :
+        st.bdrs.length + " " + W.plural;
+    }
+
+    function render() {
+      q("[data-reset]").hidden = !st.bdrs;
+      refreshHeading();
+      if (st.loading) {
+        q("[data-kpis]").innerHTML = "";
+        q("[data-chart]").innerHTML = '<p class="pr-note pp-loading">Cargando…</p>';
+        q("[data-rank]").innerHTML = "";
+        return;
+      }
+      renderMs();
+      var rows = rowsOn(), R = st.reasons;
+      var tot = {}, by = {}, names = {};
+      R.forEach(function (x) { tot[x] = 0; });
+      rows.forEach(function (r) {
+        if (!(r.reason in tot)) return;
+        var k = ok(r);
+        tot[r.reason]++;
+        by[k] = by[k] || {};
+        by[k][r.reason] = (by[k][r.reason] || 0) + 1;
+        names[k] = oName(r);
+      });
+      var total = rows.length;
+      var ranking = Object.keys(by).map(function (k) {
+        var t = 0; R.forEach(function (x) { t += by[k][x] || 0; });
+        return { email: k, name: names[k], total: t };
+      }).sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || b.total - a.total || a.name.localeCompare(b.name, "es"); });
+      var top = R.slice().sort(function (a, b) { return tot[b] - tot[a]; })[0];
+      var bestP = ranking.filter(function (p) { return p.email !== NONE; })[0];
+      var none = by[NONE] ? ranking.filter(function (p) { return p.email === NONE; })[0].total : 0;
+      var pct = function (n) { return total ? Math.round(n / total * 100) + "%" : "—"; };
+
+      q("[data-kpis]").innerHTML =
+        kpi(M.noun, fmtN(total), R.length + " motivos") +
+        kpi("Motivo principal", top && tot[top] ? fmtN(tot[top]) : 0, top && tot[top] ? esc(top) + " · " + pct(tot[top]) : "—", true) +
+        kpi("BDR con más", bestP ? fmtN(bestP.total) : 0, bestP ? oDot(bestP.email) + esc(bestP.name) + " · " + pct(bestP.total) : "—") +
+        kpi("Sin owner", fmtN(none), pct(none) + " del total");
+
+      // Barras apiladas. Por motivo (default): una barra por motivo, tramos por owner (el más
+      // grande abajo). Con `pivot` («Not ICP Reason <> BDR»): una barra por owner (A→Z, «Sin
+      // owner» al final, como HubSpot) y tramos por motivo, en sus colores fijos.
+      var cols, segKeys, colTot, segColor, cell, colKind, segKind;
+      if (PIV) {
+        cols = ranking.slice().sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || a.name.localeCompare(b.name, "es"); })
+          .map(function (p) { return { key: p.email, label: p.name, total: p.total }; });
+        segKeys = R.map(function (x) { return { key: x, label: x }; });
+        segColor = reasonColor;
+        cell = function (c, sk) { return (by[c] || {})[sk] || 0; };
+      } else {
+        cols = R.map(function (x) { return { key: x, label: x, total: tot[x] }; });
+        segKeys = ranking.map(function (p) { return { key: p.email, label: p.name }; });
+        segColor = oColor;
+        cell = function (c, sk) { return (by[sk] || {})[c] || 0; };
+      }
+      colKind = PIV ? "data-bdr" : "data-reason";
+      segKind = PIV ? "data-reason" : "data-bdr";
+      var max = Math.max.apply(null, cols.map(function (c) { return c.total; }).concat([1]));
+      q("[data-chart]").innerHTML = '<div class="pp-stack' + (cols.length > 8 ? " pp-stack--many" : "") + '">' + cols.map(function (c) {
+        var h = c.total ? Math.max(1.5, c.total / max * 100) : 0;
+        var segs = segKeys.filter(function (sk) { return cell(c.key, sk.key); }).map(function (sk) {
+          var v = cell(c.key, sk.key);
+          var reason = PIV ? sk.key : c.key, bdr = PIV ? c.key : sk.key, name = PIV ? c.label : sk.label;
+          return '<span class="pp-stack__seg" data-reason="' + esc(reason) + '" data-bdr="' + esc(bdr) + '" data-hl="' + esc(sk.key) +
+            '" style="flex:' + v + ' 1 0;--c:' + segColor(sk.key) + '" data-v="' + v + '" data-name="' + esc(name) + '"></span>';
+        }).join("");
+        return '<div class="pp-stack__col"><div class="pp-stack__track">' +
+            '<div class="pp-stack__bar" style="height:' + h + '%">' +
+              (c.total ? '<button type="button" class="pp-stack__val" ' + colKind + '="' + esc(c.key) + '">' + fmtN(c.total) + "</button>" : "") +
+              '<div class="pp-stack__segs">' + segs + "</div></div></div>" +
+          '<button type="button" class="pp-stack__x" ' + colKind + '="' + esc(c.key) + '">' +
+            (PIV ? oDot(c.key) : "") + esc(c.label) + "</button></div>";
+      }).join("") + '<div class="pp-tip" data-tip hidden></div></div>' +
+        '<div class="pp-legend">' + segKeys.map(function (sk) {
+          return '<button type="button" ' + segKind + '="' + esc(sk.key) + '" data-hl="' + esc(sk.key) + '">' +
+            '<span class="pp-pdot" style="--c:' + segColor(sk.key) + '"></span>' + esc(sk.label) + "</button>";
+        }).join("") + "</div>";
+
+      // Mapa de calor owner × motivo
+      var cmax = 1;
+      ranking.forEach(function (p) { R.forEach(function (x) { cmax = Math.max(cmax, by[p.email][x] || 0); }); });
+      q("[data-rank]").innerHTML = ranking.length ? '<div class="pp-rank__wrap"><table class="pp-heat pp-heat--cats"><thead><tr><th class="pp-heat__name">' + esc(W.head) + "</th>" +
+        R.map(function (x) { return '<th><button type="button" data-reason="' + esc(x) + '">' + esc(x) + "</button></th>"; }).join("") +
+        '<th class="pp-heat__tot">Total</th></tr></thead><tbody>' +
+        ranking.map(function (p, i) {
+          var c = oColor(p.email);
+          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + c + '">' +
+              (p.email === NONE ? "–" : i + 1) + "</span>" + esc(p.name) + "</button></th>" +
+            R.map(function (x) {
+              var v = by[p.email][x] || 0;
+              var pc = v ? Math.round(14 + v / cmax * 76) : 0;
+              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-reason="' + esc(x) + '" style="--pct:' + pc + '%;--c:' + c + '"' +
+                (pc > 55 ? ' data-dark="1"' : "") + ' title="' + esc(p.name + " · " + x + ": " + v) + '">' + fmtN(v) + "</button>" : '<span class="pp-dot">·</span>') + "</td>";
+            }).join("") +
+            '<td class="pp-heat__tot"><button type="button" data-bdr="' + esc(p.email) + '">' + fmtN(p.total) + "</button></td></tr>";
+        }).join("") +
+        '</tbody><tfoot><tr><th class="pp-heat__name">Total</th>' +
+        R.map(function (x) { return '<td><button type="button" data-reason="' + esc(x) + '">' + (tot[x] ? fmtN(tot[x]) : '<span class="pp-dot">·</span>') + "</button></td>"; }).join("") +
+        '<td class="pp-heat__tot"><button type="button" data-all>' + fmtN(total) + "</button></td></tr></tfoot></table></div>"
+        : '<p class="pr-note">Sin ' + esc(M.many) + " en esta selección.</p>";
+    }
+
+    function kpi(label, value, sub, accent) {
+      return '<div class="pp-kpi' + (accent ? " pp-kpi--accent" : "") + '"><span class="pp-kpi__label">' + esc(label) + "</span>" +
+        '<strong class="pp-kpi__value">' + value + '</strong><span class="pp-kpi__sub">' + (sub || "") + "</span></div>";
+    }
+    function fmtN(n) { return Number(n).toLocaleString("es-AR"); }
+
+    function detail(reason, bdr) {
+      var rows = rowsOn().filter(function (r) { return (!reason || r.reason === reason) && (!bdr || ok(r) === bdr); });
+      var who = bdr ? (rows[0] ? oName(rows[0]) : bdr) : (st.bdrs ? q("[data-ms-label]").textContent : W.all);
+      openDetail("Not ICP · " + (reason || "Todos los motivos") + " · " + who,
+        fmtN(rows.length) + " empresa" + (rows.length === 1 ? "" : "s"), rows, M);
+    }
+
+    el.addEventListener("click", function (e) {
+      if (e.target.closest("[data-reset]")) { st.bdrs = null; return render(); }
+      if (e.target.closest("[data-pp-info]")) { q("[data-def]").hidden = !q("[data-def]").hidden; return; }
+      if (e.target.closest("[data-all]")) return detail(null, null);
+      var b = e.target.closest("[data-reason], [data-bdr]");
+      if (b && !b.closest("[data-ms-pop]")) detail(b.getAttribute("data-reason"), b.getAttribute("data-bdr"));
+    });
+    /* Hover: resalta a esa persona en TODAS las barras (el resto se apaga) y muestra una
+       tarjeta con nombre, motivo, cantidad y % de la barra. También desde la leyenda. */
+    function hl(k) {
+      var stack = q(".pp-stack");
+      if (!stack) return;
+      stack.classList.toggle("is-hl", !!k);
+      stack.querySelectorAll(".pp-stack__seg").forEach(function (s) { s.classList.toggle("is-on", !!k && s.getAttribute("data-hl") === k); });
+      el.querySelectorAll(".pp-legend [data-hl]").forEach(function (b) { b.classList.toggle("is-on", !!k && b.getAttribute("data-hl") === k); });
+    }
+    el.addEventListener("mouseover", function (e) {
+      var seg = e.target.closest(".pp-stack__seg, .pp-legend [data-hl]");
+      var tip = q("[data-tip]");
+      if (!seg) { hl(null); if (tip) tip.hidden = true; return; }
+      hl(seg.getAttribute("data-hl"));
+      if (!tip || !seg.classList.contains("pp-stack__seg")) { if (tip) tip.hidden = true; return; }
+      var reason = seg.getAttribute("data-reason"), v = Number(seg.getAttribute("data-v"));
+      var t = 0;
+      seg.parentNode.querySelectorAll(".pp-stack__seg").forEach(function (s) { t += Number(s.getAttribute("data-v")); });
+      tip.innerHTML = '<div class="pp-tip__who">' + oDot(seg.getAttribute("data-bdr")) + esc(seg.getAttribute("data-name")) + "</div>" +
+        '<div class="pp-tip__reason"><span class="pp-pdot" style="--c:' + reasonColor(reason) + '"></span>' + esc(reason) + "</div>" +
+        '<div class="pp-tip__num"><strong>' + fmtN(v) + "</strong> empresa" + (v === 1 ? "" : "s") +
+        '<span>' + Math.round(v / (t || 1) * 100) + (PIV ? "% del BDR" : "% del motivo") + "</span></div>" +
+        '<div class="pp-tip__hint">Click para ver el detalle</div>';
+      tip.hidden = false;
+      var box = q(".pp-stack").getBoundingClientRect(), r = seg.getBoundingClientRect();
+      var left = r.right - box.left + 10;
+      if (left + 220 > box.width) left = r.left - box.left - 230;
+      tip.style.left = left + "px";
+      tip.style.top = Math.max(0, r.top - box.top + r.height / 2 - 40) + "px";
+    });
+    el.addEventListener("mouseleave", function () { hl(null); var tip = q("[data-tip]"); if (tip) tip.hidden = true; });
+    el.addEventListener("change", function (e) {
+      var t = e.target;
+      if (t.matches("[data-ms-all]")) { st.bdrs = t.checked ? null : []; render(); el.querySelector(".pp-ms").open = true; return; }
+      if (t.matches("[data-ms]")) {
+        var on = Array.prototype.map.call(el.querySelectorAll("[data-ms]:checked"), function (x) { return x.getAttribute("data-ms"); });
+        st.bdrs = on.length === people().length ? null : on;
+        render();
+        el.querySelector(".pp-ms").open = true;
+      }
+    });
+    document.addEventListener("click", function (e) {
+      var ms = el.querySelector(".pp-ms");
+      if (ms && ms.open && !ms.contains(e.target)) ms.open = false;
+    });
+
+    load();
+    return { reload: load };
   }
 
   window.ProspectingPanels = { show: show };

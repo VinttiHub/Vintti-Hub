@@ -2482,3 +2482,54 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pp-card.pp-in { animation: pp-in .22s ease; }
 @keyframes pp-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 760px) { .pp-nav__count { display: none; } .pp-card > .pp-card__head { margin: -16px -16px 0; padding: 14px 16px 12px; } }
+
+/* Paneles por categoría (Not ICP Reason, 2026-11-10): barras apiladas por owner, sin tiempo. */
+.pp-stack { display: flex; align-items: stretch; gap: 14px; height: 300px; padding-top: 24px; }
+.pp-stack__col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; height: 100%; }
+.pp-stack__track { flex: 1 1 auto; min-height: 0; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--pr-rule); }
+.pp-stack__bar { position: relative; width: 70%; max-width: 120px; min-width: 18px; display: flex; flex-direction: column; }
+.pp-stack__segs { flex: 1 1 auto; display: flex; flex-direction: column-reverse; border-radius: 6px 6px 2px 2px; overflow: hidden; }
+.pp-stack { position: relative; }
+.pp-stack__seg { display: block; min-height: 1px; background: var(--c); cursor: pointer; transition: opacity .15s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+/* Hover: la persona se ve en todas las barras y el resto se apaga (sin bordes negros). */
+.pp-stack.is-hl .pp-stack__seg { opacity: .18; }
+.pp-stack.is-hl .pp-stack__seg.is-on { opacity: 1; box-shadow: none; }
+.pp-legend button.is-on { color: var(--pr-ink); font-weight: 600; }
+.pp-tip {
+  position: absolute; z-index: 3; width: 220px; padding: 10px 12px; pointer-events: none;
+  background: var(--pr-card); border: 1px solid var(--pr-rule); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(13, 18, 30, .14); font-size: 12.5px; color: var(--pr-ink);
+}
+.pp-tip__who { font-weight: 700; display: flex; align-items: center; }
+.pp-tip__reason { color: var(--pr-ink-3); margin-top: 2px; line-height: 1.3; }
+.pp-tip__num { margin-top: 6px; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.pp-tip__num strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.pp-tip__num span { color: var(--pr-ink-3); }
+.pp-tip__hint { margin-top: 6px; font-size: 11px; color: var(--pr-violet); }
+.pp-stack__val {
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px;
+  border: 0; background: none; padding: 0 4px; font: inherit; font-size: 13px; font-weight: 700; color: var(--pr-ink); cursor: pointer; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pp-stack__val:hover { color: var(--pr-violet); }
+.pp-stack__x {
+  flex: 0 0 auto; min-height: 44px; padding: 8px 2px 0; border: 0; background: none; font: inherit; font-size: 12px; line-height: 1.3;
+  color: var(--pr-ink-2, var(--pr-ink)); cursor: pointer; text-align: center;
+}
+.pp-stack__x:hover { color: var(--pr-violet); }
+.pp-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 14px; font-size: 12.5px; }
+.pp-legend button { border: 0; background: none; padding: 2px 0; font: inherit; color: var(--pr-ink-3); cursor: pointer; display: inline-flex; align-items: center; }
+.pp-legend button:hover { color: var(--pr-ink); }
+.pp-heat--cats thead th { white-space: normal; min-width: 92px; max-width: 150px; line-height: 1.25; vertical-align: bottom; }
+@media (max-width: 720px) {
+  .pp-stack { gap: 6px; height: 240px; }
+  .pp-stack__bar { width: 86%; min-width: 10px; }
+  .pp-stack__x { font-size: 10.5px; }
+  .pp-stack__val { font-size: 11px; }
+}
+/* Muchas barras (una por BDR): más juntas y etiquetas chicas. */
+.pp-stack--many { gap: 6px; }
+.pp-stack--many .pp-stack__bar { width: 78%; max-width: 56px; min-width: 10px; }
+.pp-stack--many .pp-stack__x { font-size: 11.5px; min-height: 52px; }
+.pp-stack--many .pp-stack__val { font-size: 12px; }
+.pp-stack__x .pp-pdot { vertical-align: 1px; }

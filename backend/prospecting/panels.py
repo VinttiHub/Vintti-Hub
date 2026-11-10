@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from prospecting.constants import NOT_ICP_REASONS
+
 # --------------------------------------------------------------------------- #
 # SQLs by BDR — réplica del reporte de HubSpot (filtros de la owner, 2026-11-06)
 # --------------------------------------------------------------------------- #
@@ -311,7 +313,46 @@ def people_order(cur) -> list[str]:
         # va al final: así sumarla no le corre el color a nadie.
         (list(LQ_EXCLUDED_SCHEDULERS), list(EXCLUDED_SCHEDULERS)),
     )
-    return [r["email"] for r in cur.fetchall()]
+    order = [r["email"] for r in cur.fetchall()]
+    # Owners de empresas Not ICP que no agendaron nada: al final, así no corren a nadie.
+    cur.execute(
+        """
+        SELECT LOWER(prospecting_owner_email) AS email
+          FROM prospect_companies
+         WHERE NOT is_dummy AND NULLIF(not_icp_reason, '') IS NOT NULL
+           AND NULLIF(prospecting_owner_email, '') IS NOT NULL
+         GROUP BY 1
+         ORDER BY MIN(created_at), 1
+        """
+    )
+    seen = set(order)
+    order += [r["email"] for r in cur.fetchall() if r["email"] not in seen]
+    return order
+
+
+def not_icp_reason(cur, date_from: date | None = None, date_to: date | None = None) -> dict:
+    """Not ICP Reason (grupo «Rendimiento de Islas», 2026-11-10): empresas por motivo,
+    desglosadas por Prospecting Owner. Igual que el reporte de HubSpot: todas, sin fecha
+    (`date_from` / `date_to` se ignoran), con el motivo en alguno de los 6 de la lista.
+    Las que no tienen owner van con `owner` NULL («Sin owner» en el front)."""
+    cur.execute(
+        f"""
+        SELECT c.id AS company_id, c.name, c.domain, c.not_icp_reason AS reason,
+               c.prospecting_status AS status,
+               LOWER(NULLIF(c.prospecting_owner_email, '')) AS owner,
+               CASE WHEN NULLIF(c.prospecting_owner_email, '') IS NULL THEN NULL
+                    ELSE {_person_name_sql("LOWER(c.prospecting_owner_email)")} END AS owner_name
+          FROM prospect_companies c
+         WHERE NOT c.is_dummy AND c.not_icp_reason = ANY(%s)
+         ORDER BY c.name
+        """,
+        (list(NOT_ICP_REASONS),),
+    )
+    return {
+        "rows": [dict(r) for r in cur.fetchall()],
+        "people_order": people_order(cur),
+        "reasons": list(NOT_ICP_REASONS),  # orden fijo = color fijo por motivo
+    }
 
 
 def _names(cur, emails: list[str]) -> list[str]:
@@ -332,4 +373,5 @@ PANELS = {
     "lead_quality": lead_quality,
     "lead_quality_vinttikids": lambda cur, f, t: lead_quality(cur, f, t, team="vinttikids"),
     "lead_quality_nextgen": lambda cur, f, t: lead_quality(cur, f, t, team="nextgen"),
+    "not_icp_reason": not_icp_reason,
 }

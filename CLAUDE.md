@@ -1605,6 +1605,17 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y
   su nombre en `prospect_people`; `owner` (Contact Owner) sigue exigiendo un BDR activo. Backfill ya
   aplicado: `scripts/backfill_scheduled_by.py` (blinda los workflows por condiciones).
+  **Not ICP Reason** (grupo «Rendimiento de Islas», 2026-11-10): `panels.not_icp_reason()` = TODAS
+  las empresas con motivo (sin fecha, como HubSpot), por motivo × Prospecting Owner; sin owner =
+  «Sin owner» (gris). En el front es otro componente, `ByCategory` (barras apiladas por owner + mapa
+  de calor owner × motivo, drawer de empresas con `kind: "company"`). **Not ICP Reason <> BDR** = las
+  mismas filas con `pivot: true`: una barra por owner (A→Z, «Sin owner» al final) y tramos por motivo. Los owners que no agendaron
+  nada se suman al FINAL de `people_order`. Cuadra exacto con HubSpot (2054/1858/1474/738/384/299)
+  **sólo desde que `NOT_ICP_REASONS` tiene los 6 motivos de HubSpot** («Otro», no «Other»): con 3,
+  la importación y el sync descartaban el resto y 4676 empresas quedaron sin motivo. Las recuperó
+  `scripts/backfill_not_icp_reason.py` (ya aplicado; trae de HubSpot en vivo, sólo rellena vacíos,
+  actualiza `hubspot_seen` y blinda el workflow 7 «Not ICP conocido → DQL»: 275 de esas no estaban en
+  DQL y así siguen, igual que en HubSpot).
 - **Carpetas de workflows (2026-11-03)**, anidadas como en HubSpot: tabla `prospect_wf_folders`
   (`parent_id` NULL = raíz) + `prospect_workflows.folder_id`, autocreadas en `ensure_schema()`.
   Lógica en `backend/prospecting/folders.py`; rutas `POST/PATCH/DELETE /prospecting/workflow-folders`
