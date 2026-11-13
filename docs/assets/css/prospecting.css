@@ -2533,3 +2533,19 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 .pp-stack--many .pp-stack__x { font-size: 11.5px; min-height: 52px; }
 .pp-stack--many .pp-stack__val { font-size: 12px; }
 .pp-stack__x .pp-pdot { vertical-align: 1px; }
+
+/* Inicio / fin de cada BDR en el mapa de calor (2026-11-13). */
+.pp-heat td.pp-tcell { position: relative; }
+.pp-heat td.is-out { background: repeating-linear-gradient(135deg, var(--pr-card-soft) 0 5px, color-mix(in srgb, var(--pr-rule) 55%, transparent) 5px 6px); }
+.pp-heat td.is-out .pp-cell { opacity: .55; }
+.pp-heat td.is-start::before, .pp-heat td.is-end::after {
+  content: ""; position: absolute; top: 3px; bottom: 3px; width: 3px; border-radius: 2px; background: var(--c, var(--pr-violet));
+}
+.pp-heat td.is-start::before { left: 0; }
+.pp-heat td.is-end::after { right: 0; }
+.pp-tenure-chip {
+  margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+  color: var(--pr-ink-3); background: var(--pr-card-soft); border: 1px solid var(--pr-rule); white-space: nowrap;
+}
+.pp-tenure td { vertical-align: middle; }
+.pp-tenure input[type="date"], .pp-tenure select { min-width: 130px; }

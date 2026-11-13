@@ -356,6 +356,123 @@ def not_icp_reason(cur, date_from: date | None = None, date_to: date | None = No
     }
 
 
+# --------------------------------------------------------------------------- #
+# Inicio y fin de cada BDR (2026-11-13): la línea del mapa de calor de los paneles.
+# --------------------------------------------------------------------------- #
+# El Hub no tiene estas fechas completas (ex-BDRs sin fila en `users`, cambios de puesto sin
+# fecha, `ingreso_vintti_date` que no siempre coincide): la fuente es la tabla «Status of
+# Contract» que pasó la owner. La siembra va con ON CONFLICT DO NOTHING: lo que se corrija
+# después desde «Altas y bajas» nunca se pisa. Luca Gianni (2/9/2025 – 10/10/2025) quedó
+# afuera: no tiene email conocido ni actividad en los paneles.
+SEED_TENURE = [
+    # (email, nombre, inicio, fin)
+    ("abril@vintti.com", "Abril Acosta", "2025-09-02", None),
+    ("felicitas@vintti.com", "Felicitas Gandolfo", "2025-09-02", "2026-02-27"),
+    ("felipe@vintti.com", "Felipe Daurat", "2025-09-02", "2026-04-30"),
+    ("pilaraiassa@vintti.com", "Pilar Aiassa", "2025-12-01", "2026-03-13"),
+    ("juliana@vintti.com", "Juliana Alvarez", "2026-01-12", "2026-06-11"),
+    ("vianney@vintti.com", "Vianney Sargenton", "2026-01-20", "2026-08-31"),
+    ("agustina@vintti.com", "Agustina Valentini", "2026-01-20", None),
+    ("ana@vintti.com", "Anita Novick", "2026-02-02", "2026-09-15"),
+    ("manuela@vintti.com", "Manuela Fernandez", "2026-02-02", "2026-05-11"),
+    ("sofia@vintti.com", "Sofia Luppi", "2026-02-09", "2026-04-30"),
+    ("valeria@vintti.com", "Valeria Arias", "2026-03-02", None),
+    ("magali@vintti.com", "Magalí Muller", "2026-03-02", None),
+    ("justo@vintti.com", "Justo Esponda", "2026-03-04", "2026-07-31"),
+    ("thomas@vintti.com", "Thomas Walmsley", "2026-06-01", "2026-07-31"),
+    ("bartolome@vintti.com", "Bartolomé Rossi", "2026-06-01", None),
+    ("lunaberto@vintti.com", "Luna Berto", "2026-06-15", None),
+    ("victor@vintti.com", "Victor Sales", "2026-06-15", "2026-08-21"),
+    ("bianca@vintti.com", "Bianca Morselli", "2026-06-15", "2026-07-07"),
+    ("delfina@vintti.com", "Delfina Ezcurra", "2026-07-06", "2026-08-15"),
+    ("joel@vintti.com", "Joel Salomone", "2026-08-03", None),
+    ("pedro@vintti.com", "Pedro Restelli", "2026-08-03", "2026-08-27"),
+    ("luca.garegnani@vintti.com", "Luca Garegnani", "2026-08-24", None),
+    ("santiago.botana@vintti.com", "Santiago Botana", "2026-08-24", "2026-10-06"),
+    ("matias@vintti.com", "Matias Lopez Ferrando", "2026-09-01", None),
+    ("catalina@vintti.com", "Catalina Berardi", "2026-09-01", None),
+    ("marcos@vintti.com", "Marcos Gonzales", "2026-10-01", None),
+    ("matias.larran@vintti.com", "Matias Larran", "2026-10-01", None),
+    ("victoria@vintti.com", "Victoria Frech", "2026-10-01", None),
+    ("agustin.penna@vintti.com", "Agustin Penna", "2026-10-12", None),
+]
+END_REASONS = ("left", "role_change")
+
+
+def ensure_tenure(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_bdr_tenure (
+            email       TEXT PRIMARY KEY,
+            name        TEXT,
+            start_date  DATE,
+            end_date    DATE,
+            end_reason  TEXT,
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_by  TEXT
+        )
+        """
+    )
+    # Motivo del fin: si sigue activa en el Hub, cambió de puesto (Ana y Justo → BDM,
+    # Manuela → SOA); si no, dejó Vintti.
+    from psycopg2.extras import execute_values
+    execute_values(
+        cur,
+        """
+        INSERT INTO prospect_bdr_tenure (email, name, start_date, end_date, end_reason, updated_by)
+        SELECT v.email, v.name, v.s::date, v.e::date,
+               CASE WHEN v.e IS NULL THEN NULL
+                    WHEN EXISTS (SELECT 1 FROM users u JOIN admin_user_access a ON a.user_id = u.user_id
+                                  WHERE LOWER(TRIM(u.email_vintti)) = v.email AND a.is_active)
+                    THEN 'role_change' ELSE 'left' END,
+               'seed:owner-2026-11-13'
+          FROM (VALUES %s) AS v(email, name, s, e)
+        ON CONFLICT (email) DO NOTHING
+        """,
+        SEED_TENURE,
+        template="(%s, %s, %s, %s)",
+    )
+
+
+def tenure(cur) -> dict:
+    """{email: {start, end, reason, role, name}}; `role` = puesto actual (para «Pasó a BDM»)."""
+    cur.execute(
+        """
+        SELECT t.email, t.name, t.start_date, t.end_date, t.end_reason,
+               (SELECT u.role FROM users u WHERE LOWER(TRIM(u.email_vintti)) = t.email LIMIT 1) AS role
+          FROM prospect_bdr_tenure t
+         ORDER BY t.start_date NULLS LAST, t.email
+        """
+    )
+    return {r["email"]: {
+        "name": r["name"],
+        "start": r["start_date"].isoformat() if r["start_date"] else None,
+        "end": r["end_date"].isoformat() if r["end_date"] else None,
+        "reason": r["end_reason"],
+        "role": r["role"],
+    } for r in cur.fetchall()}
+
+
+def save_tenure(cur, email: str, start, end, reason, actor: str) -> dict:
+    email = (email or "").strip().lower()
+    if "@" not in email:
+        raise ValueError("Email inválido.")
+    if reason not in (None, "", *END_REASONS):
+        raise ValueError("Motivo inválido.")
+    if start and end and end < start:
+        raise ValueError("El fin es anterior al inicio.")
+    cur.execute(
+        f"""
+        INSERT INTO prospect_bdr_tenure (email, name, start_date, end_date, end_reason, updated_at, updated_by)
+        VALUES (%s, {_person_name_sql("%s")}, %s, %s, %s, NOW(), %s)
+        ON CONFLICT (email) DO UPDATE SET start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date,
+               end_reason = EXCLUDED.end_reason, updated_at = NOW(), updated_by = EXCLUDED.updated_by
+        """,
+        (email, email, email, email, start, end, (reason or None) if end else None, actor),
+    )
+    return tenure(cur)
+
+
 def _names(cur, emails: list[str]) -> list[str]:
     cur.execute(
         f"SELECT {_person_name_sql('e')} AS name FROM UNNEST(%s::text[]) WITH ORDINALITY AS t(e, i) ORDER BY i",

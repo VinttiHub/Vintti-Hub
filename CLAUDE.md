@@ -1600,6 +1600,14 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   equipo (= «Lead Quality - VinttiKids/NextGen» de HubSpot, todos los motivos); «Lead
   Quality x BDR» (+ VinttiKids / NextGen) desglosa por persona con un desplegable de motivo que
   arranca en Timing. Dos paneles leen el mismo endpoint: el DOM y las preferencias van por `uid`.
+  **Inicio y fin de cada BDR (2026-11-13)**: tabla `prospect_bdr_tenure` (email, inicio, fin,
+  `end_reason` = `left` | `role_change`), autocreada y **sembrada con la tabla «Status of Contract» de
+  la owner** (`panels.SEED_TENURE`, `ON CONFLICT DO NOTHING`: lo corregido nunca se pisa). Motivo
+  sembrado: `role_change` si sigue activa en el Hub (Ana y Justo → BDM, Manuela → SOA). Cada panel la
+  devuelve en `tenure`; en el mapa de calor por persona (no en Lead Quality por motivo) el período de
+  inicio lleva una línea a la izquierda, el de fin a la derecha, lo de afuera va rayado en gris (con su
+  número igual) y el nombre lleva «hasta ago ’26» / «→ BDM». Se edita en «Altas y bajas» (staff,
+  `PUT /prospecting/panels/tenure`). No usa `users.ingreso_vintti_date`: no coincide con la realidad.
   **Sólo cuadra porque las propiedades tipo `user` aceptan gente que ya no está**: el sync de
   contactos resolvía Scheduled By contra usuarios ACTIVOS y descartaba a los ex-BDRs (93 contactos).
   Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y

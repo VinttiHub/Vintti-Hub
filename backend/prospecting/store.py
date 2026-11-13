@@ -445,6 +445,9 @@ def ensure_schema(cur) -> None:
         )
         """
     )
+    # Inicio y fin de cada BDR (Paneles, 2026-11-13): sembrada con la tabla de la owner.
+    from prospecting import panels
+    panels.ensure_tenure(cur)
     # Vistas guardadas de la tabla, por persona (views.py).
     from prospecting import views
     views.ensure_schema(cur)

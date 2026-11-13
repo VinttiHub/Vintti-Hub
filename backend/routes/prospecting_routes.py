@@ -649,7 +649,33 @@ def panel_data(key: str):
         denied = _gate(cur)
         if denied:
             return denied
-        return jsonify(_json_safe(fn(cur, _d("from"), _d("to"))))
+        out = fn(cur, _d("from"), _d("to"))
+        out["tenure"] = panels.tenure(cur)  # inicio / fin de cada BDR (línea del mapa de calor)
+        return jsonify(_json_safe(out))
+
+
+@bp.put("/panels/tenure")
+def panel_tenure_save():
+    """Altas y bajas de BDRs (Paneles): sólo staff. Body: email, start, end, reason."""
+    from datetime import date as _date
+    from prospecting import panels
+
+    body = request.get_json(silent=True) or {}
+
+    def _d(v):
+        v = (v or "").strip() if isinstance(v, str) else v
+        return _date.fromisoformat(v) if v else None
+
+    with _Db() as cur:
+        denied = _gate(cur, staff=True)
+        if denied:
+            return denied
+        try:
+            data = panels.save_tenure(cur, body.get("email"), _d(body.get("start")), _d(body.get("end")),
+                                      body.get("reason"), _current_email())
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        return jsonify({"tenure": data})
 
 
 # --------------------------------------------------------------------------- #

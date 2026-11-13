@@ -35,6 +35,33 @@
   }
   function reasonColor(r) { return reasonColorMap[r] || "#8a90a0"; }
 
+  /* Inicio / fin de cada BDR (prospect_bdr_tenure, 2026-11-13): viene con cada panel y es una
+     sola para todos. En el mapa de calor: línea al empezar y al terminar, meses fuera en gris. */
+  var TENURE = {};
+  function fmtDay(s) { var d = parse(s); return d.getDate() + "-" + MONTHS[d.getMonth()] + "-" + d.getFullYear(); }
+  function endText(t) {
+    if (!t || !t.end) return "";
+    return (t.reason === "role_change" ? "Pasó a " + (t.role || "otro puesto") : "Dejó Vintti") + " el " + fmtDay(t.end);
+  }
+  /* Marca de una celda (persona × período): {cls, tip}. */
+  function tenureMark(email, k, freq) {
+    var t = TENURE[email];
+    if (!t) return { cls: "", tip: "" };
+    var sk = t.start ? periodKey(t.start, freq) : null, ek = t.end ? periodKey(t.end, freq) : null;
+    var cls = [], tip = [];
+    if ((sk && k < sk) || (ek && k > ek)) { cls.push("is-out"); tip.push(sk && k < sk ? "Todavía no era BDR" : "Ya no era BDR"); }
+    if (sk && k === sk) { cls.push("is-start"); tip.push("Empezó el " + fmtDay(t.start)); }
+    if (ek && k === ek) { cls.push("is-end"); tip.push(endText(t)); }
+    return { cls: cls.join(" "), tip: tip.join(" · ") };
+  }
+  function tenureChip(email) {
+    var t = TENURE[email];
+    if (!t || !t.end) return "";
+    var d = parse(t.end);
+    var txt = t.reason === "role_change" ? "→ " + (t.role || "otro puesto") : "hasta " + MONTHS[d.getMonth()] + " ’" + String(d.getFullYear()).slice(2);
+    return '<span class="pp-tenure-chip" title="' + esc(endText(t)) + '">' + esc(txt) + "</span>";
+  }
+
   var MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   var FREQS = [["month", "Mensual"], ["week", "Semanal"], ["quarter", "Trimestral"]];
 
@@ -274,6 +301,8 @@
 
   function openDetail(title, sub, rows, m) {
     ensureDrawer();
+    document.getElementById("ppDCsv").hidden = false;
+    document.getElementById("ppDBody").onclick = null;
     drawerRows = rows;
     drawerTitle = title;
     drawerM = m;
@@ -342,6 +371,54 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
 
+  /* «Altas y bajas»: la tabla de inicio / fin de cada BDR, editable (sólo staff; el server
+     frena igual). Usa el drawer del detalle sin el botón de CSV. Al guardar recarga los paneles
+     ya armados, así la línea se mueve en todos. */
+  function openTenure() {
+    ensureDrawer();
+    drawerM = null;
+    document.getElementById("ppDTitle").textContent = "Altas y bajas de BDRs";
+    document.getElementById("ppDSub").textContent = "Cuándo empezó y terminó cada persona. Marca la línea del mapa de calor en todos los paneles.";
+    document.getElementById("ppDCsv").hidden = true;
+    var emails = Object.keys(TENURE);
+    Object.keys(personColor).forEach(function (e) { if (emails.indexOf(e) === -1) emails.push(e); });
+    emails.sort(function (a, b) {
+      var x = (TENURE[a] || {}).start || "9999", y = (TENURE[b] || {}).start || "9999";
+      return x < y ? -1 : x > y ? 1 : a.localeCompare(b);
+    });
+    var body = document.getElementById("ppDBody");
+    body.innerHTML = '<div class="pp-dtable-wrap"><table class="pp-dtable pp-tenure"><thead><tr><th>Persona</th><th>Inicio</th><th>Fin</th><th>Motivo del fin</th><th></th></tr></thead><tbody>' +
+      emails.map(function (e) {
+        var t = TENURE[e] || {};
+        return '<tr data-te="' + esc(e) + '"><td>' + dot(e) + "<strong>" + esc(t.name || e) + '</strong><div class="pr-note">' + esc(e) + "</div></td>" +
+          '<td><input type="date" class="pr-filter__input" data-ts value="' + esc(t.start || "") + '"></td>' +
+          '<td><input type="date" class="pr-filter__input" data-tend value="' + esc(t.end || "") + '"></td>' +
+          '<td><select class="pr-filter__input" data-tr data-nosearch><option value="">—</option>' +
+            '<option value="left"' + (t.reason === "left" ? " selected" : "") + ">Dejó Vintti</option>" +
+            '<option value="role_change"' + (t.reason === "role_change" ? " selected" : "") + ">Cambió de puesto</option></select></td>" +
+          '<td><button type="button" class="pr-btn" data-tsave>Guardar</button> <span class="pr-note" data-tmsg></span></td></tr>';
+      }).join("") + "</tbody></table></div>";
+    body.onclick = function (ev) {
+      var b = ev.target.closest("[data-tsave]");
+      if (!b) return;
+      var tr = b.closest("tr"), msg = tr.querySelector("[data-tmsg]");
+      var payload = { email: tr.getAttribute("data-te"), start: tr.querySelector("[data-ts]").value || null,
+        end: tr.querySelector("[data-tend]").value || null, reason: tr.querySelector("[data-tr]").value || null };
+      if (payload.end && !payload.reason) { msg.textContent = "Elegí el motivo"; return; }
+      b.disabled = true; msg.textContent = "Guardando…";
+      P().api("/prospecting/panels/tenure", { method: "PUT", body: JSON.stringify(payload) })
+        .then(function (r) {
+          TENURE = r.tenure || TENURE;
+          msg.textContent = "Guardado";
+          PANELS.forEach(function (p) { if (p.inst && p.inst.reload) p.inst.reload(); });
+        })
+        .catch(function (err) { msg.textContent = err.message; })
+        .then(function () { b.disabled = false; });
+    };
+    drawer.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+  }
+
   /* =================================================================
      Panel de conteo por persona (SQLs, Intro calls…)
      ================================================================= */
@@ -375,6 +452,8 @@
             '<div class="pp-ms__pop" data-ms-pop></div></details>' +
           '<button type="button" class="pr-btn pp-reset" data-reset hidden title="Volver a los filtros de inicio">' +
             '<i class="fa-solid fa-rotate-left"></i> Restablecer</button>' +
+          (GK !== "reason" && ((P().me() || {}).can_delete) ? '<button type="button" class="pr-btn" data-tenure title="Cuándo empezó y terminó cada BDR">' +
+            '<i class="fa-solid fa-calendar-days"></i> Altas y bajas</button>' : "") +
         "</div></header>" +
       '<div class="pp-def" data-def hidden></div>' +
       '<div class="pp-kpis" data-kpis></div>' +
@@ -393,6 +472,7 @@
       return P().api("/prospecting/panels/" + opts.key + "?from=" + encodeURIComponent(st.from) + "&to=" + encodeURIComponent(st.to))
         .then(function (r) {
           st.rows = r.rows || []; st.def = r.definition || null; st.loading = false;
+          if (r.tenure) TENURE = r.tenure;
           if (r.people_order) setPeople(r.people_order);
           if (r.reasons) setReasons(r.reasons);
           render();
@@ -529,12 +609,16 @@
         periods.map(function (k) { return '<th><button type="button" data-period="' + k + '">' + esc(periodLabel(k, st.freq, true)) + "</button></th>"; }).join("") +
         '<th class="pp-heat__tot">Total</th></tr></thead><tbody>' +
         ranking.map(function (p, i) {
-          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + gColor(p.email) + '">' + (i + 1) + "</span>" + esc(p.name) + "</button></th>" +
+          var person = GK !== "reason";
+          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + gColor(p.email) + '">' + (i + 1) + "</span>" + esc(p.name) +
+              (person ? tenureChip(p.email) : "") + "</button></th>" +
             periods.map(function (k) {
               var v = by[p.email][k] || 0;
               var pct = v ? Math.round(14 + v / cmax * 76) : 0;
-              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-period="' + k + '" style="--pct:' + pct + '%;--c:' + gColor(p.email) + '"' +
-                (pct > 55 ? ' data-dark="1"' : "") + ' title="' + esc(p.name + " · " + periodLabel(k, st.freq) + ": " + v) + '">' + v + "</button>" : '<span class="pp-dot">·</span>') + "</td>";
+              var tm = person ? tenureMark(p.email, k, st.freq) : { cls: "", tip: "" };
+              return '<td class="pp-tcell ' + tm.cls + '" style="--c:' + gColor(p.email) + '"' + (tm.tip ? ' title="' + esc(tm.tip) + '"' : "") + ">" +
+                (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-period="' + k + '" style="--pct:' + pct + '%;--c:' + gColor(p.email) + '"' +
+                (pct > 55 ? ' data-dark="1"' : "") + ' title="' + esc(p.name + " · " + periodLabel(k, st.freq) + ": " + v + (tm.tip ? " · " + tm.tip : "")) + '">' + v + "</button>" : '<span class="pp-dot">·</span>') + "</td>";
             }).join("") +
             '<td class="pp-heat__tot"><button type="button" data-bdr="' + esc(p.email) + '">' + p.total + "</button></td></tr>";
         }).join("") +
@@ -566,6 +650,7 @@
     // Eventos
     el.addEventListener("click", function (e) {
       if (e.target.closest("[data-reset]")) return reset();
+      if (e.target.closest("[data-tenure]")) return openTenure();
       if (e.target.closest("[data-pp-info]")) { q("[data-def]").hidden = !q("[data-def]").hidden; return; }
       var f = e.target.closest("[data-freq]");
       if (f) { st.freq = f.getAttribute("data-freq"); savePref(); render(); return; }
