@@ -1609,7 +1609,17 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   las empresas con motivo (sin fecha, como HubSpot), por motivo × Prospecting Owner; sin owner =
   «Sin owner» (gris). En el front es otro componente, `ByCategory` (barras apiladas por owner + mapa
   de calor owner × motivo, drawer de empresas con `kind: "company"`). **Not ICP Reason <> BDR** = las
-  mismas filas con `pivot: true`: una barra por owner (A→Z, «Sin owner» al final) y tramos por motivo. Los owners que no agendaron
+  mismas filas con `pivot: true`: una barra por owner (A→Z, «Sin owner» al final) y tramos por motivo.
+  **Not ICP Reason <> Semana** = `dim: "week"`: una barra por «Semana» de la empresa (`week_label`,
+  normalizada a «Semana N»; vacía = «Sin semana» al final), tramos por motivo, mapa de calor semana ×
+  motivo en el color de cada motivo. El filtro de BDRs sigue siendo por owner. Cuadra con HubSpot
+  semana por semana (38–46: 479/657/1114/1284/849/794/648/539/401).
+  **Not ICP Reason - Lead Source** = `seg: "source"`: barras por motivo, tramos y mapa de calor por
+  Lead Source. `lead_source = 'HubSpot'` es el relleno de la importación cuando HubSpot no tenía valor:
+  se muestra como «Sin valor», igual que el reporte.
+  **Hasta deployar la lista de 6 motivos, el sync de prod sigue descartando los 4 nuevos**: después del
+  deploy, volver a correr `scripts/backfill_not_icp_reason.py --apply` (es idempotente; el 2026-11-13
+  ya recuperó 82 más). Los owners que no agendaron
   nada se suman al FINAL de `people_order`. Cuadra exacto con HubSpot (2054/1858/1474/738/384/299)
   **sólo desde que `NOT_ICP_REASONS` tiene los 6 motivos de HubSpot** («Otro», no «Other»): con 3,
   la importación y el sync descartaban el resto y 4676 empresas quedaron sin motivo. Las recuperó

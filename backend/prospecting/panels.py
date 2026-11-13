@@ -338,7 +338,8 @@ def not_icp_reason(cur, date_from: date | None = None, date_to: date | None = No
     cur.execute(
         f"""
         SELECT c.id AS company_id, c.name, c.domain, c.not_icp_reason AS reason,
-               c.prospecting_status AS status,
+               c.prospecting_status AS status, NULLIF(TRIM(c.lead_source), '') AS lead_source, CASE WHEN c.week_label ~ '[0-9]' THEN 'Semana ' || SUBSTRING(c.week_label FROM '[0-9]+')
+                    ELSE NULLIF(TRIM(c.week_label), '') END AS week,
                LOWER(NULLIF(c.prospecting_owner_email, '')) AS owner,
                CASE WHEN NULLIF(c.prospecting_owner_email, '') IS NULL THEN NULL
                     ELSE {_person_name_sql("LOWER(c.prospecting_owner_email)")} END AS owner_name

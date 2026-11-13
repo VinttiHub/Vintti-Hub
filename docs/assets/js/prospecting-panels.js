@@ -132,7 +132,13 @@
       render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason", m: METRICS.icp }); } },
     // Mismas filas, eje dado vuelta: una barra por BDR, tramos por motivo.
     { key: "not_icp_reason", title: "Not ICP Reason <> BDR", group: "Rendimiento de Islas",
-      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason <> BDR", m: METRICS.icp, pivot: true }); } }
+      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason <> BDR", m: METRICS.icp, pivot: true }); } },
+    // Una barra por «Semana» de la empresa (la de Clay / HubSpot), tramos por motivo.
+    { key: "not_icp_reason", title: "Not ICP Reason <> Semana", group: "Rendimiento de Islas",
+      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason <> Semana", m: METRICS.icp, dim: "week" }); } },
+    // Barras por motivo, tramos por Lead Source.
+    { key: "not_icp_reason", title: "Not ICP Reason - Lead Source", group: "Rendimiento de Islas",
+      render: function (el) { return ByCategory(el, { key: "not_icp_reason", uid: this.uid, title: "Not ICP Reason - Lead Source", m: METRICS.icp, seg: "source" }); } }
   ];
   // Dos paneles pueden leer el mismo endpoint (Lead Quality y su «x BDR»): el id del DOM y la
   // preferencia guardada van por `uid`, no por `key`.
@@ -275,12 +281,14 @@
     document.getElementById("ppDSub").textContent = sub;
     if (m.kind === "company") {
       document.getElementById("ppDBody").innerHTML = rows.length ? '<div class="pp-dtable-wrap"><table class="pp-dtable"><thead><tr>' +
-        "<th>Empresa</th><th>Motivo</th><th>Status</th><th>Owner</th></tr></thead><tbody>" +
+        "<th>Empresa</th><th>Motivo</th><th>Semana</th><th>Lead Source</th><th>Status</th><th>Owner</th></tr></thead><tbody>" +
         rows.slice(0, 1500).map(function (r) {
           return '<tr><td><a class="pp-link" href="prospecting-company.html?id=' + r.company_id + '" target="_blank" rel="noopener"><strong>' +
               esc(r.name || r.domain || "#" + r.company_id) + "</strong></a>" +
               (r.domain ? '<div class="pr-note">' + esc(r.domain) + "</div>" : "") + "</td>" +
             '<td><span class="pp-pdot" style="--c:' + reasonColor(r.reason) + '"></span>' + esc(r.reason) + "</td>" +
+            "<td>" + esc(r.week || "—") + "</td>" +
+            "<td>" + esc(r.lead_source && r.lead_source !== "HubSpot" ? r.lead_source : "—") + "</td>" +
             "<td>" + esc(r.status || "—") + "</td>" +
             "<td>" + (r.owner ? dot(r.owner) + esc(r.owner_name || r.owner) : '<span class="pr-note">Sin owner</span>') + "</td></tr>";
         }).join("") + "</tbody></table></div>" +
@@ -316,7 +324,7 @@
   function exportCsv() {
     var m = drawerM || METRICS.sql;
     var cols = m.kind === "company"
-      ? [["name", "Empresa"], ["domain", "Dominio"], ["reason", "Not ICP Reason"], ["status", "Prospecting Status"],
+      ? [["name", "Empresa"], ["domain", "Dominio"], ["reason", "Not ICP Reason"], ["week", "Semana"], ["lead_source", "Lead Source"], ["status", "Prospecting Status"],
          ["owner_name", "Prospecting Owner"], ["owner", "Prospecting Owner (email)"], ["company_id", "ID"]]
       : [["contact_name", "Contacto"], ["email", "Email"], ["company_name", "Empresa"]]
       .concat(m.withDeal ? [["deal_name", "Negocio"], ["stage_label", "Etapa"]] : [["lead_life", "Lead Life"]])
@@ -600,12 +608,31 @@
      siempre; abajo el mapa de calor owner × motivo. Barra, celda y detalle salen de las mismas filas. */
   var NONE = "__none__";
   function ByCategory(el, opts) {
-    var M = opts.m, W = BDR_WORD, PIV = !!opts.pivot;
+    var M = opts.m, W = BDR_WORD;
+    // Eje de las barras: motivo (default), owner (`pivot`) o semana (`dim: "week"`). Con owner o
+    // semana, los tramos son los motivos. El filtro de BDRs siempre es por owner.
+    var WK = opts.dim === "week", PIV = !!opts.pivot || WK;
+    // `seg: "source"`: barras por motivo, tramos por Lead Source (en vez de owner).
+    var SRC = opts.seg === "source";
     var st = { bdrs: null, rows: [], reasons: [], loading: true };
     function ok(r) { return r.owner || NONE; }
     function oName(r) { return r.owner ? (r.owner_name || r.owner) : "Sin owner"; }
     function oColor(k) { return k === NONE ? "#c3c7d1" : colorOf(k); }
     function oDot(k) { return '<span class="pp-pdot" style="--c:' + oColor(k) + '"></span>'; }
+    // Fila del ranking / barra del pivot: el owner, o la semana («Semana 38», «Sin semana» al final).
+    var NOWK = "__noweek__";
+    // Lead Source: la importación de HubSpot puso «HubSpot» donde HubSpot no tenía valor, así
+    // que se lee como «Sin valor» (igual que el reporte).
+    var NOSRC = "__nosource__";
+    function srcKey(r) { var v = r.lead_source; return !v || v === "HubSpot" ? NOSRC : v; }
+    var SRC_COLORS = { Clay: "#6c38ff", Apollo: "#003bff", "Apollo Recycle": "#4ba9ff", Manual: "#5c8a00" };
+    function srcColor(k) { return k === NOSRC ? "#c3c7d1" : SRC_COLORS[k] || reasonColor(k); }
+    function rk(r) { return WK ? (r.week || NOWK) : SRC ? srcKey(r) : ok(r); }
+    function rName(r) { return WK ? (r.week || "Sin semana") : SRC ? (srcKey(r) === NOSRC ? "Sin valor" : r.lead_source) : oName(r); }
+    function rColor(k) { return WK ? (k === NOWK ? "#c3c7d1" : "#6c38ff") : SRC ? srcColor(k) : oColor(k); }
+    function rDot(k) { return WK ? "" : '<span class="pp-pdot" style="--c:' + rColor(k) + '"></span>'; }
+    function isNone(k) { return k === NONE || k === NOWK || k === NOSRC; }
+    function wkNum(name) { var n = parseInt(String(name).replace(/\D/g, ""), 10); return isNaN(n) ? 1e9 : n; }
 
     el.innerHTML =
       '<header class="pp-card__head"><div class="pp-card__title"><h2>' + esc(opts.title) + '</h2>' +
@@ -665,24 +692,30 @@
       }
       renderMs();
       var rows = rowsOn(), R = st.reasons;
-      var tot = {}, by = {}, names = {};
+      var tot = {}, by = {}, names = {}, perOwner = {}, ownerName = {};
       R.forEach(function (x) { tot[x] = 0; });
       rows.forEach(function (r) {
         if (!(r.reason in tot)) return;
-        var k = ok(r);
+        var k = rk(r);
         tot[r.reason]++;
         by[k] = by[k] || {};
         by[k][r.reason] = (by[k][r.reason] || 0) + 1;
-        names[k] = oName(r);
+        names[k] = rName(r);
+        perOwner[ok(r)] = (perOwner[ok(r)] || 0) + 1;
+        ownerName[ok(r)] = oName(r);
       });
       var total = rows.length;
       var ranking = Object.keys(by).map(function (k) {
         var t = 0; R.forEach(function (x) { t += by[k][x] || 0; });
         return { email: k, name: names[k], total: t };
-      }).sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || b.total - a.total || a.name.localeCompare(b.name, "es"); });
+      }).sort(WK
+        ? function (a, b) { return wkNum(a.name) - wkNum(b.name); }
+        : function (a, b) { return isNone(a.email) - isNone(b.email) || b.total - a.total || a.name.localeCompare(b.name, "es"); });
       var top = R.slice().sort(function (a, b) { return tot[b] - tot[a]; })[0];
-      var bestP = ranking.filter(function (p) { return p.email !== NONE; })[0];
-      var none = by[NONE] ? ranking.filter(function (p) { return p.email === NONE; })[0].total : 0;
+      var bestK = Object.keys(perOwner).filter(function (k) { return k !== NONE; })
+        .sort(function (a, b) { return perOwner[b] - perOwner[a]; })[0];
+      var bestP = bestK ? { email: bestK, name: ownerName[bestK], total: perOwner[bestK] } : null;
+      var none = perOwner[NONE] || 0;
       var pct = function (n) { return total ? Math.round(n / total * 100) + "%" : "—"; };
 
       q("[data-kpis]").innerHTML =
@@ -696,7 +729,7 @@
       // owner» al final, como HubSpot) y tramos por motivo, en sus colores fijos.
       var cols, segKeys, colTot, segColor, cell, colKind, segKind;
       if (PIV) {
-        cols = ranking.slice().sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || a.name.localeCompare(b.name, "es"); })
+        cols = (WK ? ranking.slice() : ranking.slice().sort(function (a, b) { return (a.email === NONE) - (b.email === NONE) || a.name.localeCompare(b.name, "es"); }))
           .map(function (p) { return { key: p.email, label: p.name, total: p.total }; });
         segKeys = R.map(function (x) { return { key: x, label: x }; });
         segColor = reasonColor;
@@ -704,7 +737,7 @@
       } else {
         cols = R.map(function (x) { return { key: x, label: x, total: tot[x] }; });
         segKeys = ranking.map(function (p) { return { key: p.email, label: p.name }; });
-        segColor = oColor;
+        segColor = rColor;
         cell = function (c, sk) { return (by[sk] || {})[c] || 0; };
       }
       colKind = PIV ? "data-bdr" : "data-reason";
@@ -723,7 +756,7 @@
               (c.total ? '<button type="button" class="pp-stack__val" ' + colKind + '="' + esc(c.key) + '">' + fmtN(c.total) + "</button>" : "") +
               '<div class="pp-stack__segs">' + segs + "</div></div></div>" +
           '<button type="button" class="pp-stack__x" ' + colKind + '="' + esc(c.key) + '">' +
-            (PIV ? oDot(c.key) : "") + esc(c.label) + "</button></div>";
+            (PIV ? rDot(c.key) : "") + esc(c.label) + "</button></div>";
       }).join("") + '<div class="pp-tip" data-tip hidden></div></div>' +
         '<div class="pp-legend">' + segKeys.map(function (sk) {
           return '<button type="button" ' + segKind + '="' + esc(sk.key) + '" data-hl="' + esc(sk.key) + '">' +
@@ -733,17 +766,17 @@
       // Mapa de calor owner × motivo
       var cmax = 1;
       ranking.forEach(function (p) { R.forEach(function (x) { cmax = Math.max(cmax, by[p.email][x] || 0); }); });
-      q("[data-rank]").innerHTML = ranking.length ? '<div class="pp-rank__wrap"><table class="pp-heat pp-heat--cats"><thead><tr><th class="pp-heat__name">' + esc(W.head) + "</th>" +
+      q("[data-rank]").innerHTML = ranking.length ? '<div class="pp-rank__wrap"><table class="pp-heat pp-heat--cats"><thead><tr><th class="pp-heat__name">' + esc(WK ? "Semana" : SRC ? "Lead Source" : W.head) + "</th>" +
         R.map(function (x) { return '<th><button type="button" data-reason="' + esc(x) + '">' + esc(x) + "</button></th>"; }).join("") +
         '<th class="pp-heat__tot">Total</th></tr></thead><tbody>' +
         ranking.map(function (p, i) {
-          var c = oColor(p.email);
-          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '"><span class="pp-rankno" style="--c:' + c + '">' +
-              (p.email === NONE ? "–" : i + 1) + "</span>" + esc(p.name) + "</button></th>" +
+          var c = rColor(p.email);
+          return '<tr><th class="pp-heat__name"><button type="button" data-bdr="' + esc(p.email) + '">' +
+              (WK ? "" : SRC ? rDot(p.email) : '<span class="pp-rankno" style="--c:' + c + '">' + (isNone(p.email) ? "–" : i + 1) + "</span>") + esc(p.name) + "</button></th>" +
             R.map(function (x) {
               var v = by[p.email][x] || 0;
               var pc = v ? Math.round(14 + v / cmax * 76) : 0;
-              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-reason="' + esc(x) + '" style="--pct:' + pc + '%;--c:' + c + '"' +
+              return "<td>" + (v ? '<button type="button" class="pp-cell" data-bdr="' + esc(p.email) + '" data-reason="' + esc(x) + '" style="--pct:' + pc + '%;--c:' + (WK ? reasonColor(x) : c) + '"' +
                 (pc > 55 ? ' data-dark="1"' : "") + ' title="' + esc(p.name + " · " + x + ": " + v) + '">' + fmtN(v) + "</button>" : '<span class="pp-dot">·</span>') + "</td>";
             }).join("") +
             '<td class="pp-heat__tot"><button type="button" data-bdr="' + esc(p.email) + '">' + fmtN(p.total) + "</button></td></tr>";
@@ -761,8 +794,8 @@
     function fmtN(n) { return Number(n).toLocaleString("es-AR"); }
 
     function detail(reason, bdr) {
-      var rows = rowsOn().filter(function (r) { return (!reason || r.reason === reason) && (!bdr || ok(r) === bdr); });
-      var who = bdr ? (rows[0] ? oName(rows[0]) : bdr) : (st.bdrs ? q("[data-ms-label]").textContent : W.all);
+      var rows = rowsOn().filter(function (r) { return (!reason || r.reason === reason) && (!bdr || rk(r) === bdr); });
+      var who = bdr ? (rows[0] ? rName(rows[0]) : bdr) : (st.bdrs ? q("[data-ms-label]").textContent : W.all);
       openDetail("Not ICP · " + (reason || "Todos los motivos") + " · " + who,
         fmtN(rows.length) + " empresa" + (rows.length === 1 ? "" : "s"), rows, M);
     }
@@ -792,10 +825,10 @@
       var reason = seg.getAttribute("data-reason"), v = Number(seg.getAttribute("data-v"));
       var t = 0;
       seg.parentNode.querySelectorAll(".pp-stack__seg").forEach(function (s) { t += Number(s.getAttribute("data-v")); });
-      tip.innerHTML = '<div class="pp-tip__who">' + oDot(seg.getAttribute("data-bdr")) + esc(seg.getAttribute("data-name")) + "</div>" +
+      tip.innerHTML = '<div class="pp-tip__who">' + rDot(seg.getAttribute("data-bdr")) + esc(seg.getAttribute("data-name")) + "</div>" +
         '<div class="pp-tip__reason"><span class="pp-pdot" style="--c:' + reasonColor(reason) + '"></span>' + esc(reason) + "</div>" +
         '<div class="pp-tip__num"><strong>' + fmtN(v) + "</strong> empresa" + (v === 1 ? "" : "s") +
-        '<span>' + Math.round(v / (t || 1) * 100) + (PIV ? "% del BDR" : "% del motivo") + "</span></div>" +
+        '<span>' + Math.round(v / (t || 1) * 100) + (WK ? "% de la semana" : PIV ? "% del BDR" : "% del motivo") + "</span></div>" +
         '<div class="pp-tip__hint">Click para ver el detalle</div>';
       tip.hidden = false;
       var box = q(".pp-stack").getBoundingClientRect(), r = seg.getBoundingClientRect();
