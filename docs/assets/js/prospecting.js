@@ -125,6 +125,28 @@
   function ownerOptions() {
     return OPTS.bdrs.map(function (b) { return { value: b.email, label: b.name || b.email }; });
   }
+  /* Prospecting Owner (2026-11-13): los BDRs no lo cambian. Con owner, sólo su líder
+     (users.lider → ME.led_bdrs) y con la empresa en Recycled; sin owner, cualquier líder.
+     La owner siempre. Misma regla que store.can_change_owner(): el server frena igual. */
+  var OWNER_LOCK_TIP = "Only the BDR's leader can reassign it, with the company in Recycled";
+  function isLeader() { return !!ME.is_admin || !!(ME.led_bdrs || []).length; }
+  function canChangeOwner(r) {
+    if (ME.is_admin) return true;
+    var led = ME.led_bdrs || [];
+    var owner = String((r && r.prospecting_owner_email) || "").toLowerCase();
+    if (!owner) return led.length > 0;
+    return led.indexOf(owner) !== -1 && (r.prospecting_status || "") === "Recycled";
+  }
+  function ownerLocked(email) {
+    return '<span class="pr-owner-locked" title="' + esc(OWNER_LOCK_TIP) + '"><i class="fa-solid fa-lock"></i> ' +
+      esc(email ? ownerName(email) : "—") + "</span>";
+  }
+  function ownerCell(r) {
+    return '<span class="pr-owner-cell">' + (canChangeOwner(r)
+      ? cellSelect("prospecting_owner_email", ownerOptions(), r.prospecting_owner_email)
+      : ownerLocked(r.prospecting_owner_email)) + "</span>";
+  }
+  function errMsg(err) { return (err && err.data && err.data.message) || (err && err.message) || ""; }
   function ownerName(email) {
     if (!email) return "";
     // BDRs y, si no, cualquier usuario del Hub (p. ej. manuela / mia, que editan workflows).
@@ -232,7 +254,7 @@
     { key: "week_label", label: "Semana", sort: "week_desc", def: true, render: function (r) { return cellText(r.week_label); } },
     { key: "lead_source", label: "Lead Source", def: true, render: function (r) { return cellText(r.lead_source); } },
     { key: "prospecting_owner_email", label: "Prospecting Owner", def: true, render: function (r) {
-        return cellSelect("prospecting_owner_email", ownerOptions(), r.prospecting_owner_email);
+        return ownerCell(r);
       } },
     { key: "open_jobs", label: "Numero de vacantes abiertas", sort: "open_jobs_desc", num: true, def: true, render: function (r) { return cellText(r.open_jobs); } },
     { key: "prospecting_start_date", label: "Prospecting Start Date", sort: "start_asc", def: true, render: function (r) { return fmtDate(r.prospecting_start_date); } },
@@ -766,7 +788,8 @@
   function bulkFields(kind) {
     var o = (OPTS.objects || {})[kind] || {};
     return (o.fields || []).filter(function (f) {
-      return kind === "company" ? f.editable : f.key !== "email" && f.key !== "is_primary";
+      if (kind === "company") return f.editable && (f.key !== "prospecting_owner_email" || isLeader());
+      return f.key !== "email" && f.key !== "is_primary";
     });
   }
   function bulkValueLabel(f, v) {
@@ -1123,12 +1146,17 @@
     sel.classList.remove("is-error");
     patchCompany(id, patch).then(function (row) {
       Object.assign(rowsById[id], row);
-      if (field === "prospecting_status") sel.setAttribute("data-status", row.prospecting_status || "");
+      if (field === "prospecting_status") {
+        sel.setAttribute("data-status", row.prospecting_status || "");
+        // Pasar a / salir de Recycled destraba o traba el owner de esa fila.
+        var oc = tr.querySelector(".pr-owner-cell");
+        if (oc) oc.outerHTML = ownerCell(rowsById[id]);
+      }
       announceWorkflows(row);
       askContact(row);
     }).catch(function (err) {
       sel.classList.add("is-error");
-      alert("Could not save: " + err.message);
+      alert("Could not save: " + errMsg(err));
     }).then(function () { sel.classList.remove("is-saving"); });
   }
 
@@ -1775,8 +1803,9 @@
             '<select class="pr-filter__input" data-edit="prospecting_status">' + optionsHtml(withCurrent(OPTS.statuses, c.prospecting_status), c.prospecting_status || "", "—") + "</select>") +
           f("not_icp_reason", "Not ICP Reason",
             '<select class="pr-filter__input" data-edit="not_icp_reason">' + optionsHtml(withCurrent(OPTS.not_icp_reasons, c.not_icp_reason), c.not_icp_reason || "", "—") + "</select>") +
-          f("prospecting_owner_email", "Prospecting Owner",
-            '<select class="pr-filter__input" data-edit="prospecting_owner_email">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_email), c.prospecting_owner_email || "", "—") + "</select>") +
+          f("prospecting_owner_email", "Prospecting Owner", canChangeOwner(c)
+            ? '<select class="pr-filter__input" data-edit="prospecting_owner_email">' + optionsHtml(withCurrent(ownerOptions(), c.prospecting_owner_email), c.prospecting_owner_email || "", "—") + "</select>"
+            : '<div class="pr-filter__input pr-owner-locked" title="' + esc(OWNER_LOCK_TIP) + '"><i class="fa-solid fa-lock"></i> ' + esc(c.prospecting_owner_email ? ownerName(c.prospecting_owner_email) : "—") + "</div>") +
           f("prospecting_start_date", "Prospecting Start Date",
             '<input type="date" class="pr-filter__input" data-edit="prospecting_start_date" value="' + esc((c.prospecting_start_date || "").slice(0, 10)) + '">') +
           f("week_label", "Week",
@@ -1819,7 +1848,7 @@
           askContact(row);
           load();
           showCompany(c.id);
-        }).catch(function (err) { $("prDrawerStatus").textContent = "Error: " + err.message; });
+        }).catch(function (err) { $("prDrawerStatus").textContent = "Error: " + errMsg(err); });
       };
     }).catch(function (err) {
       $("prDrawerTitle").textContent = "Error";

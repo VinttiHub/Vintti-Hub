@@ -133,6 +133,8 @@ def me():
             "can_see_deals": _is_staff(email),
             "can_see_workflows": _is_staff(email),
             "can_delete": _is_staff(email),
+            # BDRs que lidera (users.lider): puede reasignarles el owner en Recycled.
+            "led_bdrs": store.led_bdr_emails(cur, email),
         })
 
 
@@ -376,9 +378,18 @@ def company_create():
             denied = _gate(cur)
             if denied:
                 return denied
+            owner_dropped = False
+            if (body.get("prospecting_owner_email") or "").strip():
+                ok, _ = store.can_change_owner(cur, actor, {})
+                if not ok:
+                    # Un BDR no asigna owners: la empresa nace sin owner.
+                    body = {**body, "prospecting_owner_email": None}
+                    owner_dropped = True
             row = store.create_company(cur, body, actor)
             applied = _run_instant(cur, row["id"], "created", row.pop("_changes"), actor)
             row = engine.load_company(cur, row["id"])
+            if owner_dropped:
+                row["owner_warning"] = "Only a BDR leader can assign the Prospecting Owner: the company was created without one."
     except store.CompanyExists as exc:
         return jsonify({"error": "exists", "existing": _json_safe(exc.existing)}), 409
     except ValueError as exc:
@@ -399,6 +410,15 @@ def patch_company(company_id: int):
         denied = _gate(cur)
         if denied:
             return denied
+        if "prospecting_owner_email" in patch:
+            cur.execute("SELECT prospecting_owner_email, prospecting_status FROM prospect_companies WHERE id = %s",
+                        (company_id,))
+            current = cur.fetchone()
+            new_owner = store.clean_value("prospecting_owner_email", patch["prospecting_owner_email"])
+            if current is not None and new_owner != (current["prospecting_owner_email"] or None):
+                ok, why = store.can_change_owner(cur, _current_email(), current)
+                if not ok:
+                    return jsonify({"error": "owner_locked", "message": why}), 403
         row = store.update_company(cur, company_id, patch, actor=_current_email())
         applied = []
         if row is not None:
@@ -737,11 +757,24 @@ def _bulk_update(obj: str):
         orphans = set()  # contactos sin empresa: el tick los alcanza por id
         # En el historial se distingue de una edición de a uno: `bulk:<cuántos registros>`.
         source = f"bulk:{len(ids)}"
+        owner_check = obj == "company" and field == "prospecting_owner_email"
+        led = store.led_bdr_emails(cur, actor) if owner_check else None
+        new_owner = store.clean_value(field, value) if owner_check else None
         for rid in ids:
             # Un SAVEPOINT por registro: un valor que falla en uno no puede abortar la
             # transacción entera (y con ella todo lo ya editado del lote).
             cur.execute("SAVEPOINT bulk_row")
             try:
+                if owner_check:
+                    cur.execute("SELECT prospecting_owner_email, prospecting_status FROM prospect_companies WHERE id = %s",
+                                (rid,))
+                    current = cur.fetchone()
+                    if current is not None and new_owner != (current["prospecting_owner_email"] or None):
+                        ok, why = store.can_change_owner(cur, actor, current, led=led)
+                        if not ok:
+                            cur.execute("ROLLBACK TO SAVEPOINT bulk_row")
+                            failed.append({"id": rid, "error": why})
+                            continue
                 if obj == "company":
                     row = store.update_company(cur, rid, {field: value}, actor=actor, source=source)
                     cid = rid

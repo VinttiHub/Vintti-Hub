@@ -45,6 +45,20 @@
   /* Reloj «ver historial» junto a la etiqueta (prospecting-history.js). */
   function hist(obj, id, field) { return window.ProspectingHistory ? window.ProspectingHistory.button(obj, id, field) : ""; }
   function ownerOptions() { return (opts().bdrs || []).map(function (b) { return { value: b.email, label: b.name || b.email }; }); }
+  /* Prospecting Owner (2026-11-13): misma regla que store.can_change_owner(). Con owner,
+     sólo su líder (me.led_bdrs) y con la empresa en Recycled; sin owner, cualquier líder. */
+  function canChangeOwner(c) {
+    var me = P.me() || {};
+    if (me.is_admin) return true;
+    var led = me.led_bdrs || [];
+    var owner = String(c.prospecting_owner_email || "").toLowerCase();
+    if (!owner) return led.length > 0;
+    return led.indexOf(owner) !== -1 && (c.prospecting_status || "") === "Recycled";
+  }
+  function ownerName(email) {
+    var b = (opts().bdrs || []).concat(opts().users || []).filter(function (x) { return x.email === email; })[0];
+    return b ? (b.name || b.email) : email;
+  }
 
   /* ---------- Carga ---------- */
   function load() {
@@ -101,7 +115,10 @@
         '<div class="pr-co-status">' +
           '<select class="pr-cell-select pr-status" data-edit="prospecting_status" data-status="' + esc(c.prospecting_status || "") + '">' +
             '<option value="">—</option>' + optionTags(opts().statuses || [], c.prospecting_status) + "</select></div>" +
-        sel("prospecting_owner_email", "Prospecting Owner", ownerOptions()) +
+        (canChangeOwner(c) ? sel("prospecting_owner_email", "Prospecting Owner", ownerOptions())
+          : '<label class="pr-co-field"><span class="pr-filter__label">Prospecting Owner' + hist("company", c.id, "prospecting_owner_email") + "</span>" +
+            '<div class="pr-filter__input pr-owner-locked" title="Only the BDR\'s leader can reassign it, with the company in Recycled">' +
+            '<i class="fa-solid fa-lock"></i> ' + esc(c.prospecting_owner_email ? ownerName(c.prospecting_owner_email) : "—") + "</div></label>") +
         inp("prospecting_start_date", "Prospecting Start Date", "date") +
         inp("week_label", "Semana") +
         sel("not_icp_reason", "Not ICP Reason", opts().not_icp_reasons || []) +
@@ -273,7 +290,7 @@
       return load().then(function () {
         if (row.needs_contact) C.completeFlow(company, row.contacts || company.contacts, function () { load(); });
       });
-    }).catch(function (err) { st.textContent = "Error: " + err.message; });
+    }).catch(function (err) { st.textContent = "Error: " + ((err.data && err.data.message) || err.message); });
   }
 
   function bind() {

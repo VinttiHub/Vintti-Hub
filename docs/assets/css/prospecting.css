@@ -2549,3 +2549,8 @@ label:hover .pr-hist-btn, dt:hover .pr-hist-btn, .pr-co-card:hover > .pr-filter_
 }
 .pp-tenure td { vertical-align: middle; }
 .pp-tenure input[type="date"], .pp-tenure select { min-width: 130px; }
+
+/* Prospecting Owner bloqueado (sólo el líder del BDR, con la empresa en Recycled) */
+.pr-owner-locked { display: inline-flex; align-items: center; gap: 6px; color: var(--ink, #1f2937); cursor: not-allowed; }
+.pr-owner-locked .fa-lock { font-size: 11px; opacity: .55; }
+div.pr-filter__input.pr-owner-locked { background: rgba(15, 23, 42, .04); }

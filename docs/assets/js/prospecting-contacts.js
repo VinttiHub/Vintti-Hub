@@ -508,6 +508,8 @@
     var O = P().options() || {}, me = P().me() || {};
     var bdrs = O.bdrs || [];
     var mine = bdrs.some(function (b) { return b.email === me.email; }) ? me.email : "";
+    // Sólo un líder de BDRs (o la owner) asigna owner (2026-11-13): un BDR la crea sin owner.
+    var canOwner = !!me.is_admin || !!(me.led_bdrs || []).length;
     var inp = function (id, label, val, ph) {
       return '<label class="pr-filter"><span class="pr-filter__label">' + label + '</span><input type="text" class="pr-filter__input" id="' + id +
         '" value="' + esc(val || "") + '" placeholder="' + esc(ph || "") + '" autocomplete="off"></label>';
@@ -523,9 +525,9 @@
       '<label class="pr-filter"><span class="pr-filter__label">Size</span><select class="pr-filter__input" id="ncSize"><option value="">—</option>' +
         (O.sizes || []).map(function (x) { return '<option value="' + esc(x) + '">' + esc(x) + "</option>"; }).join("") + "</select></label>" +
       inp("ncCountry", "País", "") + inp("ncCity", "Ciudad", "") +
-      '<label class="pr-filter"><span class="pr-filter__label">Prospecting Owner</span><select class="pr-filter__input" id="ncOwner"><option value="">Sin owner</option>' +
+      (canOwner ? '<label class="pr-filter"><span class="pr-filter__label">Prospecting Owner</span><select class="pr-filter__input" id="ncOwner"><option value="">Sin owner</option>' +
         bdrs.map(function (b) { return '<option value="' + esc(b.email) + '"' + (b.email === mine ? " selected" : "") + ">" + esc(b.name || b.email) + "</option>"; }).join("") +
-        "</select></label>" +
+        "</select></label>" : "") +
       '<p class="pr-note">Entra con Lead Source «Manual». Si tiene owner, los workflows le ponen status y start date como a las de Clay.</p>' +
       '<div class="pr-bulkedit__err" id="ncErr" hidden></div>' +
       '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-nc="cancel">Cancelar</button>' +
@@ -548,7 +550,7 @@
       if (b.getAttribute("data-nc") === "cancel") return close();
       var body = { name: q("ncName").value.trim(), website: q("ncWeb").value.trim(), linkedin_url: q("ncLi").value.trim(),
         industry: q("ncInd").value.trim(), size: q("ncSize").value, country: q("ncCountry").value.trim(),
-        city: q("ncCity").value.trim(), prospecting_owner_email: q("ncOwner").value };
+        city: q("ncCity").value.trim(), prospecting_owner_email: q("ncOwner") ? q("ncOwner").value : "" };
       if (!body.name) return err("Poné el nombre de la empresa.");
       running = true;
       b.disabled = true;

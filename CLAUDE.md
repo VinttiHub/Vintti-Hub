@@ -1194,6 +1194,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   de lectura de workflows; `/me` → `can_see_deals` / `can_see_workflows`). La ficha de empresa
   y de contacto les llega con `deals` e `enrollments` vacíos. Paneles los siguen viendo. El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
   La UI limitada de `crm.js` (abril, luca, felipe, felicitas) deja pasar el link por texto.
+- **Prospecting Owner bloqueado para los BDRs (2026-11-13)**: una empresa con owner sólo la
+  reasigna el **líder de ese BDR** (`users.lider`, el del organigrama) y **sólo si está en
+  Recycled** (status actual, antes del cambio); una sin owner, cualquier líder de BDRs.
+  pgonzales siempre. Una regla: `store.can_change_owner()` (+ `led_bdr_emails()`), aplicada en
+  el PATCH (403 `owner_locked`), la edición masiva (va a `failed`) y el alta manual (un BDR la
+  crea sin owner). `/me` → `led_bdrs`; el front muestra el owner con candado. **Lo automático
+  no está alcanzado**: Clay, workflows, sync e importación de HubSpot escriben el owner igual.
 - **Clay**: columna "HTTP API" → `POST /prospecting/clay/webhook` con `X-Clay-Token`
   (= env `CLAY_WEBHOOK_TOKEN`, propia). Acepta snake_case o los nombres de la planilla de
   HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
