@@ -1429,7 +1429,9 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   (Lead Life «PQL (BDRs)», «MQL (Event)», «MQL (MKT) - LM», eventos, Model…) y Marketing contact status se
   traduce a la etiqueta. Lo perdido antes lo completa `scripts/backfill_contacts_from_raw.py` (en seco por
   defecto; re-mapea `raw_payload`, sólo rellena vacíos, blinda workflows). Para ponerse al día con empresas:
-  `python scripts/import_hubspot_companies.py --sync --apply`.
+  `python scripts/import_hubspot_companies.py --sync --catch-up --apply`: aplica los datos pero **no dispara
+  workflows**, blinda como la importación (`hubspot_companies.shield()`). Sin `--catch-up`, cada cambio de hace
+  días inscribía en workflows y la corrida iba a ~3.000 empresas/hora. Se corta con Ctrl+C y sigue desde la marca.
 - **Contactos SIN empresa, como en HubSpot (2026-11-04, decisión de la owner)**:
   `prospect_contacts.company_id`, `prospect_company_events.company_id` y
   `prospect_wf_enrollments.company_id` son nullable (`ensure_schema()`). Un contacto sin empresa

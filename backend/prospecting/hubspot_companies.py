@@ -14,10 +14,11 @@ import time as _time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from psycopg2.extras import Json, RealDictCursor
+from psycopg2.extras import Json, RealDictCursor, execute_values
 
 from prospecting import engine, inbound, store
 from prospecting.constants import NOT_ICP_REASONS, SIZES, STATUSES
+from prospecting.rules import has_conditions
 from utils.hubspot import HubSpotClient
 
 # Propiedades nativas de HubSpot -> columna (prioridad sobre los alias de Clay).
@@ -450,13 +451,18 @@ def _apply_one(cur, d: dict, row: dict | None, mapping: dict, owner: OwnerResolv
 
 def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
          max_companies: int = 2000, time_budget: float = 200.0, since: datetime | None = None,
-         log=None) -> dict:
+         log=None, catch_up: bool = False) -> dict:
     """Trae de HubSpot las empresas modificadas desde la marca de agua y las aplica.
 
     Commit por página (100). La marca avanza a la última `hs_lastmodifieddate` procesada,
     así una corrida cortada por tiempo o por `max_companies` sigue en la próxima. Los
     cambios son cambios reales para los workflows (decisión de la owner, 2026-11-04):
-    `emit_event()` por empresa y un `tick()` por página."""
+    `emit_event()` por empresa y un `tick()` por página.
+
+    `catch_up=True` (sólo la puesta al día a mano, `--sync --catch-up`): aplica los datos igual
+    pero NO dispara workflows; blinda como la importación (`shield()`), así un atraso de días
+    no inscribe miles de registros de una vez con cambios viejos (decisión de la owner,
+    2026-11-24)."""
     client = client or HubSpotClient()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     store.ensure_schema(cur)
@@ -494,7 +500,7 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
                 d, notes = map_company(rec, mapping, owner)
                 stats.update({f"aviso: {k}": n for k, n in notes.items()})
                 page.append((d, _modified_at(rec)))
-            _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, errors)
+            _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, errors, catch_up)
             processed += len(results)
             page_ts = max((ts for _, ts in page if ts), default=None)
             if not dry_run:
@@ -537,7 +543,7 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
             conn.rollback()
 
 
-def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, errors) -> None:
+def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, errors, catch_up=False) -> None:
     if not page:
         return
     hs_ids = [d["hubspot_company_id"] for d, _ in page]
@@ -577,6 +583,7 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
 
     now = engine.utcnow()
     touched: list[int] = []
+    linked_contacts: list[int] = []
     for d, _ts in page:
         rows = by_hs.get(d["hubspot_company_id"]) or ([by_domain.pop(d["domain"])] if d["domain"] in by_domain else [None])
         for row in rows:
@@ -593,20 +600,25 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
                 kind, out, changes = _apply_one(cur, d, row, mapping, owner, fields, dry_run,
                                                 owner_touched=row is None or row["id"] in owner_touched)
                 if not dry_run and out is not None and kind != "same":
-                    engine.emit_event(cur, "company", out["id"], "created" if kind == "created" else "updated",
-                                      changes, now, SYNC_SOURCE)
+                    if not catch_up:
+                        engine.emit_event(cur, "company", out["id"], "created" if kind == "created" else "updated",
+                                          changes, now, SYNC_SOURCE)
                     touched.append(out["id"])
                     # Contactos de la bandeja (Calendly / HubSpot) que esperaban una empresa
                     # con este dominio: se vinculan solos, como con Clay.
                     for a in inbound.attach_pending_for_company(cur, out["id"]):
-                        engine.emit_event(cur, "contact", a["contact_id"], a["action"], a.pop("changes"),
-                                          now, SYNC_SOURCE)
+                        linked_contacts.append(a["contact_id"])
+                        if not catch_up:
+                            engine.emit_event(cur, "contact", a["contact_id"], a["action"], a.pop("changes"),
+                                              now, SYNC_SOURCE)
                         stats["contactos_de_la_bandeja_vinculados"] += 1
                     # Contactos SIN empresa con este dominio: se le asocian solos (el tick de
                     # fin de página ya cubre a la empresa y sus contactos).
                     for oid in store.attach_contacts_for_company(cur, out["id"], SYNC_SOURCE, source=SYNC_SOURCE):
-                        engine.emit_event(cur, "contact", oid, "updated",
-                                          [{"field": "company", "old": None, "new": out["id"]}], now, SYNC_SOURCE)
+                        linked_contacts.append(oid)
+                        if not catch_up:
+                            engine.emit_event(cur, "contact", oid, "updated",
+                                              [{"field": "company", "old": None, "new": out["id"]}], now, SYNC_SOURCE)
                         stats["contactos_sin_empresa_asociados"] += 1
                 cur.execute("RELEASE SAVEPOINT hs_company")
             except Exception as exc:  # una empresa rota no frena el lote
@@ -620,6 +632,38 @@ def _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, err
                                "name": d.get("name"), "accion": kind,
                                "cambios": [{"campo": c["field"], "antes": _enc(c["old"]), "ahora": _enc(c["new"])}
                                            for c in changes][:12]})
+    if catch_up:
+        if touched:
+            from prospecting import hubspot_contacts as hct  # aquí: hubspot_contacts importa este módulo
+            shield(cur, sorted(set(touched)), stats)
+            hct.shield(cur, sorted(set(linked_contacts)), stats)
+        return
     if touched:
         res = engine.tick(cur, now, automatic=True, company_id=sorted(set(touched)), actor=SYNC_SOURCE)
         stats["inscripciones_en_workflows"] += int(res.get("enrolled") or 0)
+
+
+def shield(cur, company_ids: list[int], stats: Counter, wfs: list[dict] | None = None) -> None:
+    """Workflows de empresa por condiciones: lo que YA cumple queda como "ya cumplía" (lo mismo
+    que engine.snapshot_matches(), en lote), así el cron no lo inscribe en masa. Lo usan la
+    importación y la puesta al día (`sync(catch_up=True)`)."""
+    if not company_ids:
+        return
+    now = engine.utcnow()
+    if wfs is None:
+        wfs = [wf for wf in engine.enabled_workflows(cur)
+               if engine.obj_of(wf) == "company" and wf["trigger"].get("type") == "filter"
+               and has_conditions(wf["trigger"].get("conditions"))]
+    for wf in wfs:
+        hits = engine.matching_ids(cur, wf["trigger"]["conditions"], now, False, company_ids, "company")
+        if hits:
+            execute_values(
+                cur,
+                """
+                INSERT INTO prospect_wf_match (workflow_id, record_id, matching, changed_at) VALUES %s
+                ON CONFLICT (workflow_id, record_id) DO UPDATE SET matching = TRUE, changed_at = EXCLUDED.changed_at
+                """,
+                [(wf["id"], h, True, now) for h in hits],
+                page_size=len(hits),
+            )
+            stats[f"blindadas en workflow #{wf['id']}"] += len(hits)

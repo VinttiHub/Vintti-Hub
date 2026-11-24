@@ -40,6 +40,9 @@ Sync incremental (lo mismo que corre el cron cada 30 min, sin tope de tiempo; si
 para ponerse al día la primera vez):
     python scripts/import_hubspot_companies.py --sync            # qué cambiaría
     python scripts/import_hubspot_companies.py --sync --apply    # aplica
+    python scripts/import_hubspot_companies.py --sync --catch-up --apply
+        # ponerse al día tras un atraso: aplica los datos sin disparar workflows (blinda,
+        # como la importación). Se corta con Ctrl+C y sigue desde la marca.
 """
 from __future__ import annotations
 
@@ -206,22 +209,8 @@ class Importer:
     def shield(self, ids: list[int]) -> None:
         """Lo que ya cumple un workflow por condiciones queda como "ya cumplía" (lo mismo
         que engine.snapshot_matches(), en lote): el cron no lo inscribe en masa."""
-        if not ids:
-            return
-        now = engine.utcnow()
-        for wf in self.filter_wfs:
-            hits = engine.matching_ids(self.cur, wf["trigger"]["conditions"], now, False, ids, "company")
-            if hits:
-                execute_values(
-                    self.cur,
-                    """
-                    INSERT INTO prospect_wf_match (workflow_id, record_id, matching, changed_at) VALUES %s
-                    ON CONFLICT (workflow_id, record_id) DO UPDATE SET matching = TRUE, changed_at = EXCLUDED.changed_at
-                    """,
-                    [(wf["id"], h, True, now) for h in hits],
-                    page_size=len(hits),
-                )
-                self.stats[f"blindadas en workflow #{wf['id']}"] += len(hits)
+        from prospecting.hubspot_companies import shield
+        shield(self.cur, ids, self.stats, self.filter_wfs)
 
     def schedule_report(self) -> list[str]:
         out = []
@@ -453,13 +442,16 @@ def main():
                     help="corrige el owner de las importadas según «Prospecting Owner (HubSpot)»")
     ap.add_argument("--sync", action="store_true",
                     help="sync incremental HubSpot -> Hub (lo del cron), sin tope de tiempo")
+    ap.add_argument("--catch-up", action="store_true",
+                    help="con --sync: no dispara workflows, blinda (para ponerse al día)")
     args = ap.parse_args()
     if args.sync:
         from prospecting import hubspot_companies as hs_companies
         conn = get_connection()
         try:
             report = hs_companies.sync(conn, dry_run=not args.apply, max_companies=args.limit or 10**9,
-                                       time_budget=float("inf"), log=print)
+                                       time_budget=float("inf"), log=print,
+                                       catch_up=args.catch_up)
         finally:
             conn.close()
         print(json.dumps(report, ensure_ascii=False, indent=2, default=str)[:20000])
