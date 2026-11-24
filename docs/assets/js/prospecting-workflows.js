@@ -2074,7 +2074,9 @@
           inp(id, "subject", a.subject, "text", ' placeholder="Asunto"') + area(id, "body", a.body, "Texto del mail") + TOKENS + "</div>";
       case "send_slack":
         return '<div class="pr-wf-full">' + area(id, "text", a.text, "Mensaje") + tokenPicker(id, "text") +
-          inp(id, "channel", a.channel, "text", ' placeholder="Canal (id C0…). Vacío = el canal por defecto del Hub"') +
+          '<div class="pr-wf-row">' + inp(id, "channel", a.channel, "text", ' placeholder="Canal (id C0… o link). Vacío = el canal por defecto del Hub"') +
+            '<button type="button" class="pr-btn" data-act="slack-test" data-node="' + id + '"' + dis() + '>Probar canal</button></div>' +
+          '<p class="pr-note" data-slack-test="' + id + '">En un canal privado hay que invitar a la app primero: <code>/invite @VinttiHub</code>.</p>' +
           '<div class="pr-wf-row"><span class="pr-wf-lbl">Mencionar a</span><select class="pr-filter__input" data-a="mention_field" data-node="' + id + '"' + dis() + ">" +
             '<option value="">Nadie</option>' + fieldOptions(a.mention_field || "", isPersonField, curObj === "contact") + "</select></div>" +
           '<p class="pr-note">La persona de esa propiedad recibe una @mención al principio del mensaje. Con registros de prueba sólo sale su nombre.</p>' +
@@ -2523,6 +2525,23 @@
     render();
   }
 
+  /* «Probar canal» del paso Slack: postea un mensaje de prueba y muestra si llegó. */
+  function slackTest(b) {
+    var id = b.getAttribute("data-node");
+    var a = draft.steps.nodes[id].action;
+    var note = document.querySelector('[data-slack-test="' + id + '"]');
+    b.disabled = true;
+    if (note) { note.textContent = "Probando…"; note.classList.remove("is-error"); }
+    return P.api("/prospecting/slack/test-channel", { method: "POST", body: JSON.stringify({ channel: a.channel || "" }) })
+      .then(function (r) { return r; }, function (err) { return (err && err.data) || { sent: false, message: (err && err.message) || "No se pudo probar." }; })
+      .then(function (r) {
+        b.disabled = false;
+        if (!note) return;
+        note.textContent = (r.sent ? "✓ " : "✗ ") + (r.message || (r.sent ? "Llegó." : r.error || "No llegó."));
+        note.style.color = r.sent ? "" : "#c0392b";
+      });
+  }
+
   function onClick(e) {
     var b = e.target.closest("button");
     if (!b) {
@@ -2540,6 +2559,7 @@
     if (act === "toggle") return saveThen(function () { return toggle(draft, !draft.enabled); });
     if (act === "preview") return preview();
     if (act === "apply") return applyNow();
+    if (act === "slack-test") return slackTest(b);
     if ((v = b.getAttribute("data-tab")) !== null) {
       tab = v;
       if (v === "history") { historyState.detail = null; return loadHistory(); }

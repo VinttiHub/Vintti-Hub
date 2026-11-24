@@ -874,6 +874,25 @@ def _apply_edit(cur, ctx: Ctx, row: dict, target: str, key: str, new) -> dict:
     return updated
 
 
+SLACK_APP_NAME = "@VinttiHub"
+
+
+def slack_error_text(err, channel=None) -> str:
+    """El error de Slack en criollo. `channel_not_found` con un id bien escrito casi siempre es
+    un canal privado al que no se invitó a la app: el bot no lo ve."""
+    ch = channel or "el canal"
+    if err == "channel_not_found":
+        return (f"el bot no ve {ch}. Si es privado, escribí /invite {SLACK_APP_NAME} dentro del canal; "
+                "si no, revisá el id.")
+    if err == "not_in_channel":
+        return f"la app no está en {ch}: escribí /invite {SLACK_APP_NAME} dentro del canal."
+    if err == "is_archived":
+        return f"{ch} está archivado."
+    if err == "not_configured":
+        return "Slack no está configurado en este entorno."
+    return str(err or "error desconocido")
+
+
 def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
     """Ejecuta (o, con ctx.dry, sólo describe) una acción. Devuelve
     {"summary", "changes"?}. Con dry=True actualiza `row` (y `ctx.sim_company`) en
@@ -1034,7 +1053,9 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         from utils import slack
 
         text = render_tokens(cur, a["text"], row, obj)
-        channel = (a.get("channel") or "").strip() or None
+        from prospecting.rules import slack_channel_id
+
+        channel = slack_channel_id(a.get("channel")) or None
         if test:
             text = f"[TEST] {text}"
             channel = TEST_SLACK_CHANNEL
@@ -1047,7 +1068,11 @@ def run_action(cur, a: dict, row: dict, ctx: Ctx) -> dict:
         blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": mrkdwn}}]
         res = slack.post_blocks(blocks, text, channel_override=channel)
         if not res.get("sent"):
-            raise RuntimeError(f"Slack no lo aceptó: {res.get('error')}")
+            # No levanta (2026-11-24, decisión de la owner): un Slack que no llega quedaba como
+            # inscripción «failed» y el ROLLBACK del tick deshacía lo que el workflow ya había
+            # hecho en esa corrida (p. ej. el Lead Life). Ahora queda como paso en error y sigue.
+            return {"summary": f"Slack NO llegó{(' a ' + channel) if channel else ''}: "
+                               f"{slack_error_text(res.get('error'), channel)}", "ok": False}
         return {"summary": summary}
 
     if t == "webhook":
@@ -1438,7 +1463,8 @@ def run_enrollment(cur, enr: dict, wf: dict, now: datetime, actor: str | None) -
                 _close(cur, eid, "unenrolled", "El registro se borró", now)
                 return "unenrolled"
             res = run_action(cur, node["action"], row, Ctx(wf, node_id, now, actor, dry=False))
-            _log(cur, eid, node_id, "action", f"Paso {n}: {res['summary']}", now, detail=res.get("changes"))
+            _log(cur, eid, node_id, "action", f"Paso {n}: {res['summary']}", now, detail=res.get("changes"),
+                 ok=res.get("ok", True))
             node_id = node.get("next")
             continue
         if t == "delay":

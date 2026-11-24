@@ -80,6 +80,15 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _SLACK_CHANNEL_RE = re.compile(r"^[CG][A-Z0-9]{6,}$")
 
 
+def slack_channel_id(value) -> str:
+    """Id del canal: acepta el id, «#C0…» o el link del canal (…/archives/C0…)."""
+    v = str(value or "").strip()
+    m = re.search(r"/archives/([A-Z0-9]+)", v)
+    if m:
+        return m.group(1)
+    return v.lstrip("#").strip()
+
+
 class InvalidWorkflow(ValueError):
     def __init__(self, errors: list[str]):
         super().__init__("; ".join(errors))
@@ -528,7 +537,9 @@ def check_action(a: dict, where: str, ctx: Ctx) -> list[str]:
         return errs
     if t == "send_slack":
         errs = [] if (a.get("text") or "").strip() else [f"{where}: escribí el mensaje."]
-        ch = (a.get("channel") or "").strip()
+        ch = slack_channel_id(a.get("channel"))
+        if ch != (a.get("channel") or ""):
+            a["channel"] = ch
         if ch and not _SLACK_CHANNEL_RE.match(ch):
             errs.append(f"{where}: el canal tiene que ser un id de Slack (C0…).")
         mk = a.get("mention_field")

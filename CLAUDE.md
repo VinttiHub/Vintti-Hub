@@ -1298,6 +1298,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   email (`_token_text`). Para el workflow «propiedades incompletas» volvieron al contacto
   `website` («URL del sitio web», también la guarda la llegada de Calendly) y `headcount`
   (opciones de HubSpot), con el mismo `name` que HubSpot para que el sync las traiga.
+  **Un Slack que no llega NO corta ni deshace el workflow** (2026-11-24): antes levantaba, el
+  `ROLLBACK TO SAVEPOINT` del tick deshacía lo ya hecho en esa corrida (el Lead Life) y la
+  inscripción quedaba `failed`. Ahora el paso queda en el historial con `ok=False` y el motivo
+  (`engine.slack_error_text()`) y sigue. `channel_not_found` = canal privado sin la app:
+  `/invite @VinttiHub` dentro del canal. El canal acepta el id, `#id` o el link
+  (`rules.slack_channel_id()`), y el botón **Probar canal** (`POST /prospecting/slack/test-channel`,
+  sólo `WORKFLOW_EDITORS`) postea una prueba.
 - **Condiciones sobre negocios asociados (2026-11-05)**: en un workflow de contacto o de
   empresa (y en los filtros avanzados), `deal.<key>` = «tiene algún negocio asociado que…»
   (contacto: `prospect_deal_contacts`; empresa: `prospect_deals.company_id`). **Sólo

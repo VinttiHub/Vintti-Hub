@@ -1152,6 +1152,33 @@ def _editor_only():
     return None
 
 
+@bp.post("/slack/test-channel")
+def slack_test_channel():
+    """Botón «Probar canal» del paso Slack: postea un mensaje corto y dice si llegó, con el
+    motivo en criollo si no (casi siempre falta /invite de la app en un canal privado)."""
+    denied = _editor_only()
+    if denied:
+        return denied
+    from prospecting.rules import _SLACK_CHANNEL_RE, slack_channel_id
+    from utils import slack
+
+    channel = slack_channel_id((request.get_json(silent=True) or {}).get("channel"))
+    if not channel:
+        channel = None
+    elif not _SLACK_CHANNEL_RE.match(channel):
+        return jsonify({"sent": False, "channel": channel,
+                        "message": "El canal tiene que ser un id de Slack (C0…) o el link del canal."}), 400
+    text = "Prueba del Hub: este canal recibe los avisos de los workflows de Business Dev."
+    res = slack.post_blocks([{"type": "section", "text": {"type": "mrkdwn", "text": slack.esc(text)}}],
+                            text, channel_override=channel)
+    return jsonify({
+        "sent": bool(res.get("sent")),
+        "channel": res.get("channel") or channel,
+        "error": res.get("error"),
+        "message": "Llegó: revisá el canal." if res.get("sent") else engine.slack_error_text(res.get("error"), channel),
+    })
+
+
 @bp.get("/workflows")
 def workflows_list():
     with _Db() as cur:
