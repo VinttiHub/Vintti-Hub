@@ -1351,9 +1351,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   crea un negocio dummy. **No pasa por `deal_to_hub`** (eso corre al mover de etapa) y **crea uno
   nuevo en cada ejecución** aunque ya haya otro abierto (decisión de la owner, como HubSpot). Para
   el workflow «reunión agendada → negocio» volvieron al contacto `vintti_ai` (bool) y
-  `date_of_meeting_scheduled` (date), con el `name` de HubSpot. **Mientras siga prendido en HubSpot
-  el workflow que crea ese negocio, el del Hub tiene que quedar inactivo**: el sync de negocios
-  traería el de HubSpot y habría dos.
+  `date_of_meeting_scheduled` (date), con el `name` de HubSpot. El workflow #13 del Hub
+  («Meeting Scheduled --> Deal created») y el de HubSpot conviven: **el sync de negocios adopta en
+  vez de duplicar** (2026-11-24, `hubspot_deals.find_adoptable()`): antes de crear un negocio de
+  HubSpot busca uno del Hub sin `hubspot_deal_id`, mismo pipeline, abierto, creado a ≤14 días y con
+  un contacto en común (si no, misma empresa), y le pega el id. Sin foto, sólo rellena vacíos y la
+  etapa sólo avanza (o pasa a Closed Lost si no hay oportunidad). Hueco: si el de HubSpot llega
+  ANTES que el workflow del Hub, quedan dos. Del 6 al 24-nov se habían duplicado 19 (Fuse, Vishram,
+  FinCo…): los fusiona `scripts/merge_duplicate_deals.py` (en seco por defecto; queda el que tiene
+  opp, si no el más avanzado, si no el de HubSpot; se lleva id, fecha más vieja, vacíos, contactos e
+  historial). Re-correrlo sirve también para el hueco.
 - **Desplegables con buscador (2026-11-05)**: `docs/assets/js/prospecting-select-search.js`
   (en `prospecting.html` y `prospecting-company.html`) reemplaza la lista nativa de todo
   `<select>` simple con 8+ opciones por un panel que filtra al tipear (sin acentos, por palabras,

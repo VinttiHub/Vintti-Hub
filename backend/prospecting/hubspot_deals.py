@@ -46,6 +46,9 @@ SYNC_KEY = "prospect_deals"
 SYNC_LOCK_KEY = 72_026_110_6
 ALWAYS = ["dealname", "pipeline", "dealstage", "createdate", "hs_lastmodifieddate", "hubspot_owner_id"]
 STAGE_SEEN = "__stage"
+# Un negocio nacido en el Hub (workflow «Meeting Scheduled --> Deal created», Calendly, alta a
+# mano) se adopta si fue creado a menos de esto del createdate de HubSpot (ver find_adoptable).
+ADOPT_WINDOW_DAYS = 14
 
 # Value interno / label viejo de HubSpot -> motivo del hub (ver hubspot_push.CLOSED_LOST_REASON_MAP).
 _LOST_ALIASES = {"bad timing": "Timing", "competitor": "Internal Competition", "vintti’s fault": "Vintti's Fault",
@@ -222,6 +225,55 @@ def resolve_links(cur, items: list[dict]) -> None:
         it["existing"] = existing.get(it["hs_id"])
 
 
+def find_adoptable(cur, pipeline_key: str, contact_ids: list, company_id, created_at,
+                   exclude=(), window_days: int = ADOPT_WINDOW_DAYS) -> dict | None:
+    """El negocio del Hub que es el mismo que uno de HubSpot (2026-11-24).
+
+    Mientras HubSpot siga creando negocios, cada reunión agendada genera dos: el del workflow
+    del Hub (sin `hubspot_deal_id`) y el que trae el sync. Candidato = sin id de HubSpot, no
+    dummy, mismo pipeline, abierto, creado a menos de `window_days` del createdate de HubSpot y
+    con **algún contacto en común**; si el de HubSpot no tiene contactos en el Hub, misma
+    empresa. Desempate: el más viejo. Lo usan el sync (adopta en vez de crear) y
+    `scripts/merge_duplicate_deals.py` (fusiona los pares que ya existían)."""
+    base = """
+        SELECT d.* FROM prospect_deals d
+          LEFT JOIN prospect_deal_stages s ON s.pipeline_key = d.pipeline_key AND s.stage_key = d.stage_key
+         WHERE NULLIF(d.hubspot_deal_id, '') IS NULL AND NOT d.is_dummy AND d.pipeline_key = %s
+           AND NOT COALESCE(s.is_closed, FALSE) AND d.stage_key NOT IN ('closed_won', 'closed_lost')
+           AND d.created_at BETWEEN COALESCE(%s::timestamptz, NOW()) - make_interval(days => %s)
+                                AND COALESCE(%s::timestamptz, NOW()) + make_interval(days => %s)
+           AND NOT (d.id = ANY(%s))
+    """
+    args = [pipeline_key, created_at, window_days, created_at, window_days, list(exclude) or [0]]
+    if contact_ids:
+        cur.execute(base + " AND EXISTS (SELECT 1 FROM prospect_deal_contacts x WHERE x.deal_id = d.id "
+                    "AND x.contact_id = ANY(%s)) ORDER BY d.created_at, d.id LIMIT 1", args + [list(contact_ids)])
+    elif company_id:
+        cur.execute(base + " AND d.company_id = %s ORDER BY d.created_at, d.id LIMIT 1", args + [company_id])
+    else:
+        return None
+    r = cur.fetchone()
+    return dict(r) if r else None
+
+
+def _adopt(cur, it: dict, dry_run: bool, used: set) -> bool:
+    """Ata el negocio de HubSpot a uno ya nacido en el Hub en vez de crear otro."""
+    cand = find_adoptable(cur, it["pipeline_key"], it["contact_ids"], it["company_id"], it["created_at"], used)
+    if not cand:
+        return False
+    used.add(cand["id"])
+    if dry_run:
+        it["existing"] = cand
+        return True
+    cur.execute("UPDATE prospect_deals SET hubspot_deal_id = %s, hubspot_seen = NULL, "
+                "created_at = LEAST(created_at, COALESCE(%s::timestamptz, created_at)), updated_at = NOW() "
+                "WHERE id = %s RETURNING *", (it["hs_id"], it["created_at"], cand["id"]))
+    row = dict(cur.fetchone())
+    D._log(cur, row, SYNC_SOURCE, None, "hubspot_deal_id", None, it["hs_id"])
+    it["existing"] = row
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # Importación masiva
 # --------------------------------------------------------------------------- #
@@ -297,8 +349,11 @@ def _search_since(client: HubSpotClient, since: datetime, properties: list[str],
     return payload.get("results", []), nxt
 
 
-def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
+def _sync_one(cur, it: dict, dry_run: bool, used: set | None = None) -> tuple[str, list]:
     ex = it["existing"]
+    adopted = ex is None and _adopt(cur, it, dry_run, used if used is not None else set())
+    if adopted:
+        ex = it["existing"]
     if ex is None:
         data = {k: v for k, v in it["data"].items() if v is not None}
         out = [{"field": k, "old": None, "new": v} for k, v in data.items()]
@@ -337,12 +392,21 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
             r_new, r_cur = D.rank(it["stage_key"]), D.rank(ex["stage_key"])
             if r_new is not None and r_cur is not None and r_new < r_cur:
                 move = None
+        # Recién adoptado: lo cargado en el Hub manda, HubSpot sólo lo hace avanzar (o lo
+        # cierra perdido, si no tiene oportunidad: eso lo decide Opportunities).
+        lost = it["stage_key"] == D.CLOSED_LOST and not ex.get("opportunity_id")
+        if adopted and not lost and it["pipeline_key"] == ex["pipeline_key"]:
+            r_new, r_cur = D.rank(it["stage_key"]), D.rank(ex["stage_key"])
+            if r_new is None or r_cur is None or r_new <= r_cur:
+                move = None
     new_seen[STAGE_SEEN] = stage_val
     gains_company = ex["company_id"] is None and it["company_id"] is not None
     cur.execute("SELECT contact_id FROM prospect_deal_contacts WHERE deal_id = %s", (ex["id"],))
     have = {r["contact_id"] for r in cur.fetchall()}
     add_contacts = [c for c in it["contact_ids"] if c not in have]
     out = [{"field": k, "old": before.get(k), "new": v} for k, v in patch.items()]
+    if adopted:
+        out.insert(0, {"field": "hubspot_deal_id", "old": None, "new": it["hs_id"]})
     if move:
         out.append({"field": "stage", "old": ex["stage_key"], "new": move[1]})
     if gains_company:
@@ -350,7 +414,7 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
     if add_contacts:
         out.append({"field": "contacts", "old": None, "new": add_contacts})
     if dry_run:
-        return ("updated" if out else "same"), out
+        return ("adopted" if adopted else "updated" if out else "same"), out
     cur.execute("UPDATE prospect_deals SET hubspot_seen = %s, raw_payload = %s WHERE id = %s",
                 (Json(new_seen), Json(it["raw"]), ex["id"]))
     if patch:
@@ -363,7 +427,7 @@ def _sync_one(cur, it: dict, dry_run: bool) -> tuple[str, list]:
         D.move_stage(cur, ex["id"], move[1], None, source=SYNC_SOURCE, check_required=False, pipeline_key=move[0])
     # Después del move: la fecha real de HubSpot pisa el NOW() que selló move_stage.
     _merge_stage_dates(cur, ex["id"], it)
-    return ("updated" if out else "same"), out
+    return ("adopted" if adopted else "updated" if out else "same"), out
 
 
 def _merge_stage_dates(cur, deal_id: int, it: dict) -> None:
@@ -466,18 +530,20 @@ def _sync_page(cur, items: list[dict], dry_run: bool, stats: Counter, sample: li
     if not items:
         return
     resolve_links(cur, items)
+    used: set = set()  # un negocio del Hub se adopta una sola vez por página
     for it in items:
         cur.execute("SAVEPOINT hs_deal")
         try:
-            kind, changes = _sync_one(cur, it, dry_run)
+            kind, changes = _sync_one(cur, it, dry_run, used)
             cur.execute("RELEASE SAVEPOINT hs_deal")
         except Exception as exc:  # un negocio roto no frena el lote
             cur.execute("ROLLBACK TO SAVEPOINT hs_deal")
             errors.append({"hubspot_deal_id": it["hs_id"], "negocio": it["data"].get("name"), "error": str(exc)[:300]})
             stats["errores"] += 1
             continue
-        stats[{"created": "creados", "updated": "actualizados", "same": "sin_cambios"}[kind]] += 1
-        if kind in ("created", "updated") and len(sample) < 25:
+        stats[{"created": "creados", "updated": "actualizados", "same": "sin_cambios",
+               "adopted": "adoptados_del_hub"}[kind]] += 1
+        if kind in ("created", "updated", "adopted") and len(sample) < 25:
             sample.append({"negocio": it["data"].get("name"), "accion": kind,
                            "cambios": [{"campo": c["field"], "antes": _enc(c["old"]) if not isinstance(c["old"], list) else c["old"],
                                         "ahora": _enc(c["new"]) if not isinstance(c["new"], list) else c["new"]}
