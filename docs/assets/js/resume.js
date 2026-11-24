@@ -263,6 +263,9 @@ function sanitizeHTML(html){
       if (raw==null || raw==='') return fallback;
       if (Array.isArray(raw)) return raw;
       if (typeof raw==='object') return raw;
+      // JSON válido se parsea tal cual: normalizar comillas tipográficas antes
+      // rompía strings como “engagement flows” y el editor quedaba vacío.
+      try { return JSON.parse(String(raw).trim()); } catch { /* fallbacks */ }
       let s=String(raw).trim().replace(/[“”]/g,'"').replace(/[‘’]/g,"'");
       // decode basic entities
       if (/[&][a-z]+;/.test(s)){ const ta=document.createElement('textarea'); ta.innerHTML=s; s=ta.value; }
