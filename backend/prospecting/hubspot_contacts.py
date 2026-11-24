@@ -32,6 +32,7 @@ from prospecting.hubspot_companies import (
     OwnerResolver,
     _enc,
     _read_watermark,
+    _start_from,
     _write_state,
 )
 from prospecting.rules import has_conditions
@@ -48,6 +49,9 @@ NATIVE = {
     "first_name": ["firstname"],
     "last_name": ["lastname"],
     "owner_email": ["hubspot_owner_id"],
+    # «Follow Up Task Owner» (id de owner) y, si está vacía, la versión con nombres que
+    # HubSpot sumó para el CRM nuevo (2026-11-24).
+    "follow_up_task_owner": ["task_owner", "follow_up_task_owner_new_crm"],
     "phone_number": ["phone", "mobilephone"],
     "linkedin_url": ["hs_linkedin_url"],
     "company_name": ["company"],
@@ -55,6 +59,9 @@ NATIVE = {
 }
 ALWAYS = ["email", "firstname", "lastname", "createdate", "lastmodifieddate"]
 _PERSON_TYPES = ("owner", "user")
+# Propiedades de persona que exigen alguien ACTIVO del Hub (sin el respaldo de guardar el mail
+# de HubSpot de quien ya no está, que sí vale para Scheduled By).
+ACTIVE_ONLY = {"owner_email", "follow_up_task_owner"}
 
 
 # --------------------------------------------------------------------------- #
@@ -101,11 +108,14 @@ class ContactMapping:
             self._resolvers[k] = OwnerResolver(self.meta.get(prop) or {"name": prop}, self._owners, people)
         return self._resolvers[k]
 
-    def _translate(self, prop: str, raw):
+    def _translate(self, prop: str, raw, f_type: str | None = None):
         """Valor de HubSpot -> lo que espera el Hub (sin validar todavía)."""
         meta = self.meta.get(prop) or {}
         opts = {str(o.get("value")): o.get("label") for o in meta.get("options") or []}
-        if meta.get("type") == "enumeration" and opts and meta.get("fieldType") != "booleancheckbox":
+        if meta.get("type") == "enumeration" and opts and (
+                meta.get("fieldType") != "booleancheckbox" or f_type == "enum"):
+            # booleancheckbox con opciones etiquetadas (Marketing contact status: true →
+            # «Marketing contact»): si el campo del Hub es lista, va la etiqueta (2026-11-24).
             parts = [p for p in str(raw).split(";") if p != ""]
             labels = [opts.get(p, p) for p in parts]
             return labels if meta.get("fieldType") == "checkbox" or len(labels) > 1 else (labels[0] if labels else None)
@@ -125,7 +135,7 @@ class ContactMapping:
             if f["type"] in _PERSON_TYPES:
                 resolver = self._resolver(prop, f["type"])
                 email, why = resolver.resolve(raw)
-                if not email and f["type"] == "user":
+                if not email and f["type"] == "user" and key not in ACTIVE_ONLY:
                     # Histórico (2026-11-06): Scheduled By de alguien que se fue sigue
                     # siendo quién agendó. Sólo `user`; Contact Owner exige un BDR activo.
                     hs_email, hs_name = resolver.describe(store._clean_text(raw) or "")
@@ -138,7 +148,7 @@ class ContactMapping:
                     continue
                 val = email
             else:
-                val = self._translate(prop, raw)
+                val = self._translate(prop, raw, f["type"])
                 if f["type"] != "multi" and isinstance(val, list):
                     val = "; ".join(str(x) for x in val)
             try:
@@ -256,7 +266,10 @@ def find_existing(cur, items: list[dict]) -> None:
         if ex is None and it.get("email"):
             ex = by_email.get(it["email"].lower())
             if ex is not None and ex.get("hubspot_contact_id") and ex["hubspot_contact_id"] != it["hs_id"]:
-                ex = None  # ese mail ya es otro contacto de HubSpot
+                # Ese mail ya es otro contacto de HubSpot (casi siempre uno fusionado o
+                # borrado y vuelto a crear allá): no se puede crear otro con el mismo mail.
+                it["email_taken_by"] = ex["id"]
+                ex = None
         it["existing"] = ex
         it["waiting"] = waiting.get(it["hs_id"])
 
@@ -521,8 +534,8 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
         mapping = load_mapping(cur, client)
         properties = mapping.properties()
         watermark = _read_watermark(cur, SYNC_KEY)
+        start = since or _start_from(cur, SYNC_KEY)
         conn.commit()
-        start = since or ((watermark - OVERLAP) if watermark else BOOTSTRAP)
         lower, after, processed, last_ts = start, None, 0, watermark
         seen_ids: set[str] = set()
         while processed < max_contacts:
@@ -593,6 +606,15 @@ def _sync_page(cur, items: list[dict], dry_run: bool, stats: Counter, sample: li
         if ex is not None and ex["company_id"] is not None and it["company_id"] \
                 and it["company_id"] != ex["company_id"] and it["reason"] == "hubspot_association":
             stats["cambió_de_empresa_en_hubspot (no se mueve)"] += 1
+        if ex is None and it.get("email_taken_by"):
+            # Antes era un error por corrida, y con errores la marca se congela: desde el
+            # 2026-11-17 dos de estos tenían el sync releyendo la misma semana (2026-11-24).
+            stats["mail_ya_es_de_otro_contacto_del_hub (no se crea)"] += 1
+            if len(sample) < 25:
+                sample.append({"email": it["email"], "accion": "salteado",
+                               "motivo": f"el mail ya es del contacto {it['email_taken_by']} del Hub, "
+                                         f"atado a otro id de HubSpot"})
+            continue
         cur.execute("SAVEPOINT hs_contact")
         try:
             kind, out, changes = _sync_one(cur, it, dry_run)

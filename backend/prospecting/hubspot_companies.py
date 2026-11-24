@@ -316,6 +316,22 @@ def _search_since(client: HubSpotClient, since: datetime, properties: list[str],
     return payload.get("results", []), nxt
 
 
+def _start_from(cur, key: str = SYNC_KEY) -> datetime:
+    """Desde dónde sigue la corrida. Si la anterior se cortó (`partial`, o `running` porque
+    el proceso murió), sigue EXACTO desde la marca, sin el solape de 10 min.
+
+    Con el solape, el 2026-11-17 el sync quedó trabado una semana: a las 18:20 HubSpot
+    modificó ~58.600 empresas casi a la vez, cada corrida volvía 10 min atrás, leía las
+    mismas 2.000 (el tope) y la marca no pasaba nunca de ahí. La búsqueda es GTE, así que
+    retomar desde la marca exacta sólo relee las del mismo instante (cientos, no miles)."""
+    cur.execute("SELECT watermark_ms, last_status FROM hubspot_sync_state WHERE sync_key = %s", (key,))
+    r = cur.fetchone()
+    if not r or r["watermark_ms"] is None:
+        return BOOTSTRAP
+    wm = datetime.fromtimestamp(int(r["watermark_ms"]) / 1000, tz=timezone.utc)
+    return wm if r["last_status"] in ("partial", "running") else wm - OVERLAP
+
+
 def _modified_at(rec: dict) -> datetime | None:
     v = (rec.get("properties") or {}).get("hs_lastmodifieddate") or rec.get("updatedAt")
     try:
@@ -459,8 +475,8 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
         properties = sorted({p for pl in mapping.values() for p in pl} | set(ALWAYS)
                             | {owner.prop["name"], "hs_lastmodifieddate"})
         watermark = _read_watermark(cur)
+        start = since or _start_from(cur)
         conn.commit()
-        start = since or ((watermark - OVERLAP) if watermark else BOOTSTRAP)
         lower, after, processed, last_ts = start, None, 0, watermark
         seen_ids: set[str] = set()
         while processed < max_companies:

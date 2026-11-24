@@ -15,7 +15,11 @@ seguido); por defecto, "props".
 
 Tipos (además de los de empresas): datetime, bool (casilla única), multi
 (casillas múltiples), email, phone, user (cualquier usuario activo del Hub; el
-`owner` es sólo BDRs).
+`owner` es sólo BDRs). Contact Owner y Follow Up Task Owner son `user` desde el 2026-11-24
+(decisión de la owner): en HubSpot hay contactos de Justo, Bahía, Mariano… que no son BDRs.
+
+Opciones de listas: además de las de la planilla, las que tiene HubSpot (2026-11-24); si
+falta una, el sync descarta el valor y queda en `raw_payload` (lo dice en `avisos`).
 """
 from __future__ import annotations
 
@@ -32,17 +36,22 @@ LEAD_LIFE = [
     "Active Client",
     "Archived Lead",
     "Inactive Client",
+    # Existen en HubSpot y el sync de contactos los descartaba (2026-11-24): ~330 contactos
+    # quedaban sin Lead Life. Van al final para no correr el orden de los dummies (LEAD_LIFE[:7]).
+    "MQL (Event)",
+    "PQL (BDRs)",
+    "MQL (MKT) - LM",
 ]
 _ORIGINS = ["Outbound", "Website Organic", "Referral", "Social Media", "AI", "Webinar",
             "Paid Media", "Event", "Connected Inbox", "NA", "Import", "Press Action"]
-_FOLLOW_UP = ["Bad Timing", "No Response", "Explicitly Not Interested", "Not a Fit"]
+_FOLLOW_UP = ["Bad Timing", "No Response", "Explicitly Not Interested", "Not a Fit", "Interested"]
 _INDUSTRIES = [
     "Technology", "Accounting", "Law", "Automotor", "Common Goods", "Music", "Furniture",
     "Energy", "HR", "Retail", "Agriculture", "Marketing", "Healthcare", "Construction",
     "Finance", "Ecommerce", "Consulting", "Manufacture", "Medicine", "Entretainment",
     "Pharmaceuticals", "Animation", "Beauty", "Education", "Transportation", "Art",
     "Insurance", "Fashion", "Design", "Consumer Services", "Food", "Pets", "Travel",
-    "Sports", "Security", "Real Estate",
+    "Sports", "Security", "Real Estate", "Data Labeling", "NA",
 ]
 
 # Orden de las secciones de la ficha.
@@ -85,7 +94,7 @@ CONTACT_FIELDS = [
     _f("linkedin_url", "URL de LinkedIn", "url", G[0]),
     _f("phone_number", "Phone Number", "phone", G[0]),
     _f("corporate_phone", "Corporate Phone", "phone", G[0]),
-    _f("owner_email", "Contact Owner", "owner", G[0], storage="col",
+    _f("owner_email", "Contact Owner", "user", G[0], storage="col",
        description="La persona a cargo del contacto (follow up u otra razón)."),
     _f("state_region", "State/Region", "text", G[0]),
     # ---- Calificación ------------------------------------------------------ #
@@ -105,13 +114,14 @@ CONTACT_FIELDS = [
     _f("hiring_situation", "What best describes your current hiring situation?", "enum", G[1], [
         "Actively hiring right now", "Planning to hire in the next 3 - 6 months",
         "Exploring ways to scale my team", "Not hiring right now", "Looking for a job", "Other"]),
-    _f("model", "Model", "enum", G[1], ["Staffing", "Recruiting"], "Sólo para active clients."),
+    _f("model", "Model", "enum", G[1], ["Staffing", "Recruiting", "Project-Based", "NA"], "Sólo para active clients."),
     # ---- Empresa (según el contacto) -------------------------------------- #
     _f("company_name", "Company name", "text", G[2]),
     # La de HubSpot (2026-11-03): la usa el workflow «freelance/independent en LatAm → DQL».
     # No es el «Pais» de la empresa (Clay manda el país, no el continente).
     _f("country_continent", "Country/Continent", "enum", G[2],
-       ["Latin America", "North America", "Europe", "Asia", "Africa", "Oceania", "Middle East"]),
+       ["Latin America", "North America", "Europe", "Asia", "Africa", "Oceania", "Middle East",
+        "United States", "Canada", "Australia"]),
     _f("company_type", "Company Type", "enum", G[2], ["Firm", "SMB", "Startup", "NA"]),
     _f("industria", "Industria", "enum", G[2], _INDUSTRIES),
     _f("exact_company_size", "Exact Company Size", "number", G[2]),
@@ -119,7 +129,7 @@ CONTACT_FIELDS = [
        ["1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001-10000", "10001+"],
        "Rango de tamaño de la empresa según LinkedIn."),
     _f("outsourced_before", "Outsourced before", "multi", G[2],
-       ["NA", "No", "Philippines", "India", "LATAM", "South Africa", "Yes", "No Info"]),
+       ["NA", "No", "Philippines", "India", "LATAM", "South Africa", "Yes", "No Info", "Yes - No info"]),
     _f("company_linkedin_url", "Linkedin URL - Company", "url", G[2]),
     # 2026-11-05, para el workflow «propiedades incompletas → Slack». Mismo `name` que en
     # HubSpot (website / headcount): el sync de contactos las trae solas.
@@ -128,7 +138,7 @@ CONTACT_FIELDS = [
     # ---- Seguimiento BDR --------------------------------------------------- #
     _f("bdr_follow_up_result", "BDR Follow Up Result", "enum", G[3], _FOLLOW_UP,
        "Resultado del último follow up del BDR."),
-    _f("follow_up_task_owner", "Follow Up Task Owner", "owner", G[3]),
+    _f("follow_up_task_owner", "Follow Up Task Owner", "user", G[3]),
     _f("follow_up_date", "Follow Up Date", "date", G[3], description="Fecha en la que el BDR tiene que hacer follow up."),
     _f("bdr_notes", "BDR notes", "longtext", G[3]),
     _f("bdr_insight", "BDR Insight", "longtext", G[3], description="Qué pasó con el lead al hacerle follow up."),
@@ -139,7 +149,7 @@ CONTACT_FIELDS = [
     _f("cold_call_result", "Cold Call Result", "enum", G[4],
        ["Call Scheduled", "No Response", "Explicitly Not Interested", "Not a Fit", "Bad Timing"]),
     # ---- Origen ------------------------------------------------------------ #
-    _f("origin", "Origin", "enum", G[5], _ORIGINS, "Origen del lead."),
+    _f("origin", "Origin", "enum", G[5], _ORIGINS + ["Other"], "Origen del lead."),
     _f("origin_detail", "Origin detail", "text", G[5],
        description="Punto exacto de entrada (Meta Ads, Google Ads, Lead Magnet, Chatbot, Live Chat…)."),
     _f("how_did_you_find_us", "How did you find us?", "text", G[5],
@@ -175,11 +185,14 @@ CONTACT_FIELDS = [
        description="Por qué se perdió el lead después de la reunión con el AE."),
     # ---- Eventos ----------------------------------------------------------- #
     _f("event_name", "Event Name", "enum", G[7],
-       ["F&M - Hal Smith", "F&M - Mason Brady", "F&M - Rubik", "F&M - Founder's Network"]),
+       ["F&M - Hal Smith", "F&M - Mason Brady", "F&M - Rubik", "F&M - Founder's Network",
+        "F&M - Rubik Lunch", "Webinar FN", "Webinar - Founder's Bay"]),
     _f("event_attendance", "Event Attendance", "enum", G[7],
-       ["Attended - Intent", "Attended - No Intent", "No Show"]),
+       ["Attended - Intent", "Attended - No Intent", "No Show", "Assisted", "Assisted - Intent",
+        "Assisted - No Intent"]),
     _f("event_follow_up_result", "Event Follow Up Result", "enum", G[7],
-       ["Bad Timing", "No Response", "Explicitly Not Interested", "Interested"]),
+       ["Bad Timing", "No Response", "Explicitly Not Interested", "Interested", "Scheduled Call",
+        "Not a Fit"]),
     # ---- Atribución / UTMs ------------------------------------------------- #
     *[_f(f"utm_{k}", f"UTM {k.title()}", "text", G[8]) for k in ("source", "medium", "campaign", "term", "content")],
     *[_f(f"utm_{k}_origin", f"UTM {k.title()} Origin", "text", G[8]) for k in ("campaign", "medium", "content", "term")],

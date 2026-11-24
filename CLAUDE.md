@@ -1420,6 +1420,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `prospect_contacts.hubspot_seen`, los cambios disparan workflows, la importación blinda los
   workflows de contacto por condiciones. Un contacto que en HubSpot cambia de empresa **no se
   mueve** (sale en el reporte).
+- **Sync de contactos/empresas trabado (arreglado 2026-11-24)**: el 17-nov HubSpot modificó ~58.600
+  empresas a la vez; el sync volvía 10 min atrás (`OVERLAP`) en cada corrida, releía las mismas 2.000 y la
+  marca no pasaba nunca. Ahora una corrida que quedó `partial`/`running` sigue desde la marca exacta
+  (`hubspot_companies._start_from()`, también contactos). Y un contacto cuyo mail ya es de otro contacto del
+  Hub (atado a otro id de HubSpot: fusionado o recreado allá) se saltea con aviso en vez de ser error: con
+  errores la marca se congela. Además se sumaron a `contact_fields.py` las opciones de HubSpot que faltaban
+  (Lead Life «PQL (BDRs)», «MQL (Event)», «MQL (MKT) - LM», eventos, Model…) y Marketing contact status se
+  traduce a la etiqueta. Lo perdido antes lo completa `scripts/backfill_contacts_from_raw.py` (en seco por
+  defecto; re-mapea `raw_payload`, sólo rellena vacíos, blinda workflows). Para ponerse al día con empresas:
+  `python scripts/import_hubspot_companies.py --sync --apply`.
 - **Contactos SIN empresa, como en HubSpot (2026-11-04, decisión de la owner)**:
   `prospect_contacts.company_id`, `prospect_company_events.company_id` y
   `prospect_wf_enrollments.company_id` son nullable (`ensure_schema()`). Un contacto sin empresa
@@ -1626,7 +1636,9 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **Sólo cuadra porque las propiedades tipo `user` aceptan gente que ya no está**: el sync de
   contactos resolvía Scheduled By contra usuarios ACTIVOS y descartaba a los ex-BDRs (93 contactos).
   Ahora, si no matchea a nadie del Hub, guarda el email del owner de HubSpot (activos y archivados) y
-  su nombre en `prospect_people`; `owner` (Contact Owner) sigue exigiendo un BDR activo. Backfill ya
+  su nombre en `prospect_people`. Contact Owner y Follow Up Task Owner aceptan **cualquier persona activa
+  del Hub** (tipo `user` desde el 2026-11-24; antes `owner` = sólo BDRs y se perdían ~5.000 owners de Justo,
+  Bahía, Mariano…), pero sin ese respaldo de ex-empleados (`hubspot_contacts.ACTIVE_ONLY`). Backfill ya
   aplicado: `scripts/backfill_scheduled_by.py` (blinda los workflows por condiciones).
   **Not ICP Reason** (grupo «Rendimiento de Islas», 2026-11-10): `panels.not_icp_reason()` = TODAS
   las empresas con motivo (sin fecha, como HubSpot), por motivo × Prospecting Owner; sin owner =

@@ -1568,7 +1568,9 @@
     var keep = { lead: $("prCtLead").value, owner: $("prCtOwner").value };
     var LEAD = (((OPTS.objects || {}).contact || {}).fields || []).filter(function (f) { return f.key === "lead_life"; })[0];
     $("prCtLead").innerHTML = optionsHtml((LEAD && LEAD.options) || [], "", "All");
-    $("prCtOwner").innerHTML = optionsHtml([{ value: "__none__", label: "No owner" }].concat(ownerOptions()), "", "All");
+    // Contact Owner = cualquier persona activa del Hub (2026-11-24), no sólo BDRs.
+    var ctOwners = (OPTS.users || []).map(function (u) { return { value: u.email, label: u.name || u.email }; });
+    $("prCtOwner").innerHTML = optionsHtml([{ value: "__none__", label: "No owner" }].concat(ctOwners), "", "All");
     $("prCtLead").value = keep.lead;
     $("prCtOwner").value = keep.owner;
   }
