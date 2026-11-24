@@ -35,6 +35,7 @@ from prospecting.constants import (
     TRIGGERS,
     WEEKDAYS,
     ADMIN_EMAILS,
+    OWNER_MANAGERS,
     EXTRA_ACCESS_EMAILS,
     AUTOMATION_REAL_DATA,
     DEFAULT_WORKFLOWS,
@@ -518,12 +519,13 @@ def has_access(cur, email: str) -> bool:
 # --------------------------------------------------------------------------- #
 # Quién puede cambiar el Prospecting Owner (2026-11-13, pedido de la owner)
 # --------------------------------------------------------------------------- #
-# Los BDRs no lo tocan nunca. Una empresa CON owner la reasigna sólo el líder de ese
-# BDR (`users.lider`, el del organigrama) y sólo con la empresa en Recycled; una SIN
-# owner, cualquier líder de BDRs. La owner (ADMIN_EMAILS) siempre. Sólo frena las rutas
-# de usuario (PATCH, edición masiva, alta manual): Clay, workflows y los syncs de
-# HubSpot siguen escribiendo el owner como antes.
-OWNER_LOCKED_MSG = "Only the BDR's leader can reassign the Prospecting Owner, and only when the company is Recycled."
+# Desde el 2026-11-24: OWNER_MANAGERS (pgonzales, bahia, justo, ana, manuela) lo cambian
+# siempre; cualquier otra persona con acceso (los BDRs), sólo con la empresa en Recycled
+# (status de ANTES del cambio). Ya no depende de `users.lider`. Sólo frena las rutas de
+# usuario (PATCH, edición masiva, alta manual): Clay, workflows y los syncs de HubSpot
+# siguen escribiendo el owner como antes.
+OWNER_LOCKED_MSG = ("Only Bahía, Justo, Ana, Manuela or Priscilla can change the Prospecting Owner, "
+                    "unless the company is Recycled.")
 
 
 def led_bdr_emails(cur, email: str) -> list[str]:
@@ -549,20 +551,13 @@ def led_bdr_emails(cur, email: str) -> list[str]:
 
 def can_change_owner(cur, email: str, company: dict, led: list[str] | None = None) -> tuple[bool, str]:
     """(puede, motivo). `company` = la fila actual (owner y status de ANTES del cambio).
-    `led`: led_bdr_emails() ya calculado, para no repetir la consulta en un lote."""
+    `led` ya no se usa (era la regla del líder); queda por compatibilidad de los call sites."""
     email = (email or "").strip().lower()
-    if email in ADMIN_EMAILS:
+    if email in ADMIN_EMAILS or email in OWNER_MANAGERS:
         return True, ""
-    if led is None:
-        led = led_bdr_emails(cur, email)
-    owner = (company.get("prospecting_owner_email") or "").strip().lower()
-    if not owner:
-        return (True, "") if led else (False, "Only a BDR leader can assign the Prospecting Owner.")
-    if owner not in led:
-        return False, OWNER_LOCKED_MSG
-    if (company.get("prospecting_status") or "") != STATUS_RECYCLED:
-        return False, "The company has to be Recycled before reassigning its Prospecting Owner."
-    return True, ""
+    if (company.get("prospecting_status") or "") == STATUS_RECYCLED:
+        return True, ""
+    return False, OWNER_LOCKED_MSG
 
 
 # --------------------------------------------------------------------------- #

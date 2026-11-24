@@ -28,7 +28,7 @@ from prospecting import folders as wf_folders
 from prospecting import workflows as wf_store
 from prospecting import views as views_store
 from prospecting.rules import validate_conditions
-from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, EXTRA_ACCESS_EMAILS, WORKFLOW_EDITORS
+from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, EXTRA_ACCESS_EMAILS, OWNER_MANAGERS, WORKFLOW_EDITORS
 from prospecting.rules import InvalidWorkflow
 
 bp = Blueprint("prospecting", __name__, url_prefix="/prospecting")
@@ -133,8 +133,8 @@ def me():
             "can_see_deals": _is_staff(email),
             "can_see_workflows": _is_staff(email),
             "can_delete": _is_staff(email),
-            # BDRs que lidera (users.lider): puede reasignarles el owner en Recycled.
-            "led_bdrs": store.led_bdr_emails(cur, email),
+            # Cambia el Prospecting Owner en cualquier status (el resto, sólo en Recycled).
+            "can_manage_owner": _is_admin(email) or email in OWNER_MANAGERS,
         })
 
 
@@ -389,7 +389,7 @@ def company_create():
             applied = _run_instant(cur, row["id"], "created", row.pop("_changes"), actor)
             row = engine.load_company(cur, row["id"])
             if owner_dropped:
-                row["owner_warning"] = "Only a BDR leader can assign the Prospecting Owner: the company was created without one."
+                row["owner_warning"] = "Only Bahía, Justo, Ana, Manuela or Priscilla can assign the Prospecting Owner of a new company: it was created without one."
     except store.CompanyExists as exc:
         return jsonify({"error": "exists", "existing": _json_safe(exc.existing)}), 409
     except ValueError as exc:
@@ -758,7 +758,7 @@ def _bulk_update(obj: str):
         # En el historial se distingue de una edición de a uno: `bulk:<cuántos registros>`.
         source = f"bulk:{len(ids)}"
         owner_check = obj == "company" and field == "prospecting_owner_email"
-        led = store.led_bdr_emails(cur, actor) if owner_check else None
+        led = None
         new_owner = store.clean_value(field, value) if owner_check else None
         for rid in ids:
             # Un SAVEPOINT por registro: un valor que falla en uno no puede abortar la

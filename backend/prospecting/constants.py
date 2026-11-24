@@ -48,6 +48,16 @@ EXTRA_ACCESS_EMAILS = {
     "agustin@vintti.com",  # Agustín Morrone (en el Hub; agustinmorrone@ es sólo su mail de Slack)
 }
 
+# Cambian el Prospecting Owner de cualquier empresa, en cualquier status (2026-11-24,
+# pedido de la owner). El resto (los BDRs) sólo con la empresa en Recycled.
+OWNER_MANAGERS = {
+    "pgonzales@vintti.com",
+    "bahia@vintti.com",
+    "justo@vintti.com",
+    "ana@vintti.com",
+    "manuela@vintti.com",
+}
+
 # `users.role` es texto libre: cuenta como BDR cualquier rol que contenga esto.
 BDR_ROLE_PATTERN = "%BDR%"
 

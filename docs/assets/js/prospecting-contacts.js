@@ -508,8 +508,8 @@
     var O = P().options() || {}, me = P().me() || {};
     var bdrs = O.bdrs || [];
     var mine = bdrs.some(function (b) { return b.email === me.email; }) ? me.email : "";
-    // Sólo un líder de BDRs (o la owner) asigna owner (2026-11-13): un BDR la crea sin owner.
-    var canOwner = !!me.is_admin || !!(me.led_bdrs || []).length;
+    // Sólo OWNER_MANAGERS asignan owner a una empresa nueva (2026-11-24): un BDR la crea sin owner.
+    var canOwner = !!me.can_manage_owner;
     var inp = function (id, label, val, ph) {
       return '<label class="pr-filter"><span class="pr-filter__label">' + label + '</span><input type="text" class="pr-filter__input" id="' + id +
         '" value="' + esc(val || "") + '" placeholder="' + esc(ph || "") + '" autocomplete="off"></label>';

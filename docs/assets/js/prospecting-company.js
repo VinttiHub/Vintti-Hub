@@ -45,15 +45,11 @@
   /* Reloj «ver historial» junto a la etiqueta (prospecting-history.js). */
   function hist(obj, id, field) { return window.ProspectingHistory ? window.ProspectingHistory.button(obj, id, field) : ""; }
   function ownerOptions() { return (opts().bdrs || []).map(function (b) { return { value: b.email, label: b.name || b.email }; }); }
-  /* Prospecting Owner (2026-11-13): misma regla que store.can_change_owner(). Con owner,
-     sólo su líder (me.led_bdrs) y con la empresa en Recycled; sin owner, cualquier líder. */
+  /* Prospecting Owner (2026-11-24): misma regla que store.can_change_owner(). Las 5 de
+     OWNER_MANAGERS (me.can_manage_owner) siempre; el resto, sólo con la empresa en Recycled. */
   function canChangeOwner(c) {
     var me = P.me() || {};
-    if (me.is_admin) return true;
-    var led = me.led_bdrs || [];
-    var owner = String(c.prospecting_owner_email || "").toLowerCase();
-    if (!owner) return led.length > 0;
-    return led.indexOf(owner) !== -1 && (c.prospecting_status || "") === "Recycled";
+    return !!me.can_manage_owner || (c.prospecting_status || "") === "Recycled";
   }
   function ownerName(email) {
     var b = (opts().bdrs || []).concat(opts().users || []).filter(function (x) { return x.email === email; })[0];

@@ -125,17 +125,12 @@
   function ownerOptions() {
     return OPTS.bdrs.map(function (b) { return { value: b.email, label: b.name || b.email }; });
   }
-  /* Prospecting Owner (2026-11-13): los BDRs no lo cambian. Con owner, sólo su líder
-     (users.lider → ME.led_bdrs) y con la empresa en Recycled; sin owner, cualquier líder.
-     La owner siempre. Misma regla que store.can_change_owner(): el server frena igual. */
-  var OWNER_LOCK_TIP = "Only the BDR's leader can reassign it, with the company in Recycled";
-  function isLeader() { return !!ME.is_admin || !!(ME.led_bdrs || []).length; }
+  /* Prospecting Owner (2026-11-24): bahia, justo, ana, manuela y pgonzales lo cambian
+     siempre (ME.can_manage_owner); el resto (los BDRs), sólo con la empresa en Recycled.
+     Misma regla que store.can_change_owner(): el server frena igual. */
+  var OWNER_LOCK_TIP = "Only Bahía, Justo, Ana, Manuela or Priscilla can change it, unless the company is Recycled";
   function canChangeOwner(r) {
-    if (ME.is_admin) return true;
-    var led = ME.led_bdrs || [];
-    var owner = String((r && r.prospecting_owner_email) || "").toLowerCase();
-    if (!owner) return led.length > 0;
-    return led.indexOf(owner) !== -1 && (r.prospecting_status || "") === "Recycled";
+    return !!ME.can_manage_owner || ((r && r.prospecting_status) || "") === "Recycled";
   }
   function ownerLocked(email) {
     return '<span class="pr-owner-locked" title="' + esc(OWNER_LOCK_TIP) + '"><i class="fa-solid fa-lock"></i> ' +
@@ -788,7 +783,7 @@
   function bulkFields(kind) {
     var o = (OPTS.objects || {})[kind] || {};
     return (o.fields || []).filter(function (f) {
-      if (kind === "company") return f.editable && (f.key !== "prospecting_owner_email" || isLeader());
+      if (kind === "company") return f.editable; // Owner: el server rechaza por fila las no-Recycled de un BDR
       return f.key !== "email" && f.key !== "is_primary";
     });
   }
