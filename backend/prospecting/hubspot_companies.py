@@ -441,6 +441,13 @@ def _apply_one(cur, d: dict, row: dict | None, mapping: dict, owner: OwnerResolv
     if dry_run:
         return ("updated" if patch else "same"), row, [
             {"field": f, "old": row.get(f), "new": v} for f, v in patch.items()]
+    stored = row.get("hubspot_seen")
+    if isinstance(stored, str):
+        stored = json.loads(stored)
+    if not patch and row.get("hubspot_company_id") and isinstance(stored, dict) and new_seen == stored:
+        # Nada nuevo y la foto ya está guardada: sin UPDATE. Así releer empresas ya
+        # procesadas (una corrida retomada) cuesta sólo la búsqueda, no un viaje por empresa.
+        return "same", row, []
     cur.execute(f"UPDATE prospect_companies SET {', '.join(extra_sets)} WHERE id = %s",
                 extra_vals + [row["id"]])
     if not patch:
@@ -500,13 +507,20 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
                 d, notes = map_company(rec, mapping, owner)
                 stats.update({f"aviso: {k}": n for k, n in notes.items()})
                 page.append((d, _modified_at(rec)))
+            n_err = len(errors)
             _process_page(cur, page, mapping, owner, fields, dry_run, stats, sample, errors, catch_up)
+            if log:
+                for e in errors[n_err:]:
+                    log(f"  ERROR empresa HubSpot {e['hubspot_company_id']}: {e['error']}")
             processed += len(results)
             page_ts = max((ts for _, ts in page if ts), default=None)
+            res_ts = max((t for t in (_modified_at(r) for r in results) if t), default=None)
             if not dry_run:
                 # Con un error en el camino la marca se congela: la próxima corrida vuelve
-                # a mirar desde ahí (lo ya aplicado no cambia, por la foto).
-                if not errors and page_ts and (last_ts is None or page_ts > last_ts):
+                # a mirar desde ahí (lo ya aplicado no cambia, por la foto). En la puesta al
+                # día NO: una sola empresa rota congelaba la marca de toda la corrida y cada
+                # reinicio volvía al 17-nov (2026-11-25). Los errores quedan en el reporte.
+                if (catch_up or not errors) and page_ts and (last_ts is None or page_ts > last_ts):
                     last_ts = page_ts
                 _write_state(cur, last_ts, "running", {"stats": dict(stats)})
                 conn.commit()
@@ -514,8 +528,14 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False,
                 log(f"  {processed} leídas · {dict((k, v) for k, v in stats.items() if not k.startswith('aviso'))}")
             if not nxt:
                 break
-            if int(nxt) >= SEARCH_AFTER_CAP and page_ts:
-                lower, after = page_ts, None  # nueva búsqueda desde la última fecha
+            if int(nxt) >= SEARCH_AFTER_CAP:
+                # Nueva búsqueda desde la última fecha leída (HubSpot no pagina más de 10.000).
+                # Si no avanzó (miles con la misma fecha), 1 ms más: si no, relee lo mismo.
+                if res_ts and res_ts > lower:
+                    lower = res_ts
+                else:
+                    lower = lower + timedelta(milliseconds=1)
+                after = None
             else:
                 after = nxt
         else:

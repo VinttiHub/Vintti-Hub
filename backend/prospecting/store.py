@@ -719,13 +719,21 @@ def log_event(cur, company_id: int, source: str, actor: str | None,
     )
 
 
-def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
+# Con `"recycle": true` en el body (tablas «Recycle» de Clay) estos BDR_FIELDS se
+# pisan aunque tengan valor: la empresa ya existe y se reasigna a otro BDR/semana.
+RECYCLE_OVERWRITE_FIELDS = ("prospecting_owner_email", "week_label")
+
+
+def upsert_from_clay(cur, payload: dict, is_dummy: bool = False, recycle: bool = False) -> dict:
     """Crea o actualiza una empresa con lo que manda Clay.
 
     Match por `clay_record_id`; si no viene o no matchea, por dominio. Los campos
     de enriquecimiento (CLAY_FIELDS) se actualizan siempre que Clay mande un valor;
     los que trabaja el BDR (BDR_FIELDS) sólo se rellenan si están vacíos: un
     re-envío de Clay nunca deshace lo que hizo una persona o un workflow.
+
+    `recycle=True`: sólo actualiza (si la empresa no existe, error) y pisa owner y
+    semana (RECYCLE_OVERWRITE_FIELDS) con lo que venga; lead_source ya se pisa siempre.
     """
     data = map_clay_payload(payload)
     if not data.get("name"):
@@ -755,6 +763,9 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
         )
         existing = cur.fetchone()
 
+    if existing is None and recycle:
+        raise ValueError("Recycle: esta empresa no existe en el Hub (ni por clay_record_id ni por dominio). "
+                         "Mandala como empresa nueva, sin recycle.")
     if existing is None and not is_dummy and is_deleted(cur, "company", clay_record_id=clay_id, domain=domain):
         raise ValueError("Esta empresa se eliminó en el Hub: no se vuelve a crear. "
                          "Para que vuelva, quitala de «Registros eliminados» (Configuración).")
@@ -800,7 +811,8 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False) -> dict:
     for c in BDR_FIELDS:
         v = data.get(c)
         cur_v = existing.get(c)
-        if v is not None and (cur_v is None or cur_v == ""):
+        overwrite = recycle and c in RECYCLE_OVERWRITE_FIELDS and v != "" and v != cur_v
+        if v is not None and (cur_v is None or cur_v == "" or overwrite):
             sets.append(f"{c} = %s")
             vals.append(v)
             changes.append((c, cur_v, v))

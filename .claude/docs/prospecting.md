@@ -44,6 +44,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   HubSpot (`_ALIASES` en `store.py`). Match por `clay_record_id`, si no por dominio.
   **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
   semana): esos sólo se rellenan si están vacíos.
+  **`"recycle": true` (2026-11-25)**: para las tablas «Recycle» de Clay (empresas que ya existen y se
+  reasignan). Sólo actualiza —si no matchea, error «mandala como nueva», no crea— y **pisa owner y
+  semana** (`RECYCLE_OVERWRITE_FIELDS` en `store.py`); `lead_source` ya se pisa siempre. El resto de
+  BDR_FIELDS sigue con «sólo vacíos». Los cambios disparan workflows como cualquier update de Clay.
   **`"is_dummy": true` en el body la crea como prueba** (2026-10-15): así se prueba la columna
   de Clay directo contra App Runner —Clay no llega a `localhost` sin túnel, y la owner no quiere
   túnel— sin que los BDRs vean nada; se borra con "Borrar dummies". El match por dominio es
