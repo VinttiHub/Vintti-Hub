@@ -1124,7 +1124,8 @@ def clay_webhook():
     También acepta `{"companies": [...]}` para cargas en lote desde un script.
     `"is_dummy": true` en una empresa la crea como prueba: los BDRs no la ven y se
     borra con "Borrar dummies". Sirve para probar la columna de Clay contra prod.
-    `"recycle": true` sólo actualiza una empresa existente y le pisa owner y semana.
+    `"recycle": true` (o `"recycled"`): si la empresa ya existe le pisa owner y semana;
+    si no, la crea como siempre.
     """
     if not _token_ok("CLAY_WEBHOOK_TOKEN", "X-Clay-Token"):
         return jsonify({"error": "unauthorized"}), 401
@@ -1139,7 +1140,7 @@ def clay_webhook():
             try:
                 cur.execute("SAVEPOINT clay_item")
                 is_dummy = str(item.get("is_dummy", "")).strip().lower() in ("true", "1", "yes", "si", "sí")
-                recycle = str(item.get("recycle", "")).strip().lower() in ("true", "1", "yes", "si", "sí")
+                recycle = str(item.get("recycle", item.get("recycled", ""))).strip().lower() in ("true", "1", "yes", "si", "sí")
                 result = store.upsert_from_clay(cur, item, is_dummy=is_dummy, recycle=recycle)
                 result["is_dummy"] = is_dummy
                 kind = "created" if result["action"] == "created" else "updated"

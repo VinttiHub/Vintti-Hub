@@ -732,8 +732,10 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False, recycle: bool =
     los que trabaja el BDR (BDR_FIELDS) sólo se rellenan si están vacíos: un
     re-envío de Clay nunca deshace lo que hizo una persona o un workflow.
 
-    `recycle=True`: sólo actualiza (si la empresa no existe, error) y pisa owner y
-    semana (RECYCLE_OVERWRITE_FIELDS) con lo que venga; lead_source ya se pisa siempre.
+    `recycle=True`: si la empresa ya existe, le pisa owner y semana
+    (RECYCLE_OVERWRITE_FIELDS) con lo que venga; lead_source ya se pisa siempre. Si no
+    existe, se crea igual que sin recycle: así una sola tabla de Clay manda juntas las
+    empresas nuevas y las recicladas.
     """
     data = map_clay_payload(payload)
     if not data.get("name"):
@@ -763,9 +765,6 @@ def upsert_from_clay(cur, payload: dict, is_dummy: bool = False, recycle: bool =
         )
         existing = cur.fetchone()
 
-    if existing is None and recycle:
-        raise ValueError("Recycle: esta empresa no existe en el Hub (ni por clay_record_id ni por dominio). "
-                         "Mandala como empresa nueva, sin recycle.")
     if existing is None and not is_dummy and is_deleted(cur, "company", clay_record_id=clay_id, domain=domain):
         raise ValueError("Esta empresa se eliminó en el Hub: no se vuelve a crear. "
                          "Para que vuelva, quitala de «Registros eliminados» (Configuración).")

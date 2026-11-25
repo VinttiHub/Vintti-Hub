@@ -45,9 +45,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **Un re-envío nunca pisa lo que trabaja el BDR** (status, owner, start date, Not ICP,
   semana): esos sólo se rellenan si están vacíos.
   **`"recycle": true` (2026-11-25)**: para las tablas «Recycle» de Clay (empresas que ya existen y se
-  reasignan). Sólo actualiza —si no matchea, error «mandala como nueva», no crea— y **pisa owner y
-  semana** (`RECYCLE_OVERWRITE_FIELDS` en `store.py`); `lead_source` ya se pisa siempre. El resto de
-  BDR_FIELDS sigue con «sólo vacíos». Los cambios disparan workflows como cualquier update de Clay.
+  reasignan; acepta también `"recycled"`). Si la empresa existe, **pisa owner y semana** (`RECYCLE_OVERWRITE_FIELDS` en `store.py`); `lead_source` ya se pisa siempre. El resto de
+  BDR_FIELDS sigue con «sólo vacíos». Si no existe, se crea como siempre: una sola tabla de Clay
+  manda juntas nuevas y recicladas (la respuesta dice `created`/`updated`). Riesgo aceptado por la
+  owner: una «nueva» cuyo dominio ya existía se reasigna sin aviso. Los cambios disparan workflows.
   **`"is_dummy": true` en el body la crea como prueba** (2026-10-15): así se prueba la columna
   de Clay directo contra App Runner —Clay no llega a `localhost` sin túnel, y la owner no quiere
   túnel— sin que los BDRs vean nada; se borra con "Borrar dummies". El match por dominio es
