@@ -85,7 +85,10 @@ function computeUSHolidaysObserved(year){
   add(nthWeekday(year,11,4,4)); // Thanksgiving (4th Thu Nov)  (Thu=4)
   return set;
 }
-// Cuenta business days (Mon-Fri, sin feriados US observados)
+// Días libres que da Vintti a todo el equipo. Fecha exacta: valen sólo ese año.
+// Misma lista en backend/profile_routes.py (VINTTI_COMPANY_DAYS_OFF): si tocás una, tocá la otra.
+const VINTTI_COMPANY_DAYS_OFF = ["2026-12-24", "2026-12-31"];
+// Cuenta business days (Mon-Fri, sin feriados US observados ni días libres de Vintti)
 function businessDaysBetweenISO(startISO, endISO){
   const a = parseISODateLocal(startISO), b = parseISODateLocal(endISO);
   if (!a || !b || b < a) return 0;
@@ -98,6 +101,7 @@ function businessDaysBetweenISO(startISO, endISO){
     const s = computeUSHolidaysObserved(y);
     for (const d of s) hols.add(d);
   });
+  VINTTI_COMPANY_DAYS_OFF.forEach(d => hols.add(d));
 
   let cnt = 0;
   const cur = new Date(a.getFullYear(), a.getMonth(), a.getDate());

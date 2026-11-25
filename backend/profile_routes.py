@@ -89,6 +89,11 @@ def _observed(d: date) -> date:
         return d + timedelta(days=1)
     return d
 
+# Días libres que da Vintti a todo el equipo. Fecha exacta, no regla anual: valen sólo
+# ese año (el 24 y 31-dic de 2027 vuelven a descontarse). Misma lista en
+# docs/assets/js/profile.js (VINTTI_COMPANY_DAYS_OFF): si tocás una, tocá la otra.
+VINTTI_COMPANY_DAYS_OFF = {date(2026, 12, 24), date(2026, 12, 31)}
+
 def us_federal_holidays_observed_for_year(year: int) -> Set[date]:
     """Conjunto de feriados federales de EE.UU. (observados) para un año."""
     # Fijos (con observancia):
@@ -112,7 +117,8 @@ def us_federal_holidays_observed_for_year(year: int) -> Set[date]:
     }
 
 def business_days_us(start: date, end: date) -> int:
-    """Cuenta días hábiles (lun-vie) excluyendo feriados federales de EE.UU. observados."""
+    """Cuenta días hábiles (lun-vie) excluyendo feriados federales de EE.UU. observados
+    y los días libres de Vintti (VINTTI_COMPANY_DAYS_OFF)."""
     if end < start:
         return 0
     # Prepara set de feriados para todos los años tocados por el rango
@@ -120,6 +126,7 @@ def business_days_us(start: date, end: date) -> int:
     hols = set()
     for y in years:
         hols |= us_federal_holidays_observed_for_year(y)
+    hols |= VINTTI_COMPANY_DAYS_OFF
 
     count = 0
     cur = start
