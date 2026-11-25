@@ -208,7 +208,11 @@
     pcCompanyOrig = pcCompany.id;
     document.getElementById("pcSub").textContent = (pcCompany.id ? pcCompany.name : "Sin empresa") +
       (c.is_primary && pcCompany.id ? " · contacto principal" : "");
-    var body = companyBox();
+    // Sin empresa (2026-11-25, pedido de la owner): el buscador va en el campo «Company name» y no
+    // arriba. Escribir en esa propiedad no asociaba nada, y además al reabrir se veía vacía: en
+    // get_contact `company_name` es la empresa del Hub (JOIN) y pisa la propiedad del contacto.
+    var coInField = !pcCompany.id;
+    var body = coInField ? "" : companyBox();
     if (opts.requireQualified) {
       body += '<div class="pc-banner"><i class="fa-solid fa-circle-exclamation"></i><div><strong>La empresa pasó a Qualified / SQL.</strong> ' +
         "Completá los campos con <span class=\"pc-req\">*</span> para que deje de figurar como «Contacto incompleto».</div></div>";
@@ -225,6 +229,7 @@
       var openIt = OPEN_GROUPS.indexOf(g) !== -1 || hasReq;
       body += '<details class="pc-group"' + (openIt ? " open" : "") + "><summary><span>" + esc(g) + '</span><span class="pc-group__count"></span></summary>' +
         '<div class="pc-grid">' + fs.map(function (f) {
+          if (f.key === "company_name") return companyNameField(f, g, coInField);
           var isReq = req.indexOf(f.key) !== -1;
           var wide = f.type === "longtext" || f.type === "multi";
           return '<label class="pc-field' + (isReq ? " is-required" : "") + (wide ? " pc-field--wide" : "") + '"' +
@@ -320,15 +325,30 @@
     document.getElementById("pcPropClear").addEventListener("click", function () { q.value = ""; filterProps(""); q.focus(); });
   }
 
-  /* Empresa del contacto: buscar y elegir, cambiar o quitar. Se guarda con «Guardar». */
+  /* Empresa del contacto: buscar y elegir, cambiar o quitar. Se guarda con «Guardar».
+     Va arriba si el contacto tiene empresa; sin empresa, en el lugar de «Company name». */
   function companyBox() {
-    return '<section class="pc-company"><span class="pr-filter__label">Empresa</span>' +
-      '<div class="pc-company__row"><div class="pr-inbox__pick">' +
-      '<input type="text" class="pr-filter__input" id="pcCoQ" placeholder="Sin empresa — buscá una para asociarla…" autocomplete="off" value="' + esc(pcCompany.name || "") + '">' +
+    return '<section class="pc-company"><span class="pr-filter__label">Empresa</span>' + companyPicker("Sin empresa — buscá una para asociarla…") + "</section>";
+  }
+  function companyPicker(placeholder) {
+    return '<div class="pc-company__row"><div class="pr-inbox__pick">' +
+      '<input type="text" class="pr-filter__input" id="pcCoQ" placeholder="' + esc(placeholder) + '" autocomplete="off" value="' + esc(pcCompany.name || "") + '">' +
       '<div class="pr-inbox__results" id="pcCoResults" hidden></div></div>' +
       '<a class="pr-btn" id="pcCoOpen" target="_blank" rel="noopener"' + (pcCompany.id ? ' href="prospecting-company.html?id=' + pcCompany.id + '"' : " hidden") + '><i class="fa-solid fa-arrow-up-right-from-square"></i></a>' +
       '<button type="button" class="pr-btn" id="pcCoClear"' + (pcCompany.id ? "" : " hidden") + ">Quitar</button></div>" +
-      '<p class="pr-note pc-company__hint" id="pcCoHint"></p></section>';
+      '<p class="pr-note pc-company__hint" id="pcCoHint"></p>';
+  }
+  /* «Company name» en el panel: sin empresa es el buscador (asociar o crear); con empresa, sólo
+     lectura con la del Hub (se cambia arriba). Ninguno lleva data-k: save() no lo manda como propiedad. */
+  function companyNameField(f, g, asPicker) {
+    var search = ' data-search="' + esc(propNorm([f.label, f.key, f.description, g, "empresa"].join(" "))) + '"';
+    if (asPicker) {
+      return '<div class="pc-field pc-field--wide pc-company"' + search + '><span class="pr-filter__label">' + esc(f.label) + "</span>" +
+        companyPicker("Buscá o creá la empresa…") + "</div>";
+    }
+    return '<div class="pc-field"' + search + '><span class="pr-filter__label">' + esc(f.label) + "</span>" +
+      '<input type="text" class="pr-filter__input" value="' + esc(pcCompany.name || "") + '" disabled>' +
+      '<span class="pr-note">Se cambia arriba, en Empresa.</span></div>';
   }
   function setCompany(id, name) {
     pcCompany = { id: id, name: name || "" };

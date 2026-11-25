@@ -1471,7 +1471,10 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   de contacto. Se crea desde cero con **New contact** de la pestaña Contacts
   (`POST /prospecting/contacts`, `company_id` opcional) y la empresa se elige, cambia o quita en
   su ficha (`PATCH /prospecting/contacts/<id>/company` → `store.set_contact_company()`, que
-  también mueve sus inscripciones abiertas). Se le asocia sola cuando llega una empresa con su
+  también mueve sus inscripciones abiertas). **Sin empresa, el buscador va en el campo «Company name»** del panel (2026-11-25):
+  la propiedad de texto no asocia nada y además se veía vacía al reabrir (en `get_contact()` `company_name`
+  es la empresa del Hub por el JOIN y pisa la de `props`). Con empresa, el bloque «Empresa» va arriba y
+  Company name queda de sólo lectura. Se le asocia sola cuando llega una empresa con su
   dominio (única) — `store.attach_contacts_for_company()` en el webhook de Clay y el sync de
   empresas — o cuando HubSpot le asocia una que ya está en el Hub. **Motor**: un contacto sin
   empresa se alcanza por `tick(contact_ids=[…])` (`_scope_sql` / `_enr_scope_sql`); **nunca
