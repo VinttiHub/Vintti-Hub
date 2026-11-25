@@ -1,7 +1,7 @@
 # Base de datos
 
 ### Database access
-`backend/db.py::get_connection()` returns a raw `psycopg2` connection to the shared RDS Postgres instance. **Credentials are hardcoded in that file** — do not move them without coordinating, and do not print/commit them in error messages or logs. Every route opens its own connection and is responsible for closing it; there is no pool or ORM. Login (`routes/auth_routes.py`) joins `users` against `admin_user_access` to gate inactive accounts.
+`backend/db.py::get_connection()` returns a raw `psycopg2` connection to the shared RDS Postgres instance. Credentials come from env vars (`RDS_PASSWORD`, required, no fallback; `RDS_HOST` / `RDS_PORT` / `RDS_DB` / `RDS_USER` with defaults), set in `backend/.env` locally and in App Runner in prod. The old hardcoded password was rotated on 2026-06-25 and only survives, dead, in git history. Never put the password back in code (the repo is public) and never print it in error messages or logs. Every route opens its own connection and is responsible for closing it; there is no pool or ORM. Login (`routes/auth_routes.py`) joins `users` against `admin_user_access` to gate inactive accounts.
 
 ### Database migrations
 SQL migrations live in `backend/sql/` as dated files (e.g. `20241112_add_google_calendar_tokens.sql`). There is no migration runner — run them manually against the RDS instance when merging a PR that depends on one.

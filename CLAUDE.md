@@ -36,8 +36,9 @@ antes de tocar un módulo, leé su doc. Si cambiás una regla, actualizá el doc
 
 - **No tocar `frontend/`** ni nada de React. Todo el trabajo va en `backend/` y `docs/`.
 - **Nunca poner un `.md` de documentación dentro de `docs/`**: es el sitio público de GitHub Pages.
-- `backend/db.py` tiene las credenciales de RDS hardcodeadas: no moverlas sin coordinar y nunca
-  imprimirlas en logs ni errores. Cada ruta abre y cierra su conexión (sin pool ni ORM).
+- `backend/db.py` lee el password de RDS de la env `RDS_PASSWORD` (`backend/.env` en local, App
+  Runner en prod), sin fallback: nunca volver a escribirlo en el código (el repo es público) ni
+  imprimirlo en logs o errores. Host/puerto/usuario/db tienen default con env `RDS_*`. Cada ruta abre y cierra su conexión (sin pool ni ORM).
   RDS tiene `max_connections=81`.
 - **CORS**: sólo `https://vinttihub.vintti.com` (+ `localhost:5500` / `127.0.0.1:5500` en `after_request`).
   No ampliarlo en un commit.
