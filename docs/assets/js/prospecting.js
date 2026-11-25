@@ -125,10 +125,10 @@
   function ownerOptions() {
     return OPTS.bdrs.map(function (b) { return { value: b.email, label: b.name || b.email }; });
   }
-  /* Prospecting Owner (2026-11-24): bahia, justo, ana, manuela y pgonzales lo cambian
+  /* Prospecting Owner (2026-11-24): bahia, justo, ana, manuela, mia, lara y pgonzales lo cambian
      siempre (ME.can_manage_owner); el resto (los BDRs), sólo con la empresa en Recycled.
      Misma regla que store.can_change_owner(): el server frena igual. */
-  var OWNER_LOCK_TIP = "Only Bahía, Justo, Ana, Manuela or Priscilla can change it, unless the company is Recycled";
+  var OWNER_LOCK_TIP = "Only Bahía, Justo, Ana, Manuela, Mía, Lara or Priscilla can change it, unless the company is Recycled";
   function canChangeOwner(r) {
     return !!ME.can_manage_owner || ((r && r.prospecting_status) || "") === "Recycled";
   }

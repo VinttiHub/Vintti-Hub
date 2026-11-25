@@ -621,6 +621,11 @@ def create_deal(cur, data: dict, actor: str | None, source: str = "user", is_dum
                 check_required: bool = True) -> dict:
     data = dict(data or {})
     pipeline = data.pop("pipeline_key", None) or "hiring"
+    if pipeline == "vintti_ai" and not (data.get("owner_email") or "").strip():
+        # Mia es la encargada de los negocios de Vintti AI (2026-11-25, pedido de la owner):
+        # un negocio nuevo de ese pipeline sin propietario queda a su nombre. Nunca pisa uno elegido.
+        from utils.hubspot_opportunities import PIPELINE_SALES_LEAD
+        data["owner_email"] = PIPELINE_SALES_LEAD["vintti_ai"]
     stage = data.pop("stage_key", None) or first_stage(cur, pipeline)
     if _stage(cur, pipeline, stage or "") is None:
         raise ValueError("Esa etapa no existe en ese pipeline.")

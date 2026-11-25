@@ -522,12 +522,12 @@ def has_access(cur, email: str) -> bool:
 # --------------------------------------------------------------------------- #
 # Quién puede cambiar el Prospecting Owner (2026-11-13, pedido de la owner)
 # --------------------------------------------------------------------------- #
-# Desde el 2026-11-24: OWNER_MANAGERS (pgonzales, bahia, justo, ana, manuela) lo cambian
+# Desde el 2026-11-24: OWNER_MANAGERS (pgonzales, bahia, justo, ana, manuela, lara, mia) lo cambian
 # siempre; cualquier otra persona con acceso (los BDRs), sólo con la empresa en Recycled
 # (status de ANTES del cambio). Ya no depende de `users.lider`. Sólo frena las rutas de
 # usuario (PATCH, edición masiva, alta manual): Clay, workflows y los syncs de HubSpot
 # siguen escribiendo el owner como antes.
-OWNER_LOCKED_MSG = ("Only Bahía, Justo, Ana, Manuela or Priscilla can change the Prospecting Owner, "
+OWNER_LOCKED_MSG = ("Only Bahía, Justo, Ana, Manuela, Mía, Lara or Priscilla can change the Prospecting Owner, "
                     "unless the company is Recycled.")
 
 

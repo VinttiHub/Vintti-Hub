@@ -1217,7 +1217,8 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   y de contacto les llega con `deals` e `enrollments` vacíos. Paneles los siguen viendo. El sidebar no tiene Set hardcodeado: pregunta a `GET /prospecting/me`.
   La UI limitada de `crm.js` (abril, luca, felipe, felicitas) deja pasar el link por texto.
 - **Prospecting Owner (2026-11-24, reemplaza la regla del líder del 2026-11-13)**:
-  `OWNER_MANAGERS` (`constants.py`: pgonzales, bahia, justo, ana, manuela) lo cambian siempre,
+  `OWNER_MANAGERS` (`constants.py`: pgonzales, bahia, justo, ana, manuela, lara, mia — mia desde el
+  2026-11-25, encargada de los negocios de Vintti AI) lo cambian siempre,
   en cualquier status; cualquier otra persona con acceso (los BDRs) **sólo si la empresa está en
   Recycled** (status actual, antes del cambio). Ya no usa `users.lider`. Una regla:
   `store.can_change_owner()`, aplicada en el PATCH (403 `owner_locked`), la edición masiva (va a
@@ -1368,7 +1369,9 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   vacías, primero desde HubSpot). Lead Life del contacto NO está en el mapa (lo manejan workflows).
 - **Acción «Crear registro (negocio)» (`create_deal`, 2026-11-05)**: contactos y empresas.
   `pipeline_key` + `stage_key` (validados contra `Ctx.deal_options["stage"]`), `owner_email`,
-  `name` con tokens y `values` opcionales del catálogo de negocios. `engine._create_deal()` →
+  `name` con tokens y `values` opcionales del catálogo de negocios. **Un negocio nuevo del pipeline
+  Vintti AI sin propietario queda a nombre de mia** (`create_deal()`, 2026-11-25; nunca pisa uno elegido;
+  el insert del sync de HubSpot no pasa por ahí). `engine._create_deal()` →
   `deals.create_deal(check_required=False)` asociado al contacto y a su empresa; un registro dummy
   crea un negocio dummy. **No pasa por `deal_to_hub`** (eso corre al mover de etapa) y **crea uno
   nuevo en cada ejecución** aunque ya haya otro abierto (decisión de la owner, como HubSpot). Para
@@ -1766,7 +1769,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 - **Propiedades editables desde la página (2026-11-25)**: Configuración → **Propiedades**
   (`docs/assets/js/prospecting-properties.js`) crea, edita, ordena, oculta y borra propiedades de
   empresas, contactos y negocios. Editan `PROPERTY_EDITORS` (= `OWNER_MANAGERS`: pgonzales, bahia,
-  justo, ana, manuela, lara); `/me` → `can_edit_properties`, y la sección Configuración se les
+  justo, ana, manuela, lara, mia); `/me` → `can_edit_properties`, y la sección Configuración se les
   muestra sólo con ese ítem si no son `can_configure`. Backend: `backend/prospecting/properties.py`
   + `/prospecting/properties*`. Tabla `prospect_properties` (autocreada): fila de una de fábrica =
   **override** (nombre, descripción, opciones, tipo texto ↔ desplegable, obligatoria, oculta, orden,

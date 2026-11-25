@@ -58,6 +58,7 @@ OWNER_MANAGERS = {
     "ana@vintti.com",
     "manuela@vintti.com",
     "lara@vintti.com",  # 2026-11-25, mismo acceso que la owner
+    "mia@vintti.com",  # 2026-11-25, encargada de negocios del pipeline Vintti AI
 }
 
 # `users.role` es texto libre: cuenta como BDR cualquier rol que contenga esto.
