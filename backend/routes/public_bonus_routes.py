@@ -446,6 +446,10 @@ def public_context():
       JOIN candidates c ON c.candidate_id = ho.candidate_id
       WHERE ho.account_id = %s
         AND ho.candidate_id IS NOT NULL
+        -- Sin fechas = fila del formulario de referencias (candidatos que
+        -- compitieron y no quedaron), no un hire: no va al selector.
+        AND (ho.carga_active IS NOT NULL
+             OR NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL)
     ),
     buyout_rows AS (
       SELECT
@@ -469,7 +473,7 @@ def public_context():
     active_rows AS (
       SELECT candidate_id, full_name
       FROM hire_rows
-      WHERE (start_d IS NULL OR start_d <= CURRENT_DATE)
+      WHERE start_d <= CURRENT_DATE
         AND (end_d IS NULL OR end_d >= CURRENT_DATE)
       UNION
       SELECT candidate_id, full_name
