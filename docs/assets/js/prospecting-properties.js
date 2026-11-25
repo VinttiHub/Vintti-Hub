@@ -42,6 +42,7 @@
   /* ---------------- Pantalla principal ---------------- */
   function open() {
     close();
+    q = "";  // el buscador nace vacío: la búsqueda anterior no tiene que seguir filtrando
     box = document.createElement("div");
     box.className = "pr-modal pp-props";
     box.innerHTML = '<div class="pr-modal__card pp-props__card" role="dialog" aria-modal="true" aria-label="Propiedades">' +
