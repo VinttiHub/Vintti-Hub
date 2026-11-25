@@ -33,7 +33,8 @@ SIZES = [
 ]
 
 # Siempre tiene acceso y ve el panel de pruebas, además de quien tenga rol BDR.
-ADMIN_EMAILS = {"pgonzales@vintti.com"}
+# Lara desde el 2026-11-25, con el mismo acceso que la owner (a su pedido).
+ADMIN_EMAILS = {"pgonzales@vintti.com", "lara@vintti.com"}
 
 # Entran a la página sin ser BDR ni editores de workflows: no son owners de
 # empresas ni ven Configuración. Mariano maneja sobre todo los negocios
@@ -56,6 +57,7 @@ OWNER_MANAGERS = {
     "justo@vintti.com",
     "ana@vintti.com",
     "manuela@vintti.com",
+    "lara@vintti.com",  # 2026-11-25, mismo acceso que la owner
 }
 
 # `users.role` es texto libre: cuenta como BDR cualquier rol que contenga esto.
@@ -108,6 +110,7 @@ WORKFLOW_EDITORS = {
     "manuela@vintti.com",
     "mia@vintti.com",
     "bahia@vintti.com",  # 2026-11-06, a pedido de la owner
+    "lara@vintti.com",  # 2026-11-25, mismo acceso que la owner
 }
 
 # Freno de la fase de prueba. Con False, lo AUTOMÁTICO (al editar una empresa, al

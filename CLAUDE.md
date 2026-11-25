@@ -1186,8 +1186,9 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
 `backend/routes/prospecting_routes.py`. Tablas autocreadas: `prospect_companies`,
 `prospect_company_events` (historial por campo), `prospect_workflow_runs`.
 
-- **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales siempre**
-  (`ADMIN_EMAILS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; justo, ana y
+- **Acceso**: `users.role` que contenga `BDR` (activo) **+ pgonzales y lara siempre**
+  (`ADMIN_EMAILS`; lara desde el 2026-11-25 con el mismo acceso que la owner: también está en
+  `WORKFLOW_EDITORS` y `OWNER_MANAGERS`) **+ `EXTRA_ACCESS_EMAILS`** (mariano, 2026-11-06: maneja los negocios; justo, ana y
   agustin (Morrone), 2026-11-09; no son owners ni ven Configuración). **Negocios y Workflows
   no son para los BDRs** (2026-11-09): sólo admin + `WORKFLOW_EDITORS` + `EXTRA_ACCESS_EMAILS`
   (`_is_staff()` en `prospecting_routes.py`, `_gate(cur, staff=True)` en las rutas `/deals*` y
