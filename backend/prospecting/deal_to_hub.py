@@ -16,13 +16,17 @@ La misma regla que hoy aplica el sync de HubSpot (`_process_hubspot_deal` en
     stages tienen efectos (hire activo, créditos, cliente inactivo, push a HubSpot) que
     viven en `update_opportunity_stage`. `deals.reflect()` trae ese avance al negocio.
 
-**Anti doble creación durante la transición**: un negocio que vino de HubSpot
-(`hubspot_deal_id`) NO crea nada desde acá — eso lo sigue haciendo el sync de
-oportunidades de siempre, y `deals.reflect()` lo ata por `hubspot_deal_id`. El día que
-dejen HubSpot se prende `HUB_IS_SOURCE` (y se apagan los dos crons de HubSpot).
+**Negocios que vinieron de HubSpot (desde 2026-11-25)**: también crean cuenta y
+oportunidad cuando una persona los mueve en el Hub (pedido de la owner: Delancy CPA se
+movió a SQL / Deep Dive en el Hub y en HubSpot seguía en Intro Call, así que no se creó
+nada). Para no duplicar con el sync de oportunidades, la cuenta y la opp nacen con el
+`hubspot_deal_id` del negocio: cuando HubSpot se ponga al día, el sync las encuentra por
+ese id (rama «opp existente», sin retroceder el stage). Y si el sync la creó primero, acá
+se ata a esa (`_opp_by_hubspot_deal`) en vez de crear otra. `run()` sólo lo llaman las
+acciones de una persona (`_deal_write`); el sync HubSpot -> Hub de negocios no lo llama.
 
-Las oportunidades que crea esto nacen con `hubspot_deal_id` NULL: para el sync de HubSpot
-son «cargadas a mano» y no las toca nunca. Un negocio dummy no crea nada.
+Las oportunidades de un negocio nacido en el Hub nacen con `hubspot_deal_id` NULL: para el
+sync de HubSpot son «cargadas a mano» y no las toca nunca. Un negocio dummy no crea nada.
 """
 from __future__ import annotations
 
@@ -33,8 +37,8 @@ from psycopg2.extras import Json
 from prospecting import deals as D
 from prospecting.deal_fields import CLOSED_LOST
 
-# El día del corte (sin HubSpot), True: también los negocios importados de HubSpot crean
-# cuenta / oportunidad desde el Hub.
+# El día del corte (sin HubSpot), True. Desde el 2026-11-25 ya no frena a los negocios
+# importados de HubSpot en `applies()` (crean igual, atados por `hubspot_deal_id`).
 HUB_IS_SOURCE = False
 
 # Campo del negocio -> columna de `opportunity` (se completan sólo si están vacías).
@@ -58,9 +62,29 @@ def _hs():
 def applies(deal: dict) -> tuple[bool, str | None]:
     if deal.get("is_dummy"):
         return False, "Negocio de prueba: no crea cuenta ni oportunidad."
-    if deal.get("hubspot_deal_id") and not HUB_IS_SOURCE:
-        return False, "Viene de HubSpot: la cuenta y la oportunidad las sigue creando el sync de HubSpot."
     return True, None
+
+
+def _hs_deal_id(deal: dict) -> str | None:
+    return (str(deal.get("hubspot_deal_id") or "").strip()) or None
+
+
+def _hs_raw(cur, deal: dict) -> tuple[dict, dict]:
+    """(raw_payload, hubspot_seen) del negocio: pipeline / stage / Model de HubSpot."""
+    cur.execute("SELECT raw_payload, hubspot_seen FROM prospect_deals WHERE id = %s", (deal["id"],))
+    r = cur.fetchone() or {}
+    return (r.get("raw_payload") or {}), (r.get("hubspot_seen") or {})
+
+
+def _opp_by_hubspot_deal(cur, deal: dict) -> int | None:
+    """Opp ya atada al mismo deal de HubSpot (la creó el sync y `reflect()` todavía no la ató)."""
+    hs_id = _hs_deal_id(deal)
+    if not hs_id:
+        return None
+    cur.execute("SELECT opportunity_id FROM opportunity WHERE NULLIF(TRIM(hubspot_deal_id), '') = %s "
+                "ORDER BY opportunity_id LIMIT 1", (hs_id,))
+    r = cur.fetchone()
+    return r["opportunity_id"] if r else None
 
 
 # --------------------------------------------------------------------------- #
@@ -119,6 +143,9 @@ def account_payload(cur, deal: dict) -> dict:
         "hubspot_company_id": company.get("hubspot_company_id"),
         "hubspot_contact_id": contact.get("hubspot_contact_id"),
         "vintti_ai": deal["pipeline_key"] == "vintti_ai",
+        # Negocio importado de HubSpot: la cuenta queda atada al deal, así el sync de
+        # oportunidades la encuentra primero por este id (_find_existing_account).
+        "hubspot_deal_id": _hs_deal_id(deal),
     }
 
 
@@ -221,6 +248,8 @@ def _create_opportunity(cur, deal: dict, account_id: int, actor, report: dict) -
     hs = _hs()
     dates = _stage_dates(deal, deal["stage_key"])
     stage = hs_opps.initial_stage_for_new_opportunity(deal["stage_key"], dates) or "Deep Dive"
+    hs_id = _hs_deal_id(deal)
+    raw, seen = _hs_raw(cur, deal) if hs_id else ({}, {})
     new_id = hs._insert_opportunity_from_deal(cur, {
         "account_id": account_id,
         "opp_model": deal.get("model"),
@@ -230,11 +259,18 @@ def _create_opportunity(cur, deal: dict, account_id: int, actor, report: dict) -
         "deep_dive_date": dates["deep_dive_date"],
         "nda_sent_date": dates["nda_sent_date"],
         "nda_signed_date": dates["nda_signature_or_start_date"],
-        "deal_id": None, "pipeline_id": None, "dealstage_id": None,
+        "deal_id": hs_id, "pipeline_id": raw.get("pipeline") if hs_id else None,
+        "dealstage_id": raw.get("dealstage") if hs_id else None,
     })
-    # No es un deal de HubSpot: sin foto del Model (si un día se ata a uno, cuenta como primera vez).
-    cur.execute("UPDATE opportunity SET hubspot_model_seen = NULL, hubspot_synced_at = NULL WHERE opportunity_id = %s",
-                (new_id,))
+    if hs_id:
+        # Atada al deal de HubSpot: la foto del Model es lo que HubSpot tiene hoy (si no tiene,
+        # el del negocio), así el primer sync no pisa el Model que se cargó en el Hub.
+        cur.execute("UPDATE opportunity SET hubspot_model_seen = %s WHERE opportunity_id = %s",
+                    (seen.get("model") or deal.get("model"), new_id))
+    else:
+        # No es un deal de HubSpot: sin foto del Model (si un día se ata a uno, cuenta como primera vez).
+        cur.execute("UPDATE opportunity SET hubspot_model_seen = NULL, hubspot_synced_at = NULL "
+                    "WHERE opportunity_id = %s", (new_id,))
     cur.execute(
         "UPDATE prospect_deals SET opportunity_id = %s, hub_status = NULL, hub_note = NULL WHERE id = %s",
         (new_id, deal["id"]),
@@ -341,6 +377,9 @@ def run(cur, deal_id: int, actor: str | None) -> dict:
         _write_sql_date(cur, deal, account_id, actor, report)
     if r < D.rank("deep_dive") or not account_id:
         return report
+    existing = _opp_by_hubspot_deal(cur, deal)
+    if existing:
+        return link_opportunity(cur, deal["id"], existing, actor)
     if not str(deal.get("role_to_hire") or "").strip():
         report["aviso"] = "Falta Role to hire: sin eso no se crea la oportunidad."
         return report

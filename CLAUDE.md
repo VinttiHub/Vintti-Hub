@@ -1516,9 +1516,12 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   sólo hacia adelante (NDA Sent, NDA Signed → Sourcing); Signed / Close Win / Closed Lost los mueve
   la recruiter en Opportunities y `deals.reflect()` (al abrir el tablero y en el cron) lo trae al
   negocio, sin retroceder. Las opps que crea nacen con `hubspot_deal_id` NULL: el sync de HubSpot
-  no las toca. Un negocio dummy no crea nada. **Anti doble creación mientras se use HubSpot**: un
-  negocio importado de HubSpot (`hubspot_deal_id`) NO crea cuenta ni opp (las sigue creando
-  `/hubspot/sync/opportunities`); `reflect()` lo ata por `hubspot_deal_id`. **El día del corte**:
+  no las toca. Un negocio dummy no crea nada. **Negocio importado de HubSpot (desde 2026-11-25)**:
+  movido por una persona en el Hub, también crea cuenta y opp (Delancy CPA pasó a SQL / Deep Dive en
+  el Hub con HubSpot en Intro Call y no se creaba nada). Nacen **con el `hubspot_deal_id`** del
+  negocio, así `/hubspot/sync/opportunities` las encuentra por ese id cuando HubSpot se pone al día
+  (no duplica, no retrocede); si el sync la creó primero, `_opp_by_hubspot_deal()` la ata. Lo que
+  viene sólo de HubSpot (sync de negocios) no llama a `deal_to_hub.run()`: ahí crea el sync de opps. **El día del corte**:
   `deal_to_hub.HUB_IS_SOURCE = True` y apagar los dos crons de HubSpot; antes, portar las cards que
   leen deals/contactos de HubSpot en vivo (`_sql_hubspot.py`, `_mkt_sql_anchor.py`, `mkt_*`,
   `sales_funnel_*`, `sales_mql_to_sql_30d`). **HubSpot → Hub**: importación
@@ -1806,15 +1809,14 @@ Mientras se use HubSpot, conviven dos caminos y cada negocio va por uno solo:
   Dive crea la oportunidad (con el freno «esperando decisión»); NDA Sent / NDA Signed empujan la
   opp (NDA Signed → Sourcing, con el Slack de Sourcing); Signed / Close Win / Closed Lost se
   mueven en Opportunities y `deals.reflect()` trae etapa + valores al negocio.
-- **Negocio importado de HubSpot** (`hubspot_deal_id` con valor): NO crea nada desde el Hub. La
-  cuenta y la opp las crea `POST /hubspot/sync/opportunities` (cron
-  `hubspot-opportunity-sync.yml`); `reflect()` ata el negocio por `hubspot_deal_id`. Es para no
-  duplicar.
+- **Negocio importado de HubSpot** (`hubspot_deal_id` con valor): si una persona lo mueve en el
+  Hub, crea cuenta y opp igual que uno nacido acá (desde 2026-11-25), pero **atadas al
+  `hubspot_deal_id`**, para que el sync de opps las encuentre en vez de duplicar. Si lo mueven en
+  HubSpot, las crea `POST /hubspot/sync/opportunities` y `reflect()` ata el negocio.
 
 Cuando la owner diga **«prendé el interruptor» / «apagamos HubSpot»**, hacer TODO esto junto:
-1. `deal_to_hub.HUB_IS_SOURCE = True` → los negocios importados de HubSpot también crean cuenta
-   y oportunidad desde el Hub. Antes, revisar que sus opps ya atadas tengan `opportunity_id` en
-   el negocio (si no, el freno los deja «esperando decisión» en vez de duplicar).
+1. `deal_to_hub.HUB_IS_SOURCE = True` (desde 2026-11-25 ya no frena nada en `applies()`: los
+   negocios importados ya crean desde el Hub; queda como marca del corte).
 2. **Apagar los crons de HubSpot**: `prospecting-hubspot-sync.yml` (empresas, contactos,
    negocios) y `hubspot-opportunity-sync.yml` (deals → opps, y el push del hub). Si queda
    prendido el de opps, crea opps duplicadas de deals que ya no se mueven.
