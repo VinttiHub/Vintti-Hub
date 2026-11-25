@@ -200,7 +200,7 @@ def load_company(cur, company_id: int, lock: bool = False) -> dict | None:
         (company_id,),
     )
     row = cur.fetchone()
-    return dict(row) if row else None
+    return store.flatten_company(row) if row else None
 
 
 def load_contact(cur, contact_id: int, lock: bool = False) -> dict | None:

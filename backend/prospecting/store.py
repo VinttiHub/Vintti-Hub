@@ -458,6 +458,9 @@ def ensure_schema(cur) -> None:
     # Negocios (deals.py, 2026-11-04).
     from prospecting import deals
     deals.ensure_schema(cur)
+    # Propiedades editables desde la página (properties.py, 2026-11-25) + props de empresa.
+    from prospecting import properties
+    properties.ensure_schema(cur)
     _seed_default_workflows(cur)
     _SCHEMA_READY = True
 
@@ -877,14 +880,23 @@ def create_company(cur, data: dict, actor: str | None) -> dict:
     cambio desde vacío (igual que Clay), así «cambia una propiedad» / «actualizado hoy»
     la ven y el owner dispara el workflow 2. Devuelve la fila con `_changes`."""
     vals = {}
-    for k in MANUAL_COMPANY_FIELDS:
+    for k in MANUAL_COMPANY_FIELDS + ("lead_source",):
+        f = FIELDS_BY_KEY.get(k)
+        if f is not None and f["type"] == "enum" and data.get(k) not in (None, ""):
+            clean_contact_value(f, data.get(k))  # tiene que estar en la lista
         v = clean_value(k, data.get(k))
         if v not in (None, ""):
             vals[k] = v
+    # Propiedades nuevas de empresa (Configuración → Propiedades): van a props.
+    props = {}
+    for f in FIELDS:
+        if f.get("storage") == "props" and f["key"] in (data or {}):
+            v = clean_contact_value(f, data[f["key"]])
+            if v is not None:
+                props[f["key"]] = v
     if not vals.get("name"):
         raise ValueError("Falta el nombre de la empresa.")
-    if vals.get("size") and vals["size"] not in SIZES:
-        raise ValueError(f"Size inválido: {vals['size']}.")
+    vals.setdefault("lead_source", "Manual")
     owner = vals.get("prospecting_owner_email")
     if owner and owner not in {b["email"] for b in list_bdrs(cur)}:
         raise ValueError("El Prospecting Owner tiene que ser un BDR activo.")
@@ -895,28 +907,29 @@ def create_company(cur, data: dict, actor: str | None) -> dict:
         hit = cur.fetchone()
         if hit:
             raise CompanyExists(dict(hit))
-    cols = list(vals) + ["domain", "lead_source", "is_dummy"]
-    params = list(vals.values()) + [domain, "Manual", False]
+    cols = list(vals) + ["domain", "is_dummy", "props"]
+    params = list(vals.values()) + [domain, False, Json(props)]
     cur.execute(
         f"INSERT INTO prospect_companies ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) RETURNING *",
         params,
     )
-    row = dict(cur.fetchone())
+    row = flatten_company(cur.fetchone())
     log_event(cur, row["id"], "user", actor, None, None, "created")
-    changes = [{"field": k, "old": None, "new": v} for k, v in vals.items()] + \
-              [{"field": "lead_source", "old": None, "new": "Manual"}]
+    changes = [{"field": k, "old": None, "new": v} for k, v in {**vals, **props}.items()]
     for ch in changes:
         log_event(cur, row["id"], "user", actor, ch["field"], None, ch["new"])
     return {**row, "_changes": changes}
 
 
 def update_company(cur, company_id: int, patch: dict, actor: str, source: str = "user",
-                   current: dict | None = None) -> dict | None:
+                   current: dict | None = None, validate: bool = False) -> dict | None:
     """Aplica `patch` (ya filtrado a columnas editables) y deja un evento por campo.
 
     La fila devuelta trae `_changes` ([{field, old, new}]): con eso se disparan los
     workflows "cuando cambia una propiedad" (engine.emit_event).
-    `current`: la fila ya leída con FOR UPDATE por quien llama (el motor), para no releerla."""
+    `current`: la fila ya leída con FOR UPDATE por quien llama (el motor), para no releerla.
+    `validate`: edición a mano desde la página (PATCH, edición masiva): un desplegable sólo acepta
+    valores de su lista. Clay, HubSpot y los workflows no validan (no se pierde una llegada)."""
     if current is not None:
         row = current
     else:
@@ -924,21 +937,39 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
         row = cur.fetchone()
     if row is None:
         return None
+    row = flatten_company(row)
     sets, vals, changes = [], [], []
+    new_props = dict(row.get("props") or {})
     for col, raw in patch.items():
+        f = FIELDS_BY_KEY.get(col)
+        if f is not None and f.get("storage") == "props":
+            # Propiedad nueva (Configuración → Propiedades): vive en props, tipada como en contactos.
+            v = clean_contact_value(f, raw) if validate else _clean_prop_loose(f, raw)
+            if v != row.get(col):
+                if v is None:
+                    new_props.pop(col, None)
+                else:
+                    new_props[col] = v
+                changes.append((col, row.get(col), v))
+            continue
+        if validate and f is not None and f["type"] == "enum" and col != "prospecting_status":
+            clean_contact_value(f, raw)  # el valor tiene que estar en la lista (sólo lo manual)
         v = clean_value(col, raw)
         if v != row.get(col):
             sets.append(f"{col} = %s")
             vals.append(v)
             changes.append((col, row.get(col), v))
-    if not sets:
+    if not changes:
         return {**dict(row), "_changes": []}
+    if any(c[0] in new_props or c[0] in (row.get("props") or {}) for c in changes):
+        sets.append("props = %s")
+        vals.append(Json(new_props))
     sets.append("updated_at = NOW()")
     cur.execute(
         f"UPDATE prospect_companies SET {', '.join(sets)} WHERE id = %s RETURNING *",
         vals + [company_id],
     )
-    updated = cur.fetchone()
+    updated = flatten_company(cur.fetchone())
     for col, old, new in changes:
         log_event(cur, company_id, source, actor, col, old, new)
     from prospecting import prop_sync  # lazy: prop_sync importa store
@@ -950,11 +981,30 @@ def update_company(cur, company_id: int, patch: dict, actor: str, source: str = 
     return {**out, "_changes": [{"field": f, "old": o, "new": n} for f, o, n in changes]}
 
 
+def _clean_prop_loose(f: dict, raw):
+    """Valor de una propiedad nueva de empresa sin frenar (Clay, workflows): si no valida, el
+    texto tal cual, como hace Clay con las columnas."""
+    try:
+        return clean_contact_value(f, raw)
+    except ValueError:
+        return _clean_text(raw)
+
+
+def flatten_company(row) -> dict | None:
+    """Columnas + `props` (propiedades nuevas de empresa) en un solo dict. Conserva `props`:
+    update_company la necesita para mergear."""
+    if row is None:
+        return None
+    r = dict(row)
+    props = r.get("props") or {}
+    return {**props, **r}
+
+
 # --------------------------------------------------------------------------- #
 # Lecturas
 # --------------------------------------------------------------------------- #
 LIST_COLUMNS = """
-    id, hubspot_company_id, name, domain, website, linkedin_url, description, industry,
+    id, hubspot_company_id, props, name, domain, website, linkedin_url, description, industry,
     keywords, technologies, job_types, size, city, state, country,
     open_jobs, founded_year, lead_source, tier, remote_jobs, week_label, prospecting_status,
     prospecting_owner_email, prospecting_start_date,
@@ -985,9 +1035,10 @@ def _sort_value(obj: str, field: dict) -> str:
     """El campo como valor ordenable. En contactos las propiedades viven en `props` (texto):
     el cast se protege con un patrón, así un valor mal cargado queda vacío en vez de romper la lista."""
     key, ty = field["key"], field["type"]
-    if obj == "company" or field.get("storage") == "col":
+    if field.get("storage") == "col" or (obj == "company" and field.get("storage") != "props"):
         return ("" if obj == "company" else "ct.") + key
-    raw = f"NULLIF(ct.props->>'{key}', '')"
+    tbl = "prospect_companies" if obj == "company" else "ct"
+    raw = f"NULLIF({tbl}.props->>'{key}', '')"
     if ty == "number":
         return f"(CASE WHEN {raw} ~ '^-?[0-9]+([.][0-9]+)?$' THEN ({raw})::numeric END)"
     if ty == "date":
@@ -997,7 +1048,7 @@ def _sort_value(obj: str, field: dict) -> str:
     if ty == "bool":
         return f"(CASE WHEN {raw} IN ('true', 'false') THEN ({raw})::boolean END)"
     if ty == "multi":
-        return f"(ct.props->'{key}')"
+        return f"({tbl}.props->'{key}')"
     return raw
 
 
@@ -1133,7 +1184,7 @@ def list_companies(cur, f: dict) -> dict:
         f"ORDER BY {order} LIMIT %s OFFSET %s",
         params + [size, (page - 1) * size],
     )
-    rows = [dict(r) for r in cur.fetchall()]
+    rows = [flatten_company(r) for r in cur.fetchall()]
     return {"total": total, "page": page, "page_size": size, "rows": rows}
 
 
@@ -1142,7 +1193,7 @@ def get_company(cur, company_id: int) -> dict | None:
     row = cur.fetchone()
     if row is None:
         return None
-    row = dict(row)
+    row = flatten_company(row)
     cur.execute(
         """
         SELECT e.actor, e.source, e.field, e.old_value, e.new_value, e.at, e.contact_id,
@@ -1363,8 +1414,9 @@ def options(cur) -> dict:
         "users": list_users(cur),
         "objects": _object_schema(),
         "statuses": STATUSES,
-        "not_icp_reasons": NOT_ICP_REASONS,
-        "sizes": SIZES,
+        # Editables desde Configuración → Propiedades: salen del catálogo (con su override).
+        "not_icp_reasons": FIELDS_BY_KEY.get("not_icp_reason", {}).get("options") or NOT_ICP_REASONS,
+        "sizes": FIELDS_BY_KEY.get("size", {}).get("options") or SIZES,
         "bdrs": bdrs,
         "weeks": list_weeks(cur),
         "export_fields": {"company": export_fields("company"), "contact": export_fields("contact")},
@@ -1959,14 +2011,15 @@ def export_fields(obj: str) -> list[dict]:
     from prospecting.contact_fields import CONTACT_FIELDS
 
     src = FIELDS if obj == "company" else CONTACT_FIELDS
-    return [{"key": f["key"], "label": f["label"], "type": f["type"], "group": f.get("group")} for f in src] + _EXPORT_EXTRA[obj]
+    return [{"key": f["key"], "label": f["label"], "type": f["type"], "group": f.get("group")} for f in src
+            if not f.get("hidden")] + _EXPORT_EXTRA[obj]
 
 
 def export_rows(cur, obj: str, ids: list[int], sort=None) -> list[dict]:
     """Los registros a exportar, en el orden de la tabla."""
     if obj == "company":
         cur.execute(f"SELECT {LIST_COLUMNS} FROM prospect_companies WHERE id = ANY(%s) ORDER BY {order_sql('company', sort)}", (ids,))
-        return [dict(r) for r in cur.fetchall()]
+        return [flatten_company(r) for r in cur.fetchall()]
     cur.execute(
         f"""
         SELECT ct.*, c.name AS hub_company FROM prospect_contacts ct

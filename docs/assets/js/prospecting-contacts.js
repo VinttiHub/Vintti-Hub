@@ -19,7 +19,12 @@
   function P() { return window.Prospecting; }
   function esc(v) { return P().esc(v); }
   function schema() { return (P().options().objects || {}).contact || { fields: [], groups: [], required_on_qualified: [] }; }
-  function fieldsOf(group) { return schema().fields.filter(function (f) { return f.group === group; }); }
+  // Ocultas desde Configuración → Propiedades: no se muestran en la ficha.
+  function fieldsOf(group) { return schema().fields.filter(function (f) { return f.group === group && !f.hidden; }); }
+  // Obligatorias (Configuración → Propiedades): frenan al crear y no se pueden vaciar.
+  function alwaysRequired(fields) {
+    return (fields || []).filter(function (f) { return f.required && !f.hidden; }).map(function (f) { return f.key; });
+  }
   function required() { return schema().required_on_qualified || []; }
 
   var OPEN_GROUPS = ["Contacto", "Calificación"];
@@ -84,6 +89,13 @@
     }
   }
 
+  /* Casilla de un campo `multi` (control()): la usan la ficha, el alta de empresa y otras fichas. */
+  function toggleChip(chip) {
+    chip.classList.toggle("is-on");
+    var on = chip.classList.contains("is-on");
+    chip.innerHTML = (on ? '<i class="fa-solid fa-check"></i> ' : "") + esc(chip.getAttribute("data-chip"));
+  }
+
   function readValue(el) {
     var t = el.getAttribute("data-type");
     if (t === "multi") {
@@ -135,9 +147,7 @@
       }
       var chip = e.target.closest(".pr-wf-chip");
       if (chip && chip.closest("[data-k]")) {
-        chip.classList.toggle("is-on");
-        var on = chip.classList.contains("is-on");
-        chip.innerHTML = (on ? '<i class="fa-solid fa-check"></i> ' : "") + esc(chip.getAttribute("data-chip"));
+        toggleChip(chip);
         updateCounts();
       }
     });
@@ -190,7 +200,7 @@
     var isNew = !c;
     c = c || {};
     pcCurrent = isNew ? null : c;
-    var req = opts.requireQualified ? required() : [];
+    var req = (opts.requireQualified ? required() : []).concat(alwaysRequired(schema().fields));
     document.getElementById("pcEyebrow").textContent = isNew ? "Nuevo contacto" : "Contacto";
     document.getElementById("pcTitle").textContent = isNew ? "Agregar contacto" : c.name;
     pcCompany = isNew ? { id: opts.companyId || null, name: opts.companyName || "" }
@@ -503,6 +513,64 @@
     var m = /@([^@\s]+)$/.exec(String(email || "").trim().toLowerCase());
     return m && FREE_MAIL.indexOf(m[1]) === -1 ? m[1] : "";
   }
+  /* Propiedades de empresa que el alta manual tiene que pedir además de las fijas: las nuevas
+     (Configuración → Propiedades) y las obligatorias editables que el modal no tiene. */
+  var NC_FIXED = ["name", "website", "linkedin_url", "industry", "size", "country", "city", "prospecting_owner_email"];
+  function extraCompanyFields() {
+    var fs = (((P().options() || {}).objects || {}).company || {}).fields || [];
+    var extra = fs.filter(function (f) {
+      if (f.hidden || NC_FIXED.indexOf(f.key) !== -1) return false;
+      return (f.custom && f.editable) || (f.required && f.editable);
+    });
+    if (!extra.length) return "";
+    return '<div data-nc-extra>' + extra.map(function (f) {
+      return '<label class="pr-filter' + (f.required ? " is-required" : "") + '"><span class="pr-filter__label">' + esc(f.label) +
+        (f.required ? " *" : "") + "</span>" + control(f, null) + "</label>";
+    }).join("") + "</div>";
+  }
+
+  /* «Propiedades» editables de una empresa en la vista rápida y en la ficha (2026-11-25):
+     Lead Source y las creadas en Configuración → Propiedades, con el control de su tipo.
+     Las 5 de «Business Dev» van aparte (tienen su propio bloque). */
+  var CO_BD_FIXED = ["prospecting_status", "not_icp_reason", "prospecting_owner_email", "prospecting_start_date", "week_label"];
+  function companyPropFields() {
+    var fs = (((P().options() || {}).objects || {}).company || {}).fields || [];
+    return fs.filter(function (f) { return f.editable && !f.hidden && CO_BD_FIXED.indexOf(f.key) === -1; });
+  }
+  function companyPropsHtml(c, histBtn) {
+    var fs = companyPropFields();
+    if (!fs.length) return "";
+    return '<div class="pr-grid" data-co-props>' + fs.map(function (f) {
+      var v = c[f.key];
+      if (f.type === "date" && v) v = String(v).slice(0, 10);
+      return '<label class="pr-filter' + (f.type === "longtext" || f.type === "multi" ? " pr-filter--full" : "") + '"' +
+        (f.description ? ' title="' + esc(f.description) + '"' : "") + '><span class="pr-filter__label">' + esc(f.label) +
+        (f.required ? ' <span class="pc-req">*</span>' : "") + (histBtn ? histBtn(c.id, f.key) : "") + "</span>" + control(f, v) + "</label>";
+    }).join("") + "</div>";
+  }
+  /* Lo que cambió en el bloque, como patch para PATCH /prospecting/companies/<id>. */
+  function companyPropsPatch(root, c) {
+    var patch = {}, miss = [];
+    var byKey = {};
+    companyPropFields().forEach(function (f) { byKey[f.key] = f; });
+    (root.querySelectorAll("[data-co-props] [data-k]") || []).forEach(function (el) {
+      var k = el.getAttribute("data-k"), t = el.getAttribute("data-type"), v = readValue(el);
+      var before = c[k];
+      if (t === "date" && before) before = String(before).slice(0, 10);
+      if (!sameValue(before, v, t)) {
+        patch[k] = v;
+        if (byKey[k] && byKey[k].required && isEmpty(v)) miss.push(byKey[k].label);
+      }
+    });
+    return { patch: patch, missing: miss };
+  }
+  function bindCompanyProps(root) {
+    root.addEventListener("click", function (e) {
+      var chip = e.target.closest("[data-co-props] .pr-wf-chip");
+      if (chip) toggleChip(chip);
+    });
+  }
+
   function newCompanyModal(prefill, onCreated) {
     prefill = prefill || {};
     var O = P().options() || {}, me = P().me() || {};
@@ -528,7 +596,8 @@
       (canOwner ? '<label class="pr-filter"><span class="pr-filter__label">Prospecting Owner</span><select class="pr-filter__input" id="ncOwner"><option value="">Sin owner</option>' +
         bdrs.map(function (b) { return '<option value="' + esc(b.email) + '"' + (b.email === mine ? " selected" : "") + ">" + esc(b.name || b.email) + "</option>"; }).join("") +
         "</select></label>" : "") +
-      '<p class="pr-note">Entra con Lead Source «Manual». Si tiene owner, los workflows le ponen status y start date como a las de Clay.</p>' +
+      extraCompanyFields() +
+      '<p class="pr-note">Entra con Lead Source «Manual» si no se elige otro. Si tiene owner, los workflows le ponen status y start date como a las de Clay.</p>' +
       '<div class="pr-bulkedit__err" id="ncErr" hidden></div>' +
       '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-nc="cancel">Cancelar</button>' +
         '<button type="button" class="pr-btn pr-btn--primary" data-nc="go"><i class="fa-solid fa-plus"></i> Crear empresa</button></div></div>';
@@ -543,6 +612,8 @@
     setTimeout(function () { q(prefill.name ? "ncWeb" : "ncName").focus(); }, 0);
     box.addEventListener("click", function (e) {
       if (e.target === box) return close();
+      var chip = e.target.closest("[data-nc-extra] .pr-wf-chip");
+      if (chip) { toggleChip(chip); return; }
       var use = e.target.closest("[data-nc-use]");
       if (use) { done({ id: Number(use.getAttribute("data-nc-use")), name: use.getAttribute("data-name") }); return; }
       var b = e.target.closest("[data-nc]");
@@ -551,7 +622,14 @@
       var body = { name: q("ncName").value.trim(), website: q("ncWeb").value.trim(), linkedin_url: q("ncLi").value.trim(),
         industry: q("ncInd").value.trim(), size: q("ncSize").value, country: q("ncCountry").value.trim(),
         city: q("ncCity").value.trim(), prospecting_owner_email: q("ncOwner") ? q("ncOwner").value : "" };
+      var miss = [];
+      box.querySelectorAll("[data-nc-extra] [data-k]").forEach(function (el) {
+        var v = readValue(el), k = el.getAttribute("data-k");
+        if (!isEmpty(v)) body[k] = v;
+        else if (el.closest(".is-required")) miss.push(el.closest("label").querySelector(".pr-filter__label").textContent.replace(" *", ""));
+      });
       if (!body.name) return err("Poné el nombre de la empresa.");
+      if (miss.length) return err("Obligatorio: " + esc(miss.join(", ")) + ".");
       running = true;
       b.disabled = true;
       b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando…';
@@ -579,5 +657,7 @@
   }
 
   window.ProspectingContacts = { open: open, completeFlow: completeFlow, close: close, fmtLocal: fmtLocal,
-    fieldControl: control, readFieldValue: readValue, newCompanyModal: newCompanyModal };
+    fieldControl: control, readFieldValue: readValue, toggleChip: toggleChip, sameValue: sameValue,
+    companyPropsHtml: companyPropsHtml, companyPropsPatch: companyPropsPatch, bindCompanyProps: bindCompanyProps,
+    newCompanyModal: newCompanyModal };
 })();

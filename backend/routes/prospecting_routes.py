@@ -27,8 +27,10 @@ from prospecting import inbound
 from prospecting import folders as wf_folders
 from prospecting import workflows as wf_store
 from prospecting import views as views_store
+from prospecting import properties as props_store
 from prospecting.rules import validate_conditions
-from prospecting.constants import ADMIN_EMAILS, EDITABLE_FIELDS, EXTRA_ACCESS_EMAILS, OWNER_MANAGERS, WORKFLOW_EDITORS
+from prospecting.constants import (ADMIN_EMAILS, EDITABLE_FIELDS, EXTRA_ACCESS_EMAILS, OWNER_MANAGERS,
+                                   PROPERTY_EDITORS, WORKFLOW_EDITORS)
 from prospecting.rules import InvalidWorkflow
 
 bp = Blueprint("prospecting", __name__, url_prefix="/prospecting")
@@ -56,6 +58,11 @@ def _is_staff(email: str) -> bool:
     # Negocios y Workflows: la owner, las editoras de workflows y EXTRA_ACCESS_EMAILS
     # (mariano, justo, ana, agustin). Los BDRs no (2026-11-09, pedido de la owner).
     return _is_admin(email) or _is_wf_editor(email) or email in EXTRA_ACCESS_EMAILS
+
+
+def _can_edit_properties(email: str) -> bool:
+    # Configuración → Propiedades (2026-11-25): los mismos que manejan el owner.
+    return _is_admin(email) or email in PROPERTY_EDITORS
 
 
 def _sees_dummies(email: str) -> bool:
@@ -88,6 +95,8 @@ class _Db:
         self.conn = get_connection()
         self.cur = self.conn.cursor(cursor_factory=RealDictCursor)
         store.ensure_schema(self.cur)
+        # Propiedades editadas desde la página: reconstruye los catálogos sólo si cambiaron.
+        props_store.refresh(self.cur)
         return self.cur
 
     def __exit__(self, exc_type, exc, tb):
@@ -101,9 +110,12 @@ class _Db:
         return False
 
 
-def _gate(cur, admin_only: bool = False, settings: bool = False, staff: bool = False):
+def _gate(cur, admin_only: bool = False, settings: bool = False, staff: bool = False,
+          properties: bool = False):
     email = _current_email()
-    if staff:
+    if properties:
+        ok = _can_edit_properties(email)
+    elif staff:
         ok = _is_staff(email)
     elif settings:
         ok = _can_configure(email)
@@ -135,6 +147,8 @@ def me():
             "can_delete": _is_staff(email),
             # Cambia el Prospecting Owner en cualquier status (el resto, sólo en Recycled).
             "can_manage_owner": _is_admin(email) or email in OWNER_MANAGERS,
+            # Configuración → Propiedades (crear / editar / ocultar / borrar propiedades).
+            "can_edit_properties": _can_edit_properties(email),
         })
 
 
@@ -146,6 +160,99 @@ def options():
             return denied
         data = store.options(cur)
     return jsonify(data)
+
+
+# --------------------------------------------------------------------------- #
+# Configuración → Propiedades (prospecting/properties.py, 2026-11-25)
+# --------------------------------------------------------------------------- #
+def _props_write(fn):
+    try:
+        with _Db() as cur:
+            denied = _gate(cur, properties=True)
+            if denied:
+                return denied
+            out = fn(cur)
+            if isinstance(out, tuple):
+                return out
+            out["catalog"] = props_store.editor_list(cur)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out))
+
+
+@bp.get("/properties")
+def properties_list():
+    with _Db() as cur:
+        denied = _gate(cur, properties=True)
+        if denied:
+            return denied
+        out = props_store.editor_list(cur)
+    return jsonify(_json_safe(out))
+
+
+@bp.post("/properties")
+def properties_create():
+    body = request.get_json(silent=True) or {}
+    return _props_write(lambda cur: props_store.create(cur, body.get("object"), body, _current_email()))
+
+
+@bp.patch("/properties/<obj>/<key>")
+def properties_update(obj: str, key: str):
+    body = request.get_json(silent=True) or {}
+    if obj not in props_store.OBJECTS:
+        return jsonify({"error": "not_found"}), 404
+
+    def go(cur):
+        out = props_store.update(cur, obj, key, body, _current_email())
+        if "options" in body or body.get("renames"):
+            out["usages"] = props_store.usages(cur, obj, key)  # para avisar: revisar sus filtros
+        return out
+    return _props_write(go)
+
+
+@bp.delete("/properties/<obj>/<key>")
+def properties_delete(obj: str, key: str):
+    if obj not in props_store.OBJECTS:
+        return jsonify({"error": "not_found"}), 404
+    purge = request.args.get("purge") in ("1", "true")
+
+    def go(cur):
+        out = props_store.delete(cur, obj, key, _current_email(), purge=purge)
+        if not out["deleted"]:
+            return jsonify({"error": "in_use", "usages": out["usages"],
+                            "message": "La usan workflows o vistas: sacala de ahí antes de borrarla."}), 409
+        return out
+    return _props_write(go)
+
+
+@bp.get("/properties/<obj>/<key>/values")
+def properties_values(obj: str, key: str):
+    if obj not in props_store.OBJECTS:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        with _Db() as cur:
+            denied = _gate(cur, properties=True)
+            if denied:
+                return denied
+            vals = props_store.value_counts(cur, obj, key)
+            used = props_store.usages(cur, obj, key)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe({"values": vals, "usages": used}))
+
+
+@bp.put("/properties/<obj>/order")
+def properties_order(obj: str):
+    if obj not in props_store.OBJECTS:
+        return jsonify({"error": "not_found"}), 404
+    keys = (request.get_json(silent=True) or {}).get("keys") or []
+
+    def go(cur):
+        props_store.reorder(cur, obj, keys, _current_email())
+        return {"ok": True}
+    return _props_write(go)
 
 
 @bp.get("/companies")
@@ -379,12 +486,16 @@ def company_create():
             if denied:
                 return denied
             owner_dropped = False
+            can_owner, _ = store.can_change_owner(cur, actor, {})
             if (body.get("prospecting_owner_email") or "").strip():
-                ok, _ = store.can_change_owner(cur, actor, {})
-                if not ok:
+                if not can_owner:
                     # Un BDR no asigna owners: la empresa nace sin owner.
                     body = {**body, "prospecting_owner_email": None}
                     owner_dropped = True
+            # Obligatorias (Configuración → Propiedades). Lead Source nace «Manual» si no viene;
+            # el owner no se le exige a quien no puede asignarlo.
+            props_store.check_create("company", {"lead_source": "Manual", **body},
+                                     skip=() if can_owner else ("prospecting_owner_email",))
             row = store.create_company(cur, body, actor)
             applied = _run_instant(cur, row["id"], "created", row.pop("_changes"), actor)
             row = engine.load_company(cur, row["id"])
@@ -403,13 +514,22 @@ def company_create():
 @bp.patch("/companies/<int:company_id>")
 def patch_company(company_id: int):
     body = request.get_json(silent=True) or {}
-    patch = {k: v for k, v in body.items() if k in EDITABLE_FIELDS}
-    if not patch:
-        return jsonify({"error": "Nada para actualizar.", "editable": list(EDITABLE_FIELDS)}), 400
+    patch = dict(body)
+    try:
+        return _patch_company(company_id, patch)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+def _patch_company(company_id: int, patch: dict):
     with _Db() as cur:
         denied = _gate(cur)
         if denied:
             return denied
+        patch = {k: v for k, v in patch.items() if k in EDITABLE_FIELDS}  # + las nuevas (refresh)
+        if not patch:
+            return jsonify({"error": "Nada para actualizar."}), 400
+        props_store.check_patch("company", patch)
         if "prospecting_owner_email" in patch:
             cur.execute("SELECT prospecting_owner_email, prospecting_status FROM prospect_companies WHERE id = %s",
                         (company_id,))
@@ -419,7 +539,7 @@ def patch_company(company_id: int):
                 ok, why = store.can_change_owner(cur, _current_email(), current)
                 if not ok:
                     return jsonify({"error": "owner_locked", "message": why}), 403
-        row = store.update_company(cur, company_id, patch, actor=_current_email())
+        row = store.update_company(cur, company_id, patch, actor=_current_email(), validate=True)
         applied = []
         if row is not None:
             applied = _run_instant(cur, company_id, "updated", row.pop("_changes"), _current_email())
@@ -557,6 +677,7 @@ def contact_create(company_id: int | None, body: dict | None = None):
             denied = _gate(cur)
             if denied:
                 return denied
+            props_store.check_create("contact", body)
             row = store.create_contact(cur, company_id, body, _current_email())
             applied = _run_instant(cur, company_id, "created", row.pop("_changes"), _current_email(),
                                    obj="contact", record_id=row["id"])
@@ -576,6 +697,7 @@ def contact_patch(contact_id: int):
             denied = _gate(cur)
             if denied:
                 return denied
+            props_store.check_patch("contact", body)
             row = store.update_contact(cur, contact_id, body, _current_email())
             if row is None:
                 return jsonify({"error": "not_found"}), 404
@@ -736,15 +858,20 @@ def _bulk_update(obj: str):
 
     body = request.get_json(silent=True) or {}
     field = body.get("field")
-    allowed = set(EDITABLE_FIELDS) if obj == "company" else set(CONTACT_FIELDS_BY_KEY) - _BULK_CONTACT_SKIP
-    if field not in allowed:
-        return jsonify({"error": "Esa propiedad no se puede editar en masa."}), 400
     value = body.get("value")
     actor = _current_email()
     with _Db() as cur:
         denied = _gate(cur)
         if denied:
             return denied
+        # Después de abrir _Db: el catálogo ya incluye las propiedades nuevas (props_store.refresh).
+        allowed = set(EDITABLE_FIELDS) if obj == "company" else set(CONTACT_FIELDS_BY_KEY) - _BULK_CONTACT_SKIP
+        if field not in allowed:
+            return jsonify({"error": "Esa propiedad no se puede editar en masa."}), 400
+        try:
+            props_store.check_patch(obj, {field: value})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         ids, err = _bulk_target_ids(cur, body, obj)
         if err:
             return err
@@ -776,7 +903,7 @@ def _bulk_update(obj: str):
                             failed.append({"id": rid, "error": why})
                             continue
                 if obj == "company":
-                    row = store.update_company(cur, rid, {field: value}, actor=actor, source=source)
+                    row = store.update_company(cur, rid, {field: value}, actor=actor, source=source, validate=True)
                     cid = rid
                 else:
                     row = store.update_contact(cur, rid, {field: value}, actor, source=source)
@@ -875,15 +1002,15 @@ def _export(obj: str):
     from flask import Response
 
     body = request.get_json(silent=True) or {}
-    catalog = store.export_fields(obj)
-    by_key = {f["key"]: f for f in catalog}
-    cols = [k for k in (body.get("columns") or []) if k in by_key]
-    if not cols:
-        return jsonify({"error": "Elegí al menos una columna."}), 400
     with _Db() as cur:
         denied = _gate(cur)
         if denied:
             return denied
+        catalog = store.export_fields(obj)
+        by_key = {f["key"]: f for f in catalog}
+        cols = [k for k in (body.get("columns") or []) if k in by_key]
+        if not cols:
+            return jsonify({"error": "Elegí al menos una columna."}), 400
         ids, err = _bulk_target_ids(cur, body, obj, limit=EXPORT_MAX)
         if err:
             return err
@@ -1658,6 +1785,7 @@ def deal_create():
     is_dummy = bool(body.pop("is_dummy", False)) and _sees_dummies(_current_email())
 
     def go(cur):
+        props_store.check_create("deal", body, skip=("name",))  # el nombre sale de la empresa
         row = deals_store.create_deal(cur, dict(body), _current_email(), is_dummy=is_dummy)
         return row["id"], 201, body
     return _deal_write(go)
@@ -1670,6 +1798,7 @@ def deal_patch(deal_id: int):
     body = request.get_json(silent=True) or {}
 
     def go(cur):
+        props_store.check_patch("deal", body)
         deals_store.update_deal(cur, deal_id, body, _current_email())
         return deal_id, 200
     return _deal_write(go)

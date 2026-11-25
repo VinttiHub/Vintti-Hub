@@ -279,6 +279,39 @@
     { key: "hubspot_company_id", label: "Id de la empresa (HubSpot)", render: function (r) { return cellText(r.hubspot_company_id); } },
   ];
 
+  /* Columnas que salen del catálogo (Configuración → Propiedades, 2026-11-25): las de fábrica
+     toman el nombre editado y se esconden si se ocultaron; las nuevas se suman al final, con una
+     celda genérica según su tipo, y se editan con un click (CO_INLINE). */
+  var BASE_COLUMNS = COLUMNS.slice();
+  function genericCell(f, r) {
+    var v = r[f.key];
+    if (v == null || v === "") return cellText(null);
+    if (f.type === "multi") return cellText([].concat(v).join(", "));
+    if (f.type === "bool") return cellText(v === true || v === "true" ? "Sí" : "No");
+    if (f.type === "date") return fmtDate(v);
+    if (f.type === "datetime") return fmtDateTime(v);
+    if (f.type === "url") return cellLink(v);
+    if (f.type === "longtext") return cellLong(v);
+    if (f.type === "user" || f.type === "owner") return cellText(ownerName(v));
+    return cellText(v);
+  }
+  function syncCompanyColumns() {
+    var fs = (((OPTS.objects || {}).company || {}).fields) || [];
+    var byKey = {};
+    fs.forEach(function (f) { byKey[f.key] = f; });
+    var cols = BASE_COLUMNS.filter(function (c) { return c.key === "name" || !(byKey[c.key] && byKey[c.key].hidden); })
+      .map(function (c) { return byKey[c.key] && byKey[c.key].label ? Object.assign({}, c, { label: byKey[c.key].label }) : c; });
+    fs.filter(function (f) { return f.custom && !f.hidden; }).forEach(function (f) {
+      cols.push({ key: f.key, label: f.label, num: f.type === "number", render: function (r) { return genericCell(f, r); } });
+      CO_INLINE[f.key] = true;
+    });
+    COLUMNS.length = 0;
+    Array.prototype.push.apply(COLUMNS, cols);
+    Object.keys(COL_BY_KEY).forEach(function (k) { delete COL_BY_KEY[k]; });
+    COLUMNS.forEach(function (c) { COL_BY_KEY[c.key] = c; });
+    visibleCols = normalizeCols(visibleCols);
+  }
+
   /* Columnas visibles, EN ORDEN. En una vista guardada salen de su config; en las
      pestañas fijas, de este navegador (como antes). `name` va siempre primera. */
   var COLS_KEY = "prospecting_columns_v1";
@@ -783,6 +816,7 @@
   function bulkFields(kind) {
     var o = (OPTS.objects || {})[kind] || {};
     return (o.fields || []).filter(function (f) {
+      if (f.hidden) return false;  // ocultas en Configuración → Propiedades
       if (kind === "company") return f.editable; // Owner: el server rechaza por fila las no-Recycled de un BDR
       return f.key !== "email" && f.key !== "is_primary";
     });
@@ -1169,7 +1203,7 @@
   function ctCatalog() {
     return [{ key: "name", label: "Name", group: "Contacto", fixed: true },
             { key: "hub_company", label: "Empresa (en el Hub)", group: "Contacto" }]
-      .concat((((OPTS.objects || {}).contact || {}).fields || []).map(function (f) {
+      .concat((((OPTS.objects || {}).contact || {}).fields || []).filter(function (f) { return !f.hidden; }).map(function (f) {
         return { key: f.key, label: f.label, group: f.group || "Otros", type: f.type, options: f.options };
       }));
   }
@@ -1808,10 +1842,14 @@
           f("week_label", "Week",
             '<input class="pr-filter__input" data-edit="week_label" placeholder="Semana 40" value="' + esc(c.week_label || "") + '">') +
         "</div></section>" +
+        // Lead Source + las propiedades creadas en Configuración → Propiedades, editables.
+        (function () {
+          var html = window.ProspectingContacts ? window.ProspectingContacts.companyPropsHtml(c, histBtn) : "";
+          return html ? '<section class="pr-section"><h3 class="pr-section__title">Properties</h3>' + html + "</section>" : "";
+        })() +
         '<section class="pr-section"><h3 class="pr-section__title">From Clay</h3><dl class="pr-kv">' +
           kv("Website", c.website, true, H("website")) +
           kv("LinkedIn", c.linkedin_url, true, H("linkedin_url")) +
-          kv("Lead Source", c.lead_source, false, H("lead_source")) +
           kv("Industry", c.industry, false, H("industry")) +
           kv("Size", c.size, false, H("size")) +
           kv("Founded Year", c.founded_year, false, H("founded_year")) +
@@ -1837,6 +1875,9 @@
           var before = field === "prospecting_start_date" ? (c[field] || "").slice(0, 10) : (c[field] || "");
           if ((el.value || "") !== before) patch[field] = el.value || null;
         });
+        var extra = window.ProspectingContacts ? window.ProspectingContacts.companyPropsPatch($("prDrawerBody"), c) : { patch: {}, missing: [] };
+        if (extra.missing.length) { $("prDrawerStatus").textContent = "Obligatorio: " + extra.missing.join(", ") + "."; return; }
+        Object.assign(patch, extra.patch);
         if (!Object.keys(patch).length) { $("prDrawerStatus").textContent = "No changes."; return; }
         $("prDrawerStatus").textContent = "Saving…";
         patchCompany(c.id, patch).then(function (row) {
@@ -2097,7 +2138,9 @@
   ];
   function visibleSections() {
     return SECTIONS.filter(function (x) {
-      return (!x.restricted || ME.can_configure) && (!x.requires || ME[x.requires]);
+      // Configuración: también quien edita propiedades (Bahía, Justo, Ana, Manuela… 2026-11-25),
+      // que ve sólo el ítem «Propiedades» si no es can_configure.
+      return (!x.restricted || ME.can_configure || ME.can_edit_properties) && (!x.requires || ME[x.requires]);
     });
   }
   var SECTION_KEY = "prospecting_section_v1";
@@ -2565,6 +2608,7 @@
   function refreshOptions() {
     return api("/prospecting/options").then(function (o) {
       OPTS = o;
+      syncCompanyColumns();
       var keep = { owner: $("prFOwner").value, week: $("prFWeek").value, status: $("prFStatus").value };
       fillFilters();
       fillContactFilters();
@@ -2728,6 +2772,10 @@
     $("prTestBtn").addEventListener("click", showTestPanel);
     $("prBdrIdsBtn").addEventListener("click", showBdrIds);
     $("prDeletedBtn").addEventListener("click", showDeleted);
+    $("prPropsBtn").addEventListener("click", function () {
+      if (window.ProspectingProperties) window.ProspectingProperties.open();
+    });
+    if (window.ProspectingContacts) window.ProspectingContacts.bindCompanyProps($("prDrawerBody"));
   }
 
   function init() {
@@ -2738,6 +2786,8 @@
       }
       ME = me;
       $("prApp").hidden = false;
+      $("prPropsBtn").hidden = !me.can_edit_properties;
+      ["prBdrIdsBtn", "prTestBtn", "prDeletedBtn"].forEach(function (id) { $(id).hidden = !me.can_configure; });
       if (me.sees_dummies) $("prFDummyWrap").hidden = false;
       bind();
       bindContacts();
@@ -2773,6 +2823,8 @@
     me: function () { return ME; },
     apiBase: function () { return API; },
     reloadTable: function () { return load(); },
+    // Configuración → Propiedades: después de guardar, recarga catálogos y tabla.
+    refreshOptions: function () { return refreshOptions().then(function () { load(); }); },
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

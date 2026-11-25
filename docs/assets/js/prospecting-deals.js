@@ -580,13 +580,13 @@
       '<div class="pr-inbox__results" id="pdCtResults" hidden></div></div></section>';
     // Propiedades por grupo
     (schema().groups || []).forEach(function (g, gi) {
-      var fs = schema().fields.filter(function (f) { return f.group === g; });
+      var fs = schema().fields.filter(function (f) { return f.group === g && !f.hidden; });
       if (!fs.length) return;
       body += '<details class="pc-group"' + (gi === 0 || isNew ? " open" : "") + "><summary><span>" + esc(g) + '</span><span class="pc-group__count"></span></summary>' +
         '<div class="pc-grid">' + fs.map(function (f) {
           var wide = f.type === "longtext";
           return '<label class="pc-field' + (wide ? " pc-field--wide" : "") + '"' + (f.description ? ' title="' + esc(f.description) + '"' : "") + ">" +
-            '<span class="pr-filter__label">' + esc(f.label) + (f.key === "name" ? ' <span class="pc-req">*</span>' : "") +
+            '<span class="pr-filter__label">' + esc(f.label) + (f.key === "name" || f.required ? ' <span class="pc-req">*</span>' : "") +
               (!isNew && window.ProspectingHistory ? window.ProspectingHistory.button("deal", d.id, f.key) : "") + "</span>" +
             C().fieldControl(f, d[f.key]) + "</label>";
         }).join("") + "</div></details>";
@@ -767,6 +767,12 @@
     var pipe = $("pdPipe").value, stage = $("pdStage").value;
     if (isNew) {
       if (!patch.name) { status.textContent = "Poné un nombre al negocio."; return; }
+      // Obligatorias de Configuración → Propiedades (el server frena igual).
+      var missReq = schema().fields.filter(function (f) { return f.required && !f.hidden && f.key !== "name" && isEmpty(patch[f.key]); });
+      if (missReq.length) {
+        status.textContent = "Obligatorio: " + missReq.map(function (f) { return f.label; }).join(", ") + ".";
+        return;
+      }
       var body = Object.assign({}, patch, { pipeline_key: pipe, stage_key: stage, company_id: pdCompany.id || null,
         contact_ids: pdContacts.map(function (c) { return c.id; }) });
       status.textContent = "Guardando…";

@@ -94,8 +94,14 @@ CLAY_FIELDS = (
     "remote_jobs",
 )
 
-# Lo que se puede editar desde la página.
-EDITABLE_FIELDS = BDR_FIELDS + ("lead_source",)
+# Lo que se puede editar desde la página. Lista (no tupla): properties.refresh() le suma en el
+# lugar las propiedades nuevas de empresa que se crean desde la página.
+EDITABLE_FIELDS = list(BDR_FIELDS + ("lead_source",))
+
+# Crean, editan, ocultan y borran propiedades de empresas / contactos / negocios desde
+# Configuración → Propiedades (prospecting/properties.py). Pedido de la owner, 2026-11-25:
+# los mismos que manejan el owner.
+PROPERTY_EDITORS = OWNER_MANAGERS
 
 
 # --------------------------------------------------------------------------- #

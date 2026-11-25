@@ -1739,6 +1739,44 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   workflows no cambió. Owner `__me__` = quien mira la vista. Las fijas siguen guardando
   columnas en `localStorage`.
 
+- **Propiedades editables desde la página (2026-11-25)**: Configuración → **Propiedades**
+  (`docs/assets/js/prospecting-properties.js`) crea, edita, ordena, oculta y borra propiedades de
+  empresas, contactos y negocios. Editan `PROPERTY_EDITORS` (= `OWNER_MANAGERS`: pgonzales, bahia,
+  justo, ana, manuela, lara); `/me` → `can_edit_properties`, y la sección Configuración se les
+  muestra sólo con ese ítem si no son `can_configure`. Backend: `backend/prospecting/properties.py`
+  + `/prospecting/properties*`. Tabla `prospect_properties` (autocreada): fila de una de fábrica =
+  **override** (nombre, descripción, opciones, tipo texto ↔ desplegable, obligatoria, oculta, orden,
+  grupo); fila `is_custom` = propiedad nueva, con su valor en `props` JSONB (para empresas se agregó
+  `prospect_companies.props`; `objects.sql_expr` / `store._sort_value` la leen con `storage="props"`,
+  `store.flatten_company()` la aplana en listas, ficha, export y `engine.load_company`).
+  **Cómo llega al código**: `properties.refresh(cur)` reconstruye EN EL LUGAR `FIELDS`,
+  `FIELDS_BY_KEY`, `EDITABLE_FIELDS` (ahora lista), `CONTACT_FIELDS*`, `DEAL_FIELDS*`, los grupos y los
+  sets de `objects.OBJECTS`, desde una copia del catálogo de código + la tabla. Lo llama `_Db` en cada
+  request (una consulta compara versión; sólo reconstruye si cambió, así se enteran todos los
+  workers). **No copies esos catálogos a otra estructura al importar**: no se actualizaría. Los
+  scripts sueltos (importaciones) no pasan por `_Db` y ven sólo el catálogo de fábrica.
+  - **Obligatoria frena sólo lo manual** (decisión de la owner): `check_create` / `check_patch` en las
+    rutas de alta y PATCH de empresa / contacto / negocio y en la edición masiva (no deja VACIAR una
+    obligatoria; lo que ya faltaba no frena). Clay, HubSpot, Calendly, workflows y `prop_sync` no.
+    No reemplaza `REQUIRED_ON_QUALIFIED` ni `STAGE_FORMS`.
+  - **Desplegables**: un desplegable de empresa se valida contra su lista sólo a mano
+    (`update_company(validate=True)`); Clay/HubSpot guardan lo que llegue y se ve igual. En contactos y
+    negocios la lista valida siempre (como antes): si se quita una opción, el sync de HubSpot descarta
+    ese valor (`avisos`). Las opciones editadas de un negocio ganan sobre las de HubSpot
+    (`options_locked` en `deals.field_defs`). Renombrar / unificar opciones (`renames`) hace UPDATE de
+    los registros con un evento `source='property_edit'` por registro, sin disparar workflows; los
+    filtros de workflows/vistas que nombraban el valor viejo NO se reescriben (la respuesta los lista).
+  - **Las de fábrica no se borran, se ocultan** (siguen en el catálogo con `hidden`, así los workflows
+    que las usan siguen validando). Las que el código usa a mano (`properties._locked_keys()`: BDR_FIELDS,
+    `prop_sync.LINKS`, `PREFILL`, `STAGE_FORMS`, `REQUIRED_ON_QUALIFIED`, columnas…) no se ocultan ni
+    cambian de tipo; las opciones de `prospecting_status` no se editan. Una nueva se borra (archiva) sólo
+    si ningún workflow ni vista guardada la nombra (`usages()`, 409). Claves nuevas: slug único entre los
+    tres objetos, fijo aunque se renombre.
+  - En el front: columnas de empresa por catálogo (`syncCompanyColumns()` en `prospecting.js`; las nuevas
+    se editan en la celda), tarjeta **Propiedades** en la vista rápida y la ficha
+    (`ProspectingContacts.companyPropsHtml/companyPropsPatch`, con Lead Source), y el alta de empresa
+    pide las nuevas y las obligatorias (`extraCompanyFields()`).
+
 ## Corte de HubSpot: el «interruptor» (pendiente, lo pide la owner cuando toque)
 
 Mientras se use HubSpot, conviven dos caminos y cada negocio va por uno solo:

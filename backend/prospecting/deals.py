@@ -256,7 +256,12 @@ def field_defs(cur) -> list[dict]:
     out = []
     for f in DEAL_FIELDS:
         g = {k: v for k, v in f.items() if k != "hubspot"}
-        if f["type"] == "enum":
+        if f.get("options_locked"):
+            # Opciones editadas desde Configuración → Propiedades: ganan sobre las de HubSpot.
+            if f["type"] in ("enum", "multi"):
+                g["options"] = list(f.get("options") or [])
+            g.pop("options_locked", None)
+        elif f["type"] == "enum":
             opts = list(hs.get(f["key"]) or f.get("options") or [])
             opts += [o for o in HUB_EXTRA_OPTIONS.get(f["key"], []) if o not in opts]
             if opts:
@@ -1149,7 +1154,8 @@ EXPORT_EXTRA = [
 
 
 def export_fields() -> list[dict]:
-    return [{"key": f["key"], "label": f["label"], "type": f["type"], "group": f["group"]} for f in DEAL_FIELDS] \
+    return [{"key": f["key"], "label": f["label"], "type": f["type"], "group": f["group"]} for f in DEAL_FIELDS
+            if not f.get("hidden")] \
         + EXPORT_EXTRA
 
 

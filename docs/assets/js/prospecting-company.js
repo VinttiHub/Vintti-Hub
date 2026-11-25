@@ -92,9 +92,10 @@
       return '<label class="pr-co-field"><span class="pr-filter__label">' + esc(label) + hist("company", c.id, key) + "</span>" +
         '<input type="' + (type || "text") + '" class="pr-filter__input" data-edit="' + key + '" value="' + esc(v) + '"></label>';
     };
+    // Las editables (Lead Source y las de Configuración → Propiedades) van en su propia tarjeta.
+    var propsHtml = C.companyPropsHtml(c, function (id, key) { return hist("company", id, key); });
     var clay = companyFields().filter(function (f) {
-      return ["prospecting_status", "prospecting_owner_email", "prospecting_start_date",
-        "not_icp_reason", "week_label", "name"].indexOf(f.key) === -1;
+      return !f.hidden && !f.editable && ["name"].indexOf(f.key) === -1;
     });
     return '<div class="pr-co-card">' +
         '<a class="pr-co-back" href="prospecting.html"><i class="fa-solid fa-chevron-left"></i> Business Dev</a>' +
@@ -120,6 +121,7 @@
         sel("not_icp_reason", "Not ICP Reason", opts().not_icp_reasons || []) +
         '<p class="pr-drawer__status" id="prCoStatus"></p>' +
       "</div>" +
+      (propsHtml ? '<div class="pr-co-card"><h3 class="pr-section__title">Propiedades</h3>' + propsHtml + "</div>" : "") +
       '<details class="pr-co-card pr-co-more" open><summary><h3 class="pr-section__title">Datos de Clay</h3></summary><dl class="pr-kv">' +
         clay.map(function (f) { return kv(f, c[f.key], c.id); }).join("") + "</dl></details>";
   }
@@ -139,7 +141,7 @@
         '<button type="button" class="pr-co-tab' + (tab === "activity" ? " is-active" : "") + '" data-tab="activity">Actividad</button>' +
         '<button type="button" class="pr-co-tab' + (tab === "info" ? " is-active" : "") + '" data-tab="info">Información</button>' +
       "</div>" +
-      (tab === "activity" ? activityHtml(c) : '<dl class="pr-kv pr-kv--wide">' + companyFields().map(function (f) { return kv(f, c[f.key], c.id); }).join("") + "</dl>") +
+      (tab === "activity" ? activityHtml(c) : '<dl class="pr-kv pr-kv--wide">' + companyFields().filter(function (f) { return !f.hidden; }).map(function (f) { return kv(f, c[f.key], c.id); }).join("") + "</dl>") +
       "</div>";
   }
 
@@ -278,7 +280,7 @@
     var st = $("prCoStatus");
     st.textContent = "Guardando…";
     var body = {};
-    body[field] = value || null;
+    body[field] = value === false || value === 0 ? value : (value || null);
     return P.api("/prospecting/companies/" + company.id, { method: "PATCH", body: JSON.stringify(body) }).then(function (row) {
       st.textContent = "Guardado.";
       var applied = (row.workflows_applied || []).map(function (a) { return "<strong>" + esc(a.name) + "</strong>"; });
@@ -289,13 +291,29 @@
     }).catch(function (err) { st.textContent = "Error: " + ((err.data && err.data.message) || err.message); });
   }
 
+  function savePropField(el) {
+    var k = el.getAttribute("data-k");
+    var f = companyField(k) || {};
+    var v = C.readFieldValue(el);
+    if (f.required && (v == null || v === "" || (Array.isArray(v) && !v.length))) {
+      $("prCoStatus").textContent = "«" + f.label + "» es obligatoria: no puede quedar vacía.";
+      return;
+    }
+    patch(k, v);
+  }
+
   function bind() {
     var root = $("prCo");
     root.addEventListener("change", function (e) {
       var k = e.target.getAttribute("data-edit");
       if (k) patch(k, e.target.value);
+      // Tarjeta «Propiedades»: se guarda al cambiar, como el resto de la ficha.
+      var pk = e.target.closest && e.target.closest("[data-co-props] [data-k]");
+      if (pk) savePropField(pk);
     });
     root.addEventListener("click", function (e) {
+      var chip = e.target.closest("[data-co-props] .pr-wf-chip");
+      if (chip) { C.toggleChip(chip); savePropField(chip.closest("[data-k]")); return; }
       var b = e.target.closest("[data-tab],[data-act],[data-contact],[data-deal]");
       if (!b) return;
       if (b.getAttribute("data-tab")) { tab = b.getAttribute("data-tab"); render(); return; }

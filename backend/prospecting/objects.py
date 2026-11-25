@@ -123,7 +123,7 @@ def sql_expr(obj: str, field: dict) -> str:
     assert _KEY_RE.match(key)
     if field.get("storage") == "expr":
         return field["sql"]
-    if obj == "company" or field.get("storage") == "col":
+    if field.get("storage") == "col" or (obj == "company" and field.get("storage") != "props"):
         return f"{t}.{key}"
     raw = f"({t}.props->>'{key}')"
     ty = field["type"]
