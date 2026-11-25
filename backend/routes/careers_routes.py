@@ -12,6 +12,7 @@ from utils.sheets_utils import (
     find_opportunity_id,
     get_rows_with_headers,
     get_sheet_headers,
+    get_sheet_gid_by_title,
     get_sheet_title_by_gid,
     norm_email,
     norm_linkedin,
@@ -84,7 +85,9 @@ SHEET_ACTION_HEADERS = [
 
 IMPORT_SPREADSHEET_ID = os.getenv("IMPORT_SPREADSHEET_ID") or "1Jn9xDhu08-eEL2zn9mg_VCXqCdYBdYWiy2FenU2Lmf8"
 IMPORT_SHEET_GID = os.getenv("IMPORT_SHEET_GID") or "0"
-IMPORT_SHEET_TITLE = os.getenv("IMPORT_SHEET_TITLE") or ""
+# Pestaña que Webflow llena directo (sin Zapier) desde 2026-10-31. "Job Submissions"
+# (gid 0) era la que escribía el Zap: queda como histórico.
+IMPORT_SHEET_TITLE = os.getenv("IMPORT_SHEET_TITLE") or "Formularios"
 
 
 def _sheet_title_from_range(range_value: str) -> str:
@@ -507,12 +510,21 @@ def import_candidates_from_sheet():
     try:
         payload = request.get_json(silent=True) or {}
         spreadsheet_id = payload.get("spreadsheet_id") or IMPORT_SPREADSHEET_ID
-        sheet_gid = str(payload.get("sheet_gid") or IMPORT_SHEET_GID)
-        sheet_title = (payload.get("sheet_title") or IMPORT_SHEET_TITLE).strip()
         dry_run = bool(payload.get("dry_run", False))
 
+        # Precedencia: título pedido > gid pedido > pestaña por defecto (Formularios).
+        # El gid se resuelve siempre desde el título real, así sheet_import_log queda
+        # anotado bajo la pestaña que se leyó y no bajo el gid 0 de Job Submissions.
         svc = sheets_service()
+        sheet_title = (payload.get("sheet_title") or "").strip()
+        if not sheet_title and payload.get("sheet_gid") not in (None, ""):
+            sheet_title = get_sheet_title_by_gid(svc, spreadsheet_id, str(payload["sheet_gid"]))
         if not sheet_title:
+            sheet_title = IMPORT_SHEET_TITLE.strip()
+        if sheet_title:
+            sheet_gid = get_sheet_gid_by_title(svc, spreadsheet_id, sheet_title)
+        else:
+            sheet_gid = str(IMPORT_SHEET_GID)
             sheet_title = get_sheet_title_by_gid(svc, spreadsheet_id, sheet_gid)
 
         rows = get_rows_with_headers(svc, spreadsheet_id, sheet_title)
@@ -532,7 +544,7 @@ def import_candidates_from_sheet():
                 "email_address": getv(row, "email_address", "email"),
                 "phone_number":  getv(row, "phone_number", "phone", "telefono"),
                 "location":      getv(row, "location", "country", "pais"),
-                "role":          getv(row, "role"),
+                "role":          getv(row, "role", "role_position"),
                 "area":          getv(row, "area"),
                 "linkedin_url":  getv(row, "linkedin_url", "linkedin"),
                 "english_level": getv(row, "english_level", "englishlevel", "ingles"),
@@ -553,8 +565,16 @@ def import_candidates_from_sheet():
             "skipped_no_opportunity": 0,
             "skipped_already_logged": 0,
             "skipped_missing_contact": 0,
+            "already_in_opportunity": 0,
             "details": []
         }
+
+        # Una sola consulta en vez de un SELECT por fila (el cron corre cada 15 min).
+        cur.execute("""
+            SELECT fingerprint FROM sheet_import_log
+            WHERE spreadsheet_id = %s AND sheet_gid = %s
+        """, (spreadsheet_id, sheet_gid))
+        logged = {r[0] for r in cur.fetchall()}
 
         for rec in to_process:
             email_norm = norm_email(rec["email_address"])
@@ -562,15 +582,10 @@ def import_candidates_from_sheet():
             linkedin_norm = norm_linkedin(rec["linkedin_url"])
             fingerprint = row_fingerprint(rec)
 
-            cur.execute("""
-                SELECT 1 FROM sheet_import_log
-                WHERE spreadsheet_id = %s AND sheet_gid = %s AND fingerprint = %s
-                LIMIT 1
-            """, (spreadsheet_id, sheet_gid, fingerprint))
-            if cur.fetchone():
+            if fingerprint in logged:
                 report["skipped_already_logged"] += 1
-                report["details"].append({"row": rec["_row_number"], "result": "already-logged"})
                 continue
+            logged.add(fingerprint)
 
             opp_id = find_opportunity_id(cur, rec["job_id"])
             if not opp_id:
@@ -583,16 +598,20 @@ def import_candidates_from_sheet():
             name = ((rec["first_name"] or "").strip() + " " + (rec["last_name"] or "").strip()).strip()
             country = rec.get("location") or ""
 
+            # DO NOTHING (no DO UPDATE): si el candidato ya está en la vacante, la
+            # recruiter puede haberlo movido en el pipeline; re-importar la fila (por
+            # ejemplo al pasar de Job Submissions a Formularios) no lo devuelve a Applicant.
             if existing_id:
                 cur.execute("""
                     INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
                     VALUES (%s, %s, %s)
-                    ON CONFLICT (opportunity_id, candidate_id)
-                    DO UPDATE SET stage_pipeline = EXCLUDED.stage_pipeline
+                    ON CONFLICT (opportunity_id, candidate_id) DO NOTHING
                 """, (opp_id, existing_id, "Applicant"))
                 if cur.rowcount > 0:
                     report["linked_existing"] += 1
                     report["details"].append({"row": rec["_row_number"], "result": "linked-existing", "candidate_id": existing_id})
+                else:
+                    report["already_in_opportunity"] += 1
             else:
                 cur.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
                 new_candidate_id = cur.fetchone()[0] + 1
@@ -616,11 +635,10 @@ def import_candidates_from_sheet():
                     cur.execute("""
                         INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
                         VALUES (%s, %s, %s)
-                        ON CONFLICT (opportunity_id, candidate_id)
-                        DO UPDATE SET stage_pipeline = EXCLUDED.stage_pipeline
+                        ON CONFLICT (opportunity_id, candidate_id) DO NOTHING
                     """, (opp_id, new_candidate_id, "Applicant"))
-                    report["created_candidates"] += 1
-                    report["details"].append({"row": rec["_row_number"], "result": "created", "candidate_id": new_candidate_id})
+                report["created_candidates"] += 1
+                report["details"].append({"row": rec["_row_number"], "result": "would-create" if dry_run else "created", "candidate_id": None if dry_run else new_candidate_id})
 
             if not dry_run:
                 cur.execute("""

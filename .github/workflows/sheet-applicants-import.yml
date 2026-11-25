@@ -1,0 +1,36 @@
+name: Sheet applicants import
+
+# Postulantes del form de la web → Hub (POST /sheets/candidates/import, careers_routes.py).
+# Webflow escribe cada postulación en la pestaña "Formularios" del Sheet de candidatos;
+# esto la lee y crea/vincula al candidato como Applicant en su vacante. Reemplaza al Zap,
+# que escribía en "Job Submissions" y llamaba al import por cada fila nueva.
+#
+# No duplica: sheet_import_log recuerda cada fila importada, y un candidato que ya está
+# en la vacante no se toca (ON CONFLICT DO NOTHING), así que puede convivir con el Zap.
+#
+# Ojo: GitHub atrasa los crons (de minutos a horas en los peores días), así que un
+# postulante puede tardar en aparecer en el Hub.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "true = sólo muestra qué importaría, NO escribe"
+        required: false
+        default: "false"
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Importar postulantes de la pestaña Formularios
+        run: |
+          DRY="${{ github.event.inputs.dry }}"
+          if [ "$DRY" = "true" ]; then BODY='{"dry_run": true}'; else BODY='{"dry_run": false}'; fi
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 --max-time 280 \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/sheets/candidates/import" \
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); r.pop("details",None); print(json.dumps(r, indent=2))'

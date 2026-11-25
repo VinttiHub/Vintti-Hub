@@ -77,6 +77,17 @@ def get_sheet_title_by_gid(service, spreadsheet_id: str, gid: str) -> str:
     return meta.get("sheets", [])[0].get("properties", {}).get("title")
 
 
+def get_sheet_gid_by_title(service, spreadsheet_id: str, title: str) -> str:
+    """gid de la pestaña con ese título. Sin fallback a la primera: leer otra
+    pestaña en silencio importaría filas que no corresponden."""
+    meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for sheet in meta.get("sheets", []):
+        props = sheet.get("properties", {})
+        if (props.get("title") or "").strip() == title.strip():
+            return str(props.get("sheetId"))
+    raise ValueError(f"No existe la pestaña '{title}' en el Sheet {spreadsheet_id}")
+
+
 def get_rows_with_headers(service, spreadsheet_id: str, sheet_title: str) -> list[dict]:
     quoted = a1_quote(sheet_title)
     resp = service.spreadsheets().values().get(

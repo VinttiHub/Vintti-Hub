@@ -1110,6 +1110,27 @@ evento anual (día completo, `transparent`, invita a `team@vintti.com`, título
 - `POST /birthdays/backfill` es **dry-run por defecto**; el botón "Preview full sync" lo muestra
   y "Create missing events" lo aplica. Arranque: Jazmín conecta → preview → aplicar.
 
+## Postulantes del form web → Sheet → Hub
+
+El form de las vacantes de la web (Webflow, página "Jobs Template") escribe cada postulación en
+la pestaña **Formularios** del Sheet `1Jn9xDhu08…` (`IMPORT_SPREADSHEET_ID`), y
+`POST /sheets/candidates/import` (`routes/careers_routes.py`) la trae al Hub: busca la vacante por
+`Job ID` (opportunity_id o `career_job_id`), encuentra al candidato por mail / LinkedIn / teléfono
+o lo crea, y lo suma como **Applicant**. Lo dispara `.github/workflows/sheet-applicants-import.yml`
+cada 15 min (desde 2026-11-25, para dejar de gastar créditos de Zapier).
+
+- **Job Submissions es histórica.** Hasta nov-2026 un Zap escribía ahí y llamaba al import por cada
+  fila nueva (el endpoint no tiene token por eso). Las dos pestañas tienen las mismas postulaciones
+  desde el 31-oct.
+- **`ON CONFLICT DO NOTHING`, no `DO UPDATE`.** `sheet_import_log` dedupea por huella **y por gid**:
+  al cambiar de pestaña, las filas que ya habían entrado por Job Submissions se re-procesan una vez.
+  Con el `DO UPDATE SET stage_pipeline='Applicant'` de antes eso devolvía a Applicant a candidatos
+  que la recruiter ya había movido. Consecuencia aceptada: re-postularse a la misma vacante no
+  resetea la etapa.
+- El gid del log sale del **título real** de la pestaña (`get_sheet_gid_by_title()`, sin fallback a
+  la primera pestaña). Para leer otra pestaña: `{"sheet_title": "..."}` en el body o la env
+  `IMPORT_SHEET_TITLE`.
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):
