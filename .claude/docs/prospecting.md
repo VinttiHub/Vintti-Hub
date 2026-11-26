@@ -302,6 +302,20 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **dominio repetido → 409 con la existente** («Usar esta»). La lista de borrados no la frena (lo
   decide una persona). Cada campo con valor queda como cambio desde vacío y pasa por
   `_run_instant()`, así el owner dispara el workflow 2 igual que con Clay.
+- **Importar CSV (2026-11-25)**: Empresas → «Importar CSV» → `POST /prospecting/companies/import`
+  (`backend/prospecting/csv_import.py`). **Mapeo de columnas como HubSpot**: al elegir el archivo, el dry devuelve
+  `headers`, `mapping` sugerido (alias de `_ALIASES`/`_EXTRA_ALIASES` → label de la propiedad → palabra clave),
+  `fields` y un ejemplo por columna; la persona cambia cada columna o la marca «No importar» y se vuelve a revisar
+  mandando `mapping`. Una propiedad va a una sola columna. Sin columna de website no se clasifica nada.
+  Por fila, por **dominio** contra las reales: sin dominio → error; repetido en el archivo → salteada; en «Registros
+  eliminados» → salteada; no existe → se crea (`create_company` + el resto con `update_company` sin validar, como
+  Clay; sin nombre → error); existe **sin owner, con owner inactivo (no está en `list_users`) o en Recycled** → se asigna owner (y semana), el resto sólo rellena
+  vacíos; existe con owner → salteada («ya es de X»). **Owner**: un BDR importa a su nombre; `can_manage_owner`
+  elige el BDR en el desplegable y puede mapear una columna «Prospecting Owner» por fila (ID del Hub, email o
+  nombre si no es ambiguo; con varias columnas candidatas se sugiere la que más reconoce, y en empate la de IDs);
+  la fila sin owner usa el desplegable. Status/start date del CSV no se importan. Cada fila con SAVEPOINT y
+  `_run_instant` (workflow 2 como en «Nueva empresa»). Tope 2000 filas. Si `OPTS.bdrs` llegó vacío, el modal
+  vuelve a pedir `/options`.
 - **Exportar a CSV (2026-10-29)**: Acciones → «Exportar a CSV», con las columnas que se elijan
   (arranca con las de la tabla). `POST /prospecting/companies/export` y `/contacts/export`, mismos
   `ids` / `filters` que la edición masiva (`_bulk_target_ids()`), tope `EXPORT_MAX` = 20000. El

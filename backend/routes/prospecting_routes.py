@@ -511,6 +511,72 @@ def company_create():
     return jsonify(_json_safe(row)), 201
 
 
+@bp.post("/companies/import")
+def company_import():
+    """Importar empresas desde un CSV (Empresas → «Importar CSV»). Body: {csv, mapping?,
+    owner_email?, week_label?, dry}. Como en HubSpot, cada columna se mapea a una propiedad:
+    sin `mapping` se usa el sugerido. `dry: true` sólo clasifica (preview) y devuelve el mapeo;
+    sin dry crea / asigna y corre los workflows al instante de cada empresa. Reglas por fila:
+    `prospecting/csv_import.py`. Owner: un BDR importa a su nombre; quien maneja owners elige el
+    BDR y puede mapear una columna de owner (ID del Hub o email) para el owner por fila."""
+    from prospecting import csv_import
+
+    body = request.get_json(silent=True) or {}
+    actor = _current_email()
+    dry = bool(body.get("dry"))
+    with _Db() as cur:
+        denied = _gate(cur)
+        if denied:
+            return denied
+        bdrs = store.list_bdrs(cur)
+        bdr_emails = {b["email"] for b in bdrs}
+        can_owner, _ = store.can_change_owner(cur, actor, {})
+        default_owner = (body.get("owner_email") or "").strip().lower() if can_owner else actor
+        if default_owner and default_owner not in bdr_emails:
+            return jsonify({"error": f"{default_owner} no es un BDR activo: no puede ser Prospecting Owner."}), 400
+        week = store.clean_value("week_label", body.get("week_label"))
+        try:
+            headers, raw_rows = csv_import.read_csv(body.get("csv") or "")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if isinstance(body.get("mapping"), dict):
+            mapping = csv_import.clean_mapping(body["mapping"], headers, can_owner)
+        else:
+            mapping = csv_import.suggest_mapping(headers, can_owner, raw_rows, bdrs)
+        mapped = set(v for v in mapping.values() if v)
+        missing = [lbl for k, lbl in (("website", "website / dominio"), ("name", "nombre de la empresa"))
+                   if k not in mapped]
+        resp = {"dry": dry, "headers": headers, "mapping": mapping,
+                "fields": csv_import.importable_fields(can_owner),
+                "sample": csv_import.sample(headers, raw_rows), "can_owner": can_owner,
+                "missing": missing}
+        if "website" not in mapped:
+            # Sin dominio no se puede clasificar nada: se muestra el paso Columnas y nada más.
+            resp.update(summary=None, rows=[])
+            return jsonify(resp)
+        rows = csv_import.apply_mapping(raw_rows, mapping)
+        active = {u["email"] for u in store.list_users(cur)}
+        items = csv_import.classify(cur, rows, default_owner or None, bdrs, active)
+        if not dry:
+            for it in items:
+                if it["action"] not in ("create", "assign"):
+                    continue
+                try:
+                    cur.execute("SAVEPOINT csv_row")
+                    cid, kind, changes = csv_import.apply_row(cur, it, week, actor)
+                    _run_instant(cur, cid, kind, changes, actor)
+                    it["company_id"] = cid
+                    cur.execute("RELEASE SAVEPOINT csv_row")
+                except store.CompanyExists as exc:
+                    cur.execute("ROLLBACK TO SAVEPOINT csv_row")
+                    it.update(action="skip", reason=f"Ya existe ({exc.existing.get('name')}).")
+                except ValueError as exc:
+                    cur.execute("ROLLBACK TO SAVEPOINT csv_row")
+                    it.update(action="error", reason=str(exc))
+        resp.update(summary=csv_import.summary(items), rows=csv_import.public(items))
+    return jsonify(resp)
+
+
 @bp.patch("/companies/<int:company_id>")
 def patch_company(company_id: int):
     body = request.get_json(silent=True) or {}

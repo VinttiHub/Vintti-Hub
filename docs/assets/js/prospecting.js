@@ -1733,9 +1733,194 @@
         showCompany(co.id);
       });
     });
+    $("prCoImport").addEventListener("click", importCsvModal);
     // Contacto desde cero, con o sin empresa (como en HubSpot, 2026-11-04).
     $("prCtNew").addEventListener("click", function () {
       window.ProspectingContacts.open({ onSaved: function () { loadContacts(); } });
+    });
+  }
+
+  /* ---------- Importar CSV (Empresas → «Importar CSV», 2026-11-25) ----------
+     Un BDR sube las empresas que prospectó por su cuenta. Como en HubSpot, cada columna del
+     archivo se mapea a una propiedad: «Revisar» (POST /prospecting/companies/import, dry)
+     devuelve el mapeo sugerido + qué pasaría con cada fila (nueva, se asigna si existe sin owner o
+     en Recycled, salteada si es de otro, eliminada, error). Cambiar una columna pide revisar de
+     nuevo. Un BDR importa a su nombre; quien maneja owners elige el BDR y puede mapear una columna
+     de owner (ID del Hub, email o nombre) para el owner por fila. */
+  var IMPORT_TEMPLATE = "name,website,linkedin_url,industry,size,city,state,country,lead_source,week_label\n" +
+    "Acme Inc,acme.com,https://www.linkedin.com/company/acme,Software Development,11-50,Miami,FL,United States,Manual,Semana 48\n";
+  var IMPORT_LABELS = { create: "Nueva", assign: "Se asigna", skip: "Salteada", error: "Error" };
+  function importCsvModal() {
+    var canOwner = !!ME.can_manage_owner;
+    var box = document.createElement("div");
+    box.className = "pr-modal";
+    box.innerHTML = '<div class="pr-modal__card pr-bulkedit pr-import" role="dialog" aria-modal="true">' +
+      "<h3>Importar empresas desde un CSV</h3>" +
+      '<p class="pr-note">Subí el CSV con las columnas que tengas: al revisar se muestra a qué propiedad va cada una y se puede cambiar. ' +
+        'Se busca cada empresa por su dominio: las nuevas se crean, las que ya existen sin owner, con un owner inactivo o en Recycled se asignan, y las que ya son de otro BDR se saltean. ' +
+        '<button type="button" class="pr-wf-link" data-im="template">Bajar un ejemplo</button></p>' +
+      '<div class="pr-import__top">' +
+      '<label class="pr-filter"><span class="pr-filter__label">Archivo CSV</span><input type="file" accept=".csv,text/csv" class="pr-filter__input" id="prImFile"></label>' +
+      (canOwner
+        ? '<label class="pr-filter"><span class="pr-filter__label" id="prImOwnerLbl">Prospecting Owner</span><select class="pr-filter__input" id="prImOwner" data-nosearch><option value="">Cargando BDRs…</option></select></label>'
+        : '<p class="pr-note">Las empresas quedan a tu nombre como Prospecting Owner.</p>') +
+      '<label class="pr-filter"><span class="pr-filter__label">Semana (opcional: pisa la del CSV)</span><input type="text" class="pr-filter__input" id="prImWeek" placeholder="Semana 48"></label>' +
+      "</div>" +
+      '<div class="pr-import__map" id="prImMap" hidden></div>' +
+      '<div class="pr-import__result" id="prImResult" hidden></div>' +
+      '<p class="pr-bulkedit__err" id="prImErr" hidden></p>' +
+      '<div class="pr-modal__foot"><button type="button" class="pr-btn" data-im="cancel">Cancelar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-im="check"><i class="fa-solid fa-magnifying-glass"></i> Revisar</button>' +
+        '<button type="button" class="pr-btn pr-btn--primary" data-im="go" hidden><i class="fa-solid fa-file-import"></i> Importar</button></div></div>';
+    document.body.appendChild(box);
+    var q = function (id) { return box.querySelector("#" + id); };
+    var btn = function (k) { return box.querySelector('[data-im="' + k + '"]'); };
+    var csvText = null, mapping = null, running = false, done = false;
+    var err = function (msg) { q("prImErr").hidden = !msg; q("prImErr").textContent = msg || ""; };
+    var close = function () { if (running) return; box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function (e) { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+
+    // BDRs del desplegable: de OPTS si ya llegaron; si no (el /options del arranque falló), se piden.
+    var fillOwners = function () {
+      var sel = q("prImOwner");
+      if (!sel) return;
+      var bdrs = OPTS.bdrs || [];
+      sel.innerHTML = '<option value="">' + (bdrs.length ? "Elegí un BDR…" : "No hay BDRs activos") + "</option>" +
+        bdrs.map(function (b) { return '<option value="' + esc(b.email) + '">' + esc(b.name || b.email) + "</option>"; }).join("");
+    };
+    if (canOwner) {
+      if ((OPTS.bdrs || []).length) fillOwners();
+      else refreshOptions().then(fillOwners, function (e) { fillOwners(); err("No se pudieron cargar los BDRs: " + e.message); });
+    }
+
+    // Cambiar algo invalida el preview: hay que volver a revisar antes de importar.
+    var reset = function () { btn("go").hidden = true; btn("check").hidden = false; q("prImResult").hidden = true; err(""); };
+    q("prImFile").addEventListener("change", function () {
+      reset();
+      csvText = null;
+      mapping = null;
+      q("prImMap").hidden = true;
+      var f = this.files && this.files[0];
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () { csvText = String(rd.result || ""); send(true); };
+      rd.onerror = function () { err("No se pudo leer el archivo."); };
+      rd.readAsText(f);
+    });
+    if (canOwner) q("prImOwner").addEventListener("change", reset);
+    q("prImWeek").addEventListener("input", reset);
+
+    var ownerMapped = function () {
+      return !!mapping && Object.keys(mapping).some(function (h) { return mapping[h] === "prospecting_owner"; });
+    };
+    var renderMap = function (r) {
+      var opts = function (cur) {
+        return '<option value="">No importar</option>' + r.fields.map(function (f) {
+          return '<option value="' + esc(f.key) + '"' + (f.key === cur ? " selected" : "") + ">" + esc(f.label) + "</option>";
+        }).join("");
+      };
+      q("prImMap").innerHTML = '<div class="pr-filter__label">Columnas del archivo</div>' +
+        (r.missing && r.missing.length ? '<p class="pr-import__warn"><i class="fa-solid fa-triangle-exclamation"></i> Falta elegir la columna de: ' + esc(r.missing.join(" y ")) + ".</p>" : "") +
+        '<div class="pr-import__list"><table class="pr-table pr-import__cols"><thead><tr><th>Columna</th><th>Ejemplo</th><th>Va a</th></tr></thead><tbody>' +
+        r.headers.map(function (h) {
+          return "<tr" + (mapping[h] ? "" : ' class="is-off"') + "><td><b>" + esc(h) + "</b></td><td>" + esc(r.sample[h] || "—") +
+            '</td><td><select class="pr-filter__input" data-nosearch data-col="' + esc(h) + '">' + opts(mapping[h]) + "</select></td></tr>";
+        }).join("") + "</tbody></table></div>";
+      q("prImMap").hidden = false;
+      var lbl = q("prImOwnerLbl");
+      if (lbl) lbl.textContent = ownerMapped() ? "Owner para las filas sin owner (opcional)" : "Prospecting Owner";
+    };
+    q("prImMap").addEventListener("change", function (e) {
+      var s = e.target.closest("[data-col]");
+      if (!s) return;
+      var h = s.getAttribute("data-col");
+      // Una propiedad va a una sola columna: si otra ya la tenía, esa pasa a «No importar».
+      if (s.value) Object.keys(mapping).forEach(function (k) { if (k !== h && mapping[k] === s.value) mapping[k] = null; });
+      mapping[h] = s.value || null;
+      box.querySelectorAll("#prImMap [data-col]").forEach(function (x) {
+        x.value = mapping[x.getAttribute("data-col")] || "";
+        x.closest("tr").classList.toggle("is-off", !x.value);
+      });
+      var lbl = q("prImOwnerLbl");
+      if (lbl) lbl.textContent = ownerMapped() ? "Owner para las filas sin owner (opcional)" : "Prospecting Owner";
+      reset();
+    });
+
+    var render = function (r) {
+      if (!r.summary) { q("prImResult").hidden = true; return; }
+      var s = r.summary;
+      q("prImResult").innerHTML =
+        '<div class="pr-import__sum">' +
+          '<span class="pr-import__pill is-create">' + s.create + (r.dry ? " nuevas" : " creadas") + "</span>" +
+          '<span class="pr-import__pill is-assign">' + s.assign + (r.dry ? " se asignan" : " asignadas") + "</span>" +
+          '<span class="pr-import__pill is-skip">' + s.skip + " salteadas</span>" +
+          '<span class="pr-import__pill is-error">' + s.error + " con error</span></div>" +
+        (r.rows.length ? '<div class="pr-import__list"><table class="pr-table pr-import__rows"><thead><tr><th>Fila</th><th>Empresa</th><th>Dominio</th><th>Owner</th><th>Qué pasa</th></tr></thead><tbody>' +
+          r.rows.map(function (x) {
+            return '<tr class="is-' + x.action + '"><td>' + x.row + "</td><td>" + esc(x.name) + "</td><td>" + esc(x.domain) +
+              "</td><td>" + esc(ownerName(x.owner) || "—") + '</td><td><b>' + IMPORT_LABELS[x.action] + "</b> · " + esc(x.reason) + "</td></tr>";
+          }).join("") + "</tbody></table></div>" : "");
+      q("prImResult").hidden = false;
+    };
+    var ownerName = function (email) {
+      var b = (OPTS.bdrs || []).filter(function (x) { return x.email === email; })[0];
+      return b ? (b.name || b.email) : email;
+    };
+    var send = function (dry) {
+      err("");
+      if (!csvText) return err("Elegí un archivo CSV.");
+      var owner = canOwner ? q("prImOwner").value : "";
+      if (!dry && canOwner && !owner && !ownerMapped()) return err("Elegí el BDR que va a quedar como Prospecting Owner.");
+      running = true;
+      var b = btn(dry ? "check" : "go");
+      var label = b.innerHTML;
+      b.disabled = true;
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (dry ? "Revisando…" : "Importando…");
+      var payload = { csv: csvText, owner_email: owner, week_label: q("prImWeek").value.trim(), dry: dry };
+      if (mapping) payload.mapping = mapping;
+      api("/prospecting/companies/import", { method: "POST", body: JSON.stringify(payload) })
+        .then(function (r) {
+          mapping = r.mapping;
+          renderMap(r);
+          render(r);
+          if (dry) {
+            var n = r.summary ? r.summary.create + r.summary.assign : 0;
+            btn("go").hidden = !n;
+            btn("go").innerHTML = '<i class="fa-solid fa-file-import"></i> Importar ' + n;
+            btn("check").hidden = !!n;
+            if (r.summary && !n) err("No hay empresas para crear ni asignar con este mapeo.");
+          } else {
+            done = true;
+            btn("go").hidden = true;
+            btn("check").hidden = true;
+            btn("cancel").textContent = "Cerrar";
+            box.querySelectorAll("#prImMap select").forEach(function (x) { x.disabled = true; });
+            load();
+            toast('<i class="fa-solid fa-file-import"></i> Importación lista: ' + r.summary.create + " creadas, " + r.summary.assign + " asignadas.");
+          }
+        })
+        .catch(function (e) { err(e.message); })
+        .then(function () { running = false; b.disabled = false; b.innerHTML = label; });
+    };
+    box.addEventListener("click", function (e) {
+      if (e.target === box) return close();
+      var b = e.target.closest("[data-im]");
+      if (!b) return;
+      var k = b.getAttribute("data-im");
+      if (k === "cancel") return close();
+      if (k === "template") {
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob(["﻿" + IMPORT_TEMPLATE], { type: "text/csv;charset=utf-8" }));
+        a.download = "ejemplo-empresas.csv";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        return;
+      }
+      if (done || running) return;
+      if (k === "check") send(true);
+      if (k === "go") send(false);
     });
   }
 

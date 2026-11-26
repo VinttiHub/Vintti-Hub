@@ -2608,3 +2608,34 @@ div.pr-filter__input.pr-owner-locked { background: rgba(15, 23, 42, .04); }
   .pp-props__card { padding: 14px; }
   .pp-props__table th:nth-child(4), .pp-props__table td:nth-child(4) { display: none; }
 }
+
+/* Importar CSV (Empresas → «Importar CSV»): ancho para que columnas y filas se lean sin scroll lateral */
+.pr-modal__card.pr-import { width: min(1100px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 26px 30px; gap: 16px; }
+.pr-import__top { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 14px; align-items: end; }
+@media (max-width: 860px) { .pr-import__top { grid-template-columns: 1fr; } }
+.pr-import__top .pr-filter { display: flex; flex-direction: column; gap: 6px; }
+.pr-import__sum { display: flex; flex-wrap: wrap; gap: 8px; }
+.pr-import__pill { font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+.pr-import__pill.is-create { background: #c1ff72; color: #1b2433; }
+.pr-import__pill.is-assign { background: color-mix(in srgb, #6c38ff 14%, #fff); color: #6c38ff; }
+.pr-import__pill.is-skip { background: color-mix(in srgb, #4ba9ff 16%, #fff); color: #1b5fa8; }
+.pr-import__pill.is-error { background: color-mix(in srgb, #ff1fdb 14%, #fff); color: #b3009a; }
+.pr-import__result { display: flex; flex-direction: column; gap: 10px; }
+.pr-import__list { max-height: 42vh; overflow: auto; border: 1px solid rgba(13, 18, 30, .08); border-radius: 12px; }
+.pr-import__list .pr-table { font-size: 13px; table-layout: fixed; }
+.pr-import__list .pr-table td { white-space: normal; overflow-wrap: anywhere; padding: 10px 14px; line-height: 1.4; }
+.pr-import__list .pr-table th { padding: 10px 14px; }
+.pr-import__list tr.is-error td:last-child { color: #b3009a; }
+.pr-import__map { display: flex; flex-direction: column; gap: 8px; }
+.pr-import__map .pr-import__list { max-height: 34vh; }
+.pr-import__cols th:nth-child(1) { width: 30%; }
+.pr-import__cols th:nth-child(2) { width: 38%; }
+.pr-import__cols th:nth-child(3) { width: 32%; }
+.pr-import__cols td { padding-top: 7px !important; padding-bottom: 7px !important; }
+.pr-import__map select.pr-filter__input { width: 100%; min-width: 0; padding-top: 6px; padding-bottom: 6px; }
+.pr-import__map tr.is-off td:first-child, .pr-import__map tr.is-off td:nth-child(2) { color: var(--pr-ink-3); }
+.pr-import__rows th:nth-child(1) { width: 64px; }
+.pr-import__rows th:nth-child(2) { width: 22%; }
+.pr-import__rows th:nth-child(3) { width: 20%; }
+.pr-import__rows th:nth-child(4) { width: 16%; }
+.pr-import__warn { color: #b3009a; font-size: 12.5px; font-weight: 600; }
