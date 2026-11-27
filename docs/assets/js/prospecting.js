@@ -1738,6 +1738,19 @@
     $("prCtNew").addEventListener("click", function () {
       window.ProspectingContacts.open({ onSaved: function () { loadContacts(); } });
     });
+    // Duplicados (2026-11-27): la lista general para revisar y fusionar. Mismo permiso que Eliminar.
+    $("prCtDups").hidden = !ME.can_delete;
+    if (ME.can_delete) refreshDupCount();
+    $("prCtDups").addEventListener("click", function () {
+      window.ProspectingContacts.openDuplicates({ onChanged: function () { loadContacts(); refreshDupCount(); } });
+    });
+  }
+
+  function refreshDupCount() {
+    api("/prospecting/contacts/duplicates").then(function (r) {
+      var n = (r.groups || []).length;
+      $("prCtDupsCount").textContent = n ? "(" + n + ")" : "";
+    }).catch(function () { $("prCtDupsCount").textContent = ""; });
   }
 
   /* ---------- Importar CSV (Empresas → «Importar CSV», 2026-11-25) ----------

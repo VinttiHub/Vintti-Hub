@@ -132,6 +132,7 @@
           '<button type="button" class="pr-drawer__close" data-pc-close aria-label="Cerrar">&times;</button></header>' +
         '<div class="pr-drawer__body" id="pcBody"></div>' +
         '<footer class="pr-drawer__foot"><span class="pr-drawer__status" id="pcStatus"></span>' +
+          '<button type="button" class="pr-btn" id="pcMerge" hidden title="Fusionar con un contacto duplicado"><i class="fa-solid fa-code-merge"></i> Fusionar</button>' +
           '<button type="button" class="pr-btn pr-btn--danger" id="pcDelete" hidden><i class="fa-regular fa-trash-can"></i></button>' +
           '<button type="button" class="pr-btn pr-btn--primary" id="pcSave"><i class="fa-regular fa-floppy-disk"></i> Guardar</button></footer>' +
       "</aside>";
@@ -277,7 +278,223 @@
         if (opts.onSaved) opts.onSaved(null);
       }).catch(function (err) { alert(err.message); });
     };
-    document.getElementById("pcSave").onclick = function () { save(c, isNew, opts); };
+    var mg = document.getElementById("pcMerge");
+    // Fusionar: mismo permiso que eliminar (uno de los dos se borra).
+    mg.hidden = isNew || !((P().me() || {}).can_delete);
+    mg.onclick = function () { mergeStart(c, opts); };
+    var sv = document.getElementById("pcSave");
+    sv.hidden = false;
+    sv.onclick = function () { save(c, isNew, opts); };
+  }
+
+  /* =================================================================
+     Fusionar contactos (2026-11-27). Paso 1: elegir el duplicado (sugeridos por mismo
+     nombre, o buscar). Paso 2: cuál queda (sugerido: mail de empresa > más datos > más
+     viejo), lo que se pasa solo (vacío en el que queda) y los conflictos (se elige).
+     ================================================================= */
+  /* Mientras se fusiona, el pie (Fusionar / Eliminar / Guardar) se esconde; render() lo restaura. */
+  function mergeMode() {
+    ["pcMerge", "pcDelete", "pcSave"].forEach(function (id) { document.getElementById(id).hidden = true; });
+    document.getElementById("pcStatus").textContent = "";
+  }
+  function mergeBack(c, opts) { render(c, opts); }
+
+  function mergeStart(c, opts) {
+    mergeMode();
+    var body = document.getElementById("pcBody");
+    body.innerHTML = '<div class="pc-merge"><p class="pc-merge__lead"><strong>Fusionar «' + esc(c.name) + '»</strong> con otro contacto. ' +
+      "Elegí el duplicado; en el paso siguiente ves qué queda y qué se pasa.</p>" +
+      '<input type="search" class="pr-filter__input" id="pcMergeQ" placeholder="Buscar por nombre o mail…" autocomplete="off">' +
+      '<div id="pcMergeList" class="pc-merge__list"><p class="pr-note">Buscando duplicados…</p></div>' +
+      '<div class="pc-merge__actions"><button type="button" class="pr-btn" id="pcMergeBack"><i class="fa-solid fa-arrow-left"></i> Volver</button></div></div>';
+    document.getElementById("pcMergeBack").onclick = function () { mergeBack(c, opts); };
+    var t = null;
+    function load(q) {
+      P().api("/prospecting/contacts/" + c.id + "/merge-candidates" + (q ? "?q=" + encodeURIComponent(q) : "")).then(function (r) {
+        var list = document.getElementById("pcMergeList");
+        if (!list) return;
+        var rows = r.candidates || [];
+        list.innerHTML = rows.length ? rows.map(function (x) {
+          return '<button type="button" class="pc-merge__cand" data-cand="' + x.id + '">' +
+            "<strong>" + esc(x.name) + "</strong>" + (x.same_company ? ' <span class="pc-merge__tag">misma empresa</span>' : "") +
+            '<span class="pr-note">' + esc(x.email || "sin mail") + " · " + esc(x.company_name || "sin empresa") +
+            " · " + x.deal_count + " negocio" + (x.deal_count === 1 ? "" : "s") + "</span></button>";
+        }).join("") : '<p class="pr-note">' + (q ? "Nada coincide." : "No hay otro contacto con el mismo nombre. Buscalo por nombre o mail.") + "</p>";
+        list.querySelectorAll("[data-cand]").forEach(function (b) {
+          b.onclick = function () { mergePreview(c.id, Number(b.getAttribute("data-cand")), contactFlow(c, opts)); };
+        });
+      }).catch(function (err) { var l = document.getElementById("pcMergeList"); if (l) l.innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>"; });
+    }
+    document.getElementById("pcMergeQ").oninput = function (e) {
+      clearTimeout(t);
+      var q = e.target.value.trim();
+      t = setTimeout(function () { load(q); }, 250);
+    };
+    load("");
+  }
+
+  function mergeFmt(type, v) {
+    if (isEmpty(v)) return '<span class="pr-note">—</span>';
+    if (type === "bool") return v === true || v === "true" ? "Sí" : "No";
+    if (Array.isArray(v)) return esc(v.join(", "));
+    if (type === "datetime") return fmtLocal(v);
+    var sv = String(v);
+    return '<span title="' + esc(sv) + '">' + esc(sv.length > 60 ? sv.slice(0, 57) + "…" : sv) + "</span>";
+  }
+
+  /* Desde el panel de un contacto: «Volver» elige otro duplicado; al fusionar abre el que quedó. */
+  function contactFlow(c, opts) {
+    return {
+      back: function () { mergeStart(c, opts); }, backLabel: "Elegir otro",
+      done: function (res, keep) {
+        if (opts.onSaved) opts.onSaved(res);
+        open(Object.assign({}, opts, { contactId: keep }));
+      },
+    };
+  }
+
+  /* Vista previa de la fusión de dos contactos (la usan el panel del contacto y la lista de
+     Duplicados). flow = {back(), backLabel, done(res, keepId), keep?: id sugerido}. */
+  function mergePreview(aId, otherId, flow) {
+    var body = document.getElementById("pcBody");
+    body.innerHTML = '<p class="pr-note">Comparando…</p>';
+    P().api("/prospecting/contacts/" + aId + "/merge-preview?other=" + otherId).then(function (pv) {
+      var keep = flow.keep || pv.suggested_keep;
+      function draw() {
+        var k = keep === pv.a.id ? pv.a : pv.b, o = keep === pv.a.id ? pv.b : pv.a;
+        var kSide = keep === pv.a.id ? "a" : "b", oSide = kSide === "a" ? "b" : "a";
+        var fills = pv.fields.filter(function (f) { return isEmpty(f[kSide]) && !isEmpty(f[oSide]); });
+        var conflicts = pv.fields.filter(function (f) { return !isEmpty(f[kSide]) && !isEmpty(f[oSide]); });
+        function card(x) {
+          var on = x.id === keep;
+          return '<label class="pc-merge__card' + (on ? " is-keep" : "") + '"><input type="radio" name="pcKeep" value="' + x.id + '"' + (on ? " checked" : "") + ">" +
+            '<span class="pc-merge__badge">' + (on ? "Queda" : "Se borra") + "</span><strong>" + esc(x.name) + "</strong>" +
+            '<span class="pr-note">' + esc(x.email || "sin mail") + "</span>" +
+            '<span class="pr-note">' + esc(x.company_name || "sin empresa") + " · " + x.deal_count + " negocio" + (x.deal_count === 1 ? "" : "s") +
+            (x.hubspot_contact_id ? " · HubSpot " + esc(x.hubspot_contact_id) : "") + "</span></label>";
+        }
+        var emailRow = (k.email && o.email && k.email.toLowerCase() !== o.email.toLowerCase()) ?
+          '<tr><td>Email principal</td><td>' + esc(k.email) + '</td><td><label class="pc-merge__pick"><input type="radio" name="pcPick_email" value="keep" checked> este</label></td>' +
+          '<td>' + esc(o.email) + '</td><td><label class="pc-merge__pick"><input type="radio" name="pcPick_email" value="other"> este</label></td></tr>' : "";
+        var html = '<div class="pc-merge"><p class="pc-merge__lead">Elegí cuál <strong>queda</strong>. El otro se borra y todo lo suyo pasa al que queda: ' +
+          "negocios, historial, workflows. Su mail queda en «Other emails».</p>" +
+          '<div class="pc-merge__cards">' + card(pv.a) + card(pv.b) + "</div>";
+        html += '<h4 class="pc-merge__h">Se pasan solos (' + fills.length + ')</h4>' +
+          (fills.length ? '<p class="pr-note">El que queda no los tiene; se copian del otro.</p><ul class="pc-merge__fills">' + fills.map(function (f) {
+            return "<li><span>" + esc(f.label) + "</span>" + mergeFmt(f.type, f[oSide]) + "</li>";
+          }).join("") + "</ul>" : '<p class="pr-note">Nada: el que queda ya tiene todo lo que tiene el otro.</p>');
+        html += '<h4 class="pc-merge__h">Conflictos (' + (conflicts.length + (emailRow ? 1 : 0)) + ')</h4>' +
+          ((conflicts.length || emailRow) ? '<p class="pr-note">Los dos tienen un valor distinto: elegí cuál gana (por defecto, el del que queda).</p>' +
+            '<table class="pc-merge__table"><thead><tr><th>Propiedad</th><th colspan="2">Queda</th><th colspan="2">Se borra</th></tr></thead><tbody>' + emailRow +
+            conflicts.map(function (f) {
+              return "<tr><td>" + esc(f.label) + "</td><td>" + mergeFmt(f.type, f[kSide]) +
+                '</td><td><label class="pc-merge__pick"><input type="radio" name="pcPick_' + esc(f.key) + '" value="keep" checked> este</label></td>' +
+                "<td>" + mergeFmt(f.type, f[oSide]) +
+                '</td><td><label class="pc-merge__pick"><input type="radio" name="pcPick_' + esc(f.key) + '" value="other"> este</label></td></tr>';
+            }).join("") + "</tbody></table>" : '<p class="pr-note">Ninguno.</p>');
+        html += '<div class="pc-merge__actions"><button type="button" class="pr-btn" id="pcMergeBack"><i class="fa-solid fa-arrow-left"></i> ' + esc(flow.backLabel || "Volver") + "</button>" +
+          '<button type="button" class="pr-btn pr-btn--primary" id="pcMergeGo"><i class="fa-solid fa-code-merge"></i> Fusionar</button></div></div>';
+        body.innerHTML = html;
+        body.querySelectorAll('input[name="pcKeep"]').forEach(function (r) {
+          r.onchange = function () { keep = Number(r.value); draw(); };
+        });
+        document.getElementById("pcMergeBack").onclick = flow.back;
+        document.getElementById("pcMergeGo").onclick = function () {
+          var choices = {};
+          body.querySelectorAll('input[name^="pcPick_"]:checked').forEach(function (r) {
+            if (r.value === "other") choices[r.name.slice(7)] = "other";
+          });
+          if (!confirm("¿Fusionar? «" + o.name + "» (" + (o.email || "sin mail") + ") se borra y queda «" + k.name + "».")) return;
+          var go = document.getElementById("pcMergeGo");
+          go.disabled = true;
+          P().api("/prospecting/contacts/" + aId + "/merge", { method: "POST",
+            body: JSON.stringify({ other_id: otherId, keep_id: keep, choices: choices }) }).then(function (res) {
+            P().toast("Contactos fusionados.");
+            flow.done(res, keep);
+          }).catch(function (err) { go.disabled = false; alert(err.message); });
+        };
+      }
+      draw();
+    }).catch(function (err) {
+      body.innerHTML = '<p class="pr-note">' + esc(err.message) + '</p><div class="pc-merge__actions"><button type="button" class="pr-btn" id="pcMergeBack">Volver</button></div>';
+      document.getElementById("pcMergeBack").onclick = flow.back;
+    });
+  }
+
+  /* =================================================================
+     Duplicados (2026-11-27): la lista general, desde Contactos → «Duplicados». Cada grupo
+     (mismo nombre + misma empresa / sin empresa / mismo dominio) con el sugerido para quedar;
+     «Revisar fusión» abre la misma vista previa, «No son duplicados» lo saca de la lista.
+     opts: {onChanged()} — la tabla de contactos se recarga después de fusionar.
+     ================================================================= */
+  function openDuplicates(opts) {
+    opts = opts || {};
+    ensurePanel();
+    panel.classList.add("is-open");
+    panel.setAttribute("aria-hidden", "false");
+    pcCurrent = null;
+    document.getElementById("pcEyebrow").textContent = "Contactos";
+    document.getElementById("pcTitle").textContent = "Duplicados";
+    document.getElementById("pcSub").textContent = "Mismo nombre en la misma empresa, sin empresa o con el mismo dominio de mail.";
+    mergeMode();
+    var body = document.getElementById("pcBody");
+    body.innerHTML = '<p class="pr-note">Buscando duplicados…</p>';
+    P().api("/prospecting/contacts/duplicates").then(function (r) {
+      var groups = r.groups || [];
+      if (!groups.length) {
+        body.innerHTML = '<p class="pr-note">No hay duplicados para revisar.</p>';
+        return;
+      }
+      body.innerHTML = '<div class="pc-merge"><input type="search" class="pr-filter__input" id="pcDupQ" placeholder="Filtrar por nombre, mail o empresa…" autocomplete="off">' +
+        '<p class="pr-note" id="pcDupCount"></p><div class="pc-dups" id="pcDupList"></div></div>';
+      function draw(q) {
+        q = (q || "").toLowerCase();
+        var shown = groups.filter(function (g) {
+          return !q || g.contacts.some(function (x) {
+            return [x.name, x.email, x.company_name].join(" ").toLowerCase().indexOf(q) !== -1;
+          });
+        });
+        document.getElementById("pcDupCount").textContent = shown.length + " grupo" + (shown.length === 1 ? "" : "s") +
+          " · primero los que tienen negocios";
+        document.getElementById("pcDupList").innerHTML = shown.map(function (g) {
+          var gi = groups.indexOf(g);
+          return '<div class="pc-dup">' + g.contacts.map(function (x) {
+            var keep = x.id === g.suggested_keep;
+            return '<div class="pc-dup__row' + (keep ? " is-keep" : "") + '">' +
+              '<div class="pc-dup__who"><strong>' + esc(x.name) + "</strong>" + (keep ? ' <span class="pc-merge__tag">sugerido para quedar</span>' : "") +
+              '<span class="pr-note">' + esc(x.email || "sin mail") + " · " + esc(x.company_name || "sin empresa") + " · " +
+              x.deal_count + " negocio" + (x.deal_count === 1 ? "" : "s") + "</span></div>" +
+              (keep ? '<button type="button" class="pr-btn pd-mini" data-dup-open="' + x.id + '">Ver</button>'
+                : '<button type="button" class="pr-btn pd-mini" data-dup-merge="' + gi + ":" + x.id + '"><i class="fa-solid fa-code-merge"></i> Revisar fusión</button>') +
+              "</div>";
+          }).join("") +
+            '<div class="pc-dup__foot"><button type="button" class="pr-btn pd-mini" data-dup-dismiss="' + gi + '">No son duplicados</button></div></div>';
+        }).join("") || '<p class="pr-note">Nada coincide.</p>';
+      }
+      draw("");
+      document.getElementById("pcDupQ").oninput = function (e) { draw(e.target.value.trim()); };
+      document.getElementById("pcDupList").onclick = function (e) {
+        var m = e.target.closest("[data-dup-merge]"), d = e.target.closest("[data-dup-dismiss]"), o = e.target.closest("[data-dup-open]");
+        if (o) return open({ contactId: Number(o.getAttribute("data-dup-open")), onSaved: opts.onChanged });
+        if (m) {
+          var parts = m.getAttribute("data-dup-merge").split(":"), g = groups[Number(parts[0])];
+          return mergePreview(g.suggested_keep, Number(parts[1]), {
+            keep: g.suggested_keep, backLabel: "Volver a duplicados",
+            back: function () { openDuplicates(opts); },
+            done: function () { if (opts.onChanged) opts.onChanged(); openDuplicates(opts); },
+          });
+        }
+        if (d) {
+          var grp = groups[Number(d.getAttribute("data-dup-dismiss"))];
+          if (!confirm("¿Marcar como que NO son la misma persona? No vuelven a aparecer en esta lista.")) return;
+          P().api("/prospecting/contacts/duplicates/dismiss", { method: "POST",
+            body: JSON.stringify({ ids: grp.contacts.map(function (x) { return x.id; }) }) }).then(function () {
+            groups.splice(groups.indexOf(grp), 1);
+            draw(document.getElementById("pcDupQ").value.trim());
+          }).catch(function (err) { alert(err.message); });
+        }
+      };
+    }).catch(function (err) { body.innerHTML = '<p class="pr-note">' + esc(err.message) + "</p>"; });
   }
 
   /* Buscador de propiedades: sin acentos, por palabras (todas tienen que estar). */
@@ -677,6 +894,7 @@
   }
 
   window.ProspectingContacts = { open: open, completeFlow: completeFlow, close: close, fmtLocal: fmtLocal,
+    openDuplicates: openDuplicates,
     fieldControl: control, readFieldValue: readValue, toggleChip: toggleChip, sameValue: sameValue,
     companyPropsHtml: companyPropsHtml, companyPropsPatch: companyPropsPatch, bindCompanyProps: bindCompanyProps,
     newCompanyModal: newCompanyModal };

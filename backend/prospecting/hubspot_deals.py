@@ -216,12 +216,18 @@ def resolve_links(cur, items: list[dict]) -> None:
                     "AND NOT is_dummy ORDER BY id", (ct_ids,))
         for r in cur.fetchall():
             by_ct.setdefault(r["hubspot_contact_id"], r["id"])
+        # Contacto fusionado en el Hub (2026-11-27): su id de HubSpot apunta al que quedó.
+        cur.execute("SELECT hubspot_id, merged_into FROM prospect_deleted_records WHERE object = 'contact' "
+                    "AND merged_into IS NOT NULL AND hubspot_id = ANY(%s)", (ct_ids,))
+        for r in cur.fetchall():
+            by_ct.setdefault(r["hubspot_id"], r["merged_into"])
     cur.execute("SELECT * FROM prospect_deals WHERE hubspot_deal_id = ANY(%s)", ([it["hs_id"] for it in items],))
     existing = {r["hubspot_deal_id"]: dict(r) for r in cur.fetchall()}
     for it in items:
         ordered = sorted(it["companies"] or [], key=lambda a: not a[1])
         it["company_id"] = next((by_co[c] for c, _ in ordered if c in by_co), None)
-        it["contact_ids"] = [by_ct[c] for c, _ in it["contacts"] or [] if c in by_ct]
+        # dict.fromkeys: dos ids de HubSpot fusionados en el mismo contacto no lo repiten.
+        it["contact_ids"] = list(dict.fromkeys(by_ct[c] for c, _ in it["contacts"] or [] if c in by_ct))
         it["existing"] = existing.get(it["hs_id"])
 
 
@@ -503,6 +509,13 @@ def sync(conn, client: HubSpotClient | None = None, *, dry_run: bool = False, ma
             stats["atados_a_su_oportunidad"] += r["linked"]
             stats["etapa_desde_la_oportunidad"] += r["moved"]
             stats["campos_de_cierre_desde_la_oportunidad"] += r["copied"]
+            # Pares Hub ↔ HubSpot que el adopt no vio (el de HubSpot llegó antes que el contacto).
+            from prospecting import deal_merge
+            m = deal_merge.run(cur, days=60)
+            stats["duplicados_fusionados"] += m["fusionados"]
+            for e in m["errores"]:
+                notes[f"fusión fallida {e}"[:200]] += 1
+            conn.commit()
         report = {
             "status": status, "dry_run": dry_run, "since": start.isoformat(),
             "watermark": last_ts.isoformat() if last_ts else None, "read": processed,

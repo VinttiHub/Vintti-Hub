@@ -2639,3 +2639,40 @@ div.pr-filter__input.pr-owner-locked { background: rgba(15, 23, 42, .04); }
 .pr-import__rows th:nth-child(3) { width: 20%; }
 .pr-import__rows th:nth-child(4) { width: 16%; }
 .pr-import__warn { color: #b3009a; font-size: 12.5px; font-weight: 600; }
+
+/* Fusionar contactos (prospecting-contacts.js → mergeStart / mergePreview, 2026-11-27) */
+.pc-merge { display: flex; flex-direction: column; gap: 12px; }
+.pc-merge__lead { margin: 0; color: var(--pr-ink-2); line-height: 1.5; }
+.pc-merge__list { display: flex; flex-direction: column; gap: 8px; }
+.pc-merge__cand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit;
+  padding: 10px 12px; border: 1px solid var(--pr-rule); border-radius: 12px; background: var(--pr-card-soft); cursor: pointer; }
+.pc-merge__cand:hover { border-color: var(--pr-violet); }
+.pc-merge__tag { font-size: 11px; font-weight: 600; color: var(--pr-violet); background: color-mix(in srgb, var(--pr-violet) 10%, transparent);
+  padding: 1px 8px; border-radius: 999px; }
+.pc-merge__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pc-merge__card { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 12px; border: 1px solid var(--pr-rule);
+  border-radius: 12px; cursor: pointer; background: var(--pr-card-soft); }
+.pc-merge__card input { position: absolute; opacity: 0; pointer-events: none; }
+.pc-merge__card.is-keep { border-color: var(--pr-violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pr-violet) 16%, transparent); }
+.pc-merge__badge { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--pr-mag) 12%, transparent); color: var(--pr-mag); }
+.pc-merge__card.is-keep .pc-merge__badge { background: #c1ff72; color: #1a1a1a; }
+.pc-merge__h { margin: 6px 0 0; font-size: 13.5px; }
+.pc-merge__fills { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.pc-merge__fills li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--pr-rule); padding: 4px 0; }
+.pc-merge__fills li > span:first-child { color: var(--pr-ink-2); }
+.pc-merge__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pc-merge__table th, .pc-merge__table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--pr-rule); vertical-align: top; word-break: break-word; }
+.pc-merge__table th { color: var(--pr-ink-3); font-weight: 600; font-size: 12px; }
+.pc-merge__pick { white-space: nowrap; color: var(--pr-ink-2); font-size: 12px; }
+.pc-merge__actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+@media (max-width: 640px) { .pc-merge__cards { grid-template-columns: 1fr; } }
+/* Duplicados (prospecting-contacts.js → openDuplicates, 2026-11-27) */
+.pc-dups { display: flex; flex-direction: column; gap: 10px; }
+.pc-dup { border: 1px solid var(--pr-rule); border-radius: 12px; background: var(--pr-card-soft); overflow: hidden; }
+.pc-dup__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--pr-rule); }
+.pc-dup__row.is-keep { box-shadow: inset 3px 0 0 var(--pr-violet); }
+.pc-dup__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-dup__who .pr-note { overflow-wrap: anywhere; }
+.pc-dup__row .pr-btn { flex-shrink: 0; }
+.pc-dup__foot { display: flex; justify-content: flex-end; padding: 6px 12px; }

@@ -787,6 +787,96 @@ def contact_delete(contact_id: int):
 
 
 # --------------------------------------------------------------------------- #
+# Fusionar contactos (2026-11-27): mismo permiso que eliminar (uno de los dos se borra).
+# --------------------------------------------------------------------------- #
+@bp.get("/contacts/duplicates")
+def contacts_duplicates():
+    """La lista general (Contactos → Duplicados): todos los grupos de posibles duplicados."""
+    with _Db() as cur:
+        denied = _gate(cur, staff=True)
+        if denied:
+            return denied
+        groups = store.duplicate_groups(cur)
+    return jsonify(_json_safe({"groups": groups}))
+
+
+@bp.post("/contacts/duplicates/dismiss")
+def contacts_duplicates_dismiss():
+    """«No son duplicados»: `{ids: [...]}` (los del grupo) no vuelven a aparecer juntos."""
+    body = request.get_json(silent=True) or {}
+    ids = [store._to_int(x) for x in (body.get("ids") or []) if store._to_int(x)]
+    if len(ids) < 2:
+        return jsonify({"error": "Faltan los contactos."}), 400
+    with _Db() as cur:
+        denied = _gate(cur, staff=True)
+        if denied:
+            return denied
+        n = store.dismiss_duplicates(cur, ids, _current_email())
+    return jsonify({"dismissed": n})
+
+
+@bp.get("/contacts/<int:contact_id>/merge-candidates")
+def contact_merge_candidates(contact_id: int):
+    try:
+        with _Db() as cur:
+            denied = _gate(cur, staff=True)
+            if denied:
+                return denied
+            rows = store.merge_candidates(cur, contact_id, request.args.get("q") or "")
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(_json_safe({"candidates": rows}))
+
+
+@bp.get("/contacts/<int:contact_id>/merge-preview")
+def contact_merge_preview(contact_id: int):
+    other = store._to_int(request.args.get("other"))
+    if not other:
+        return jsonify({"error": "Falta el otro contacto."}), 400
+    try:
+        with _Db() as cur:
+            denied = _gate(cur, staff=True)
+            if denied:
+                return denied
+            out = store.merge_preview(cur, contact_id, other)
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out))
+
+
+@bp.post("/contacts/<int:contact_id>/merge")
+def contact_merge(contact_id: int):
+    """`{other_id, keep_id, choices}`: `keep_id` es uno de los dos; `choices` = {propiedad: "other"}
+    en los conflictos donde gana el valor del que se va."""
+    body = request.get_json(silent=True) or {}
+    other = store._to_int(body.get("other_id"))
+    keep = store._to_int(body.get("keep_id")) or contact_id
+    if not other or keep not in (contact_id, other):
+        return jsonify({"error": "Elegí los dos contactos."}), 400
+    drop = other if keep == contact_id else contact_id
+    try:
+        with _Db() as cur:
+            denied = _gate(cur, staff=True)
+            if denied:
+                return denied
+            res = store.merge_contacts(cur, keep, drop, body.get("choices") or {}, _current_email())
+            applied = []
+            if res["_changes"]:
+                cur.execute("SELECT company_id FROM prospect_contacts WHERE id = %s", (keep,))
+                applied = _run_instant(cur, cur.fetchone()["company_id"], "updated", res["_changes"],
+                                       _current_email(), obj="contact", record_id=keep)
+            out = _contact_response(cur, keep, applied)
+            out["merge"] = {k: v for k, v in res.items() if k != "_changes"}
+    except LookupError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(_json_safe(out))
+
+
+# --------------------------------------------------------------------------- #
 # Eliminar en masa (Acciones → Eliminar): tildados o todos los del filtro.
 # Sólo admin + editoras (_can_configure). Lo borrado queda en «Registros eliminados»
 # y Clay / HubSpot no lo recrean (store.is_deleted).

@@ -214,6 +214,21 @@ def _find_contact(cur, email: str):
         "SELECT id, company_id, is_dummy FROM prospect_contacts WHERE LOWER(email) = LOWER(%s) ORDER BY id LIMIT 1",
         (email,),
     )
+    r = cur.fetchone()
+    if r is not None:
+        return r
+    # Un mail que quedó en «Other emails» al fusionar dos contactos (2026-11-27): el booking
+    # cae en el que quedó en vez de crear otro.
+    cur.execute(
+        """
+        SELECT id, company_id, is_dummy FROM prospect_contacts
+         WHERE NULLIF(props->>'additional_emails', '') IS NOT NULL
+           AND position(',' || LOWER(%s) || ',' IN
+                        ',' || LOWER(REPLACE(props->>'additional_emails', ' ', '')) || ',') > 0
+         ORDER BY id LIMIT 1
+        """,
+        (email.strip(),),
+    )
     return cur.fetchone()
 
 

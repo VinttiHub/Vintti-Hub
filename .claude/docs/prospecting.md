@@ -108,6 +108,26 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `REQUIRED_ON_QUALIFIED` completos, `contact_incomplete = TRUE`. El PATCH responde
   `needs_contact` y la página abre «Completá el contacto». Se recalcula en cada cambio de
   contacto o de status (`recompute_contact_incomplete`).
+- **Fusionar contactos (2026-11-27)**: botón «Fusionar» en el panel del contacto (mismo permiso que
+  Eliminar, `can_delete`), nunca automático. `store.merge_candidates` (mismo nombre, primero misma
+  empresa; o búsqueda), `merge_preview` (sugiere cuál queda: mail de dominio de empresa — no en
+  `inbound.FREE_EMAIL_DOMAINS` — > más datos > más viejo) y `merge_contacts(keep, drop, choices)`:
+  lo vacío en el que queda se copia solo; en conflictos gana el que queda salvo `choices[k] =
+  "other"` (también `email`). Mueve `prospect_deal_contacts`, historial (`company_events.contact_id`),
+  inscripciones (si los dos están en el mismo workflow, se cierra la del que se va), `prospect_wf_match`
+  de workflows de contacto y la bandeja de inbound; borra el otro con DELETE directo. Su mail va a
+  la propiedad **Other emails** (`additional_emails`): la búsqueda y Calendly (`inbound._find_contact`)
+  la miran. Id de HubSpot: si el que queda no tiene, se lo pasa; si tiene, el del otro va a
+  `prospect_deleted_records` con `merged_into` (el sync de contactos no lo recrea; el de negocios,
+  `resolve_links`, lo traduce al que quedó). Rutas `GET /contacts/<id>/merge-candidates`,
+  `GET …/merge-preview?other=`, `POST …/merge`.
+  **Lista general «Duplicados»** (botón en la barra de Contactos, con la cantidad de grupos; mismo
+  permiso): `store.duplicate_groups()` — mismo nombre y apellido normalizados + (misma empresa, o uno
+  sin empresa, o mismo dominio de mail no gratuito), agrupados con union-find, primero los que tienen
+  negocios; `GET /contacts/duplicates`. «Revisar fusión» abre la misma vista previa
+  (`mergePreview(aId, bId, flow)` en `prospecting-contacts.js`, compartida con el panel del contacto).
+  «No son duplicados» → `POST /contacts/duplicates/dismiss` guarda los pares en
+  `prospect_contact_not_dup` (autocreada) y no vuelven a aparecer.
 
 ### Importación y sync desde HubSpot
 
@@ -281,6 +301,13 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   asociación, foto `hubspot_seen` (clave `__stage` para la etapa); con oportunidad, HubSpot no hace
   retroceder la etapa. De paso se arregló el mail de Credit Loop del sync de oportunidades
   (`payload` sin definir → NameError tragado, no salía nunca).
+- **Negocios duplicados Hub ↔ HubSpot (fusión automática, 2026-11-27)**: `find_adoptable` sólo mira
+  al CREAR el negocio de HubSpot; si ése llegó antes que su contacto (Siana Marketing: HubSpot 9/11
+  sin contacto ni empresa, workflow #13 del Hub el 10/11), el par se escapaba. `prospecting/deal_merge.py`
+  (`find_pairs` + `merge`, antes en `scripts/merge_duplicate_deals.py`, que ahora lo importa) corre al
+  final de cada `hubspot_deals.sync()` no-dry (stat `duplicados_fusionados`, SAVEPOINT por par).
+  `merge()` también pasa la empresa si el que queda no tiene (`D.set_company`) y recalcula
+  `pull_into_deal` + `summary_for_contacts`.
 
 ### Tabla, vistas y paneles
 

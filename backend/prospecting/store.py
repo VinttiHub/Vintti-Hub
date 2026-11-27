@@ -434,6 +434,21 @@ def ensure_schema(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_hs_idx ON prospect_deleted_records (object, hubspot_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_clay_idx ON prospect_deleted_records (clay_record_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS prospect_deleted_domain_idx ON prospect_deleted_records (object, domain)")
+    # Fusión de contactos (2026-11-27): el id de HubSpot del que se fue queda bloqueado y apunta al
+    # que quedó (el sync de negocios traduce ese id para atar sus negocios).
+    cur.execute("ALTER TABLE prospect_deleted_records ADD COLUMN IF NOT EXISTS merged_into BIGINT")
+    # «No son duplicados» (2026-11-27): pares que una persona descartó en la lista de duplicados.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prospect_contact_not_dup (
+            a_id         BIGINT NOT NULL,
+            b_id         BIGINT NOT NULL,
+            dismissed_by TEXT,
+            dismissed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (a_id, b_id)
+        )
+        """
+    )
     # Gente que aparece en propiedades de persona (Scheduled By) y no está en `users`:
     # ex-BDRs que sólo existen como owners de HubSpot. Sólo para mostrar su nombre.
     cur.execute(
@@ -1826,11 +1841,353 @@ def deleted_hubspot_ids(cur, obj: str, hs_ids: list) -> set:
 
 def list_deleted(cur, limit: int = 500) -> list[dict]:
     cur.execute(
-        "SELECT id, object, record_id, name, hubspot_id, clay_record_id, domain, email, deleted_by, deleted_at "
+        "SELECT id, object, record_id, name, hubspot_id, clay_record_id, domain, email, deleted_by, deleted_at, "
+        "merged_into "
         "FROM prospect_deleted_records ORDER BY deleted_at DESC, id DESC LIMIT %s",
         (limit,),
     )
     return [dict(r) for r in cur.fetchall()]
+
+
+# --------------------------------------------------------------------------- #
+# Fusionar contactos (2026-11-27). Lo decide una persona desde el panel del contacto: elige cuál
+# queda y, en los conflictos, qué valor gana. Nunca automático por nombre.
+# --------------------------------------------------------------------------- #
+# No se comparan como propiedades: el email lo maneja la fusión (el del otro va a Other emails).
+_MERGE_SKIP = {"email", "additional_emails"}
+
+
+def _merge_empty(v) -> bool:
+    return v is None or v == "" or v == []
+
+
+def _merge_same(a, b) -> bool:
+    from prospecting.prop_sync import _same
+    return _same(a, b)
+
+
+def _email_domain(email) -> str:
+    return (email or "").strip().lower().rpartition("@")[2]
+
+
+def _merge_score(c: dict) -> tuple:
+    """Cuál conviene que quede: mail con dominio de empresa > más datos > el más viejo."""
+    from prospecting.contact_fields import CONTACT_FIELDS
+    from prospecting.inbound import FREE_EMAIL_DOMAINS
+
+    dom = _email_domain(c.get("email"))
+    corporate = 1 if dom and dom not in FREE_EMAIL_DOMAINS else 0
+    filled = sum(1 for f in CONTACT_FIELDS if not _merge_empty(c.get(f["key"])))
+    created = c.get("created_at")
+    return (corporate, filled, -(created.timestamp() if hasattr(created, "timestamp") else 0))
+
+
+def _contact_for_merge(cur, contact_id: int, lock: bool = False) -> dict | None:
+    cur.execute(
+        "SELECT ct.*, c.name AS company_name FROM prospect_contacts ct "
+        "LEFT JOIN prospect_companies c ON c.id = ct.company_id WHERE ct.id = %s" + (" FOR UPDATE OF ct" if lock else ""),
+        (contact_id,),
+    )
+    r = cur.fetchone()
+    if r is None:
+        return None
+    out = _flatten_contact(r)
+    cur.execute("SELECT COUNT(*) AS n FROM prospect_deal_contacts WHERE contact_id = %s", (contact_id,))
+    out["deal_count"] = cur.fetchone()["n"]
+    return out
+
+
+def merge_candidates(cur, contact_id: int, q: str = "", limit: int = 12) -> list[dict]:
+    """Posibles duplicados: mismo nombre (primero los de la misma empresa); con `q`, búsqueda
+    por nombre / mail. Mismo mundo dummy o real."""
+    cur.execute("SELECT * FROM prospect_contacts WHERE id = %s", (contact_id,))
+    me = cur.fetchone()
+    if me is None:
+        raise LookupError("contact")
+    q = (q or "").strip()
+    if q:
+        cond = ("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s "
+                "OR ct.props->>'additional_emails' ILIKE %s)")
+        params = [f"%{q}%"] * 3
+    else:
+        if not (me["first_name"] or me["last_name"]):
+            return []
+        cond = ("LOWER(TRIM(COALESCE(ct.first_name, ''))) = LOWER(TRIM(COALESCE(%s, ''))) "
+                "AND LOWER(TRIM(COALESCE(ct.last_name, ''))) = LOWER(TRIM(COALESCE(%s, '')))")
+        params = [me["first_name"], me["last_name"]]
+    cur.execute(
+        f"""
+        SELECT ct.id, ct.first_name, ct.last_name, ct.email, ct.company_id, c.name AS company_name,
+               ct.hubspot_contact_id, ct.created_at,
+               (SELECT COUNT(*) FROM prospect_deal_contacts x WHERE x.contact_id = ct.id) AS deal_count
+          FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id
+         WHERE ct.id <> %s AND ct.is_dummy = %s AND {cond}
+         ORDER BY (ct.company_id IS NOT DISTINCT FROM %s) DESC, ct.created_at
+         LIMIT %s
+        """,
+        [contact_id, bool(me["is_dummy"])] + params + [me["company_id"], limit],
+    )
+    out = []
+    for r in cur.fetchall():
+        r = dict(r)
+        r["name"] = " ".join(x for x in (r["first_name"], r["last_name"]) if x) or r["email"] or f"#{r['id']}"
+        r["same_company"] = r["company_id"] is not None and r["company_id"] == me["company_id"]
+        out.append(r)
+    return out
+
+
+def merge_preview(cur, a_id: int, b_id: int) -> dict:
+    """Los dos contactos, cuál se sugiere que quede y las propiedades donde difieren (la página
+    arma «se pasan solos» y «conflictos» según cuál quede)."""
+    from prospecting.contact_fields import CONTACT_FIELDS
+
+    if a_id == b_id:
+        raise ValueError("Elegí otro contacto.")
+    a, b = _contact_for_merge(cur, a_id), _contact_for_merge(cur, b_id)
+    if a is None or b is None:
+        raise LookupError("contact")
+    if bool(a.get("is_dummy")) != bool(b.get("is_dummy")):
+        raise ValueError("Un contacto de prueba no se fusiona con uno real.")
+    rows = []
+    for f in CONTACT_FIELDS:
+        k = f["key"]
+        if k in _MERGE_SKIP:
+            continue
+        va, vb = a.get(k), b.get(k)
+        if _merge_empty(va) and _merge_empty(vb) or _merge_same(va, vb):
+            continue
+        rows.append({"key": k, "label": f["label"], "type": f["type"], "a": va, "b": vb})
+
+    def card(c):
+        return {"id": c["id"], "name": c["name"], "email": c.get("email"), "additional_emails": c.get("additional_emails"),
+                "company_id": c.get("company_id"), "company_name": c.get("company_name"),
+                "hubspot_contact_id": c.get("hubspot_contact_id"), "deal_count": c.get("deal_count"),
+                "created_at": c.get("created_at"), "is_primary": c.get("is_primary")}
+
+    keep = a if _merge_score(a) >= _merge_score(b) else b
+    return {"a": card(a), "b": card(b), "suggested_keep": keep["id"], "fields": rows}
+
+
+def duplicate_groups(cur, limit: int = 300) -> list[dict]:
+    """Todos los posibles duplicados (2026-11-27, la lista general de Contactos → Duplicados).
+
+    Par = mismo nombre y apellido (sin mayúsculas ni espacios de más) y además: misma empresa, o
+    uno sin empresa, o el mismo dominio de mail de empresa. Nombres distintos en empresas
+    distintas son otras personas. Los pares descartados («No son duplicados») no vuelven. Los
+    pares se juntan en grupos (3 «John Doe» = un grupo). Sin dummies."""
+    from prospecting.inbound import FREE_EMAIL_DOMAINS
+
+    cur.execute(
+        """
+        WITH k AS (
+            SELECT id, company_id, split_part(LOWER(COALESCE(email, '')), '@', 2) AS dom,
+                   LOWER(REGEXP_REPLACE(TRIM(CONCAT_WS(' ', first_name, last_name)), '\\s+', ' ', 'g')) AS nm
+              FROM prospect_contacts
+             WHERE NOT is_dummy AND NULLIF(TRIM(first_name), '') IS NOT NULL AND NULLIF(TRIM(last_name), '') IS NOT NULL
+        )
+        SELECT a.id AS a_id, b.id AS b_id, a.dom AS a_dom, b.dom AS b_dom,
+               (a.company_id IS NOT NULL AND a.company_id = b.company_id) AS same_co,
+               (a.company_id IS NULL OR b.company_id IS NULL) AS one_orphan
+          FROM k a JOIN k b ON a.nm = b.nm AND a.id < b.id
+         WHERE NOT EXISTS (SELECT 1 FROM prospect_contact_not_dup x WHERE x.a_id = a.id AND x.b_id = b.id)
+        """
+    )
+    parent = {}
+
+    def find(x):
+        while parent.setdefault(x, x) != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for r in cur.fetchall():
+        same_dom = r["a_dom"] and r["a_dom"] == r["b_dom"] and r["a_dom"] not in FREE_EMAIL_DOMAINS
+        if r["same_co"] or r["one_orphan"] or same_dom:
+            parent[find(r["a_id"])] = find(r["b_id"])
+    groups = {}
+    for x in list(parent):
+        groups.setdefault(find(x), []).append(x)
+    groups = [g for g in groups.values() if len(g) > 1]
+    if not groups:
+        return []
+    ids = [i for g in groups for i in g]
+    cur.execute(
+        """
+        SELECT ct.*, c.name AS company_name,
+               (SELECT COUNT(*) FROM prospect_deal_contacts x WHERE x.contact_id = ct.id) AS deal_count
+          FROM prospect_contacts ct LEFT JOIN prospect_companies c ON c.id = ct.company_id
+         WHERE ct.id = ANY(%s)
+        """,
+        (ids,),
+    )
+    rows = {}
+    for r in cur.fetchall():
+        f = _flatten_contact(r)
+        f["deal_count"] = r["deal_count"]
+        rows[r["id"]] = f
+    out = []
+    for g in groups:
+        cs = sorted((rows[i] for i in g if i in rows), key=_merge_score, reverse=True)
+        if len(cs) < 2:
+            continue
+        out.append({
+            "suggested_keep": cs[0]["id"],
+            "with_deals": sum(1 for c in cs if c["deal_count"]),
+            "contacts": [{"id": c["id"], "name": c["name"], "email": c.get("email"),
+                          "company_id": c.get("company_id"), "company_name": c.get("company_name"),
+                          "deal_count": c["deal_count"], "hubspot_contact_id": c.get("hubspot_contact_id"),
+                          "created_at": c.get("created_at")} for c in cs],
+        })
+    # Primero los que tienen negocios (los que más molestan), después por nombre.
+    out.sort(key=lambda g: (-g["with_deals"], g["contacts"][0]["name"].lower()))
+    return out[:limit]
+
+
+def dismiss_duplicates(cur, ids: list, actor: str | None) -> int:
+    """«No son duplicados»: guarda todos los pares del grupo."""
+    ids = sorted({int(i) for i in ids or [] if str(i).strip()})
+    n = 0
+    for i, a in enumerate(ids):
+        for b in ids[i + 1:]:
+            cur.execute("INSERT INTO prospect_contact_not_dup (a_id, b_id, dismissed_by) VALUES (%s, %s, %s) "
+                        "ON CONFLICT DO NOTHING", (a, b, actor))
+            n += cur.rowcount
+    return n
+
+
+def _join_emails(*parts) -> list[str]:
+    out = []
+    for p in parts:
+        for e in str(p or "").replace(";", ",").split(","):
+            e = e.strip().lower()
+            if e and e not in out:
+                out.append(e)
+    return out
+
+
+def merge_contacts(cur, keep_id: int, drop_id: int, choices: dict | None, actor: str | None) -> dict:
+    """Fusiona `drop_id` en `keep_id` y borra `drop_id`.
+
+    `choices`: {propiedad: "other"} para los conflictos donde gana el valor del que se va
+    (también "email": "other" = el mail del otro pasa a ser el principal). Lo que el que queda
+    tiene vacío y el otro no, se pasa solo. Se mueven negocios, historial, inscripciones a
+    workflows, memoria de workflows y la bandeja de inbound."""
+    from prospecting.contact_fields import CONTACT_FIELDS
+
+    keep_id, drop_id = int(keep_id), int(drop_id)
+    if keep_id == drop_id:
+        raise ValueError("Elegí otro contacto.")
+    choices = choices or {}
+    # Orden fijo de locks: el id menor primero (dos fusiones cruzadas no se trancan).
+    first, second = sorted((keep_id, drop_id))
+    _contact_for_merge(cur, first, lock=True)
+    _contact_for_merge(cur, second, lock=True)
+    keep, drop = _contact_for_merge(cur, keep_id), _contact_for_merge(cur, drop_id)
+    if keep is None or drop is None:
+        raise LookupError("contact")
+    if bool(keep.get("is_dummy")) != bool(drop.get("is_dummy")):
+        raise ValueError("Un contacto de prueba no se fusiona con uno real.")
+
+    # 1. Qué se le escribe al que queda.
+    patch = {}
+    for f in CONTACT_FIELDS:
+        k = f["key"]
+        if k in _MERGE_SKIP:
+            continue
+        kv, dv = keep.get(k), drop.get(k)
+        if _merge_empty(dv) or _merge_same(kv, dv):
+            continue
+        if _merge_empty(kv) or choices.get(k) == "other":
+            patch[k] = dv
+    main_email = keep.get("email")
+    if choices.get("email") == "other" and drop.get("email"):
+        main_email = drop["email"]
+        patch["email"] = drop["email"]
+    others = [e for e in _join_emails(keep.get("email"), keep.get("additional_emails"), drop.get("email"),
+                                      drop.get("additional_emails")) if e != (main_email or "").strip().lower()]
+    if others != _join_emails(keep.get("additional_emails")):
+        patch["additional_emails"] = ", ".join(others) or None
+
+    # 2. Todo lo que apunta al que se va pasa al que queda.
+    cur.execute("INSERT INTO prospect_deal_contacts (deal_id, contact_id) "
+                "SELECT deal_id, %s FROM prospect_deal_contacts WHERE contact_id = %s ON CONFLICT DO NOTHING",
+                (keep_id, drop_id))
+    cur.execute("SELECT deal_id FROM prospect_deal_contacts WHERE contact_id = %s", (drop_id,))
+    deal_ids = [r["deal_id"] for r in cur.fetchall()]
+    cur.execute("DELETE FROM prospect_deal_contacts WHERE contact_id = %s", (drop_id,))
+    cur.execute("UPDATE prospect_company_events SET contact_id = %s WHERE contact_id = %s", (keep_id, drop_id))
+    # Inscripciones: si los dos están adentro del mismo workflow, la del que se va se cierra.
+    cur.execute(
+        """
+        UPDATE prospect_wf_enrollments e
+           SET status = 'unenrolled', finished_at = NOW(), wake_at = NULL, wait_deadline = NULL,
+               last_error = 'Contacto fusionado: sigue la inscripción del que quedó.'
+         WHERE e.contact_id = %s AND e.status IN ('active', 'waiting')
+           AND EXISTS (SELECT 1 FROM prospect_wf_enrollments k WHERE k.contact_id = %s
+                        AND k.workflow_id = e.workflow_id AND k.status IN ('active', 'waiting'))
+        """,
+        (drop_id, keep_id),
+    )
+    cur.execute("UPDATE prospect_wf_enrollments SET contact_id = %s, company_id = COALESCE(company_id, %s) "
+                "WHERE contact_id = %s", (keep_id, keep.get("company_id"), drop_id))
+    # Memoria «ya cumplía» de los workflows de contactos (record_id = id del contacto).
+    cur.execute(
+        """
+        DELETE FROM prospect_wf_match m USING prospect_workflows w
+         WHERE w.id = m.workflow_id AND COALESCE(w.object, 'company') = 'contact' AND m.record_id = %s
+           AND EXISTS (SELECT 1 FROM prospect_wf_match k WHERE k.workflow_id = m.workflow_id AND k.record_id = %s)
+        """,
+        (drop_id, keep_id),
+    )
+    cur.execute(
+        """
+        UPDATE prospect_wf_match m SET record_id = %s FROM prospect_workflows w
+         WHERE w.id = m.workflow_id AND COALESCE(w.object, 'company') = 'contact' AND m.record_id = %s
+        """,
+        (keep_id, drop_id),
+    )
+    cur.execute("UPDATE prospect_inbound_contacts SET contact_id = %s WHERE contact_id = %s", (keep_id, drop_id))
+
+    # 3. Se borra el que se va (después de mover todo; antes del patch, así su mail queda libre).
+    cur.execute("DELETE FROM prospect_contacts WHERE id = %s", (drop_id,))
+    hs_moved = False
+    if drop.get("hubspot_contact_id"):
+        if not keep.get("hubspot_contact_id"):
+            cur.execute("UPDATE prospect_contacts SET hubspot_contact_id = %s WHERE id = %s",
+                        (drop["hubspot_contact_id"], keep_id))
+            hs_moved = True
+        else:
+            # Bloqueado: el sync de HubSpot no lo recrea; el de negocios lo traduce a `keep`.
+            cur.execute(
+                """
+                INSERT INTO prospect_deleted_records (object, record_id, name, hubspot_id, email, deleted_by, merged_into)
+                VALUES ('contact', %s, %s, %s, %s, %s, %s)
+                """,
+                (drop_id, f"{drop['name']} (fusionado en {keep['name']})", drop["hubspot_contact_id"],
+                 (drop.get("email") or "").lower() or None, actor, keep_id),
+            )
+    log_event(cur, keep.get("company_id") or drop.get("company_id"), "merge", actor, None, None,
+              f"contact_merged:{drop['name']} ({drop.get('email') or '#' + str(drop_id)})", contact_id=keep_id)
+
+    # 4. Empresa y primario.
+    if keep.get("company_id") is None and drop.get("company_id") is not None:
+        set_contact_company(cur, keep_id, drop["company_id"], actor, source="merge")
+    if drop.get("is_primary") and drop.get("company_id") is not None:
+        cur.execute("SELECT company_id FROM prospect_contacts WHERE id = %s", (keep_id,))
+        if cur.fetchone()["company_id"] == drop["company_id"]:
+            cur.execute("UPDATE prospect_contacts SET is_primary = (id = %s) WHERE company_id = %s",
+                        (keep_id, drop["company_id"]))
+
+    # 5. Los valores (historial + prop_sync + workflows, como cualquier edición).
+    res = update_contact(cur, keep_id, patch, actor, source="merge") if patch else None
+    from prospecting import prop_sync
+    cur.execute("SELECT deal_id FROM prospect_deal_contacts WHERE contact_id = %s", (keep_id,))
+    for r in cur.fetchall():
+        prop_sync.summary_for_contacts(cur, r["deal_id"], actor)
+    for cid in {keep.get("company_id"), drop.get("company_id")} - {None}:
+        recompute_contact_incomplete(cur, cid)
+    return {"kept": keep_id, "dropped": drop_id, "fields": sorted(patch), "deals_moved": len(deal_ids),
+            "hubspot_id_moved": hs_moved, "_changes": (res or {}).get("_changes") or []}
 
 
 def allow_back(cur, deleted_id: int) -> bool:
@@ -1984,8 +2341,9 @@ def _contact_where(f: dict) -> tuple[str, list]:
         params.append(_to_int(f["company_id"]))
     q = (f.get("q") or "").strip()
     if q:
-        where.append("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s OR c.name ILIKE %s)")
-        params += [f"%{q}%"] * 3
+        where.append("(ct.email ILIKE %s OR CONCAT_WS(' ', ct.first_name, ct.last_name) ILIKE %s OR c.name ILIKE %s "
+                     "OR ct.props->>'additional_emails' ILIKE %s)")
+        params += [f"%{q}%"] * 4
     # Filtros avanzados (vistas de contactos, 2026-11-06): el route ya los validó. El
     # compilador de los workflows escribe para `FROM prospect_contacts` sin alias, y acá
     # la tabla es `ct` con LEFT JOIN `c`: por eso va como subconsulta.

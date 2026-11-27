@@ -83,6 +83,9 @@ G = CONTACT_GROUPS
 CONTACT_FIELDS = [
     # ---- Contacto ---------------------------------------------------------- #
     _f("email", "Email", "email", G[0], storage="col"),
+    _f("additional_emails", "Other emails", "text", G[0],
+       description="Otros mails de la misma persona (separados por coma). Los deja la fusión de contactos; "
+                   "Calendly y la búsqueda también los miran."),
     _f("first_name", "First Name", "text", G[0], storage="col"),
     _f("last_name", "Last Name", "text", G[0], storage="col"),
     _f("position", "Position", "enum", G[0], [
