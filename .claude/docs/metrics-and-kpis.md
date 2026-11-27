@@ -210,6 +210,14 @@ algo que hizo el AM. No es marginal: en septiembre de 2026 eran $28.8K contra un
 de $228K (valores en GMRR, de antes de pasar a MRR), así que contarlo como expansión
 subía el NRR del AM de 94% a ~107%.
 
+**Upsells del AM en cuentas nuevas** (decisión de la owner, 2026-11-27: «todo lo que lleva
+Pilar es upsell»). En el NRR del AM, `nrr_ups` no exige que la cuenta esté en la cohorte:
+alcanza `am_owned`, o sea, que la vacante no la haya vendido un AE. El NRR global sigue
+excluyendo cuentas nuevas (new business). El caso que lo motivó fue Papaya Tutor
+(nov-2026, $2.687 de fee). Es retroactivo: sube todos los meses de la serie en que alguien
+que no es AE vendió en una cuenta nueva (jul-2026 Real Books/agustin@, ago-2026 Anderson
+Law + Green House/lara@).
+
 ## Brand color palette (dashboards)
 
 When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):

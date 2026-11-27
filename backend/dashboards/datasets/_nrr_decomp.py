@@ -17,6 +17,9 @@ Entrada: tres CTE ya presentes en el WITH, todos con el grano
             de precio de las unidades que sobrevivieron.
   - `ups` : upsells — hires con `opp_close_date` DENTRO de la ventana, valuados al
             cierre. Poblacion: `upsell_population()`.
+            En el NRR global solo cuentan sobre cuentas que ya eran clientes al inicio;
+            en el del AM cuenta todo lo que vendio el AM, aunque la cuenta sea nueva
+            (decision de la owner, 2026-11-27).
 
 Salida: el CTE `nrr_rows(componente, candidate_id, account_id, opportunity_id, monto)`.
 
@@ -121,7 +124,6 @@ def decomp_cte(
     # `am_owned` solo se enciende (el reloj de 3 meses avanza, nunca retrocede), asi que
     # si la unidad es del AM al inicio tambien lo es al cierre: alcanza con filtrar `i`.
     owned_ini = " AND i.am_owned" if owned else ""
-    owned_ups = " AND u.am_owned" if owned else ""
 
     # Particion opcional: sin `key` es una sola ventana; con `key` es una por mes.
     k_i = f"i.{key}, " if key else ""
@@ -134,6 +136,20 @@ def decomp_cte(
     coh_j = f"c.{key} = u.{key} AND " if key else ""
     j_bi = f" AND b.{key} = i.{key}" if key else ""
     j_i0 = f" AND i0.{key} = i.{key}" if key else ""
+
+    # Poblacion de upsells. NRR global: solo cuentas que ya eran clientes al inicio (una
+    # cuenta nueva es new business). NRR del AM: TODO lo que vende el AM es upsell, aunque
+    # la cuenta sea nueva (decision de la owner, 2026-11-27: Papaya Tutor, dos Close Win de
+    # Pilar en nov-2026 sobre una cuenta sin contractors al inicio). Alcanza `am_owned`: para
+    # un hire cerrado dentro de la ventana es TRUE solo si NO lo vendio un AE (esas vacantes
+    # entran al libro del AM recien al vencer su M3).
+    if owned:
+        ups_where = "WHERE u.am_owned"
+    else:
+        ups_where = f"""WHERE EXISTS (
+            SELECT 1 FROM nrr_cohorte c
+            WHERE {coh_j}c.account_id = u.account_id
+          )"""
 
     # Unidad que se fue por buyout en la ventana: sale de la base y del churn.
     no_buyout_i = (
@@ -159,8 +175,8 @@ def decomp_cte(
 
     return f"""
         nrr_cohorte AS (
-          -- Las cuentas que YA eran clientes al inicio. Un hire en una cuenta nueva es
-          -- new business, no expansion, y queda fuera del NRR.
+          -- Las cuentas que YA eran clientes al inicio. En el NRR global un hire en una
+          -- cuenta nueva es new business y queda fuera; en el del AM no (ver `ups_where`).
           SELECT DISTINCT {coh_k}i.account_id
           FROM {ini} i
           WHERE i.account_id IS NOT NULL{owned_ini}
@@ -168,10 +184,7 @@ def decomp_cte(
         nrr_ups AS (
           SELECT u.*
           FROM {ups} u
-          WHERE EXISTS (
-            SELECT 1 FROM nrr_cohorte c
-            WHERE {coh_j}c.account_id = u.account_id
-          ){owned_ups}
+          {ups_where}
         ),
         nrr_buyouts AS (
           -- Estaban al inicio, ya no al cierre, y la baja que cae en la ventana es un
