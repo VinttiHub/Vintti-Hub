@@ -44,3 +44,16 @@ pgonzales, jazmin y lara (`STAFFING_MAIL_ALLOWED` en `staffing_routes.py`, `MAIL
   tener su texto editado. Reply-to = quien lo manda (`reply_to` nuevo y opcional en
   `/send_email`; aplica recién con el backend deployado, porque `post_transactional_email`
   pega a prod). Registro en `staffing_email_log` (autocreada). `TEST_ONLY_RECIPIENT` para pruebas.
+
+### Prorrateo (Days worked / Prorated salary / Prorated fee)
+
+Pestaña Database, selector **Payroll month** (default = mes en curso). Todo en el front
+(`proration()` / `prorate()` en `staffing.js`), sin endpoint:
+
+- Días hábiles = **lunes a viernes, sin feriados**, start y end **inclusive**.
+- `hábiles trabajados en el mes / hábiles del mes × salary` (y × fee). Ej.: nov-2026 = 21;
+  entra el 16 → 11/21 × $500 = $261.90. Sin end = trabaja hasta fin de mes.
+- Sin start_date o contrato fuera del mes → `—`. Mes completo = 100%.
+- El total del pie de las dos columnas prorrateadas suma **también Inactive** (`totalAll`):
+  quien se fue a mitad de mes se paga. El resto del pie sigue siendo "Active total".
+- El CSV (`/staffing/database.csv`) y los KPIs no incluyen el prorrateo.

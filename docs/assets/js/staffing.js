@@ -101,6 +101,55 @@
 
   function dash(value) { return value == null || value === "" ? "—" : esc(value); }
 
+  /* ---------- Prorrateo por días hábiles ----------
+     Días hábiles = lunes a viernes (sin feriados), ambos extremos inclusive.
+     prorrateo = hábiles trabajados en el mes / hábiles del mes × monto.
+     Ej.: nov-2026 tiene 21; entra el 16 → 11/21 × $500 = $261.90. */
+  function isoToUTC(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+
+  function businessDays(fromMs, toMs) {
+    var n = 0;
+    for (var t = fromMs; t <= toMs; t += 86400000) {
+      var dow = new Date(t).getUTCDay();
+      if (dow !== 0 && dow !== 6) n++;
+    }
+    return n;
+  }
+
+  function currentMonth() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+
+  function monthLabel(ym) {
+    var parts = String(ym || "").split("-");
+    return MONTHS[Number(parts[1]) - 1] + " " + parts[0];
+  }
+
+  // { worked, total, ratio } del contrato de la fila en el mes `ym` ("YYYY-MM").
+  // Sin start, o si el contrato no toca el mes → worked 0.
+  function proration(row, ym) {
+    var parts = String(ym || currentMonth()).split("-");
+    var y = Number(parts[0]), m = Number(parts[1]) - 1;
+    var first = Date.UTC(y, m, 1), last = Date.UTC(y, m + 1, 0);
+    var total = businessDays(first, last);
+    var start = isoToUTC(row.start_date);
+    var end = isoToUTC(row.end_date);
+    if (start == null) return { worked: 0, total: total, ratio: 0 };
+    var from = Math.max(start, first);
+    var to = end == null ? last : Math.min(end, last);
+    var worked = from > to ? 0 : businessDays(from, to);
+    return { worked: worked, total: total, ratio: total ? worked / total : 0 };
+  }
+
+  function prorate(row, amount) {
+    var p = proration(row, state.payMonth);
+    return Math.round(Number(amount || 0) * p.ratio * 100) / 100;
+  }
+
   // El backend cae al email del hr_lead cuando no encuentra el nombre en `users`
   // (típicamente ex-empleados que ya no están en la tabla). Se muestra prolijo.
   //
@@ -147,7 +196,9 @@
     // number/date -> {min, max}. Si la clave no está, la columna no filtra.
     filters: { database: {}, churn: {}, bonos: {} },
     sort: { database: null, churn: null, bonos: null },
-    search: { database: "", churn: "", bonos: "" }
+    search: { database: "", churn: "", bonos: "" },
+    // Mes del prorrateo de la pestaña Database ("YYYY-MM").
+    payMonth: currentMonth()
   };
 
   var $ = function (sel) { return document.querySelector(sel); };
@@ -298,6 +349,20 @@
         value: function (r) { return r.fee; }, cell: moneyCell("stf-money--soft") },
       { key: "client_payment", label: "Client payment", type: "number", total: true,
         value: function (r) { return r.client_payment; }, cell: moneyCell("stf-money--solid") },
+      // Prorrateo del mes elegido en "Payroll month". Suman Active + Inactive
+      // (totalAll): quien se fue a mitad de mes también se paga.
+      { key: "days_worked", label: "Days worked", type: "number",
+        value: function (r) { return proration(r, state.payMonth).worked; },
+        cell: function (r) {
+          var p = proration(r, state.payMonth);
+          if (!p.worked) return '<span class="stf-td--muted">—</span>';
+          return '<span class="stf-days' + (p.worked < p.total ? " stf-days--partial" : "") + '">' +
+            p.worked + "/" + p.total + "</span>";
+        } },
+      { key: "prorated_salary", label: "Prorated salary", type: "number", total: true, totalAll: true,
+        value: function (r) { return prorate(r, r.salary); }, cell: moneyCell("") },
+      { key: "prorated_fee", label: "Prorated fee", type: "number", total: true, totalAll: true,
+        value: function (r) { return prorate(r, r.fee); }, cell: moneyCell("stf-money--soft") },
       { key: "payment", label: "Payments", type: "text", options: ["Yes", "No"],
         value: function (r) { return r.payment ? "Yes" : "No"; },
         cell: paymentCell },
@@ -540,11 +605,12 @@
 
     var totals = {};
     var body = rows.map(function (row, index) {
-      if (!opts.totalOf || opts.totalOf(row)) {
-        cols.forEach(function (col) {
-          if (col.total) totals[col.key] = (totals[col.key] || 0) + Number(col.value(row) || 0);
-        });
-      }
+      var inTotal = !opts.totalOf || opts.totalOf(row);
+      cols.forEach(function (col) {
+        if (col.total && (inTotal || col.totalAll)) {
+          totals[col.key] = (totals[col.key] || 0) + Number(col.value(row) || 0);
+        }
+      });
       var cells = cols.map(function (col) {
         var cls = col.sticky ? "stf-td-name" : (col.align === "left" ? "stf-td--left" : "");
         if (col.muted) cls += " stf-td--muted";
@@ -1549,6 +1615,12 @@
         ["Salary", money(row.salary)],
         ["Vintti fee", money(row.fee)],
         ["Client payment", money(row.client_payment)],
+        ["Days worked (" + monthLabel(state.payMonth) + ")", (function () {
+          var p = proration(row, state.payMonth);
+          return p.worked ? p.worked + "/" + p.total : "—";
+        })()],
+        ["Prorated salary", money(prorate(row, row.salary))],
+        ["Prorated fee", money(prorate(row, row.fee))],
         ["Equipment", row.equipment]
       ], row.orphan
         ? "This row came from the Sheet and matched no hire in the Hub. It fills itself in once the opportunity exists."
@@ -2311,6 +2383,16 @@
         renderTab(tab);
       });
     });
+
+    var payMonth = $("[data-pay-month]");
+    if (payMonth) {
+      payMonth.value = state.payMonth;
+      payMonth.addEventListener("change", function () {
+        state.payMonth = payMonth.value || currentMonth();
+        if (!payMonth.value) payMonth.value = state.payMonth;
+        renderDatabase();
+      });
+    }
 
     $$("[data-bulk-pay]").forEach(function (btn) {
       btn.addEventListener("click", function () { bulkPayment(btn.dataset.bulkPay === "on"); });

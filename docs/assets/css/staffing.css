@@ -1051,3 +1051,10 @@ datalist { display: none; }
 .stf-rte__area--tall { min-height: 200px; max-height: 420px; }
 .stf-rte__area ul, .stf-rte__area ol { margin: 4px 0; padding-left: 22px; }
 .stf-rte__area a { color: var(--stf-violet); }
+
+/* Prorrateo: "Days worked" resalta a quien no trabajó el mes completo. */
+.stf-days { font-variant-numeric: tabular-nums; }
+.stf-days--partial {
+  padding: 2px 8px; border-radius: 999px; font-weight: 600;
+  background: color-mix(in srgb, #c1ff72 55%, transparent); color: #1a1a1a;
+}
