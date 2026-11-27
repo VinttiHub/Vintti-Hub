@@ -582,6 +582,23 @@
   /* =====================================================================
      Render de la tabla
      ===================================================================== */
+  // La tabla ocupa exactamente lo que queda de pantalla debajo de los KPIs y
+  // filtros: así el pie (totales) y la barra de scroll horizontal se ven sin
+  // scrollear la página. En pantallas bajas no baja de 360px (scrollea la página).
+  var SCROLL_MIN = 360;
+  var SCROLL_BOTTOM_GAP = 72; // padding de la card + de la página
+
+  function fitScroller(el) {
+    if (!el || !el.offsetParent) return; // pestaña oculta: se ajusta al mostrarse
+    var top = el.getBoundingClientRect().top + window.scrollY;
+    var room = window.innerHeight - top - SCROLL_BOTTOM_GAP;
+    el.style.maxHeight = Math.max(SCROLL_MIN, Math.floor(room)) + "px";
+  }
+
+  function fitAllScrollers() {
+    $$(".stf-scroll").forEach(fitScroller);
+  }
+
   function renderTable(tab, hostId, opts) {
     var host = $(hostId);
     if (!host) return [];
@@ -649,6 +666,7 @@
       "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody>" + foot + "</table></div>";
 
     var newScroller = host.querySelector(".stf-scroll");
+    fitScroller(newScroller);
     newScroller.scrollLeft = keepLeft;
     newScroller.scrollTop = keepTop;
     var restoredLeft = newScroller.scrollLeft;
@@ -2444,6 +2462,7 @@
         $$(".stf-panel").forEach(function (p) { p.classList.toggle("is-active", p.dataset.panel === tab); });
         $("#stfExportCsv").style.display = tab === "database" ? "" : "none";
         loadTab(tab);
+        fitAllScrollers(); // la tabla ya cargada de esa pestaña estaba oculta
       });
     });
 
@@ -2466,6 +2485,25 @@
         renderTab(tab);
       });
     });
+
+    // El alto de la tabla depende de todo lo que está arriba (KPIs, filtros,
+    // botones que se agregan por JS, la fuente web, el sidebar). Al cargar eso
+    // termina de acomodarse DESPUÉS del primer render, así que se vuelve a medir
+    // cada vez que cambia el tamaño de la página. Es idempotente: el alto de la
+    // tabla no mueve su propio `top`, así que el observer se calma solo.
+    var fitQueued = false;
+    var queueFit = function () {
+      if (fitQueued) return;
+      fitQueued = true;
+      requestAnimationFrame(function () { fitQueued = false; fitAllScrollers(); });
+    };
+    window.addEventListener("resize", queueFit);
+    window.addEventListener("load", queueFit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit);
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(queueFit);
+      $$(".stf-head, .stf-tabs, .stf-kpis, .stf-filters").forEach(function (el) { ro.observe(el); });
+    }
 
     var payMonth = $("[data-pay-month]");
     if (payMonth) {
