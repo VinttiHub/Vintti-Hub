@@ -102,6 +102,11 @@ Cinco cosas que no son obvias:
 - **Por eso los upsells se valúan con un snapshot sin filtro de actividad**: el
   `where_extra` de `unit_snapshot()` / `am_unit_snapshot()`. Con la cláusula de actividad
   un upsell que todavía no arrancó se valuaría en cero.
+  Pero **sí exige `start_d IS NOT NULL`** (gate de contratado, R17): ese `where_extra`
+  reemplaza la población por defecto, y en el motor del AM (`hires`) el gate vivía ahí.
+  Sin él, el NRR del AM contaba como upsell las filas de referencias de candidatos que
+  nunca fueron contratados (2026-11-27: 2–7 por mes, casi todas a $0; jul y ago 2026
+  tenían $1.400 y $700 fantasma). Vive en `upsell_population()`.
 - **Expansión y contracción excluyen lo ya contado como upsell** (`NOT EXISTS` contra
   `nrr_ups`): una opp puede tener `opp_close_date` dentro de la ventana con el hire
   activo desde antes —close date cargado tarde, o pisado por el sync de HubSpot— y se

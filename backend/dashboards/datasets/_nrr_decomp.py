@@ -65,9 +65,16 @@ def upsell_population(win_ini: str, win_fin: str, col: str = "opp_close_d") -> s
 
     `col` es como se llama esa fecha en el CTE base: `opp_close_d` en `hires_full`
     (NRR global) y `close_d` en `hires` (NRR del AM).
+
+    `start_d IS NOT NULL` es el gate de "contratado" (R17). Este predicado REEMPLAZA la
+    poblacion por defecto del snapshot, que es donde vive ese gate en el motor del AM
+    (`hires` no lo filtra). Sin el, toda fila de `hire_opportunity` de una opp cerrada en
+    la ventana entraba como upsell: tambien las de referencias de candidatos que
+    compitieron y nunca fueron contratados (2026-11-27). En `hires_full` ya se filtraba.
     """
     return (
-        f"h.{col} IS NOT NULL"
+        f"h.start_d IS NOT NULL"
+        f" AND h.{col} IS NOT NULL"
         f" AND h.{col} > {win_ini} AND h.{col} <= {win_fin}"
     )
 
