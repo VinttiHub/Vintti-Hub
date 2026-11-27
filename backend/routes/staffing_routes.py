@@ -1597,11 +1597,19 @@ def _first_name(full_name: str) -> str:
 
 
 def _active_people(cur, include_onboarding: bool, viewer: str = "") -> list:
-    """Una entrada por mail (o por candidato, si no tiene mail), con sus cuentas."""
     wanted = {"Active", "Onboarding"} if include_onboarding else {"Active"}
+    return _staffing_people(cur, wanted, viewer=viewer)
+
+
+def _staffing_people(cur, statuses=None, viewer: str = "") -> list:
+    """Una entrada por mail (o por candidato, si no tiene mail), con sus cuentas.
+
+    `statuses=None` = cualquier status del Database ("Email filtered": el front
+    filtra, pero el destinatario igual tiene que ser alguien de la tabla).
+    """
     people = {}
     for r in _fetch_pairs(cur, include_orphans=False):
-        if r.get("status") not in wanted:
+        if statuses is not None and r.get("status") not in statuses:
             continue
         mail = (r.get("mail") or "").strip().lower()
         key = mail if "@" in mail else f"cid:{r['candidate_id']}"
@@ -1772,7 +1780,14 @@ def staffing_send_email():
         _ensure_schema(cur)
         _ensure_mail_log(cur)
         conn.commit()
-        by_cid = {p["candidate_id"]: p for p in _active_people(cur, include_onboarding=True, viewer=sender)}
+        # scope "filtered": cualquiera de la tabla Staffing (el filtro lo hizo la
+        # persona en la página). Si no, como siempre: Active + Onboarding.
+        filtered = data.get("scope") == "filtered"
+        if filtered:
+            people = _staffing_people(cur, None, viewer=sender)
+        else:
+            people = _active_people(cur, include_onboarding=True, viewer=sender)
+        by_cid = {str(p["candidate_id"]): p for p in people}
 
         results = []
         for m in messages:
@@ -1781,7 +1796,7 @@ def staffing_send_email():
             body = (m or {}).get("body") or ""
             person = by_cid.get(cid)
             if person is None:
-                results.append({"candidate_id": cid, "result": "not_active"})
+                results.append({"candidate_id": cid, "result": "not_found" if filtered else "not_active"})
                 continue
             if not person["mail"]:
                 results.append({"candidate_id": cid, "result": "no_email"})

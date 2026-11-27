@@ -44,6 +44,11 @@ pgonzales, jazmin y lara (`STAFFING_MAIL_ALLOWED` en `staffing_routes.py`, `MAIL
   tener su texto editado. Reply-to = quien lo manda (`reply_to` nuevo y opcional en
   `/send_email`; aplica recién con el backend deployado, porque `post_transactional_email`
   pega a prod). Registro en `staffing_email_log` (autocreada). `TEST_ONLY_RECIPIENT` para pruebas.
+- **Email filtered (N)**: mismo modal, pero la lista sale de las filas visibles de la tabla
+  (búsqueda + filtros por columna, `filteredPeople()` en el front), **cualquier status** (Inactive
+  incluido), sin filas "Sheet only". El POST lleva `scope: "filtered"` y el servidor valida contra
+  `_staffing_people(cur, None)`: sigue resolviendo el mail desde el candidate_id y sólo le escribe
+  a gente de la tabla Staffing.
 
 ### Prorrateo (Days worked / Prorated salary / Prorated fee)
 

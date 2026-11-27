@@ -1392,6 +1392,7 @@
     });
     $("#stfCountDatabase").textContent = rows.length + " of " + state.database.length + " contractors";
     renderDatabaseKpis(rows);
+    if (typeof updateFilterMailBtn === "function") updateFilterMailBtn();
   }
 
   function renderChurn() {
@@ -1977,9 +1978,53 @@
 
   var mail = {
     el: null, people: [], selected: {}, search: "", onboarding: true,
+    // "actives" = lista del backend (/active-emails); "filtered" = las filas que
+    // quedaron visibles en la tabla Database (búsqueda + filtros por columna).
+    scope: "actives", filterBtn: null,
     step: "list", subject: "", template: "Hi " + NAME_TOKEN + ",<br><br>", edits: {},
     idx: 0, results: {}, sending: false
   };
+
+  // Mismo criterio que `_staffing_people` del backend: una entrada por mail (o por
+  // candidato si no tiene mail), con sus cuentas. Las filas "Sheet only" no tienen
+  // candidato en el Hub y el servidor no podría resolverles el mail.
+  function filteredPeople() {
+    var people = {}, order = [];
+    visibleRows("database").forEach(function (r) {
+      if (r.orphan || r.candidate_id == null) return;
+      var addr = String(r.mail || "").trim().toLowerCase();
+      var has = addr.indexOf("@") > -1;
+      var key = has ? addr : "cid:" + r.candidate_id;
+      var p = people[key];
+      if (!p) {
+        var first = String(r.candidate_name || "").trim().split(" ")[0] || "";
+        p = people[key] = {
+          candidate_id: String(r.candidate_id),
+          name: r.candidate_name || "",
+          first_name: first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "",
+          mail: has ? addr : null,
+          accounts: [],
+          status: r.status
+        };
+        order.push(p);
+      }
+      if (r.client_name && p.accounts.indexOf(r.client_name) === -1) p.accounts.push(r.client_name);
+      if (r.status === "Active") p.status = "Active";
+    });
+    return order.sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
+  }
+
+  function updateFilterMailBtn() {
+    if (!mail.filterBtn) return;
+    var n = filteredPeople().filter(function (p) { return p.mail; }).length;
+    mail.filterBtn.innerHTML = '<i class="fa-regular fa-envelope"></i> Email filtered (' + n + ")";
+    mail.filterBtn.disabled = !n;
+  }
+
+  function mailCountText() {
+    return mailRecipients().length + " selected · " + mail.people.length +
+      (mail.scope === "filtered" ? " filtered" : " active");
+  }
 
   function mailPerson(cid) {
     for (var i = 0; i < mail.people.length; i++) if (mail.people[i].candidate_id === cid) return mail.people[i];
@@ -2093,7 +2138,7 @@
       b.classList.toggle("is-active", b.dataset.mailStep === mail.step);
     });
     mail.el.querySelector("[data-mail-count]").textContent =
-      recipients.length + " selected · " + mail.people.length + " active";
+      mailCountText();
     mail.el.querySelector("[data-mail-test]").style.display = mail.testOnly ? "" : "none";
     if (mail.testOnly) {
       mail.el.querySelector("[data-mail-test]").textContent =
@@ -2112,7 +2157,8 @@
     var html =
       '<div class="stf-mail__toolbar">' +
         '<input type="text" class="stf-filter__input" data-mail-search placeholder="Name, email or client…" value="' + esc(mail.search) + '">' +
-        '<label class="stf-mail__check"><input type="checkbox" data-mail-onb' + (mail.onboarding ? " checked" : "") + '> Include onboarding</label>' +
+        (mail.scope === "filtered" ? "" :
+          '<label class="stf-mail__check"><input type="checkbox" data-mail-onb' + (mail.onboarding ? " checked" : "") + '> Include onboarding</label>') +
         '<button type="button" class="stf-btn" data-mail-all="on">Select all</button>' +
         '<button type="button" class="stf-btn" data-mail-all="off">Select none</button>' +
         '<span class="stf-filters__spacer"></span>' +
@@ -2127,6 +2173,7 @@
             (p.mail ? "" : " disabled") + (mail.selected[p.candidate_id] ? " checked" : "") + '>' +
           '<span class="stf-mail__who"><strong>' + esc(p.name) + '</strong>' +
             (p.status === "Onboarding" ? ' <span class="stf-mail__tag">Onboarding</span>' : "") +
+            (p.status === "Inactive" ? ' <span class="stf-mail__tag stf-mail__tag--bad">Inactive</span>' : "") +
             (p.is_test ? ' <span class="stf-mail__tag stf-mail__tag--bad">Test</span>' : "") +
             (res === "sent" ? ' <span class="stf-mail__tag stf-mail__tag--ok">Sent</span>' : "") +
             '<small>' + esc(p.accounts.join(", ")) + '</small></span>' +
@@ -2147,7 +2194,8 @@
       again.focus();
       again.setSelectionRange(pos, pos);
     });
-    body.querySelector("[data-mail-onb]").addEventListener("change", function (e) {
+    var onb = body.querySelector("[data-mail-onb]");
+    if (onb) onb.addEventListener("change", function (e) {
       mail.onboarding = e.target.checked;
       loadMailPeople();
     });
@@ -2162,7 +2210,7 @@
       cb.addEventListener("change", function () {
         if (cb.checked) mail.selected[cb.dataset.mailPick] = true; else delete mail.selected[cb.dataset.mailPick];
         mail.el.querySelector("[data-mail-count]").textContent =
-          mailRecipients().length + " selected · " + mail.people.length + " active";
+          mailCountText();
       });
     });
     body.querySelectorAll("[data-mail-copy-one]").forEach(function (b) {
@@ -2279,6 +2327,7 @@
         return api("/staffing/send-email", {
           method: "POST",
           body: JSON.stringify({
+            scope: mail.scope,
             messages: chunk.map(function (p) {
               return { candidate_id: p.candidate_id, subject: mail.subject, body: mailBodyFor(p) };
             })
@@ -2302,10 +2351,34 @@
     });
   }
 
-  function openMail() {
+  function openMail(scope) {
+    scope = scope === "filtered" ? "filtered" : "actives";
+    var changed = scope !== mail.scope;
+    mail.scope = scope;
+    mail.el.querySelector("#stfMailTitle").textContent =
+      scope === "filtered" ? "Email filtered candidates" : "Email active contractors";
     mail.el.classList.add("is-open");
     mail.el.setAttribute("aria-hidden", "false");
-    if (!mail.people.length) loadMailPeople(); else renderMail();
+    if (scope === "filtered") {
+      // Siempre se rearma: los filtros pueden haber cambiado desde la última vez.
+      mail.people = filteredPeople();
+      mail.selected = {};
+      mail.results = {};
+      mail.edits = {};
+      mail.search = "";
+      mail.step = "list";
+      mail.people.forEach(function (p) { if (p.mail) mail.selected[p.candidate_id] = true; });
+      renderMail();
+    } else if (changed || !mail.people.length) {
+      mail.people = [];
+      mail.selected = {};
+      mail.results = {};
+      mail.edits = {};
+      mail.step = "list";
+      loadMailPeople();
+    } else {
+      renderMail();
+    }
   }
 
   function closeMail() {
@@ -2322,8 +2395,18 @@
     btn.type = "button";
     btn.className = "stf-btn stf-btn--primary";
     btn.innerHTML = '<i class="fa-regular fa-envelope"></i> Email actives';
-    btn.addEventListener("click", openMail);
+    btn.addEventListener("click", function () { openMail("actives"); });
     bar.insertBefore(btn, bar.querySelector(".stf-filters__spacer"));
+
+    // Mail a las filas que dejó la búsqueda + los filtros por columna (cualquier status).
+    var fbtn = document.createElement("button");
+    fbtn.type = "button";
+    fbtn.className = "stf-btn";
+    fbtn.title = "Email the contractors currently shown in the table (search + column filters)";
+    fbtn.addEventListener("click", function () { openMail("filtered"); });
+    bar.insertBefore(fbtn, bar.querySelector(".stf-filters__spacer"));
+    mail.filterBtn = fbtn;
+    updateFilterMailBtn();
 
     mail.el.querySelectorAll("[data-mail-close]").forEach(function (el) { el.addEventListener("click", closeMail); });
     mail.el.querySelectorAll("[data-mail-step]").forEach(function (b) {
