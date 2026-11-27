@@ -222,6 +222,16 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   `sql_lost_reason`, `role_hired` (mismo `name` que HubSpot). Datos existentes:
   `scripts/backfill_prop_sync.py` (en seco reporta diferencias; `--apply` completa sólo las nuevas
   vacías, primero desde HubSpot). Lead Life del contacto NO está en el mapa (lo manejan workflows).
+  **2026-11-27**: + Role to Hire (`common`). **SQL Date la manda el negocio** (no va en `LINKS`):
+  al contacto va la primera de sus negocios; el contacto sólo rellena negocios abiertos sin fecha
+  (`fill_sql_date_from_contact`, y en `pull_into_deal`). `summary_for_contacts()` (reemplaza a
+  `deep_dive_dates_for_contacts`, que sigue adentro) calcula en el contacto, sobre TODOS sus
+  negocios: SQL Date, First/Last Deep Dive, First/Last Closed Win y Closed Lost Date (fecha del
+  negocio o, si falta, `stage_dates`) y los checks First Intro Call Completed (≥ SQL), Deep Dive
+  Completed (≥ Deep Dive), NDA Signed (≥ NDA Signed o `nda_signed_date`), que sólo se prenden.
+  Nunca vacía lo que vino de HubSpot. Corre en `after_stage` (toda etapa), al asociar contactos y
+  cuando cambia en el negocio una de `SUMMARY_DEAL_KEYS`. Owner no se sincroniza (BDR ≠ AE).
+  Datos existentes: `scripts/backfill_contact_summaries.py` (en seco / `--apply`).
 - **Negocios (deals, 2026-11-04)**: el pipeline de ventas de HubSpot (*Proceso De Contratación*
   y *Vintti AI Pipeline*) como tablero por etapa en la sección Negocios (`prospecting-deals.js`):
   arrastrar = cambiar de etapa, tabla, filtros, export, panel del negocio, tarjeta en la ficha de

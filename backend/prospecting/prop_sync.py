@@ -66,7 +66,12 @@ LINKS = [
     ("credits_expiring_date", "credits_expiring_date", None, "common"),
     ("mkt_collab", "mkt_collab", None, "common"),
     ("follow_up_date", "follow_up_date", None, "common"),
+    # 2026-11-27: estaba en los dos y no viajaba.
+    ("role_to_hire", "role_to_hire", None, "common"),
 ]
+# SQL Date no va en LINKS: la manda el negocio (al contacto, la primera de sus negocios, en
+# `summary_for_contacts`) y el contacto sólo rellena negocios abiertos sin fecha
+# (`fill_sql_date_from_contact`). Ninguna de las tres políticas es eso.
 _IDX = {"contact": 0, "deal": 1, "company": 2}
 
 
@@ -177,13 +182,17 @@ def propagate(cur, obj: str, record_id: int, changes: list[dict], actor: str | N
     changed = {c["field"]: c["new"] for c in changes}
     i = _IDX[obj]
     links = [l for l in LINKS if l[i] and l[i] in changed]
-    if not links:
-        return []
+    out = []
     try:
-        return _propagate(cur, obj, record_id, changed, links, actor)
+        if links:
+            out = _propagate(cur, obj, record_id, changed, links, actor)
+        if obj == "deal" and SUMMARY_DEAL_KEYS & set(changed):
+            summary_for_contacts(cur, record_id, actor)
+        if obj == "contact" and "sql_date" in changed:
+            fill_sql_date_from_contact(cur, record_id, actor)
     except Exception:  # noqa: BLE001 — nunca romper el guardado del registro original
         logging.exception("prop_sync: no se pudo propagar %s #%s", obj, record_id)
-        return []
+    return out
 
 
 def _propagate(cur, obj, record_id, changed, links, actor) -> list:
@@ -310,11 +319,123 @@ def pull_into_deal(cur, deal_id: int, actor: str | None) -> list:
             v = comp.get(co_key)
         if not _empty(v):
             pairs.append((d_key, v))
+    # SQL Date: el contacto sólo rellena (ver nota bajo LINKS).
+    if ct and not _empty(ct.get("sql_date")):
+        pairs.append(("sql_date", _day(ct.get("sql_date"))))
     patch = _patch_for(_defs(cur)["deal"], pairs, fd, fill_only=True)
     if not patch:
         return []
     D.update_deal(cur, deal_id, patch, actor, source=f"{SOURCE_PREFIX}deal:{deal_id}")
     return [("deal", deal_id, d["company_id"], list(patch))]
+
+
+# Resúmenes del contacto que salen de TODOS sus negocios (2026-11-27, pedido de la owner): el
+# Hub los llena solo, sin HubSpot. Se recalculan al cambiar de etapa (`deals.after_stage`), al
+# asociar contactos y cuando cambia en el negocio alguna de estas propiedades.
+SUMMARY_DEAL_KEYS = {"sql_date", "closed_win_date", "closed_lost_date", "nda_signed_date", "first_deep_dive_date"}
+
+
+def _day(v) -> str | None:
+    """Fecha (YYYY-MM-DD) de un valor date / datetime / string ISO."""
+    if _empty(v):
+        return None
+    if hasattr(v, "isoformat"):
+        v = v.isoformat()
+    v = str(v).strip()
+    return v[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", v) else None
+
+
+def _reached(d: dict) -> list[int]:
+    """Ranks de la etapa actual y de todas por las que pasó el negocio (como `lost_before_sql`)."""
+    from prospecting import deals as D
+    stages = [d.get("stage_key")] + [k.partition(":")[2] for k in (d.get("stage_dates") or {})]
+    return [r for r in (D.rank(s) for s in stages if s) if r is not None]
+
+
+def _summary_patch(deals: list[dict], ct: dict) -> dict:
+    """Lo que cambia en el contacto según sus negocios. Nunca vacía un valor que ya tiene (si
+    los negocios no aportan el dato, queda el que vino de HubSpot) y los checks sólo se prenden."""
+    from prospecting import deals as D
+
+    sql_dates, won, lost = [], [], []
+    intro = dive = nda = False
+    for d in deals:
+        stamps = d.get("stage_dates") or {}
+        pipe = d.get("pipeline_key")
+        v = _day(d.get("sql_date"))
+        if v:
+            sql_dates.append(v)
+        if d.get("stage_key") == "closed_won":
+            v = _day(d.get("closed_win_date")) or _day(stamps.get(f"{pipe}:closed_won"))
+            if v:
+                won.append(v)
+        if d.get("stage_key") == "closed_lost":
+            v = _day(d.get("closed_lost_date")) or _day(stamps.get(f"{pipe}:closed_lost"))
+            if v:
+                lost.append(v)
+        ranks = _reached(d)
+        intro = intro or any(r >= D.rank("sql") for r in ranks)
+        dive = dive or any(r >= D.rank("deep_dive") for r in ranks)
+        nda = nda or any(r >= D.rank("nda_signed") for r in ranks) or not _empty(d.get("nda_signed_date"))
+
+    want = {}
+    if sql_dates:
+        want["sql_date"] = min(sql_dates)
+    if won:
+        want["first_closed_win_date"], want["last_closed_win_date"] = min(won), max(won)
+    if lost:
+        want["first_closed_lost_date"], want["last_closed_lost_date"] = min(lost), max(lost)
+    for key, on in (("first_intro_call_completed", intro), ("deep_dive_completed", dive), ("nda_signed", nda)):
+        if on:
+            want[key] = True
+
+    patch = {}
+    for key, val in want.items():
+        cur_v = ct.get(key)
+        if isinstance(val, bool):
+            if cur_v not in (True, "true", "True", 1):
+                patch[key] = True
+        elif _day(cur_v) != val:
+            patch[key] = val
+    return patch
+
+
+def summary_for_contacts(cur, deal_id: int, actor: str | None) -> None:
+    """Por cada contacto del negocio, sus resúmenes sobre TODOS sus negocios: First / Last Deep
+    Dive Date, SQL Date (la primera; el negocio manda), First / Last Closed Win y Closed Lost
+    Date, y los checks First Intro Call Completed / Deep Dive Completed / NDA Signed."""
+    from prospecting import deals as D
+
+    deep_dive_dates_for_contacts(cur, deal_id, actor)
+    cur.execute("SELECT contact_id FROM prospect_deal_contacts WHERE deal_id = %s", (deal_id,))
+    for cid in [r["contact_id"] for r in cur.fetchall()]:
+        cur.execute(
+            """
+            SELECT d.* FROM prospect_deals d JOIN prospect_deal_contacts dc ON dc.deal_id = d.id
+             WHERE dc.contact_id = %s
+            """,
+            (cid,),
+        )
+        deals = [D._flatten(r) for r in cur.fetchall()]
+        ct = _contact(cur, cid)
+        if not ct or not deals:
+            continue
+        patch = _summary_patch(deals, ct)
+        if patch:
+            res = store.update_contact(cur, cid, patch, actor, source=f"{SOURCE_PREFIX}deal:{deal_id}")
+            _emit(cur, [("contact", cid, ct.get("company_id"), (res or {}).get("_changes") or [])], actor)
+
+
+def fill_sql_date_from_contact(cur, contact_id: int, actor: str | None) -> None:
+    """SQL Date contacto → negocios ABIERTOS que no la tienen (sólo rellena: el negocio manda)."""
+    ct = _contact(cur, contact_id) or {}
+    v = _day(ct.get("sql_date"))
+    if not v:
+        return
+    from prospecting import deals as D
+    for d in _open_deals_of_contact(cur, contact_id):
+        if _empty(_flat_deal(d).get("sql_date")):
+            D.update_deal(cur, d["id"], {"sql_date": v}, actor, source=f"{SOURCE_PREFIX}contact:{contact_id}")
 
 
 def deep_dive_dates_for_contacts(cur, deal_id: int, actor: str | None) -> None:

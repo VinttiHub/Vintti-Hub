@@ -592,8 +592,8 @@ LEAD_LIFE_BY_STAGE = {
 
 def after_stage(cur, deal_id: int, pipeline: str, stage: str, actor: str | None) -> None:
     """Lo que se llena solo al entrar a una etapa (sin depender de HubSpot): Lead Life (Deal),
-    y en Deep Dive la First Deep Dive Date del negocio (si está vacía) + First / Last Deep Dive
-    Date de sus contactos."""
+    en Deep Dive la First Deep Dive Date del negocio (si está vacía), y los resúmenes de sus
+    contactos (`prop_sync.summary_for_contacts`)."""
     cur.execute("SELECT * FROM prospect_deals WHERE id = %s", (deal_id,))
     raw = cur.fetchone()
     if raw is None:
@@ -608,9 +608,9 @@ def after_stage(cur, deal_id: int, pipeline: str, stage: str, actor: str | None)
                                          or datetime.now(timezone.utc).isoformat())
     if patch:
         update_deal(cur, deal_id, patch, actor, source="deal_stage")
-    if stage == "deep_dive" or "first_deep_dive_date" in patch:
-        from prospecting import prop_sync
-        prop_sync.deep_dive_dates_for_contacts(cur, deal_id, actor)
+    # Resúmenes del contacto (Deep Dive / SQL / Closed Win-Lost Dates y checks) en cada etapa.
+    from prospecting import prop_sync
+    prop_sync.summary_for_contacts(cur, deal_id, actor)
 
 
 # Sella la entrada a una etapa en stage_dates (parámetro: "<pipeline>:<etapa>").
@@ -906,6 +906,7 @@ def set_contacts(cur, deal_id: int, contact_ids: list[int], actor: str | None, s
     if add:
         from prospecting import prop_sync
         prop_sync.pull_into_deal(cur, deal_id, actor)
+        prop_sync.summary_for_contacts(cur, deal_id, actor)
     if log and (add or drop):
         names = _contact_names(cur, add + drop)
         if add:
