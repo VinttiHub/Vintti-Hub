@@ -726,6 +726,56 @@ def staffing_database():
             conn.close()
 
 
+# --------------------------------------------------------------------------- #
+# Prorrateo por días hábiles (lunes a viernes, sin feriados, extremos inclusive).
+# Mismo cálculo que `proration()` de docs/assets/js/staffing.js: si tocás uno,
+# tocá el otro.
+# --------------------------------------------------------------------------- #
+def _parse_iso(value):
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(value or ""))
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def _business_days(start, end):
+    if start > end:
+        return 0
+    days = (end - start).days + 1
+    weeks, extra = divmod(days, 7)
+    count = weeks * 5
+    wd = start.weekday()
+    for i in range(extra):
+        if (wd + i) % 7 < 5:
+            count += 1
+    return count
+
+
+def _parse_month(value):
+    """'YYYY-MM' -> (primer día, último día). Inválido o vacío -> mes en curso."""
+    m = re.match(r"^(\d{4})-(\d{2})$", str(value or "").strip())
+    today = date.today()
+    y, mo = (int(m.group(1)), int(m.group(2))) if m and 1 <= int(m.group(2)) <= 12 else (today.year, today.month)
+    first = date(y, mo, 1)
+    nxt = date(y + 1, 1, 1) if mo == 12 else date(y, mo + 1, 1)
+    return first, date.fromordinal(nxt.toordinal() - 1)
+
+
+def _proration(row, first, last):
+    """(trabajados, hábiles del mes) del contrato de la fila en el mes."""
+    total = _business_days(first, last)
+    start = _parse_iso(row.get("start_date"))
+    if start is None:
+        return 0, total
+    end = _parse_iso(row.get("end_date"))
+    frm = max(start, first)
+    to = last if end is None else min(end, last)
+    return _business_days(frm, to), total
+
+
 @bp.route("/database.csv", methods=["GET"])
 def staffing_database_csv():
     if _current_email() not in STAFFING_ALLOWED:
@@ -754,7 +804,14 @@ def staffing_database_csv():
             conn.close()
 
     rows.sort(key=lambda r: (r.get("candidate_name") or "").lower())
+    first, last = _parse_month(request.args.get("month"))
+    month_label = first.strftime("%b %Y")
     for row in rows:
+        worked, total = _proration(row, first, last)
+        ratio = worked / total if total else 0
+        row["days_worked"] = f"{worked}/{total}" if worked else ""
+        row["prorated_salary"] = round(float(row.get("salary") or 0) * ratio, 2) if worked else ""
+        row["prorated_fee"] = round(float(row.get("fee") or 0) * ratio, 2) if worked else ""
         custom = row.get("custom") or {}
         for c in custom_cols:
             value = custom.get(f"c_{c['column_id']}")
@@ -766,7 +823,11 @@ def staffing_database_csv():
         ("performance", "Performance"), ("client_name", "Client"), ("country", "Country"),
         ("start_date", "Starting Date"), ("end_date", "End date"), ("churn_date", "Churn date"),
         ("platform", "Platform"), ("payment", "Payments"),
-        ("salary", "Salary"), ("equipment", "Equipment"), ("provider", "Provider"),
+        ("salary", "Salary"),
+        ("days_worked", f"Days worked ({month_label})"),
+        ("prorated_salary", f"Prorated salary ({month_label})"),
+        ("prorated_fee", f"Prorated fee ({month_label})"),
+        ("equipment", "Equipment"), ("provider", "Provider"),
         ("recruiter", "Recruiter"), ("notes", "Comments"),
     ] + [(f"c_{c['column_id']}", c["label"]) for c in custom_cols]
     buf = io.StringIO()
@@ -780,7 +841,7 @@ def staffing_database_csv():
     return Response(
         buf.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="staffing-database-{stamp}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="staffing-database-{stamp}-payroll-{first:%Y-%m}.csv"'},
     )
 
 

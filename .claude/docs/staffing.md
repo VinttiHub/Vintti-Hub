@@ -56,4 +56,6 @@ Pestaña Database, selector **Payroll month** (default = mes en curso). Todo en 
 - Sin start_date o contrato fuera del mes → `—`. Mes completo = 100%.
 - El total del pie de las dos columnas prorrateadas suma **también Inactive** (`totalAll`):
   quien se fue a mitad de mes se paga. El resto del pie sigue siendo "Active total".
-- El CSV (`/staffing/database.csv`) y los KPIs no incluyen el prorrateo.
+- El CSV (`/staffing/database.csv?month=YYYY-MM`) trae Days worked / Prorated salary / Prorated fee
+  del mes elegido. Lo calcula `_proration()` en `staffing_routes.py`: **mismo cálculo que
+  `proration()` del JS**, si tocás uno tocá el otro. Los KPIs no incluyen el prorrateo.

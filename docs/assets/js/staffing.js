@@ -2425,7 +2425,9 @@
     $("#stfExportCsv").addEventListener("click", function (e) {
       e.preventDefault();
       // La descarga necesita el header X-User-Email, así que se baja por fetch.
-      fetch(API + "/staffing/database.csv", { headers: { "X-User-Email": userEmail() } })
+      // El mes del prorrateo viaja al backend: el CSV trae las mismas columnas que la tabla.
+      fetch(API + "/staffing/database.csv?month=" + encodeURIComponent(state.payMonth),
+        { headers: { "X-User-Email": userEmail() } })
         .then(function (res) {
           if (!res.ok) throw new Error("Could not export (HTTP " + res.status + ")");
           return res.blob();
@@ -2434,7 +2436,7 @@
           var url = URL.createObjectURL(blob);
           var a = document.createElement("a");
           a.href = url;
-          a.download = "staffing-database.csv";
+          a.download = "staffing-database-" + state.payMonth + ".csv";
           a.click();
           URL.revokeObjectURL(url);
         })
