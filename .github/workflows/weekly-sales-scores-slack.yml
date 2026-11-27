@@ -1,0 +1,34 @@
+name: Weekly Sales Scores Slack
+
+# «WEEKLY SALES SCORES» a Slack (utils/weekly_sales_scores_slack.py): SQLs de la semana
+# anterior, Top Bookers del mes y NextGen vs VinttiKids. Mismos datos que el panel
+# «SQLs by BDR» de Prospecting.
+#
+# Corre CADA HORA los lunes (y las primeras horas UTC del martes = lunes a la noche en
+# Argentina) por el atraso de GitHub. El endpoint postea UNA sola vez por semana
+# (tabla weekly_sales_scores_log) y solo desde las 07:00 hora Argentina.
+on:
+  schedule:
+    - cron: "0 * * * 1"
+    - cron: "0 0-2 * * 2"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = devuelve el texto, NO postea a Slack"
+        required: false
+        default: ""
+      force:
+        description: "1 = manda una prueba aunque no sea lunes (no cuenta como el envío de la semana)"
+        required: false
+        default: ""
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Postear Weekly Sales Scores
+        run: |
+          curl -sS -X POST \
+            --fail-with-body --retry 3 --retry-delay 15 \
+            -H "X-Audit-Token: ${{ secrets.DASHBOARD_AUDIT_TOKEN }}" \
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/weekly_sales_scores/due?dry=${{ github.event.inputs.dry }}&force=${{ github.event.inputs.force }}"

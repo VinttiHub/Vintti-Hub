@@ -96,3 +96,22 @@ siempre después del commit, en un hilo y sin levantar nunca. En `dry_run` no sa
   (`slack.list_members()`, cache 6 h por proceso). Sin ID la persona sale en negrita y **no
   le suena**: le pasaba a las recruiters dadas de alta después del mapa. Si en Slack tiene
   otro mail que en el hub, no hay match: agregarla a mano al mapa.
+
+## Slack: Weekly Sales Scores (lunes 07:00 AR, 2026-11-27)
+
+`backend/utils/weekly_sales_scores_slack.py` reemplaza el mensaje «📊 WEEKLY SALES SCORES — W46 |
+9 de noviembre» que se armaba a mano. **Sin IA**: los números salen de
+`prospecting.panels.sqls_by_bdr`, el mismo panel «SQLs by BDR» de Prospecting (no contar SQLs con
+otra query: si no cuadran con el panel, se rompió uno de los dos).
+
+- **Weekly Recap** = semana anterior lun-dom (empresa — @Scheduled By). **Monthly Recap** = del
+  día 1 del mes del domingo anterior hasta ese domingo: Top Bookers (1º 🥇, 2º 🥈, 3º+ 🥉; empates
+  comparten medalla) y NextGen vs VinttiKids (`panels.TEAMS`). La W es la semana ISO del lunes
+  de envío (como el mensaje manual).
+- Cron `.github/workflows/weekly-sales-scores-slack.yml` → `POST /reminders/weekly_sales_scores/due`
+  con `X-Audit-Token`. `?dry=1` devuelve el texto sin postear; `?force=1` postea una prueba
+  cualquier día sin tocar el log. Sólo lunes desde las 07:00 AR; un mensaje por semana lo
+  garantiza `weekly_sales_scores_log` (autocreada, PK `week_start`), reclamada antes de postear y
+  soltada si Slack falla.
+- Canal `C09C4C6RHNK` (hardcodeado, definitivo desde el 2026-11-27; antes el de prueba `C0C0UQ7SYBW`). El bot tiene que estar invitado.
+- @menciones vía `daily_digest.people.slack_id()`; sin ID la persona sale en negrita.

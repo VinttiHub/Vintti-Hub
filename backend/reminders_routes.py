@@ -13,6 +13,7 @@ from utils.profile_completion_reminder import run_due_profile_reminders
 from utils.birthday_calendar import run_weekly_birthday_report
 from utils.am_roster import am_history, current_ams
 from utils.stale_opps_slack import run_stale_opps_alert
+from utils.weekly_sales_scores_slack import run_weekly_sales_scores
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -1640,6 +1641,20 @@ def send_stale_opps_slack_alert():
         return jsonify({"error": "unauthorized"}), 401
     dry = str(request.args.get("dry", "")).strip().lower() in ("1", "true", "yes")
     return jsonify(run_stale_opps_alert(dry_run=dry)), 200
+
+
+@bp.route("/reminders/weekly_sales_scores/due", methods=["POST"])
+def send_weekly_sales_scores():
+    """«WEEKLY SALES SCORES» a Slack (utils/weekly_sales_scores_slack.py): lunes desde
+    las 07:00 AR, un mensaje por semana (`weekly_sales_scores_log`). ?dry=1 devuelve el
+    texto sin postear; ?force=1 manda una prueba cualquier día sin tocar el log.
+    """
+    expected = os.environ.get("DASHBOARD_AUDIT_TOKEN")
+    given = request.headers.get("X-Audit-Token") or request.args.get("token")
+    if not expected or not given or given != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    flag = lambda k: str(request.args.get(k, "")).strip().lower() in ("1", "true", "yes")
+    return jsonify(run_weekly_sales_scores(dry_run=flag("dry"), force=flag("force"))), 200
 
 
 @bp.route("/reminders/birthdays/weekly", methods=["POST"])

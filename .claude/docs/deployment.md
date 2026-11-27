@@ -42,6 +42,7 @@ No test suite is wired up in either frontend or backend.
 | `second-interview-references.yml` | cada hora | `POST /reminders/second_interview_refs/due` |
 | `profile-completion-reminder.yml` | cada hora | `POST /reminders/profile_completion/due` |
 | `stale-opps-slack.yml` | cada hora | `POST /reminders/stale_opps_slack/due` |
+| `weekly-sales-scores-slack.yml` | cada hora los lunes (+ martes 0-2 UTC) | `POST /reminders/weekly_sales_scores/due` |
 | `birthday-weekly-report.yml` | lunes | `POST /reminders/birthdays/weekly` |
 | `daily-reminders.yml` | diario 12:00 | `/reminders/due` |
 | `daily-digest.yml` | lun-vie 08:00 | digest de pendientes a Slack |

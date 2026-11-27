@@ -417,6 +417,7 @@ Código en `backend/prospecting/` (`constants.py`, `store.py`, `workflows.py`) +
   **NextGen** (`TEAMS["nextgen"]`). **El color de cada persona es el mismo en todos los paneles**:
   sale de `people_order` (quienes tienen algún SQL, por fecha de su primer SQL; 24 colores en `PALETTE`), no de las filas
   del panel; alguien nuevo va al final y no corre a nadie.
+  **Weekly Sales Scores** (Slack, lunes 07:00 AR) usa `sqls_by_bdr` y `TEAMS`: cambiar el panel cambia el mensaje (ver `notifications.md`).
   **Se ven de a uno** (2026-11-06): barra ‹ selector › arriba (`PANELS` del front con `title` +
   `group`; el grupo es un `<optgroup>` y se lee arriba del nombre). Los 3 de SQLs van en el grupo
   «SQLs - Monthly YTD». Cada panel se arma la primera vez que se muestra y después sólo se oculta
