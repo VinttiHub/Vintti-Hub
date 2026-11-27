@@ -274,9 +274,59 @@
   }
 
   var dragId = null;
+
+  /* Auto-scroll al arrastrar: el drag nativo no desplaza el tablero (overflow-x)
+     cuando el puntero llega al borde. Un loop de rAF lo mueve según qué tan cerca
+     esté del borde; también en vertical dentro de la columna bajo el puntero.
+     Los listeners de document se registran una sola vez (wireBoard corre en cada render). */
+  var AS_EDGE = 90, AS_MAX = 22;
+  var asX = null, asY = null, asRaf = 0, asWired = false;
+  function asSpeed(pos, start, end) {
+    if (pos < start + AS_EDGE) return -Math.ceil(AS_MAX * Math.min(1, (start + AS_EDGE - pos) / AS_EDGE));
+    if (pos > end - AS_EDGE) return Math.ceil(AS_MAX * Math.min(1, (pos - (end - AS_EDGE)) / AS_EDGE));
+    return 0;
+  }
+  function asTick() {
+    asRaf = 0;
+    if (dragId == null || asX == null) return;
+    var board = document.querySelector("#pdBody .pd-board");
+    if (board) {
+      var r = board.getBoundingClientRect();
+      if (asY >= r.top && asY <= r.bottom) {
+        var dx = asSpeed(asX, r.left, r.right);
+        if (dx) board.scrollLeft += dx;
+      }
+      var el = document.elementFromPoint(asX, asY);
+      var body = el && el.closest ? el.closest(".pd-col__body") : null;
+      if (body && body.scrollHeight > body.clientHeight) {
+        var b = body.getBoundingClientRect();
+        var dy = asSpeed(asY, b.top, b.bottom);
+        if (dy) body.scrollTop += dy;
+      }
+    }
+    asRaf = requestAnimationFrame(asTick);
+  }
+  function asStop() {
+    asX = asY = null;
+    if (asRaf) cancelAnimationFrame(asRaf);
+    asRaf = 0;
+  }
+  function wireAutoScroll() {
+    if (asWired) return;
+    asWired = true;
+    document.addEventListener("dragover", function (e) {
+      if (dragId == null) return;
+      asX = e.clientX; asY = e.clientY;
+      if (!asRaf) asRaf = requestAnimationFrame(asTick);
+    });
+    document.addEventListener("dragend", function () { dragId = null; asStop(); });
+    document.addEventListener("drop", asStop);
+  }
+
   function wireBoard() {
     var board = document.querySelector("#pdBody .pd-board");
     if (!board) return;
+    wireAutoScroll();
     board.addEventListener("dragstart", function (e) {
       var card = e.target.closest(".pd-card");
       if (!card) return;
